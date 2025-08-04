@@ -1,0 +1,21 @@
+.dashboard-container {
+  margin-left: 0;
+  padding: 2rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.dashboard-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+}
+
+@media (min-width: 992px) {
+  .dashboard-container {
+    margin-left: 240px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
