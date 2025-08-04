@@ -1,71 +1,76 @@
-/* Mobile Menu */
-.modern-menu {
+.menu-overlay {
   position: fixed;
-  inset: 0;
-  z-index: 1040;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  backdrop-filter: blur(6px);
+  background-color: rgba(0, 0, 0, 0.25);
   display: flex;
   justify-content: center;
   align-items: center;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-  opacity: 0;
-  visibility: hidden;
-  transform: scale(1.05);
-  transition: all 0.35s ease;
+  z-index: 1050;
+  animation-duration: 0.4s;
+  animation-fill-mode: both;
 }
-.modern-menu.open {
-  opacity: 1;
-  visibility: visible;
-  transform: scale(1);
+
+.menu-overlay.fade-in {
+  animation-name: fadeIn;
+}
+
+.menu-overlay.fade-out {
+  animation-name: fadeOut;
 }
 
 .menu-box {
-  background: #ffffff;
-  padding: 3rem 2rem;
   width: 90%;
   max-width: 400px;
-  text-align: center;
+  background-color: white;
+  padding: 2rem;
+  animation: slideIn 0.4s ease-out;
 }
 
-/* Menu Link Styling */
-.menu-box .nav-link,
-.sidebar-link {
+.nav-link {
   font-size: 1.2rem;
+  padding: 0.6rem 0;
   color: #333;
-  margin: 0.75rem 0;
-  transition: 0.2s ease;
+  display: block;
+  transition: background 0.2s;
+}
+
+.nav-link:hover {
+  background-color: #f2f2f2;
+  border-radius: 8px;
+}
+
+.nav-link.active {
+  font-weight: bold;
+  color: #007bff;
+}
+
+.btn-link {
   text-decoration: none;
+  font-size: 0.95rem;
+  padding: 0.4rem 1rem;
 }
 
-.menu-box .nav-link:hover,
-.sidebar-link:hover {
-  color: #0088cc;
-  transform: scale(1.05);
-}
-
-.menu-box .nav-link.active,
-.sidebar-link.active {
-  color: #0088cc;
-  font-weight: bold;
+.btn-link:hover {
   text-decoration: underline;
+  color: #0d6efd;
 }
 
-/* Sidebar styling (desktop only) */
-.sidebar {
-  position: fixed;
-  top: 56px;
-  left: 0;
-  height: calc(100% - 56px);
-  width: 220px;
-  background-color: #0088cc;
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.sidebar-link {
-  margin-bottom: 1rem;
-  color: white;
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
-.sidebar-link.active {
-  font-weight: bold;
-  text-decoration: underline;
+@keyframes slideIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
