@@ -14,7 +14,9 @@ const Spinner = () => (
 const Login = () => {
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState("login"); // 'login' or 'signup'
+  const [mode, setMode] = useState(() => {
+    return localStorage.getItem("auth_mode") || "login";
+  }); // 'login' or 'signup'
   const [step, setStep] = useState("credentials"); // 'credentials' or 'code'
   const [method, setMethod] = useState("email"); // 'email' or 'phone'
   const [form, setForm] = useState({
@@ -36,6 +38,18 @@ const Login = () => {
     setShowPasswordPopup(false);
   }, [mode]);
 
+  // Watch localStorage.auth_mode and update mode when it changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const storedMode = localStorage.getItem("auth_mode");
+      if (storedMode && storedMode !== mode) {
+        setMode(storedMode);
+        localStorage.removeItem("auth_mode");
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [mode]);
+
   // Clear irrelevant field when method changes
   useEffect(() => {
     if (method === "email") {
@@ -51,7 +65,6 @@ const Login = () => {
       [e.target.name]: e.target.value,
     });
 
-  // Prepare data payload based on method
   const getPayload = () => {
     const base = { username: form.username.trim() };
     if (method === "email") base.email = form.email.trim();
@@ -59,7 +72,6 @@ const Login = () => {
     return base;
   };
 
-  // Validate form before sending
   const validateCredentials = () => {
     if (!form.username.trim()) return "Username is required";
     if (method === "email") {
@@ -75,7 +87,6 @@ const Login = () => {
     return null;
   };
 
-  // Send initial credentials to request code
   const handleCredentials = async (e) => {
     e.preventDefault();
     setError("");
@@ -101,7 +112,6 @@ const Login = () => {
     }
   };
 
-  // Verify code
   const handleCode = async (e) => {
     e.preventDefault();
     setError("");
@@ -129,7 +139,6 @@ const Login = () => {
     }
   };
 
-  // Final login with password (2FA)
   const handleFinal = async (e) => {
     e.preventDefault();
     setError("");
@@ -202,9 +211,7 @@ const Login = () => {
               <label className="form-label">Use:</label>{" "}
               <button
                 type="button"
-                className={`btn btn-outline-secondary btn-sm me-2 ${
-                  method === "email" ? "active" : ""
-                }`}
+                className={`btn btn-outline-secondary btn-sm me-2 ${method === "email" ? "active" : ""}`}
                 onClick={() => setMethod("email")}
                 disabled={loading}
                 aria-pressed={method === "email"}
@@ -213,9 +220,7 @@ const Login = () => {
               </button>
               <button
                 type="button"
-                className={`btn btn-outline-secondary btn-sm ${
-                  method === "phone" ? "active" : ""
-                }`}
+                className={`btn btn-outline-secondary btn-sm ${method === "phone" ? "active" : ""}`}
                 onClick={() => setMethod("phone")}
                 disabled={loading}
                 aria-pressed={method === "phone"}
@@ -303,24 +308,14 @@ const Login = () => {
         )}
 
         {error && (
-          <div
-            className="alert alert-danger mt-3"
-            role="alert"
-            aria-live="assertive"
-          >
+          <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">
             {error}
           </div>
         )}
       </div>
 
-      {/* Password popup for 2FA */}
       {showPasswordPopup && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="password-popup-title"
-        >
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="password-popup-title">
           <div className="modal-content">
             <h3 id="password-popup-title">Enter Password</h3>
             <form onSubmit={handleFinal} noValidate>
@@ -341,29 +336,15 @@ const Login = () => {
                   autoComplete="current-password"
                 />
               </div>
-              <button
-                type="submit"
-                className="btn btn-primary me-2"
-                disabled={loading}
-                aria-busy={loading}
-              >
+              <button type="submit" className="btn btn-primary me-2" disabled={loading} aria-busy={loading}>
                 Login
               </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setShowPasswordPopup(false)}
-                disabled={loading}
-              >
+              <button type="button" className="btn btn-secondary" onClick={() => setShowPasswordPopup(false)} disabled={loading}>
                 Cancel
               </button>
             </form>
             {error && (
-              <div
-                className="alert alert-danger mt-3"
-                role="alert"
-                aria-live="assertive"
-              >
+              <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">
                 {error}
               </div>
             )}
