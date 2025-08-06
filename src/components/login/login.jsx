@@ -1,3 +1,4 @@
+// Login.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +14,7 @@ const Spinner = () => (
 
 const Login = () => {
   const navigate = useNavigate();
+
 
   const [mode, setMode] = useState(() => {
     return localStorage.getItem("auth_mode") || "login";
@@ -30,13 +32,13 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPasswordPopup, setShowPasswordPopup] = useState(false);
 
-  // Reset form and errors when mode changes
   useEffect(() => {
     setStep("credentials");
     setForm({ username: "", email: "", phone: "", code: "", password: "" });
     setError("");
     setShowPasswordPopup(false);
-  }, [mode]);
+  }, []);
+
 
   // Watch localStorage.auth_mode and update mode when it changes
   useEffect(() => {
@@ -52,11 +54,8 @@ const Login = () => {
 
   // Clear irrelevant field when method changes
   useEffect(() => {
-    if (method === "email") {
-      setForm((prev) => ({ ...prev, phone: "" }));
-    } else {
-      setForm((prev) => ({ ...prev, email: "" }));
-    }
+    if (method === "email") setForm((prev) => ({ ...prev, phone: "" }));
+    else setForm((prev) => ({ ...prev, email: "" }));
   }, [method]);
 
   const onChange = (e) =>
@@ -100,10 +99,7 @@ const Login = () => {
     const data = getPayload();
 
     try {
-      if (mode === "signup") {
-        await axios.post(`${BASE_URL}/signin/`, data);
-      }
-      await axios.post(`${BASE_URL}/login/`, data);
+      await axios.post(`${BASE_URL}/authentication/`, data);
       setStep("code");
     } catch (err) {
       setError(err.response?.data?.message || "Failed to send verification code");
@@ -146,8 +142,13 @@ const Login = () => {
       setError("Password is required");
       return;
     }
+
     setLoading(true);
-    const data = { ...getPayload(), code: form.code.trim(), password: form.password };
+    const data = {
+      ...getPayload(),
+      code: form.code.trim(),
+      password: form.password,
+    };
 
     try {
       const res = await axios.post(`${BASE_URL}/login/token/`, data);
@@ -162,48 +163,27 @@ const Login = () => {
     }
   };
 
+  const [showPassword, setShowPassword] = useState(false);
+
+
   return (
     <div className="login-container">
       {loading && <Spinner />}
 
       <div className="login-card shadow rounded" aria-busy={loading}>
-        <h2 className="text-center text-primary mb-4">
-          {mode === "login" ? "Login" : "Sign Up"}
-        </h2>
-
-        <div className="text-center mb-3">
-          <button
-            className={`btn btn-link ${mode === "login" ? "active" : ""}`}
-            onClick={() => setMode("login")}
-            disabled={loading}
-          >
-            Login
-          </button>
-          <button
-            className={`btn btn-link ${mode === "signup" ? "active" : ""}`}
-            onClick={() => setMode("signup")}
-            disabled={loading}
-          >
-            Sign Up
-          </button>
-        </div>
+        <h2 className="text-center text-primary mb-4">Login / Sign Up</h2>
 
         {step === "credentials" && (
           <form onSubmit={handleCredentials} noValidate>
             <div className="mb-3">
-              <label className="form-label" htmlFor="username">
-                Username
-              </label>
+              <label className="form-label">Username</label>
               <input
-                id="username"
                 name="username"
                 className="form-control"
                 value={form.username}
                 onChange={onChange}
                 required
                 disabled={loading}
-                autoComplete="username"
-                aria-required="true"
               />
             </div>
 
@@ -214,7 +194,6 @@ const Login = () => {
                 className={`btn btn-outline-secondary btn-sm me-2 ${method === "email" ? "active" : ""}`}
                 onClick={() => setMethod("email")}
                 disabled={loading}
-                aria-pressed={method === "email"}
               >
                 Email
               </button>
@@ -223,7 +202,6 @@ const Login = () => {
                 className={`btn btn-outline-secondary btn-sm ${method === "phone" ? "active" : ""}`}
                 onClick={() => setMethod("phone")}
                 disabled={loading}
-                aria-pressed={method === "phone"}
               >
                 Phone
               </button>
@@ -231,11 +209,8 @@ const Login = () => {
 
             {method === "email" ? (
               <div className="mb-3">
-                <label className="form-label" htmlFor="email">
-                  Email Address
-                </label>
+                <label className="form-label">Email</label>
                 <input
-                  id="email"
                   name="email"
                   type="email"
                   className="form-control"
@@ -243,17 +218,12 @@ const Login = () => {
                   onChange={onChange}
                   required
                   disabled={loading}
-                  autoComplete="email"
-                  aria-required="true"
                 />
               </div>
             ) : (
               <div className="mb-3">
-                <label className="form-label" htmlFor="phone">
-                  Phone Number
-                </label>
+                <label className="form-label">Phone</label>
                 <input
-                  id="phone"
                   name="phone"
                   type="tel"
                   className="form-control"
@@ -261,8 +231,6 @@ const Login = () => {
                   onChange={onChange}
                   required
                   disabled={loading}
-                  autoComplete="tel"
-                  aria-required="true"
                 />
               </div>
             )}
@@ -271,43 +239,48 @@ const Login = () => {
               type="submit"
               className="btn btn-primary w-100"
               disabled={loading}
-              aria-busy={loading}
             >
-              {mode === "signup" ? "Sign Up and Send Code" : "Send Code"}
+              Send Verification Code
             </button>
           </form>
         )}
 
         {step === "code" && (
-          <form onSubmit={handleCode} noValidate>
+          <form onSubmit={handleCode}>
             <div className="mb-3">
-              <label className="form-label" htmlFor="code">
-                Verification Code
-              </label>
+              <label className="form-label">Verification Code</label>
               <input
-                id="code"
                 name="code"
                 className="form-control"
                 value={form.code}
                 onChange={onChange}
                 required
                 disabled={loading}
-                aria-required="true"
-                autoComplete="one-time-code"
               />
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary w-100"
-              disabled={loading}
-              aria-busy={loading}
-            >
-              Verify Code
-            </button>
+            <div className="d-flex justify-content-between">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => setStep("credentials")}
+                disabled={loading}
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+              >
+                Verify Code
+              </button>
+            </div>
           </form>
         )}
 
+
         {error && (
+
           <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">
             {error}
           </div>
@@ -315,31 +288,51 @@ const Login = () => {
       </div>
 
       {showPasswordPopup && (
+
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="password-popup-title">
           <div className="modal-content">
-            <h3 id="password-popup-title">Enter Password</h3>
-            <form onSubmit={handleFinal} noValidate>
+            <h3>Enter Password</h3>
+            <form onSubmit={handleFinal}>
               <div className="mb-3">
-                <label className="form-label" htmlFor="password">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  className="form-control"
-                  value={form.password}
-                  onChange={onChange}
-                  required
-                  disabled={loading}
-                  aria-required="true"
-                  autoComplete="current-password"
-                />
+                <label className="form-label">Password</label>
+                <div className="input-group">
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    className="form-control"
+                    value={form.password}
+                    onChange={onChange}
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
               </div>
-              <button type="submit" className="btn btn-primary me-2" disabled={loading} aria-busy={loading}>
+
+
+              <button
+                type="submit"
+                className="btn btn-primary me-2"
+                disabled={loading}
+              >
                 Login
               </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setShowPasswordPopup(false)} disabled={loading}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setShowPasswordPopup(false);
+                  setForm((prev) => ({ ...prev, password: "" }));
+                }}
+              >
                 Cancel
               </button>
             </form>
