@@ -255,15 +255,26 @@ const Login = () => {
                 disabled={loading}
               />
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary w-100"
-              disabled={loading}
-            >
-              Verify Code
-            </button>
+            <div className="d-flex justify-content-between">
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={() => setStep("credentials")}
+                disabled={loading}
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+              >
+                Verify Code
+              </button>
+            </div>
           </form>
         )}
+
 
         {error && (
 
