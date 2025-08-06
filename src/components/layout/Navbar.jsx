@@ -41,8 +41,22 @@ const Navbar = () => {
         <div className="d-flex align-items-center">
           <Link className="navbar-brand fw-bold text-white fs-4 me-3" to="/">PaaS Deployer</Link>
           <div className="d-none d-md-flex gap-2">
-            <Link to="/login" className="btn btn-outline-light btn-sm">Login</Link>
-            <Link to="/register" className="btn btn-light btn-sm text-primary fw-bold">Create Account</Link>
+            <Link
+              to="/login"
+              className="btn btn-outline-light btn-sm"
+              onClick={() => localStorage.setItem("auth_mode", "login")}
+            >
+              Login
+            </Link>
+
+            <Link
+              to="/login"
+              className="btn btn-light btn-sm text-primary fw-bold"
+              onClick={() => localStorage.setItem("auth_mode", "signup")}
+            >
+              Create Account
+            </Link>
+
           </div>
         </div>
         <button className="navbar-toggler border-0" onClick={() => setMenuOpen(true)}>
@@ -68,19 +82,26 @@ const Navbar = () => {
               ))}
               <li className="nav-item mt-4 d-md-none">
                 <Link
-                  to="/login"
-                  className="btn btn-outline-primary mb-2 w-100 fw-bold rounded-pill"
-                  onClick={closeMenu}
-                >
-                  Login
-                </Link>
-                <Link
-                  to="/register"
-                  className="btn btn-primary w-100 fw-bold rounded-pill"
-                  onClick={closeMenu}
-                >
-                  Create Account
-                </Link>
+                    to="/login"
+                    className="btn btn-outline-primary mb-2 w-100 fw-bold rounded-pill"
+                    onClick={() => {
+                      localStorage.setItem("auth_mode", "login");
+                      closeMenu();
+                    }}
+                  >
+                    Login
+                  </Link>
+
+                  <Link
+                    to="/login"
+                    className="btn btn-primary w-100 fw-bold rounded-pill"
+                    onClick={() => {
+                      localStorage.setItem("auth_mode", "signup");
+                      closeMenu();
+                    }}
+                  >
+                    Create Account
+                  </Link>
               </li>
             </ul>
           </div>

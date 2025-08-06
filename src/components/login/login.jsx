@@ -15,7 +15,11 @@ const Spinner = () => (
 const Login = () => {
   const navigate = useNavigate();
 
-  const [step, setStep] = useState("credentials"); // 'credentials', 'code', 'password'
+
+  const [mode, setMode] = useState(() => {
+    return localStorage.getItem("auth_mode") || "login";
+  }); // 'login' or 'signup'
+  const [step, setStep] = useState("credentials"); // 'credentials' or 'code'
   const [method, setMethod] = useState("email"); // 'email' or 'phone'
   const [form, setForm] = useState({
     username: "",
@@ -35,6 +39,20 @@ const Login = () => {
     setShowPasswordPopup(false);
   }, []);
 
+
+  // Watch localStorage.auth_mode and update mode when it changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const storedMode = localStorage.getItem("auth_mode");
+      if (storedMode && storedMode !== mode) {
+        setMode(storedMode);
+        localStorage.removeItem("auth_mode");
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [mode]);
+
+  // Clear irrelevant field when method changes
   useEffect(() => {
     if (method === "email") setForm((prev) => ({ ...prev, phone: "" }));
     else setForm((prev) => ({ ...prev, email: "" }));
@@ -170,9 +188,7 @@ const Login = () => {
               <label className="form-label">Use:</label>{" "}
               <button
                 type="button"
-                className={`btn btn-outline-secondary btn-sm me-2 ${
-                  method === "email" ? "active" : ""
-                }`}
+                className={`btn btn-outline-secondary btn-sm me-2 ${method === "email" ? "active" : ""}`}
                 onClick={() => setMethod("email")}
                 disabled={loading}
               >
@@ -180,9 +196,7 @@ const Login = () => {
               </button>
               <button
                 type="button"
-                className={`btn btn-outline-secondary btn-sm ${
-                  method === "phone" ? "active" : ""
-                }`}
+                className={`btn btn-outline-secondary btn-sm ${method === "phone" ? "active" : ""}`}
                 onClick={() => setMethod("phone")}
                 disabled={loading}
               >
@@ -252,14 +266,16 @@ const Login = () => {
         )}
 
         {error && (
-          <div className="alert alert-danger mt-3" role="alert">
+
+          <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">
             {error}
           </div>
         )}
       </div>
 
       {showPasswordPopup && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
+
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="password-popup-title">
           <div className="modal-content">
             <h3>Enter Password</h3>
             <form onSubmit={handleFinal}>
@@ -291,7 +307,7 @@ const Login = () => {
               </button>
             </form>
             {error && (
-              <div className="alert alert-danger mt-3" role="alert">
+              <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">
                 {error}
               </div>
             )}
