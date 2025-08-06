@@ -163,6 +163,9 @@ const Login = () => {
     }
   };
 
+  const [showPassword, setShowPassword] = useState(false);
+
+
   return (
     <div className="login-container">
       {loading && <Spinner />}
@@ -292,16 +295,29 @@ const Login = () => {
             <form onSubmit={handleFinal}>
               <div className="mb-3">
                 <label className="form-label">Password</label>
-                <input
-                  name="password"
-                  type="password"
-                  className="form-control"
-                  value={form.password}
-                  onChange={onChange}
-                  required
-                  disabled={loading}
-                />
+                <div className="input-group">
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    className="form-control"
+                    value={form.password}
+                    onChange={onChange}
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
               </div>
+
+
               <button
                 type="submit"
                 className="btn btn-primary me-2"
@@ -312,7 +328,10 @@ const Login = () => {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setShowPasswordPopup(false)}
+                onClick={() => {
+                  setShowPasswordPopup(false);
+                  setForm((prev) => ({ ...prev, password: "" }));
+                }}
               >
                 Cancel
               </button>
