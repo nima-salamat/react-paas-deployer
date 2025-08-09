@@ -1,0 +1,74 @@
+/* AboutUs.css */
+
+.container {
+  max-width: 960px;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeSlideUp 0.5s ease forwards;
+  animation-delay: 0.1s;
+}
+
+img.img-fluid {
+  object-fit: contain;
+  max-height: 300px;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  transform: translateY(30px);
+  animation: fadeSlideUp 0.5s ease forwards;
+  animation-delay: 0.2s;
+}
+
+h2.text-primary {
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fadeSlideUp 0.5s ease forwards;
+  animation-delay: 0.15s;
+}
+
+.lead {
+  font-size: 1.1rem;
+  color: #333;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fadeSlideUp 0.5s ease forwards;
+  animation-delay: 0.25s;
+}
+
+p {
+  color: #555;
+  line-height: 1.6;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fadeSlideUp 0.5s ease forwards;
+  animation-delay: 0.3s;
+}
+
+@keyframes fadeSlideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .row.align-items-center {
+    text-align: center;
+  }
+
+  .row.align-items-center .col-md-6 {
+    margin-bottom: 2rem;
+  }
+}
+
+img.img-fluid {
+  transition: transform 0.3s ease, filter 0.3s ease;
+  cursor: pointer;
+}
+
+img.img-fluid:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2));
+}

@@ -6,6 +6,7 @@ import Login from './components/login/login.jsx';
 import Plans from './components/plans/plans.jsx';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
+import AboutUs from './components/aboutUs/aboutUs.jsx';
 
 const Layout = () => {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="plans" element={<Plans />} />
           <Route path="login" element={<Login />} />
+          <Route path="aboutUs" element={<AboutUs />} />
           {/* add other routes here */}
         </Route>
       </Routes>
