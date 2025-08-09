@@ -3,7 +3,7 @@ import { Routes, Route, BrowserRouter as Router, Outlet } from 'react-router-dom
 import Home from './components/home/home.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Login from './components/login/login.jsx';
-import Plans from './components/plans/plans.jsx'; // <-- import your Plans page here
+import Plans from './components/plans/plans.jsx';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
 
