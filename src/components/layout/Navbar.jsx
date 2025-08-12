@@ -31,6 +31,25 @@ const Navbar = () => {
     }, 300);
   };
 
+  // 🆕 بستن منو با کلیک بیرون از آن
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        closeMenu();
+      }
+    };
+
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [menuOpen]);
+
   useEffect(() => {
     if (location.pathname === '/login') {
       setCheckingAuth(false);
@@ -49,7 +68,6 @@ const Navbar = () => {
       }
 
       try {
-
         const validateRes = await fetch('http://localhost:8000/auth/api/validateToken/', {
           method: 'GET',
           headers: {
@@ -82,7 +100,6 @@ const Navbar = () => {
         } else {
           setUserImage(null);
         }
-
       } catch (error) {
         console.error("Auth check failed:", error);
         setLoggedIn(false);
@@ -150,8 +167,18 @@ const Navbar = () => {
 
       {(menuOpen || isClosing) && (
         <div className={`menu-overlay ${isClosing ? 'fade-out' : 'fade-in'}`}>
-          <div className="menu-box rounded-4 shadow-lg" ref={menuRef}>
-            <ul className="nav flex-column text-center">
+          <div className="menu-box rounded-4 shadow-lg position-relative" ref={menuRef}>
+            
+            {/* 🆕 دکمه ضربدر */}
+            <button
+              className="btn btn-light position-absolute top-0 end-0 m-2"
+              onClick={closeMenu}
+              aria-label="Close menu"
+            >
+              ✕
+            </button>
+
+            <ul className="nav flex-column text-center mt-4">
               <h4 className="text-primary mb-4">Menu</h4>
               {navItems.map(({ path, label }) => (
                 <li className="nav-item" key={path}>
