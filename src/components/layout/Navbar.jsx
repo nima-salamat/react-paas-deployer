@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import apiRequest from "../customHooks/apiRequest";
 import './Navbar.css';
+import defaultUserIcon from '../../assets/icons/user.svg';
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [userImage, setUserImage] = useState(null);
+
   const location = useLocation();
   const navigate = useNavigate();
   const menuRef = useRef();
@@ -37,15 +39,59 @@ const Navbar = () => {
     }
 
     const checkAuth = async () => {
-      try {
-        await apiRequest({ method: 'GET', url: 'http://127.0.0.1:8000/auth/api/user/' });
-        setLoggedIn(true);
-      } catch {
+      setCheckingAuth(true);
+      const accessToken = localStorage.getItem('access');
+
+      if (!accessToken) {
         setLoggedIn(false);
+        setCheckingAuth(false);
+        return;
+      }
+
+      try {
+
+        const validateRes = await fetch('http://localhost:8000/auth/api/validateToken/', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!validateRes.ok) {
+          setLoggedIn(false);
+          setCheckingAuth(false);
+          return;
+        }
+
+        setLoggedIn(true);
+
+        const profileRes = await fetch('http://localhost:8000/users/api/profile/list/', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          if (Array.isArray(data) && data.length > 0 && data[0].image_url) {
+            setUserImage(data[0].image_url);
+          } else {
+            setUserImage(null);
+          }
+        } else {
+          setUserImage(null);
+        }
+
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        setLoggedIn(false);
+        setUserImage(null);
       } finally {
         setCheckingAuth(false);
       }
     };
+
     checkAuth();
   }, [location.pathname]);
 
@@ -53,6 +99,8 @@ const Navbar = () => {
     localStorage.removeItem('access');
     localStorage.removeItem('refresh');
     setLoggedIn(false);
+    setUserImage(null);
+    navigate('/login');
   };
 
   return (
@@ -76,21 +124,20 @@ const Navbar = () => {
 
             {!checkingAuth && loggedIn && (
               <button
-                className="btn btn-primary rounded-circle d-flex align-items-center justify-content-center"
+                className="btn btn-primary rounded-circle d-flex align-items-center justify-content-center p-0 overflow-hidden"
                 style={{ width: '36px', height: '36px' }}
                 onClick={() => navigate('/profile')}
                 aria-label="User profile"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="white"
-                  viewBox="0 0 24 24"
-                  width="20"
-                  height="20"
-                >
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M12 14c-5 0-7 3-7 5v1h14v-1c0-2-2-5-7-5z" />
-                </svg>
+                <img
+                  src={userImage || defaultUserIcon}
+                  alt="User"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
               </button>
             )}
           </div>
