@@ -1,104 +1,206 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './plans.css';
+import React, { useEffect, useRef, useState } from "react";
+import axios from "axios";
 
-const PLANS_PER_PAGE = 6;
+const PLATFORMS_API = "http://127.0.0.1:8000/plans/platforms/";
+const PLANS_API = "http://127.0.0.1:8000/plans/";
 
-// Replace this with your actual API endpoint when ready
-const API_URL = 'http://127.0.0.1:8000/api/plans/';
-
-const Plans = () => {
+export default function PlatformPlans() {
+  const [platforms, setPlatforms] = useState([]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [plans, setPlans] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loadingPlatforms, setLoadingPlatforms] = useState(false);
+  const [loadingPlans, setLoadingPlans] = useState(false);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
+  const [platformErrors, setPlatformErrors] = useState([]); // [{platform: 'django', status: 404}, ...]
+  const fetchIdRef = useRef(0);
 
-  const totalPages = Math.ceil(plans.length / PLANS_PER_PAGE);
+  const uniqueBy = (arr, keyFn) => {
+    const seen = new Set();
+    return arr.filter((item) => {
+      const k = keyFn(item);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  };
 
-  // Fetch plans on component mount or page change
   useEffect(() => {
-    const fetchPlans = async () => {
-      setLoading(true);
+    const fetchPlatforms = async () => {
+      setLoadingPlatforms(true);
       setError(null);
       try {
-        const response = await axios.get(API_URL);
-        // Assume response.data is an array of plans
-        setPlans(response.data);
-      } catch (err) {
-        setError('Failed to load plans. Please try again later.');
-        console.error(err);
+        const res = await axios.get(PLATFORMS_API);
+        setPlatforms(res.data);
+      } catch (e) {
+        setError("Failed to load platforms.");
       } finally {
-        setLoading(false);
+        setLoadingPlatforms(false);
+      }
+    };
+    fetchPlatforms();
+  }, []);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      const thisFetchId = ++fetchIdRef.current;
+      setLoadingPlans(true);
+      setError(null);
+      setPlatformErrors([]);
+
+      try {
+        if (selectedPlatforms.length === 0) {
+          const res = await axios.get(`${PLANS_API}?page=${page}`);
+          if (fetchIdRef.current !== thisFetchId) return; // stale
+          const results = Array.isArray(res.data.results) ? res.data.results : [];
+          setPlans((prev) => (page === 1 ? results : [...prev, ...results]));
+          setHasNext(Boolean(res.data.next));
+        } else {
+          const promises = selectedPlatforms.map((platformKey) =>
+            axios.post(PLATFORMS_API, { platform: platformKey })
+          );
+
+          const settled = await Promise.allSettled(promises);
+
+          if (fetchIdRef.current !== thisFetchId) return; // stale
+
+          const merged = [];
+          const errors = [];
+
+          settled.forEach((res, idx) => {
+            const platformKey = selectedPlatforms[idx];
+            if (res.status === "fulfilled") {
+              const data = res.value.data;
+              if (Array.isArray(data)) merged.push(...data);
+              else if (Array.isArray(data?.results)) merged.push(...data.results);
+              else if (data) merged.push(data);
+            } else {
+              const status = res.reason?.response?.status || null;
+              errors.push({ platform: platformKey, status, message: res.reason?.message });
+            }
+          });
+
+          const unique = uniqueBy(merged, (p) => `${p.platform || p.platform}_${p.name || JSON.stringify(p)}`);
+
+          setPlans((prev) => (page === 1 ? unique : [...prev, ...unique]));
+          setHasNext(false);
+          setPlatformErrors(errors);
+          if (errors.length === selectedPlatforms.length && unique.length === 0) {
+            setError("No plans found for selected platforms.");
+          }
+        }
+      } catch (e) {
+        setPlans([]);
+        setError(e.response?.data?.error || "Failed to load plans.");
+      } finally {
+        setLoadingPlans(false);
       }
     };
 
     fetchPlans();
-  }, []); // empty dependency to run once on mount
+  }, [selectedPlatforms, page]);
 
-  // Get plans for current page
-  const currentPlans = plans.slice(
-    (currentPage - 1) * PLANS_PER_PAGE,
-    currentPage * PLANS_PER_PAGE
-  );
-
-  const goToPage = (page) => {
-    if (page >= 1 && page <= totalPages) setCurrentPage(page);
+  const togglePlatform = (code) => {
+    setSelectedPlatforms((prev) => {
+      if (prev.includes(code)) return prev.filter((c) => c !== code);
+      return [...prev, code];
+    });
+    setPage(1);
+    setPlatformErrors([]);
+    setError(null);
   };
 
-  if (loading) return <div className="text-center py-5">Loading plans...</div>;
-  if (error) return <div className="text-center text-danger py-5">{error}</div>;
+  const toggleSelectAll = () => {
+    if (selectedPlatforms.length === platforms.length) {
+      setSelectedPlatforms([]);
+    } else {
+      setSelectedPlatforms(platforms.map((p) => p[0]));
+    }
+    setPage(1);
+    setPlatformErrors([]);
+    setError(null);
+  };
 
   return (
     <div className="container py-4">
-      <h2 className="text-primary mb-4">Our Plans</h2>
+      <h2 className="mb-3">Select Platforms</h2>
 
-      <div className="row g-4">
-        {currentPlans.map(({ id, title, description, price }) => (
-          <div key={id} className="col-12 col-sm-6 col-md-4">
-            <div className="plan-card shadow rounded-4 p-4 h-100 d-flex flex-column justify-content-between">
-              <h5 className="plan-title mb-3">{title}</h5>
-              <p className="plan-desc flex-grow-1">{description}</p>
-              <div className="d-flex justify-content-between align-items-center mt-3">
-                <span className="plan-price fw-bold">{price}</span>
-                <button className="btn btn-primary btn-sm rounded-pill">
-                  Select
+      {loadingPlatforms && <p>Loading platforms...</p>}
+
+      {!loadingPlatforms && platforms.length > 0 && (
+        <>
+          <button onClick={toggleSelectAll} className="btn btn-sm mb-2">
+            {selectedPlatforms.length === platforms.length ? "Deselect All" : "Select All"}
+          </button>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+            {platforms.map(([key, display]) => {
+              const isSelected = selectedPlatforms.includes(key);
+              return (
+                <button
+                  key={key}
+                  onClick={() => togglePlatform(key)}
+                  style={{
+                    padding: "8px 15px",
+                    borderRadius: "20px",
+                    border: isSelected ? "2px solid #0d6efd" : "1px solid #ccc",
+                    backgroundColor: isSelected ? "#0d6efd" : "white",
+                    color: isSelected ? "white" : "black",
+                    fontWeight: isSelected ? "600" : "400",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                  }}
+                >
+                  {display}
                 </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <hr />
+
+      {error && <div className="alert alert-danger">{error}</div>}
+
+
+      <h3>Plans {selectedPlatforms.length > 0 ? "(filtered)" : "(all)"}</h3>
+
+      {loadingPlans && <p>Loading plans...</p>}
+
+      {!loadingPlans && !error && plans.length === 0 && <p>No plans found.</p>}
+
+      {!loadingPlans && plans.length > 0 && (
+        <div className="row g-4">
+          {plans.map((plan, idx) => (
+            <div key={idx} className="col-12 col-md-6 col-lg-4">
+              <div className="plan-card p-3 border rounded shadow-sm">
+                <h5>{plan.name}</h5>
+                <p>Platform: {plan.platform}</p>
+                <p>CPU: {plan.max_cpu} cores</p>
+                <p>RAM: {plan.max_ram} MB</p>
+                <p>
+                  Storage: {plan.max_storage} GB ({plan.storage_type})
+                </p>
+                <p>Price per hour: {plan.price_per_hour} Toman</p>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {plans.length > PLANS_PER_PAGE && (
-        <nav aria-label="Plans pagination" className="mt-5 d-flex justify-content-center">
-          <ul className="pagination pagination-sm">
-            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => goToPage(currentPage - 1)}>
-                Previous
-              </button>
-            </li>
-
-            {[...Array(totalPages)].map((_, idx) => (
-              <li
-                key={idx}
-                className={`page-item ${currentPage === idx + 1 ? 'active' : ''}`}
-              >
-                <button className="page-link" onClick={() => goToPage(idx + 1)}>
-                  {idx + 1}
-                </button>
-              </li>
-            ))}
-
-            <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => goToPage(currentPage + 1)}>
-                Next
-              </button>
-            </li>
-          </ul>
-        </nav>
+      {hasNext && selectedPlatforms.length === 0 && (
+        <div className="mt-3 text-center">
+          <button
+            className="btn btn-primary"
+            onClick={() => setPage((prev) => prev + 1)}
+            disabled={loadingPlans}
+          >
+            {loadingPlans ? "Loading..." : "Load More"}
+          </button>
+        </div>
       )}
     </div>
   );
-};
-
-export default Plans;
+}
