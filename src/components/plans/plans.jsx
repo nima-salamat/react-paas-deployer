@@ -1,8 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
+// components/PlatformPlans.jsx
+import React, { useEffect, useRef, useState, Suspense } from "react";
 import axios from "axios";
 
 const PLATFORMS_API = "http://127.0.0.1:8000/plans/platforms/";
 const PLANS_API = "http://127.0.0.1:8000/plans/";
+
+// lazy import the separate modal module
+const CreateDeploymentModal = React.lazy(() => import("./CreateDeploymentModal"));
 
 export default function PlatformPlans() {
   const [platforms, setPlatforms] = useState([]);
@@ -15,8 +19,10 @@ export default function PlatformPlans() {
   const [hasNext, setHasNext] = useState(false);
   const [platformErrors, setPlatformErrors] = useState([]);
 
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalInitial, setModalInitial] = useState(null);
+
   const fetchIdRef = useRef(0);
-  // simpler scroll approach: store key of last existing item, then after append scroll that item into view aligned to bottom
   const lastKeyRef = useRef(null);
 
   const getKey = (p) => {
@@ -71,9 +77,6 @@ export default function PlatformPlans() {
 
       try {
         if (!isFiltered) {
-          // SIMPLE SCROLL STRATEGY:
-          // before fetching page>1, store the key of the last existing plan; after append, find it and
-          // call scrollIntoView({ block: 'end' }) so previous last item stays visible and new items appear below it.
           if (page > 1 && plans.length > 0) {
             lastKeyRef.current = getKey(plans[plans.length - 1]);
           } else {
@@ -82,13 +85,13 @@ export default function PlatformPlans() {
 
           const res = await axios.get(`${PLANS_API}?page=${page}`);
           if (fetchIdRef.current !== thisFetchId) return; // stale
-
+          console.log(res.data)
           const results = Array.isArray(res.data.results)
             ? res.data.results
             : Array.isArray(res.data)
             ? res.data
             : [];
-
+          
           setPlans((prev) => {
             if (page === 1) {
               return uniqueBy(results, getKey);
@@ -102,19 +105,16 @@ export default function PlatformPlans() {
 
           setHasNext(Boolean(res.data.next));
 
-          // After DOM updates, scroll the previous last item into view aligned at the bottom
           if (page > 1 && lastKeyRef.current) {
             setTimeout(() => {
               const key = lastKeyRef.current;
               lastKeyRef.current = null;
               if (!key) return;
-              const el = document.querySelector(`[data-uid=\"${key}\"]`);
+              const el = document.querySelector(`[data-uid="${key}"]`);
               if (el && typeof el.scrollIntoView === "function") {
-                // align the *bottom* of the previous last item with the bottom of viewport
-                // so new items appear below and user doesn't jump to top
                 el.scrollIntoView({ block: "end", behavior: "auto" });
               }
-            }, 50); // small delay to allow browser render
+            }, 50);
           }
         } else {
           const promises = selectedPlatforms.map((platformKey) =>
@@ -180,6 +180,29 @@ export default function PlatformPlans() {
     });
   };
 
+  const openCreate = (plan) => {
+    setModalInitial(plan ? { name: plan.platform, type: plan.name , id: plan.id} : {});
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalInitial(null);
+  };
+
+      const handleCreated = (result) => {
+    console.log("Deployment creation result:", result);
+
+    if (result?.ok) {
+      closeModal();
+    } else {
+     
+      console.warn("Service creation failed:", result?.error);
+    }
+  
+  };
+
+
   return (
     <div className="container py-4">
       <h2 className="mb-3">Select Platforms</h2>
@@ -241,6 +264,12 @@ export default function PlatformPlans() {
                   Storage: {plan.max_storage} GB ({plan.storage_type})
                 </p>
                 <p>Price per hour: {plan.price_per_hour} Toman</p>
+
+                <div className="d-flex justify-content-end mt-2">
+                  <button className="btn btn-sm btn-primary" onClick={() => openCreate(plan)}>
+                    Create
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -257,6 +286,48 @@ export default function PlatformPlans() {
           >
             {loadingPlans ? "Loading..." : "Load More"}
           </button>
+        </div>
+      )}
+
+      {/* Modal overlay + dialog centered relative to viewport (fixed & translate centering).
+          Overlay won't close modal on click; modal always stays centered in user's viewport. */}
+      {modalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 9999,
+            // don't use flex centering here; use fixed + translate on inner dialog for pixel-perfect center
+          }}
+        >
+          <div
+            // dialog positioned exactly at the center of the viewport
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              background: "white",
+              borderRadius: 8,
+              padding: 20,
+              width: "min(95%, 720px)",
+              boxShadow: "0 12px 36px rgba(0,0,0,0.35)",
+              maxHeight: "calc(100vh - 80px)",
+              overflowY: "auto",
+            }}
+          >
+            <Suspense fallback={<div>Loading deployment form...</div>}>
+              <CreateDeploymentModal
+                initialData={modalInitial}
+                onCancel={closeModal}
+                onCreate={handleCreated}
+              />
+            </Suspense>
+          </div>
         </div>
       )}
     </div>

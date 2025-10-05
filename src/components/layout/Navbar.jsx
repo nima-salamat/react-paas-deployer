@@ -31,7 +31,6 @@ const Navbar = () => {
     }, 300);
   };
 
-  // 🆕 بستن منو با کلیک بیرون از آن
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
