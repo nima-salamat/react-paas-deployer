@@ -1,21 +1,42 @@
-.dashboard-container {
-  margin-left: 0;
-  padding: 2rem;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.5rem;
+.plan-card {
+  background: #fff;
+  border: 1px solid #e3e6f0;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+  cursor: pointer;
 }
 
-.dashboard-card {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 12px;
-  border: 1px solid #ddd;
+.plan-card:hover {
+  box-shadow: 0 0.5rem 1rem rgba(13, 110, 253, 0.25);
+  transform: translateY(-5px);
 }
 
-@media (min-width: 992px) {
-  .dashboard-container {
-    margin-left: 240px;
-    grid-template-columns: repeat(2, 1fr);
-  }
+.plan-title {
+  color: #0d6efd; /* Bootstrap primary blue */
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.plan-desc {
+  font-size: 0.95rem;
+  color: #6c757d; /* Bootstrap secondary text */
+}
+
+.plan-price {
+  font-size: 1.1rem;
+  color: #198754; /* Bootstrap success green */
+}
+
+.pagination .page-item.active .page-link {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: white;
+}
+
+.pagination .page-link {
+  color: #0d6efd;
+}
+
+.pagination .page-link:hover {
+  background-color: #cfe2ff;
+  color: #0d6efd;
 }
