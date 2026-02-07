@@ -1,7 +1,7 @@
 // src/components/ServicesList.jsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import apiRequest from "../components/customHooks/apiRequest"; // <--- use this
+import apiRequest from "../customHooks/apiRequest"; // <--- use this
 import { useNavigate } from "react-router-dom";
 
 

@@ -1,13 +1,13 @@
 import './App.css';
 import { Routes, Route, BrowserRouter as Router, Outlet } from 'react-router-dom';
 import Home from './components/home/home.jsx';
-import Services from './pages/Services.jsx';
+import Services from './components/service/Services.jsx';
 import Login from './components/login/login.jsx';
 import Plans from './components/plans/plans.jsx';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
 import AboutUs from './components/aboutUs/aboutUs.jsx';
-import ServiceDetail from "./pages/ServiceDetail";
+import ServiceDetail from "./components/service/ServiceDetail.jsx";
 
 
 const Layout = () => {
