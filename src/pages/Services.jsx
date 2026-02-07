@@ -2,6 +2,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import apiRequest from "../components/customHooks/apiRequest"; // <--- use this
+import { useNavigate } from "react-router-dom";
+
 
 const API_BASE = "http://127.0.0.1:8000";
 const PLANS_API = `${API_BASE}/plans/`;
@@ -27,6 +29,8 @@ export default function ServicesList({
 
   const fetchIdRef = useRef(0);
   const lastKeyRef = useRef(null);
+
+  const navigate = useNavigate();
 
   const getKey = (s) => {
     if (!s) return "null";
@@ -149,11 +153,13 @@ export default function ServicesList({
     }
   }, [networkCache]);
 
+
   const handleOpen = (svc) => {
-    if (typeof onOpen === "function") {
-      onOpen(svc);
-    } else {
-      console.log("Open pressed for service:", svc);
+    if (svc.id || svc.pk) {
+      const id = svc.id ?? svc.pk;
+      navigate(`/service/${id}`);
+    } else if (typeof props.onOpen === "function") {
+      props.onOpen(svc);
     }
   };
 

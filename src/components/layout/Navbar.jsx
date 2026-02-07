@@ -16,7 +16,7 @@ const Navbar = () => {
 
   const navItems = [
     { path: '/', label: 'Home' },
-    { path: '/dashboard', label: 'Dashboard' },
+    { path: '/services', label: 'Services' },
     { path: '/plans', label: 'Plans' },
     { path: '/aboutUs', label: 'About us' },
   ];
@@ -208,11 +208,11 @@ const Navbar = () => {
                 {!checkingAuth && loggedIn && (
                   <>
                     <Link
-                      to="/dashboard"
+                      to="/services"
                       className="btn btn-outline-primary mb-2 w-100 fw-bold rounded-pill"
                       onClick={closeMenu}
                     >
-                      Dashboard
+                      Services
                     </Link>
                     <button
                       className="btn btn-danger w-100 fw-bold rounded-pill"

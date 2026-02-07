@@ -1,12 +1,14 @@
 import './App.css';
 import { Routes, Route, BrowserRouter as Router, Outlet } from 'react-router-dom';
 import Home from './components/home/home.jsx';
-import Dashboard from './pages/Dashboard.jsx';
+import Services from './pages/Services.jsx';
 import Login from './components/login/login.jsx';
 import Plans from './components/plans/plans.jsx';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
 import AboutUs from './components/aboutUs/aboutUs.jsx';
+import ServiceDetail from "./pages/ServiceDetail";
+
 
 const Layout = () => {
   return (
@@ -24,10 +26,12 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
-          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="services" element={<Services />} />
           <Route path="plans" element={<Plans />} />
           <Route path="login" element={<Login />} />
           <Route path="aboutUs" element={<AboutUs />} />
+          <Route path="/service/:id" element={<ServiceDetail />} />
+
           {/* add other routes here */}
         </Route>
       </Routes>
