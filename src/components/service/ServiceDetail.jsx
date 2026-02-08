@@ -1,9 +1,108 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
+import { createPortal } from "react-dom";
 import apiRequest from "../customHooks/apiRequest";
 import axios from "axios";
 import "./ServiceDetail.css";
 
+function PortalModal({ open, title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", loading = false, onConfirm, onCancel }) {
+  const elRef = useRef(null);
+
+  useEffect(() => {
+    if (!elRef.current) {
+      elRef.current = document.createElement("div");
+      // mark for debugging
+      elRef.current.setAttribute("data-portal", "service-detail-modal");
+    }
+    const el = elRef.current;
+    document.body.appendChild(el);
+
+    // lock body scroll
+    const prevOverflow = document.body.style.overflow;
+    if (open) document.body.style.overflow = "hidden";
+
+    return () => {
+      // restore overflow and cleanup
+      document.body.style.overflow = prevOverflow;
+      if (el.parentNode === document.body) document.body.removeChild(el);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape" && open) onCancel && onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  const backdropStyle = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2147483647,
+    padding: "16px",
+    boxSizing: "border-box",
+  };
+
+  const modalStyle = {
+    width: "100%",
+    maxWidth: "520px",
+    background: "#fff",
+    color: "#0f172a",
+    borderRadius: "12px",
+    padding: "20px",
+    boxShadow: "0 12px 40px rgba(2,6,23,0.35)",
+    zIndex: 2147483648,
+  };
+
+  const titleStyle = { margin: 0, marginBottom: 8, fontSize: 18, fontWeight: 700 };
+  const messageStyle = { margin: 0, marginBottom: 16, color: "#334155", whiteSpace: "pre-wrap" };
+
+  const actionsStyle = { display: "flex", gap: 10, justifyContent: "flex-end" };
+  const primaryBtnStyle = {
+    background: "#2563eb",
+    color: "white",
+    border: "none",
+    padding: "9px 14px",
+    borderRadius: 8,
+    fontWeight: 600,
+    cursor: loading ? "not-allowed" : "pointer",
+    opacity: loading ? 0.7 : 1,
+  };
+  const secondaryBtnStyle = {
+    background: "transparent",
+    border: "1px solid #e5e7eb",
+    padding: "9px 12px",
+    borderRadius: 8,
+    cursor: loading ? "not-allowed" : "pointer",
+  };
+
+  return createPortal(
+    <div style={backdropStyle} onClick={onCancel} aria-modal="true" role="dialog">
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <h3 style={titleStyle}>{title}</h3>
+        <p style={messageStyle}>{message}</p>
+        <div style={actionsStyle}>
+          <button style={primaryBtnStyle} onClick={onConfirm} disabled={loading}>
+            {loading ? "Please wait..." : confirmLabel}
+          </button>
+          <button style={secondaryBtnStyle} onClick={onCancel} disabled={loading}>
+            {cancelLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    elRef.current
+  );
+}
+
+/* ---------- Main Component ---------- */
 export default function ServiceDetail() {
   const { id } = useParams();
 
@@ -26,6 +125,10 @@ export default function ServiceDetail() {
   const [editOriginalName, setEditOriginalName] = useState("");
   const [editZipFile, setEditZipFile] = useState(null);
 
+  const [uploadProgress, setUploadProgress] = useState({}); // { key: percent }
+  // modal state: { open, type, deployId, title, message, loading }
+  const [confirmModal, setConfirmModal] = useState({ open: false, type: null, deployId: null, title: "", message: "", loading: false });
+
   const BASE = "http://127.0.0.1:8000/deploy/";
 
   useEffect(() => {
@@ -46,7 +149,23 @@ export default function ServiceDetail() {
     }
   };
 
-  const fetchDeploys = async (page = 1) => {
+  const formatDate = (iso) => {
+    if (!iso) return "-";
+    try {
+      const d = new Date(iso);
+      return new Intl.DateTimeFormat(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(d);
+    } catch {
+      return iso;
+    }
+  };
+
+  async function fetchDeploys(page = 1) {
     setLoading(true);
     setError(null);
     try {
@@ -56,19 +175,18 @@ export default function ServiceDetail() {
       setDeploys(data.results || []);
       setPageInfo({ next: data.next, previous: data.previous, count: data.count, page });
     } catch (err) {
-      console.error(err);
+      console.error("fetchDeploys:", err);
       setError("Failed to load deploys.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handlePrev = () => {
     if (!pageInfo.previous) return;
     const prev = getPageFromUrl(pageInfo.previous) || Math.max(1, pageInfo.page - 1);
     fetchDeploys(prev);
   };
-
   const handleNext = () => {
     if (!pageInfo.next) return;
     const next = getPageFromUrl(pageInfo.next) || pageInfo.page + 1;
@@ -135,7 +253,18 @@ export default function ServiceDetail() {
         const headers = {};
         if (access) headers["Authorization"] = `Bearer ${access}`;
 
-        const createResp = await axios.post(BASE, fd, { headers });
+        const key = "create";
+        setUploadProgress((p) => ({ ...p, [key]: 0 }));
+
+        const createResp = await axios.post(BASE, fd, {
+          headers,
+          onUploadProgress: (ev) => {
+            if (!ev.total) return;
+            const percent = Math.round((ev.loaded * 100) / ev.total);
+            setUploadProgress((p) => ({ ...p, [key]: percent }));
+          },
+        });
+
         if (createResp.status === 201) {
           setSuccessMessage("Deploy created.");
           fetchDeploys(1);
@@ -148,6 +277,7 @@ export default function ServiceDetail() {
         } else {
           setError("Create (multipart) request failed.");
         }
+        setUploadProgress((p) => ({ ...p, [key]: undefined }));
       }
     } catch (err) {
       console.error("handleCreate:", err);
@@ -210,7 +340,6 @@ export default function ServiceDetail() {
     setEditZipFile(null);
     setSuccessMessage("");
     setError(null);
-    // scroll to form
     const formEl = document.querySelector(".create-deploy");
     if (formEl) formEl.scrollIntoView({ behavior: "smooth" });
   };
@@ -261,11 +390,19 @@ export default function ServiceDetail() {
         const headers = {};
         if (access) headers["Authorization"] = `Bearer ${access}`;
 
+        const key = `update-${deployId}`;
+        setUploadProgress((p) => ({ ...p, [key]: 0 }));
+
         const resp = await axios({
           method: "put",
           url: `${BASE}${deployId}/`,
           data: fd,
           headers,
+          onUploadProgress: (ev) => {
+            if (!ev.total) return;
+            const percent = Math.round((ev.loaded * 100) / ev.total);
+            setUploadProgress((p) => ({ ...p, [key]: percent }));
+          },
         });
 
         if (resp.status === 200) {
@@ -275,6 +412,8 @@ export default function ServiceDetail() {
         } else {
           setError("Update (multipart) failed.");
         }
+
+        setUploadProgress((p) => ({ ...p, [key]: undefined }));
       }
     } catch (err) {
       console.error("handleUpdate:", err);
@@ -285,7 +424,6 @@ export default function ServiceDetail() {
   };
 
   const handleDestroy = async (deployId) => {
-    if (!window.confirm("Are you sure you want to delete this deploy?")) return;
     setError(null);
     setSuccessMessage("");
     setAction(deployId, { deleting: true });
@@ -302,6 +440,33 @@ export default function ServiceDetail() {
       setError(err.response ? JSON.stringify(err.response.data) : "Unexpected delete error");
     } finally {
       setAction(deployId, { deleting: false });
+      // close modal handled by confirm flow
+    }
+  };
+
+  // modal helpers
+  const openConfirm = (type, deployId, title, message) => setConfirmModal({ open: true, type, deployId, title, message, loading: false });
+  const closeModal = () => setConfirmModal({ open: false, type: null, deployId: null, title: "", message: "", loading: false });
+
+  const confirmModalAction = async () => {
+    const { type, deployId } = confirmModal;
+    if (!type || !deployId) {
+      closeModal();
+      return;
+    }
+    setConfirmModal((c) => ({ ...c, loading: true }));
+    try {
+      if (type === "delete") {
+        await handleDestroy(deployId);
+      } else if (type === "stop") {
+        await stopDeploy(deployId);
+      } else if (type === "start") {
+        await startDeploy(deployId);
+      }
+    } finally {
+      setConfirmModal((c) => ({ ...c, loading: false }));
+      // slight delay to ensure state updates, then close
+      setTimeout(() => closeModal(), 120);
     }
   };
 
@@ -327,90 +492,61 @@ export default function ServiceDetail() {
           <input
             className="sd-input"
             value={editingDeployId ? editData.name : name}
-            onChange={(e) =>
-              editingDeployId ? setEditData((d) => ({ ...d, name: e.target.value })) : setName(e.target.value)
-            }
+            onChange={(e) => (editingDeployId ? setEditData((d) => ({ ...d, name: e.target.value })) : setName(e.target.value))}
             placeholder="Name (>=4 chars)"
           />
 
           <input
             className="sd-input"
             value={editingDeployId ? editData.version : version}
-            onChange={(e) =>
-              editingDeployId ? setEditData((d) => ({ ...d, version: e.target.value })) : setVersion(e.target.value)
-            }
+            onChange={(e) => (editingDeployId ? setEditData((d) => ({ ...d, version: e.target.value })) : setVersion(e.target.value))}
             placeholder="Version (optional)"
           />
 
           <textarea
             className="sd-textarea"
             value={editingDeployId ? editData.config : config}
-            onChange={(e) =>
-              editingDeployId ? setEditData((d) => ({ ...d, config: e.target.value })) : setConfig(e.target.value)
-            }
+            onChange={(e) => (editingDeployId ? setEditData((d) => ({ ...d, config: e.target.value })) : setConfig(e.target.value))}
             placeholder="Config (JSON or plain text) (optional)"
           />
 
           <div>
             {!editingDeployId ? (
-              <input id="zipFileInput" type="file" accept=".zip" onChange={handleFileChange} className="sd-file" />
+              <>
+                <input id="zipFileInput" type="file" accept=".zip" onChange={handleFileChange} className="sd-file" />
+                {zipFile && <div className="file-info">Selected file: <strong>{zipFile.name}</strong> ({Math.round(zipFile.size/1024)} KB)</div>}
+                {uploadProgress["create"] >= 0 && uploadProgress["create"] !== undefined && (
+                  <div className="progress-row">
+                    <div className="progress-bar"><div className="progress-fill" style={{ width: `${uploadProgress["create"]}%` }} /></div>
+                    <div className="progress-label">{uploadProgress["create"]}%</div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="edit-file-block">
                 <label className="sd-file-label">Replace zip file (optional)</label>
                 <input type="file" accept=".zip" onChange={handleEditFileChange} className="sd-file" />
-                <button
-                  type="button"
-                  className="clear-file-btn"
-                  onClick={() => {
-                    setEditZipFile(null);
-                    const fi = document.querySelector(".edit-file-block input[type=file]");
-                    if (fi) fi.value = "";
-                  }}
-                >
-                  Clear
-                </button>
+                <button type="button" className="clear-file-btn" onClick={() => { setEditZipFile(null); const fi = document.querySelector(".edit-file-block input[type=file]"); if (fi) fi.value = ""; }}>Clear</button>
+                {editZipFile && <div className="file-info">Selected file: <strong>{editZipFile.name}</strong> ({Math.round(editZipFile.size/1024)} KB)</div>}
+                {uploadProgress[`update-${editingDeployId}`] >= 0 && uploadProgress[`update-${editingDeployId}`] !== undefined && (
+                  <div className="progress-row">
+                    <div className="progress-bar"><div className="progress-fill" style={{ width: `${uploadProgress[`update-${editingDeployId}`]}%` }} /></div>
+                    <div className="progress-label">{uploadProgress[`update-${editingDeployId}`]}%</div>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           <div className="sd-form-actions">
-            <button
-              type="submit"
-              className="primary-btn"
-              disabled={
-                submitting ||
-                checkingName ||
-                (editingDeployId ? actionState[editingDeployId]?.updating : false)
-              }
-            >
-              {editingDeployId
-                ? actionState[editingDeployId]?.updating
-                  ? "Updating..."
-                  : "Update Deploy"
-                : submitting
-                ? "Submitting..."
-                : "Create Deploy"}
+            <button type="submit" className="primary-btn" disabled={submitting || checkingName || (editingDeployId ? actionState[editingDeployId]?.updating : false)}>
+              {editingDeployId ? (actionState[editingDeployId]?.updating ? "Updating..." : "Update Deploy") : (submitting ? "Submitting..." : "Create Deploy")}
             </button>
 
             {editingDeployId ? (
-              <button type="button" className="secondary-btn" onClick={handleCancelEdit}>
-                Cancel
-              </button>
+              <button type="button" className="secondary-btn" onClick={handleCancelEdit}>Cancel</button>
             ) : (
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => {
-                  setName("");
-                  setVersion("");
-                  setConfig("");
-                  setZipFile(null);
-                  const fi = document.querySelector("#zipFileInput");
-                  if (fi) fi.value = "";
-                }}
-              >
-                Reset
-              </button>
+              <button type="button" className="secondary-btn" onClick={() => { setName(""); setVersion(""); setConfig(""); setZipFile(null); const fi = document.querySelector("#zipFileInput"); if (fi) fi.value = ""; }}>Reset</button>
             )}
           </div>
         </form>
@@ -423,82 +559,60 @@ export default function ServiceDetail() {
       <section className="card deploy-list">
         <h3>Existing Deploys</h3>
 
-        {loading ? (
-          <div className="info">Loading...</div>
-        ) : deploys.length === 0 ? (
-          <div className="info">No deploys found for this service.</div>
-        ) : (
+        {loading ? <div className="info">Loading...</div> : deploys.length === 0 ? <div className="info">No deploys found for this service.</div> : (
           <>
             <div className="deploys-wrapper">
               {deploys.map((d) => (
                 <div key={d.id} className="deploy-item">
                   <div className="deploy-meta">
-                    <div className="deploy-name">
-                      {d.name} <span className="deploy-id">#{d.id}</span>
-                    </div>
+                    <div className="deploy-name">{d.name} <span className="deploy-id">#{d.id}</span></div>
                     <div className="deploy-small">version: {d.version || "-"}</div>
                     <div className="deploy-small">running: {String(d.running)}</div>
-                    <div className="deploy-small">created: {d.created_at}</div>
+                    <div className="deploy-small">created: {formatDate(d.created_at)}</div>
                   </div>
 
                   <div className="deploy-actions">
                     {!d.running ? (
-                      <button
-                        onClick={() => startDeploy(d.id)}
-                        disabled={actionState[d.id]?.starting}
-                        className="action-btn start-btn"
-                      >
+                      <button onClick={() => openConfirm("start", d.id, "Start deploy", `Start deploy "${d.name}" now?`)} disabled={actionState[d.id]?.starting} className="action-btn start-btn">
                         {actionState[d.id]?.starting ? "Starting..." : "Start"}
                       </button>
                     ) : (
-                      <button
-                        onClick={() => stopDeploy(d.id)}
-                        disabled={actionState[d.id]?.stopping}
-                        className="action-btn stop-btn"
-                      >
+                      <button onClick={() => openConfirm("stop", d.id, "Stop deploy", `Stop running deploy "${d.name}"?`)} disabled={actionState[d.id]?.stopping} className="action-btn stop-btn">
                         {actionState[d.id]?.stopping ? "Stopping..." : "Stop"}
                       </button>
                     )}
 
-                    <button
-                      onClick={() => {
-                        handleEditClick(d);
-                      }}
-                      className="action-btn edit-btn"
-                    >
-                      Edit
-                    </button>
+                    <button onClick={() => handleEditClick(d)} className="action-btn edit-btn">Edit</button>
 
-                    <button
-                      onClick={() => handleDestroy(d.id)}
-                      disabled={actionState[d.id]?.deleting}
-                      className="action-btn delete-btn"
-                    >
+                    <button onClick={() => openConfirm("delete", d.id, "Delete deploy", `Delete deploy "${d.name}"?`)} disabled={actionState[d.id]?.deleting} className="action-btn delete-btn">
                       {actionState[d.id]?.deleting ? "Deleting..." : "Delete"}
                     </button>
 
-                    <button onClick={() => fetchDeploys(pageInfo.page)} className="action-btn refresh-btn">
-                      Refresh
-                    </button>
+                    <button onClick={() => fetchDeploys(pageInfo.page)} className="action-btn refresh-btn">Refresh</button>
                   </div>
                 </div>
               ))}
             </div>
 
             <div className="pagination">
-              <button onClick={handlePrev} disabled={!pageInfo.previous} className="page-btn">
-                Prev
-              </button>
-              <div className="page-info">
-                Page {pageInfo.page} — {pageInfo.count} total
-              </div>
-              <button onClick={handleNext} disabled={!pageInfo.next} className="page-btn">
-                Next
-              </button>
+              <button onClick={handlePrev} disabled={!pageInfo.previous} className="page-btn">Prev</button>
+              <div className="page-info">Page {pageInfo.page} — {pageInfo.count} total</div>
+              <button onClick={handleNext} disabled={!pageInfo.next} className="page-btn">Next</button>
             </div>
           </>
         )}
       </section>
+
+      <PortalModal
+        open={confirmModal.open}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        loading={confirmModal.loading}
+        confirmLabel={confirmModal.type === "delete" ? "Delete" : confirmModal.type === "stop" ? "Stop" : "Start"}
+        cancelLabel="Cancel"
+        onConfirm={confirmModalAction}
+        onCancel={closeModal}
+      />
     </div>
   );
 }
