@@ -211,3 +211,33 @@
   .sd-form .sd-input, .sd-form .sd-textarea{ font-size:15px; }
   .back-btn{ padding:8px 12px; }
 }
+
+.sd-modal-backdrop{
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999; 
+  background: rgba(0,0,0,0.55);
+  pointer-events: auto;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.sd-modal{
+  width: min(92%, 560px);
+  max-width: 560px;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(2,6,23,0.45);
+  outline: none;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-sizing: border-box;
+  color: var(--text);
+}
+
+.sd-modal-title{ font-size: 18px; margin: 0 0 8px 0; }
+.sd-modal-message{ margin-bottom: 16px; color: #374151; white-space: pre-wrap; }
+.sd-modal-actions{ display:flex; gap:10px; justify-content:flex-end; }

@@ -12,52 +12,65 @@ const NETWORK_API_ROOT = `${API_BASE}/services/networks/`;
 const PLANS_BASE = `${API_BASE}/plans/`;
 
 function PortalModal({ open, title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", loading = false, onConfirm, onCancel }) {
-  const elRef = useRef(null);
-  if (!elRef.current) {
-    const el = document.createElement("div");
-    el.setAttribute("data-portal", "service-detail-modal");
-    elRef.current = el;
-  }
+  const rootId = "sd-modal-root";
+  const containerRef = useRef(null);
 
+  // create or reuse single modal root on body
   useEffect(() => {
-    const el = elRef.current;
-    document.body.appendChild(el);
+    let root = document.getElementById(rootId);
+    if (!root) {
+      root = document.createElement("div");
+      root.id = rootId;
+      // ensure it doesn't inherit strange styles
+      root.style.position = "relative";
+      root.style.zIndex = "0";
+      document.body.appendChild(root);
+    }
+    containerRef.current = document.createElement("div");
+    // do not rely on generic class names — use sd- prefix
+    containerRef.current.className = "sd-modal-portal-wrapper";
+    root.appendChild(containerRef.current);
+
+    return () => {
+      if (containerRef.current && containerRef.current.parentNode) containerRef.current.parentNode.removeChild(containerRef.current);
+      // note: we keep root (sd-modal-root) in DOM to reuse between modals
+    };
+  }, []); // run once
+
+  // manage body overflow while modal is open
+  useEffect(() => {
     const prev = document.body.style.overflow;
     if (open) document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-      if (el.parentNode === document.body) document.body.removeChild(el);
-    };
+    return () => { document.body.style.overflow = prev; };
   }, [open]);
 
+  // escape key (only active when open)
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape" && open) onCancel && onCancel();
-    };
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onCancel && onCancel(); };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onCancel]);
 
   if (!open) return null;
+  // defensive: if containerRef not yet created, don't crash
+  if (!containerRef.current) return null;
 
   return createPortal(
-    <div className="modal-backdrop" onClick={onCancel} aria-modal="true" role="dialog">
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal-title">{title}</h3>
-        <p className="modal-message">{message}</p>
-        <div className="modal-actions">
-          <button className="primary-btn" onClick={onConfirm} disabled={loading}>
-            {loading ? "Please wait..." : confirmLabel}
-          </button>
-          <button className="secondary-btn" onClick={onCancel} disabled={loading}>
-            {cancelLabel}
-          </button>
+    <div className="sd-modal-backdrop" onClick={() => { if (!loading) onCancel && onCancel(); }} role="presentation">
+      <div className="sd-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h3 className="sd-modal-title">{title}</h3>
+        <div className="sd-modal-message">{message}</div>
+        <div className="sd-modal-actions">
+          <button className="primary-btn" onClick={onConfirm} disabled={loading}>{loading ? "Please wait..." : confirmLabel}</button>
+          <button className="secondary-btn" onClick={onCancel} disabled={loading}>{cancelLabel}</button>
         </div>
       </div>
     </div>,
-    elRef.current
+    containerRef.current
   );
 }
+
 
 export default function ServiceDetail() {
   const { id } = useParams();
