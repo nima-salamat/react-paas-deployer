@@ -7,7 +7,7 @@ import Plans from './components/plans/plans.jsx';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
 import AboutUs from './components/aboutUs/aboutUs.jsx';
-import ServiceDetail from "./components/service/ServiceDetail.jsx";
+import ServiceDetail from "./components/service_detail/ServiceDetail.jsx";
 
 
 const Layout = () => {
