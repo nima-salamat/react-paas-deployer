@@ -1,7 +1,7 @@
 // Login.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import "./Login.css";
 
 const BASE_URL = "http://127.0.0.1:8000/auth/api";
@@ -14,33 +14,88 @@ const Spinner = () => (
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [mode, setMode] = useState(() => {
-    return localStorage.getItem("auth_mode") || "login";
-  }); // 'login' or 'signup'
-  const [step, setStep] = useState("credentials"); // 'credentials' or 'code'
-  const [method, setMethod] = useState("email"); // 'email' or 'phone'
-  const [form, setForm] = useState({
-    username: "",
-    email: "",
-    phone: "",
-    code: "",
-    password: "",
-  });
+  const [mode, setMode] = useState(() => localStorage.getItem("auth_mode") || "login");
+  const [step, setStep] = useState("credentials");
+  const [method, setMethod] = useState("email");
+  const [form, setForm] = useState({ username: "", email: "", phone: "", code: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPasswordPopup, setShowPasswordPopup] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  const getReturnPath = () => {
+    const from = location.state?.from;
+    if (!from) return null;
+    return typeof from === "string" ? from : from.pathname || null;
+  };
+
+  const validateAccessToken = async (accessToken) => {
+    if (!accessToken) return false;
+    try {
+      const res = await axios.get(`${BASE_URL}/validateToken/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        timeout: 5000,
+      });
+      return res.status >= 200 && res.status < 300;
+    } catch (err) {
+      if (err.response && err.response.status === 401) return false;
+      throw err;
+    }
+  };
+
+  const finishLoginFromExistingToken = async () => {
+    const accessToken = localStorage.getItem("access");
+    if (!accessToken) return false;
+    try {
+      const ok = await validateAccessToken(accessToken);
+      if (!ok) return false;
+
+      try {
+        const profileRes = await axios.get("http://localhost:8000/users/api/profile/list/", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          timeout: 5000,
+        });
+      } catch {}
+
+      const returnPath = getReturnPath();
+      if (returnPath) navigate(returnPath, { replace: true });
+      else {
+        try {
+          navigate(-1);
+        } catch {
+          navigate("/", { replace: true });
+        }
+      }
+      return true;
+    } catch (err) {
+      if (!navigator.onLine) setError("No internet connection. Please check your network.");
+      else setError("Server is unreachable. Please try again later.");
+      return false;
+    }
+  };
+
   useEffect(() => {
-    // initialize/reset on mount
+    let mounted = true;
+    const tryAutoRedirect = async () => {
+      const accessToken = localStorage.getItem("access");
+      if (!accessToken) return;
+      setLoading(true);
+      const done = await finishLoginFromExistingToken();
+      if (!done && mounted) setLoading(false);
+    };
+    tryAutoRedirect();
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
     setStep("credentials");
     setForm({ username: "", email: "", phone: "", code: "", password: "" });
     setError("");
     setShowPasswordPopup(false);
   }, []);
 
-  // Listen for changes to localStorage.auth_mode using storage event
   useEffect(() => {
     const onStorage = (e) => {
       if (e.key === "auth_mode" && e.newValue) {
@@ -52,19 +107,13 @@ const Login = () => {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Clear irrelevant field when method changes
   useEffect(() => {
     if (method === "email") setForm((prev) => ({ ...prev, phone: "" }));
     else setForm((prev) => ({ ...prev, email: "" }));
   }, [method]);
 
-  const onChange = (e) =>
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  // Build payload matching your Django view: username + (email || phone_number)
   const getPayload = () => {
     const base = { username: form.username.trim() };
     if (method === "email") base.email = form.email.trim();
@@ -81,221 +130,124 @@ const Login = () => {
     } else {
       if (!form.phone.trim()) return "Phone number is required";
       const phoneRegex = /^[0-9+\-\s]{7,15}$/;
-      if (!phoneRegex.test(form.phone.trim()))
-        return "Invalid phone number format";
+      if (!phoneRegex.test(form.phone.trim())) return "Invalid phone number format";
     }
     return null;
+  };
+
+  const tryExistingTokenBeforeAction = async () => {
+    const credentialsEmpty =
+      !form.username.trim() &&
+      (method === "email" ? !form.email.trim() : !form.phone.trim()) &&
+      !form.code.trim() &&
+      !form.password.trim();
+    if (!credentialsEmpty) return false;
+    const accessToken = localStorage.getItem("access");
+    if (!accessToken) return false;
+    return await finishLoginFromExistingToken();
   };
 
   const handleCredentials = async (e) => {
     e.preventDefault();
     setError("");
-    const validationError = validateCredentials();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
-    setLoading(true);
-    const data = getPayload();
-
     try {
-      // your original used /authentication/ — keep that to match your Django view
-      await axios.post(`${BASE_URL}/authentication/`, data);
-      // move to code step
+      const shortcut = await tryExistingTokenBeforeAction();
+      if (shortcut) return;
+    } catch {}
+    const validationError = validateCredentials();
+    if (validationError) { setError(validationError); return; }
+    setLoading(true);
+    try {
+      await axios.post(`${BASE_URL}/authentication/`, getPayload());
       setStep("code");
     } catch (err) {
-      setError(
-        err.response?.data?.message || err.response?.data?.errors || err.message || "Failed to send verification code"
-      );
-    } finally {
-      setLoading(false);
-    }
+      setError(err.response?.data?.message || err.response?.data?.errors || err.message || "Failed to send verification code");
+    } finally { setLoading(false); }
   };
 
   const handleCode = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.code.trim()) {
-      setError("Verification code is required");
-      return;
-    }
-
+    try { if (await tryExistingTokenBeforeAction()) return; } catch {}
+    if (!form.code.trim()) { setError("Verification code is required"); return; }
     setLoading(true);
-    const data = { ...getPayload(), code: form.code.trim() };
-
     try {
-      const res = await axios.post(`${BASE_URL}/login/validate/`, data);
-      // backend: if twofactor == False -> returns tokens; else returns twofactor true
+      const res = await axios.post(`${BASE_URL}/login/validate/`, { ...getPayload(), code: form.code.trim() });
       if (!res.data.twofactor) {
-        // save tokens then navigate
         if (res.data.access) localStorage.setItem("access", res.data.access);
         if (res.data.refresh) localStorage.setItem("refresh", res.data.refresh);
-        navigate("/");
-      } else {
-        // require password next
-        setShowPasswordPopup(true);
-      }
+        const returnPath = getReturnPath();
+        if (returnPath) navigate(returnPath, { replace: true });
+        else navigate("/", { replace: true });
+      } else setShowPasswordPopup(true);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Invalid verification code");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleFinal = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.password.trim()) {
-      setError("Password is required");
-      return;
-    }
-
+    try { if (await tryExistingTokenBeforeAction()) return; } catch {}
+    if (!form.password.trim()) { setError("Password is required"); return; }
     setLoading(true);
-    const data = {
-      ...getPayload(),
-      code: form.code.trim(),
-      password: form.password,
-    };
-
     try {
-      // your backend AuthAPIView returns tokens when code+password correct
-      const res = await axios.post(`${BASE_URL}/login/token/`, data);
+      const res = await axios.post(`${BASE_URL}/login/token/`, { ...getPayload(), code: form.code.trim(), password: form.password });
       if (res.data.access) localStorage.setItem("access", res.data.access);
       if (res.data.refresh) localStorage.setItem("refresh", res.data.refresh);
       setShowPasswordPopup(false);
-      navigate("/");
+      const returnPath = getReturnPath();
+      if (returnPath) navigate(returnPath, { replace: true });
+      else navigate("/", { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="login-container">
       {loading && <Spinner />}
-
       <div className="login-card shadow rounded" aria-busy={loading}>
         <h2 className="text-center text-primary mb-4">Login / Sign Up</h2>
-
         {step === "credentials" && (
           <form onSubmit={handleCredentials} noValidate>
             <div className="mb-3">
               <label className="form-label">Username</label>
-              <input
-                name="username"
-                className="form-control"
-                value={form.username}
-                onChange={onChange}
-                required
-                disabled={loading}
-              />
+              <input name="username" className="form-control" value={form.username} onChange={onChange} required disabled={loading} />
             </div>
-
             <div className="mb-3">
               <label className="form-label">Use:</label>{" "}
-              <button
-                type="button"
-                className={`btn btn-outline-secondary btn-sm me-2 ${method === "email" ? "active" : ""}`}
-                onClick={() => setMethod("email")}
-                disabled={loading}
-              >
-                Email
-              </button>
-              <button
-                type="button"
-                className={`btn btn-outline-secondary btn-sm ${method === "phone" ? "active" : ""}`}
-                onClick={() => setMethod("phone")}
-                disabled={loading}
-              >
-                Phone
-              </button>
+              <button type="button" className={`btn btn-outline-secondary btn-sm me-2 ${method === "email" ? "active" : ""}`} onClick={() => setMethod("email")} disabled={loading}>Email</button>
+              <button type="button" className={`btn btn-outline-secondary btn-sm ${method === "phone" ? "active" : ""}`} onClick={() => setMethod("phone")} disabled={loading}>Phone</button>
             </div>
-
             {method === "email" ? (
               <div className="mb-3">
                 <label className="form-label">Email</label>
-                <input
-                  name="email"
-                  type="email"
-                  className="form-control"
-                  value={form.email}
-                  onChange={onChange}
-                  required
-                  disabled={loading}
-                />
+                <input name="email" type="email" className="form-control" value={form.email} onChange={onChange} required disabled={loading} />
               </div>
             ) : (
               <div className="mb-3">
                 <label className="form-label">Phone</label>
-                <input
-                  name="phone"
-                  type="tel"
-                  className="form-control"
-                  value={form.phone}
-                  onChange={onChange}
-                  required
-                  disabled={loading}
-                />
+                <input name="phone" type="tel" className="form-control" value={form.phone} onChange={onChange} required disabled={loading} />
               </div>
             )}
-
-            <button
-              type="submit"
-              className="btn btn-primary w-100"
-              disabled={loading}
-            >
-              Send Verification Code
-            </button>
+            <button type="submit" className="btn btn-primary w-100" disabled={loading}>Send Verification Code</button>
           </form>
         )}
-
         {step === "code" && (
           <form onSubmit={handleCode}>
             <div className="mb-3">
               <label className="form-label">Verification Code</label>
-              <input
-                name="code"
-                className="form-control"
-                value={form.code}
-                onChange={onChange}
-                required
-                disabled={loading}
-                autoFocus
-              />
+              <input name="code" className="form-control" value={form.code} onChange={onChange} required disabled={loading} autoFocus />
             </div>
             <div className="d-flex justify-content-between">
-              <button
-                type="button"
-                className="btn btn-outline-secondary"
-                onClick={() => {
-                  setStep("credentials");
-                  setForm((prev) => ({ ...prev, code: "" }));
-                  setError("");
-                }}
-                disabled={loading}
-              >
-                Back
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={loading}
-              >
-                Verify Code
-              </button>
+              <button type="button" className="btn btn-outline-secondary" onClick={() => { setStep("credentials"); setForm(prev => ({ ...prev, code: "" })); setError(""); }} disabled={loading}>Back</button>
+              <button type="submit" className="btn btn-primary" disabled={loading}>Verify Code</button>
             </div>
           </form>
         )}
-
-        {error && (
-          <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">
-            {error}
-          </div>
-        )}
+        {error && <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">{error}</div>}
       </div>
-
       {showPasswordPopup && (
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="password-popup-title">
           <div className="modal-content">
@@ -304,55 +256,16 @@ const Login = () => {
               <div className="mb-3">
                 <label className="form-label">Password</label>
                 <div className="input-group">
-                  <input
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    className="form-control"
-                    value={form.password}
-                    onChange={onChange}
-                    required
-                    disabled={loading}
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    tabIndex={-1}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? "🙈" : "👁️"}
-                  </button>
+                  <input name="password" type={showPassword ? "text" : "password"} className="form-control" value={form.password} onChange={onChange} required disabled={loading} autoFocus />
+                  <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPassword(prev => !prev)} tabIndex={-1} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "🙈" : "👁️"}</button>
                 </div>
               </div>
-
               <div>
-                <button
-                  type="submit"
-                  className="btn btn-primary me-2"
-                  disabled={loading}
-                >
-                  Login
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowPasswordPopup(false);
-                    setForm((prev) => ({ ...prev, password: "" }));
-                    setError("");
-                  }}
-                >
-                  Cancel
-                </button>
+                <button type="submit" className="btn btn-primary me-2" disabled={loading}>Login</button>
+                <button type="button" className="btn btn-secondary" onClick={() => { setShowPasswordPopup(false); setForm(prev => ({ ...prev, password: "" })); setError(""); }}>Cancel</button>
               </div>
             </form>
-
-            {error && (
-              <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">
-                {error}
-              </div>
-            )}
+            {error && <div className="alert alert-danger mt-3" role="alert" aria-live="assertive">{error}</div>}
           </div>
         </div>
       )}
