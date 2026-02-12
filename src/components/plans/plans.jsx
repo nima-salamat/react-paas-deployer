@@ -1,6 +1,8 @@
-// components/PlatformPlans.jsx
+// src/components/PlatformPlans.jsx
 import React, { useEffect, useRef, useState, Suspense } from "react";
 import axios from "axios";
+import { motion } from "framer-motion";
+import "./plans.css";
 
 const PLATFORMS_API = "http://127.0.0.1:8000/plans/platforms/";
 const PLANS_API = "http://127.0.0.1:8000/plans/";
@@ -33,8 +35,7 @@ export default function PlatformPlans() {
     const cpu = p.max_cpu ?? "";
     const ram = p.max_ram ?? "";
     const price = p.price_per_hour ?? "";
-    const key = `${platform}|${name}|${cpu}|${ram}|${price}`;
-    return key || JSON.stringify(p);
+    return `${platform}|${name}|${cpu}|${ram}|${price}`;
   };
 
   const uniqueBy = (arr, keyFn) => {
@@ -85,13 +86,12 @@ export default function PlatformPlans() {
 
           const res = await axios.get(`${PLANS_API}?page=${page}`);
           if (fetchIdRef.current !== thisFetchId) return; // stale
-          console.log(res.data)
           const results = Array.isArray(res.data.results)
             ? res.data.results
             : Array.isArray(res.data)
             ? res.data
             : [];
-          
+
           setPlans((prev) => {
             if (page === 1) {
               return uniqueBy(results, getKey);
@@ -112,9 +112,9 @@ export default function PlatformPlans() {
               if (!key) return;
               const el = document.querySelector(`[data-uid="${key}"]`);
               if (el && typeof el.scrollIntoView === "function") {
-                el.scrollIntoView({ block: "end", behavior: "auto" });
+                el.scrollIntoView({ block: "end", behavior: "smooth" });
               }
-            }, 50);
+            }, 80);
           }
         } else {
           const promises = selectedPlatforms.map((platformKey) =>
@@ -157,6 +157,7 @@ export default function PlatformPlans() {
     };
 
     fetchPlans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlatforms, page]);
 
   const togglePlatform = (code) => {
@@ -181,7 +182,7 @@ export default function PlatformPlans() {
   };
 
   const openCreate = (plan) => {
-    setModalInitial(plan ? { name: plan.platform, type: plan.name , id: plan.id} : {});
+    setModalInitial(plan ? { name: plan.platform, type: plan.name, id: plan.id } : {});
     setModalOpen(true);
   };
 
@@ -190,32 +191,31 @@ export default function PlatformPlans() {
     setModalInitial(null);
   };
 
-      const handleCreated = (result) => {
+  const handleCreated = (result) => {
     console.log("Deployment creation result:", result);
-
     if (result?.ok) {
       closeModal();
     } else {
-     
       console.warn("Service creation failed:", result?.error);
     }
-  
   };
 
-
   return (
-    <div className="container py-4">
-      <h2 className="mb-3">Select Platforms</h2>
+    <div className="pp-container">
+      <h2 className="pp-heading">Select Platforms</h2>
 
-      {loadingPlatforms && <p>Loading platforms...</p>}
+      {loadingPlatforms && <p className="pp-muted">Loading platforms...</p>}
 
       {!loadingPlatforms && platforms.length > 0 && (
         <>
-          <button type="button" onClick={toggleSelectAll} className="btn btn-sm mb-2">
-            {selectedPlatforms.length === platforms.length ? "Deselect All" : "Select All"}
-          </button>
+          <div className="pp-actions-row">
+            <button type="button" onClick={toggleSelectAll} className="btn btn-sm btn-secondary">
+              {selectedPlatforms.length === platforms.length ? "Deselect All" : "Select All"}
+            </button>
+            <div className="pp-spacer" />
+          </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          <div className="pp-chips">
             {platforms.map(([key, display]) => {
               const isSelected = selectedPlatforms.includes(key);
               return (
@@ -223,16 +223,8 @@ export default function PlatformPlans() {
                   key={key}
                   type="button"
                   onClick={() => togglePlatform(key)}
-                  style={{
-                    padding: "8px 15px",
-                    borderRadius: "20px",
-                    border: isSelected ? "2px solid #0d6efd" : "1px solid #ccc",
-                    backgroundColor: isSelected ? "#0d6efd" : "white",
-                    color: isSelected ? "white" : "black",
-                    fontWeight: isSelected ? "600" : "400",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                  }}
+                  className={`platform-chip ${isSelected ? "selected" : ""}`}
+                  aria-pressed={isSelected}
                 >
                   {display}
                 </button>
@@ -242,42 +234,65 @@ export default function PlatformPlans() {
         </>
       )}
 
-      <hr />
+      <hr className="pp-sep" />
 
-      {error && <div className="alert alert-danger">{error}</div>}
+      {error && <div className="pp-alert">{error}</div>}
 
-      <h3>Plans {selectedPlatforms.length > 0 ? "(filtered)" : "(all)"}</h3>
+      <h3 className="pp-subheading">Plans {selectedPlatforms.length > 0 ? "(filtered)" : "(all)"}</h3>
 
-      {loadingPlans && <p>Loading plans...</p>}
-      {!loadingPlans && !error && plans.length === 0 && <p>No plans found.</p>}
+      {loadingPlans && <p className="pp-muted">Loading plans...</p>}
+      {!loadingPlans && !error && plans.length === 0 && <p className="pp-muted">No plans found.</p>}
 
       {!loadingPlans && plans.length > 0 && (
-        <div className="row g-4">
-          {plans.map((plan) => (
-            <div key={getKey(plan)} data-uid={getKey(plan)} className="col-12 col-md-6 col-lg-4">
-              <div className="plan-card p-3 border rounded shadow-sm">
-                <h5>{plan.name}</h5>
-                <p>Platform: {plan.platform}</p>
-                <p>CPU: {plan.max_cpu} cores</p>
-                <p>RAM: {plan.max_ram} MB</p>
-                <p>
-                  Storage: {plan.max_storage} GB ({plan.storage_type})
-                </p>
-                <p>Price per hour: {plan.price_per_hour} Toman</p>
+        <div className="plans-grid">
+          {plans.map((plan, idx) => {
+            const key = getKey(plan);
+            const isFeatured = plan.featured || false;
+            return (
+              <motion.article
+                key={key}
+                data-uid={key}
+                className={`plan-card ${isFeatured ? "featured" : ""}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(idx * 0.03, 0.4), duration: 0.28 }}
+                whileHover={{ scale: 1.02 }}
+                onClick={() => openCreate(plan)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") openCreate(plan); }}
+                aria-label={`Create deployment for ${plan.name} on ${plan.platform}`}
+              >
+                <div className="plan-card-top">
+                  <div>
+                    <h4 className="plan-title">{plan.name}</h4>
+                    <div className="plan-desc small">{plan.plan_type ? `${plan.plan_type} • ${plan.storage_type || ""}` : plan.platform}</div>
+                  </div>
+                  <div className="plan-badge">
+                    <div className="plan-price">{plan.price_per_hour} <span className="plan-price-sub">/ hr</span></div>
+                  </div>
+                </div>
 
-                <div className="d-flex justify-content-end mt-2">
-                  <button className="btn btn-sm btn-primary" onClick={() => openCreate(plan)}>
+                <div className="plan-body">
+                  <div className="plan-spec"><strong>{plan.max_cpu}</strong> CPU</div>
+                  <div className="plan-spec"><strong>{plan.max_ram}</strong> MB RAM</div>
+                  <div className="plan-spec"><strong>{plan.max_storage}</strong> GB</div>
+                </div>
+
+                <div className="plan-footer">
+                  <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); openCreate(plan); }}>
                     Create
                   </button>
+                  <div className="plan-meta small">{plan.description ?? ""}</div>
                 </div>
-              </div>
-            </div>
-          ))}
+              </motion.article>
+            );
+          })}
         </div>
       )}
 
       {hasNext && selectedPlatforms.length === 0 && (
-        <div className="mt-3 text-center">
+        <div className="pp-loadmore">
           <button
             type="button"
             className="btn btn-primary"
@@ -289,43 +304,12 @@ export default function PlatformPlans() {
         </div>
       )}
 
-      {/* Modal overlay + dialog centered relative to viewport (fixed & translate centering).
-          Overlay won't close modal on click; modal always stays centered in user's viewport. */}
+      {/* Modal overlay */}
       {modalOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            zIndex: 9999,
-            // don't use flex centering here; use fixed + translate on inner dialog for pixel-perfect center
-          }}
-        >
-          <div
-            // dialog positioned exactly at the center of the viewport
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "fixed",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              background: "white",
-              borderRadius: 8,
-              padding: 20,
-              width: "min(95%, 720px)",
-              boxShadow: "0 12px 36px rgba(0,0,0,0.35)",
-              maxHeight: "calc(100vh - 80px)",
-              overflowY: "auto",
-            }}
-          >
-            <Suspense fallback={<div>Loading deployment form...</div>}>
-              <CreateDeploymentModal
-                initialData={modalInitial}
-                onCancel={closeModal}
-                onCreate={handleCreated}
-              />
+        <div className="modal-backdrop-pp" role="dialog" aria-modal="true" onClick={closeModal}>
+          <div className="modal-card-pp" onClick={(e) => e.stopPropagation()}>
+            <Suspense fallback={<div className="pp-muted">Loading deployment form...</div>}>
+              <CreateDeploymentModal initialData={modalInitial} onCancel={closeModal} onCreate={handleCreated} />
             </Suspense>
           </div>
         </div>
