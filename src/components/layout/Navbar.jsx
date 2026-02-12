@@ -13,7 +13,7 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const menuRef = useRef();
-  const firstFocusableRef = useRef(null); // focus first link when opening
+  const firstFocusableRef = useRef(null);
 
   const navItems = [
     { path: '/', label: 'Home' },
@@ -41,8 +41,6 @@ const Navbar = () => {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
-        // ignore click on toggler button itself (so toggler can open)
-        // if you need, add more checks here
         closeMenu();
       }
     };
@@ -58,7 +56,7 @@ const Navbar = () => {
     };
   }, [menuOpen]);
 
-  // handle Escape key & focus first item when menu opens
+  // Escape key & focus first
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'Escape' && menuOpen) {
@@ -67,10 +65,8 @@ const Navbar = () => {
     };
     if (menuOpen) {
       document.addEventListener('keydown', onKey);
-      // disable background scroll
       const prev = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-      // focus first focusable element in menu after a tick
       setTimeout(() => {
         if (firstFocusableRef.current) firstFocusableRef.current.focus();
       }, 80);
@@ -83,7 +79,7 @@ const Navbar = () => {
     return () => {};
   }, [menuOpen]);
 
-  // auth check (unchanged logic, just kept)
+  // initial auth check (keeps original logic)
   useEffect(() => {
     if (location.pathname === '/login') {
       setCheckingAuth(false);
@@ -154,6 +150,77 @@ const Navbar = () => {
     navigate('/login');
   };
 
+  // NEW: single function to handle click on "Sign In / Create Account"
+  const handleSignInClick = async ({ fromMenu = false } = {}) => {
+    // prevent multiple clicks
+    if (checkingAuth) return;
+
+    setCheckingAuth(true);
+    const accessToken = localStorage.getItem('access');
+
+    // if no token -> go to login
+    if (!accessToken) {
+      localStorage.setItem('auth_mode', 'login');
+      setCheckingAuth(false);
+      if (fromMenu) closeMenu();
+      navigate('/login');
+      return;
+    }
+
+    try {
+      // validate token
+      const validateRes = await fetch('http://localhost:8000/auth/api/validateToken/', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+
+      if (!validateRes.ok) {
+        // token invalid -> go to login
+        localStorage.setItem('auth_mode', 'login');
+        setCheckingAuth(false);
+        if (fromMenu) closeMenu();
+        navigate('/login');
+        return;
+      }
+
+      // token valid -> set logged in and fetch profile (no routing)
+      setLoggedIn(true);
+
+      try {
+        const profileRes = await fetch('http://localhost:8000/users/api/profile/list/', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        });
+
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          if (Array.isArray(data) && data.length > 0 && data[0].image_url) {
+            setUserImage(data[0].image_url);
+          } else {
+            setUserImage(null);
+          }
+        } else {
+          setUserImage(null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch profile after validate:', err);
+        setUserImage(null);
+      }
+
+      // close menu if it was opened from mobile menu
+      if (fromMenu) closeMenu();
+      setCheckingAuth(false);
+      // no navigate -> navbar updated with avatar/button
+    } catch (error) {
+      // network error or server unreachable -> don't remove tokens, but navigate to login
+      console.error('Auth validation failed on sign-in click:', error);
+      localStorage.setItem('auth_mode', 'login');
+      setCheckingAuth(false);
+      if (fromMenu) closeMenu();
+      navigate('/login');
+    }
+  };
+
   return (
     <>
       <nav className="navbar navbar-dark bg-primary shadow-sm px-4 d-flex justify-content-between align-items-center" role="navigation" aria-label="Main navigation">
@@ -164,10 +231,8 @@ const Navbar = () => {
             {!checkingAuth && !loggedIn && (
               <button
                 className="btn btn-light btn-sm text-primary fw-bold"
-                onClick={() => {
-                  localStorage.setItem("auth_mode", "login");
-                  navigate('/login');
-                }}
+                onClick={() => handleSignInClick({ fromMenu: false })}
+                disabled={checkingAuth}
               >
                 Sign In / Create Account
               </button>
@@ -218,8 +283,6 @@ const Navbar = () => {
             ref={menuRef}
             id="mobile-main-menu"
           >
-
-            {/* Header inside menu: profile (left) + title (center) + close (right) */}
             <div className="menu-header d-flex align-items-center justify-content-between">
               <div className="menu-header-left">
                 {loggedIn ? (
@@ -234,11 +297,8 @@ const Navbar = () => {
                 ) : (
                   <button
                     className="btn btn-link small sign-in-in-menu"
-                    onClick={() => {
-                      localStorage.setItem("auth_mode", "login");
-                      closeMenu();
-                      navigate('/login');
-                    }}
+                    onClick={() => handleSignInClick({ fromMenu: true })}
+                    disabled={checkingAuth}
                   >
                     Sign in
                   </button>
@@ -259,11 +319,7 @@ const Navbar = () => {
               </div>
             </div>
 
-            <ul className="nav flex-column text-center mt-4" onKeyDown={(e) => {
-              // simple keyboard: Enter on focused link will follow link (native), Escape handled globally
-              // for arrow navigation you can enhance later
-            }}>
-              {/* first visible link gets ref to focus when opening */}
+            <ul className="nav flex-column text-center mt-4">
               {navItems.map(({ path, label }, idx) => (
                 <li className="nav-item" key={path}>
                   <Link
@@ -281,11 +337,8 @@ const Navbar = () => {
                 {!checkingAuth && !loggedIn && (
                   <button
                     className="btn btn-primary w-100 fw-bold rounded-pill"
-                    onClick={() => {
-                      localStorage.setItem("auth_mode", "login");
-                      closeMenu();
-                      navigate('/login');
-                    }}
+                    onClick={() => handleSignInClick({ fromMenu: true })}
+                    disabled={checkingAuth}
                   >
                     Sign In / Create Account
                   </button>

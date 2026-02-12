@@ -11,7 +11,6 @@ const PLANS_API = `${API_BASE}/plans/`;
 const PLATFORMS_API = `${API_BASE}/plans/platforms/`;
 const NETWORK_API_ROOT = `${API_BASE}/services/networks/`;
 
-/* ---------------- Modal (portal + center + simple scale animation, no vertical move) ---------------- */
 function Modal({ open, onClose, title, children, ariaLabelledBy }) {
   const mountRef = useRef(null);
   const modalRef = useRef(null);
@@ -45,7 +44,6 @@ function Modal({ open, onClose, title, children, ariaLabelledBy }) {
     const onKey = (e) => {
       if (e.key === "Escape") onClose?.();
       if (e.key === "Tab") {
-        // focus trap (simple)
         const nodes = modalRef.current?.querySelectorAll(
           'a[href], area[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
         );
@@ -107,17 +105,13 @@ function Modal({ open, onClose, title, children, ariaLabelledBy }) {
   );
 }
 
-/* ---------------- Helpers ---------------- */
 const getServicePlatform = (service) => {
   if (!service) return null;
-  // prefer explicit platform on plan object, else service.platform, else fallback to plan name/string
   if (service.plan && typeof service.plan === "object") return service.plan.platform ?? service.plan.name ?? null;
   if (service.platform) return service.platform;
-  // if plan is primitive id/string we can't infer platform — caller should handle
   return null;
 };
 
-/* ---------------- ServicesList (main) ---------------- */
 export default function ServicesList({
   apiUrl = "/services/service/",
   pageSize = 10,
@@ -128,20 +122,24 @@ export default function ServicesList({
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState(null);
+  const [servicesFetchError, setServicesFetchError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [query, setQuery] = useState("");
 
   const [planCache, setPlanCache] = useState({});
+  const [planCacheErrors, setPlanCacheErrors] = useState({});
   const [networkCache, setNetworkCache] = useState({});
+  const [networkCacheErrors, setNetworkCacheErrors] = useState({});
 
   const [networks, setNetworks] = useState([]);
   const [networksLoading, setNetworksLoading] = useState(false);
+  const [networksFetchError, setNetworksFetchError] = useState(null);
 
   const [actionLoading, setActionLoading] = useState(false);
-  const [editingService, setEditingService] = useState(null); // { service, network, planId, creatingNetwork }
+  const [editingService, setEditingService] = useState(null);
   const [plansForPlatform, setPlansForPlatform] = useState({});
+  const [plansForPlatformErrors, setPlansForPlatformErrors] = useState({});
 
   const [alert, setAlert] = useState(null);
 
@@ -199,13 +197,12 @@ export default function ServicesList({
     [page, pageSize, query]
   );
 
-  /* ---------------- fetch services ---------------- */
   useEffect(() => {
     const fetchServices = async () => {
       const thisFetchId = ++fetchIdRef.current;
       setLoading(page === 1);
       setLoadingMore(page > 1);
-      setError(null);
+      setServicesFetchError(null);
 
       try {
         if (page === 1) lastKeyRef.current = null;
@@ -213,7 +210,7 @@ export default function ServicesList({
 
         const url = buildUrl(apiUrl, extraQueryParams);
         const res = await apiRequest({ method: "GET", url });
-        if (fetchIdRef.current !== thisFetchId) return; // stale
+        if (fetchIdRef.current !== thisFetchId) return;
         const data = res.data;
         const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
 
@@ -227,7 +224,7 @@ export default function ServicesList({
 
         setHasNext(Boolean(data?.next));
       } catch (e) {
-        setError(e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load services.");
+        setServicesFetchError(e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load services.");
         setServices([]);
         setHasNext(false);
       } finally {
@@ -237,12 +234,11 @@ export default function ServicesList({
     };
 
     fetchServices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, apiUrl, buildUrl, JSON.stringify(extraQueryParams), query]);
 
-  /* ---------------- networks & plan cache ---------------- */
   const fetchNetworks = useCallback(async () => {
     setNetworksLoading(true);
+    setNetworksFetchError(null);
     try {
       const url = buildUrl(NETWORK_API_ROOT, { page_size: 100 });
       const res = await apiRequest({ method: "GET", url });
@@ -253,7 +249,8 @@ export default function ServicesList({
       for (const n of items) cache[n.id ?? n.pk] = n;
       setNetworkCache((prev) => ({ ...prev, ...cache }));
     } catch (e) {
-      console.warn("Failed to fetch networks", e);
+      setNetworks([]);
+      setNetworksFetchError(e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load networks.");
     } finally {
       setNetworksLoading(false);
     }
@@ -264,23 +261,30 @@ export default function ServicesList({
   const loadPlan = useCallback(async (planId) => {
     if (!planId) return;
     if (planCache[planId]) return;
+    setPlanCacheErrors((s) => ({ ...s, [planId]: null }));
     try {
       const res = await apiRequest({ method: "GET", url: `${PLANS_API}?id=${planId}` });
       const planObj = res.data;
       setPlanCache((p) => ({ ...p, [planId]: planObj }));
-    } catch (e) { console.warn("Failed to load plan", planId, e?.message || e); }
+      setPlanCacheErrors((s) => ({ ...s, [planId]: null }));
+    } catch (e) {
+      setPlanCacheErrors((s) => ({ ...s, [planId]: e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load plan." }));
+    }
   }, [planCache]);
 
   const loadNetwork = useCallback(async (networkId) => {
     if (!networkId) return;
     if (networkCache[networkId]) return;
+    setNetworkCacheErrors((s) => ({ ...s, [networkId]: null }));
     try {
       const res = await apiRequest({ method: "GET", url: `${NETWORK_API_ROOT}${networkId}/` });
       setNetworkCache((n) => ({ ...n, [networkId]: res.data }));
-    } catch (e) { console.warn("Failed to load network", networkId, e?.message || e); }
+      setNetworkCacheErrors((s) => ({ ...s, [networkId]: null }));
+    } catch (e) {
+      setNetworkCacheErrors((s) => ({ ...s, [networkId]: e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load network." }));
+    }
   }, [networkCache]);
 
-  /* ---------------- CRUD actions (unchanged) ---------------- */
   const getServiceDetailUrl = (id) => {
     const base = `${API_BASE}${apiUrl.startsWith("/") ? apiUrl : "/" + apiUrl}`;
     return base.endsWith("/") ? `${base}${id}/` : `${base}${id}/`;
@@ -317,7 +321,6 @@ export default function ServicesList({
             })
           );
         } catch (e2) {
-          console.warn("Updated plan but failed to fetch plan details", e2);
           setServices((prev) =>
             prev.map((s) => {
               const id = s.id ?? s.pk;
@@ -356,9 +359,7 @@ export default function ServicesList({
       setTimeout(() => setAlert(null), 2500);
       return true;
     } catch (e) {
-      console.error("Failed to update service", e);
       const msg = e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to update service.";
-      setError(msg);
       setAlert({ type: "error", message: msg });
       setTimeout(() => setAlert(null), 3000);
       return false;
@@ -376,34 +377,30 @@ export default function ServicesList({
       setTimeout(() => setAlert(null), 2500);
       return true;
     } catch (e) {
-      console.error("Failed to delete service", e);
       const msg = e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to delete service.";
-      setError(msg);
       setAlert({ type: "error", message: msg });
       setTimeout(() => setAlert(null), 3000);
       return false;
     } finally { setActionLoading(false); }
   };
 
-  /* ---------------- plans for platform (cached) ---------------- */
   const fetchPlansForPlatform = async (platform) => {
     if (!platform) return [];
     if (plansForPlatform[platform]) return plansForPlatform[platform];
+    setPlansForPlatformErrors((s) => ({ ...s, [platform]: null }));
     try {
       const res = await apiRequest({ method: "POST", url: PLATFORMS_API, data: { platform } });
       const plans = res.data || [];
-      // ensure cached
       setPlansForPlatform((p) => ({ ...p, [platform]: plans }));
+      setPlansForPlatformErrors((s) => ({ ...s, [platform]: null }));
       return plans;
     } catch (e) {
-      console.error("Failed to fetch plans for platform", e);
-      setAlert({ type: "error", message: "Fail to load plans." });
-      setTimeout(() => setAlert(null), 2500);
+      const msg = e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load plans for platform.";
+      setPlansForPlatformErrors((s) => ({ ...s, [platform]: msg }));
       return [];
     }
   };
 
-  /* ---------------- create / delete network ---------------- */
   const createNetworkInline = async ({ name }) => {
     const trimmed = (name || "").trim();
     if (!trimmed) {
@@ -420,7 +417,6 @@ export default function ServicesList({
       setTimeout(() => setAlert(null), 2000);
       return obj;
     } catch (e) {
-      console.error("Failed to create network", e);
       setAlert({ type: "error", message: "Failed to create network." });
       setTimeout(() => setAlert(null), 3000);
       return null;
@@ -444,14 +440,27 @@ export default function ServicesList({
       setTimeout(() => setAlert(null), 2500);
       return true;
     } catch (e) {
-      console.error("Failed to delete network", e);
       setAlert({ type: "error", message: "Failed to delete network." });
       setTimeout(() => setAlert(null), 3000);
       return false;
     }
   };
 
-  /* ---------------- render ---------------- */
+  const retryAll = () => {
+    setServicesFetchError(null);
+    setNetworksFetchError(null);
+    fetchNetworks();
+    setPage(1);
+  };
+
+  const retryLoadPlan = (planId) => {
+    loadPlan(planId);
+  };
+
+  const retryLoadNetwork = (networkId) => {
+    loadNetwork(networkId);
+  };
+
   return (
     <div className="services-list container py-4">
       <h2 className="mb-3">My Services</h2>
@@ -471,69 +480,91 @@ export default function ServicesList({
       )}
 
       {alert && <div className={`alert ${alert.type === "error" ? "alert-danger" : "alert-success"}`}>{alert.message}</div>}
+
       {loading && <p>Loading services...</p>}
-      {error && <div className="alert alert-danger">{error}</div>}
 
-      <div className="row g-4">
-        {services.map((s) => {
-          const key = getKey(s);
-          const planIsObj = s.plan && typeof s.plan === "object";
-          const netIsObj = s.network && typeof s.network === "object";
-          const planId = !planIsObj && s.plan ? s.plan : null;
-          const networkId = !netIsObj && s.network ? s.network : null;
+      {servicesFetchError && (
+        <div className="pp-alert" style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8 }}>{servicesFetchError}</div>
+          <button className="btn btn-lg btn-primary w-100" onClick={() => { setServicesFetchError(null); setPage(1); }}>
+            Retry
+          </button>
+        </div>
+      )}
 
-          if (planId && !planCache[planId]) loadPlan(planId);
-          if (networkId && !networkCache[networkId]) loadNetwork(networkId);
+      {(!loading && !servicesFetchError) && (
+        <div className="row g-4">
+          {services.map((s) => {
+            const key = getKey(s);
+            const planIsObj = s.plan && typeof s.plan === "object";
+            const netIsObj = s.network && typeof s.network === "object";
+            const planId = !planIsObj && s.plan ? s.plan : null;
+            const networkId = !netIsObj && s.network ? s.network : null;
 
-          const planPlatform =
-            (planIsObj && (s.plan.platform ?? s.plan.name ?? "—")) ||
-            (planId && (planCache[planId]?.platform ?? planCache[planId]?.name)) ||
-            "—";
+            if (planId && !planCache[planId] && !planCacheErrors[planId]) loadPlan(planId);
+            if (networkId && !networkCache[networkId] && !networkCacheErrors[networkId]) loadNetwork(networkId);
 
-          const networkName = (netIsObj && (s.network.name ?? "—")) || (networkId && networkCache[networkId]?.name) || "—";
+            const planPlatform =
+              (planIsObj && (s.plan.platform ?? s.plan.name ?? "—")) ||
+              (planId && (planCache[planId]?.platform ?? planCache[planId]?.name)) ||
+              "—";
 
-          const cpu = (planIsObj && s.plan.max_cpu) || (planId && planCache[planId]?.max_cpu) || null;
-          const ram = (planIsObj && s.plan.max_ram) || (planId && planCache[planId]?.max_ram) || null;
-          const storage = (planIsObj && s.plan.max_storage) || (planId && planCache[planId]?.max_storage) || null;
-          const price = (planIsObj && s.plan.price_per_hour) || (planId && planCache[planId]?.price_per_hour) || null;
+            const networkName = (netIsObj && (s.network.name ?? "—")) || (networkId && networkCache[networkId]?.name) || "—";
 
-          return (
-            <div key={key} data-uid={key} className="col-12 col-md-6 col-lg-4">
-              <motion.div className="plan-card p-3" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02 }} transition={{ duration: 0.18 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                  <div>
-                    <div className="plan-title">{s.name ?? "(no name)"}</div>
-                    <div className="plan-desc">{networkName}</div>
+            const cpu = (planIsObj && s.plan.max_cpu) || (planId && planCache[planId]?.max_cpu) || null;
+            const ram = (planIsObj && s.plan.max_ram) || (planId && planCache[planId]?.max_ram) || null;
+            const storage = (planIsObj && s.plan.max_storage) || (planId && planCache[planId]?.max_storage) || null;
+            const price = (planIsObj && s.plan.price_per_hour) || (planId && planCache[planId]?.price_per_hour) || null;
+
+            return (
+              <div key={key} data-uid={key} className="col-12 col-md-6 col-lg-4">
+                <motion.div className="plan-card p-3" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ scale: 1.02 }} transition={{ duration: 0.18 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                    <div>
+                      <div className="plan-title">{s.name ?? "(no name)"}</div>
+                      <div className="plan-desc">{networkName}</div>
+                      {networkCacheErrors[networkId] && (
+                        <div style={{ marginTop: 6 }}>
+                          <small className="text-danger">Failed to load network</small>
+                          <div><button className="btn btn-link btn-sm" onClick={() => retryLoadNetwork(networkId)}>Retry</button></div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div className={`status-pill ${s.status === "running" ? "status-running" : s.status === "stopped" ? "status-stopped" : "status-unknown"}`}>{s.status ?? "unknown"}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>{planPlatform}</div>
+                      {planCacheErrors[planId] && (
+                        <div style={{ marginTop: 6 }}>
+                          <small className="text-danger">Failed to load plan</small>
+                          <div><button className="btn btn-link btn-sm" onClick={() => retryLoadPlan(planId)}>Retry</button></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div className={`status-pill ${s.status === "running" ? "status-running" : s.status === "stopped" ? "status-stopped" : "status-unknown"}`}>{s.status ?? "unknown"}</div>
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>{planPlatform}</div>
+
+                  <div style={{ marginTop: 12 }}>
+                    {cpu !== null && <div>CPU: <strong>{cpu}</strong> cores</div>}
+                    {ram !== null && <div>RAM: <strong>{ram}</strong> MB</div>}
+                    {storage !== null && <div>Storage: <strong>{storage}</strong> GB</div>}
+                    {price !== null && <div className="plan-price">Price/hr: <strong>{price}</strong> toman</div>}
                   </div>
-                </div>
 
-                <div style={{ marginTop: 12 }}>
-                  {cpu !== null && <div>CPU: <strong>{cpu}</strong> cores</div>}
-                  {ram !== null && <div>RAM: <strong>{ram}</strong> MB</div>}
-                  {storage !== null && <div>Storage: <strong>{storage}</strong> GB</div>}
-                  {price !== null && <div className="plan-price">Price/hr: <strong>{price}</strong> toman</div>}
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-                  <button className="btn btn-sm btn-outline-secondary" onClick={(e) => { e.stopPropagation(); setEditingService({ service: s, network: (s.network && (s.network.id ?? s.network.pk)) || (s.network ? s.network : null), planId: (s.plan && (s.plan.id ?? s.plan.pk)) || (s.plan ? s.plan : null) }); }}>Edit</button>
-                  <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); deleteService(s.id ?? s.pk); }}>Delete</button>
-                  <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); handleOpen(s); }}>Open</button>
-                </div>
-              </motion.div>
-            </div>
-          );
-        })}
-      </div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+                    <button className="btn btn-sm btn-outline-secondary" onClick={(e) => { e.stopPropagation(); setEditingService({ service: s, network: (s.network && (s.network.id ?? s.network.pk)) || (s.network ? s.network : null), planId: (s.plan && (s.plan.id ?? s.plan.pk)) || (s.plan ? s.plan : null) }); }}>Edit</button>
+                    <button className="btn btn-sm btn-outline-danger" onClick={(e) => { e.stopPropagation(); deleteService(s.id ?? s.pk); }}>Delete</button>
+                    <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); handleOpen(s); }}>Open</button>
+                  </div>
+                </motion.div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-3 text-center">
-        {hasNext && <button type="button" className="btn btn-primary" onClick={() => setPage((p) => p + 1)} disabled={loadingMore}>{loadingMore ? "Loading..." : "Load more"}</button>}
+        {hasNext && !servicesFetchError && <button type="button" className="btn btn-primary" onClick={() => setPage((p) => p + 1)} disabled={loadingMore}>{loadingMore ? "Loading..." : "Load more"}</button>}
       </div>
 
-      {/* ---------------- MODAL (centered + resize-safe) ---------------- */}
       <Modal open={Boolean(editingService)} onClose={() => setEditingService(null)} title={editingService?.service?.name ?? "Edit service"}>
         {editingService && (
           <EditorInside
@@ -541,9 +572,13 @@ export default function ServicesList({
             setEditingService={setEditingService}
             networks={networks}
             networksLoading={networksLoading}
+            networksFetchError={networksFetchError}
+            retryNetworks={() => fetchNetworks()}
             createNetworkInline={createNetworkInline}
             deleteNetwork={deleteNetwork}
             fetchPlansForPlatform={fetchPlansForPlatform}
+            plansForPlatform={plansForPlatform}
+            plansForPlatformErrors={plansForPlatformErrors}
             updateService={updateService}
             actionLoading={actionLoading}
           />
@@ -553,21 +588,22 @@ export default function ServicesList({
   );
 }
 
-/* ---------------- EditorInside: modal content (extract for clarity) ---------------- */
 function EditorInside({
   editingService,
   setEditingService,
   networks,
   networksLoading,
+  networksFetchError,
+  retryNetworks,
   createNetworkInline,
   deleteNetwork,
   fetchPlansForPlatform,
+  plansForPlatform,
+  plansForPlatformErrors,
   updateService,
   actionLoading,
 }) {
   const svc = editingService.service;
-
-  // derived platform (service-level)
   const platform = getServicePlatform(svc);
 
   const [availablePlans, setAvailablePlans] = useState([]);
@@ -581,20 +617,16 @@ function EditorInside({
       }
       setPlansLoading(true);
       const p = await fetchPlansForPlatform(platform);
-      // defensive filter: ensure plan.platform exactly equals platform (if available)
       const filtered = (p || []).filter((pl) => {
         if (!pl) return false;
         if (pl.platform !== undefined && pl.platform !== null) return String(pl.platform) === String(platform);
-        // if API didn't include platform property, assume they are already correct
         return true;
       });
       setAvailablePlans(filtered);
       setPlansLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [platform]);
+  }, [platform, fetchPlansForPlatform]);
 
-  // plan selection handler: clicking card sets planId in editingService.state
   const onPickPlan = (planId) => {
     setEditingService((es) => ({ ...es, planId }));
   };
@@ -618,7 +650,7 @@ function EditorInside({
           <button className="btn btn-sm btn-outline-secondary" type="button" onClick={() => setEditingService((es) => ({ ...es, creatingNetwork: { name: "" } }))}>+ create</button>
           <button className="btn btn-sm btn-outline-danger" type="button" onClick={async () => {
             const nid = editingService.network;
-            if (!nid) { setAlertLocal("No network selected to delete."); return; }
+            if (!nid) { alert("No network selected to delete."); return; }
             await deleteNetwork(nid);
             setEditingService((es) => ({ ...es, network: null }));
           }}>delete</button>
@@ -644,35 +676,52 @@ function EditorInside({
 
         <div style={{ marginTop: 16 }}>
           <label className="form-label">Plans for platform {platform ? `— ${platform}` : ""}</label>
-          {plansLoading ? <div>Loading plans...</div> : (
-            <div className="plans-grid">
-              {availablePlans.length === 0 && <div className="muted">No plans available for this platform.</div>}
-              {availablePlans.map((p) => {
-                const pid = p.id ?? p.pk;
-                const isSelected = String(editingService.planId ?? "") === String(pid);
-                return (
-                  <div key={pid} className={`plan-card-small ${isSelected ? "selected" : ""}`} onClick={() => onPickPlan(pid)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onPickPlan(pid); }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                      <div>
-                        <div className="plan-title">{p.name}</div>
-                        <div className="plan-desc">{p.plan_type || ""} • {p.storage_type || ""}</div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div className="plan-price">{p.price_per_hour} / hr</div>
-                      </div>
-                    </div>
 
-                    <div style={{ marginTop: 8 }} className="plan-meta">
-                      <div className="plan-desc">{p.max_cpu} CPU · {p.max_ram} MB · {p.max_storage} GB</div>
-                      {/* selection marker */}
-                      <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
-                        {isSelected ? <div className="pill-selected">Selected</div> : <div className="muted">Click to select</div>}
+          {plansLoading ? <div>Loading plans...</div> : (
+            <>
+              {plansForPlatformErrors[platform] && (
+                <div className="pp-alert" style={{ marginBottom: 8 }}>
+                  <div style={{ marginBottom: 8 }}>{plansForPlatformErrors[platform]}</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="btn btn-sm btn-primary" onClick={async () => {
+                      setAvailablePlans([]);
+                      setPlansLoading(true);
+                      const p = await fetchPlansForPlatform(platform);
+                      setAvailablePlans((p || []).filter(pl => pl && (pl.platform === undefined || String(pl.platform) === String(platform))));
+                      setPlansLoading(false);
+                    }}>Retry</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="plans-grid">
+                {availablePlans.length === 0 && !plansForPlatformErrors[platform] && <div className="muted">No plans available for this platform.</div>}
+                {availablePlans.map((p) => {
+                  const pid = p.id ?? p.pk;
+                  const isSelected = String(editingService.planId ?? "") === String(pid);
+                  return (
+                    <div key={pid} className={`plan-card-small ${isSelected ? "selected" : ""}`} onClick={() => onPickPlan(pid)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onPickPlan(pid); }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                        <div>
+                          <div className="plan-title">{p.name}</div>
+                          <div className="plan-desc">{p.plan_type || ""} • {p.storage_type || ""}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div className="plan-price">{p.price_per_hour} / hr</div>
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: 8 }} className="plan-meta">
+                        <div className="plan-desc">{p.max_cpu} CPU · {p.max_ram} MB · {p.max_storage} GB</div>
+                        <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+                          {isSelected ? <div className="pill-selected">Selected</div> : <div className="muted">Click to select</div>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
@@ -698,7 +747,10 @@ function EditorInside({
         </div>
 
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 700 }}>Available networks</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontWeight: 700 }}>Available networks</div>
+            {networksFetchError && <button className="btn btn-sm btn-link" onClick={() => retryNetworks()}>Retry</button>}
+          </div>
           {networksLoading ? <div>Loading networks...</div> : (
             networks.length === 0 ? <div>No networks. Create one.</div> : (
               <div style={{ marginTop: 8 }}>
@@ -710,10 +762,4 @@ function EditorInside({
       </aside>
     </div>
   );
-}
-
-/* ---------------- small helper: local alert (keeps inside modal) ---------------- */
-function setAlertLocal(msg) {
-  // simple fallback: browser alert (we avoid messing global state here)
-  alert(msg);
 }

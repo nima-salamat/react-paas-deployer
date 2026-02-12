@@ -1,4 +1,3 @@
-// src/components/PlatformPlans.jsx
 import React, { useEffect, useRef, useState, Suspense } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
@@ -6,8 +5,6 @@ import "./plans.css";
 
 const PLATFORMS_API = "http://127.0.0.1:8000/plans/platforms/";
 const PLANS_API = "http://127.0.0.1:8000/plans/";
-
-// lazy import the separate modal module
 const CreateDeploymentModal = React.lazy(() => import("./CreateDeploymentModal"));
 
 export default function PlatformPlans() {
@@ -16,10 +13,9 @@ export default function PlatformPlans() {
   const [plans, setPlans] = useState([]);
   const [loadingPlatforms, setLoadingPlatforms] = useState(false);
   const [loadingPlans, setLoadingPlans] = useState(false);
-  const [error, setError] = useState(null);
+  const [fetchError, setFetchError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
-  const [platformErrors, setPlatformErrors] = useState([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalInitial, setModalInitial] = useState(null);
@@ -51,121 +47,77 @@ export default function PlatformPlans() {
     return out;
   };
 
-  useEffect(() => {
-    const fetchPlatforms = async () => {
-      setLoadingPlatforms(true);
-      setError(null);
-      try {
-        const res = await axios.get(PLATFORMS_API);
-        setPlatforms(Array.isArray(res.data) ? res.data : []);
-      } catch (e) {
-        setError("Failed to load platforms.");
-      } finally {
-        setLoadingPlatforms(false);
+  const fetchPlatforms = async () => {
+    setLoadingPlatforms(true);
+    setFetchError(null);
+    try {
+      const res = await axios.get(PLATFORMS_API);
+      setPlatforms(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      setPlatforms([]);
+      setFetchError("Failed to load platforms or plans.");
+    } finally {
+      setLoadingPlatforms(false);
+    }
+  };
+
+  const fetchPlans = async () => {
+    const thisFetchId = ++fetchIdRef.current;
+    setLoadingPlans(true);
+    setFetchError(null);
+
+    const isFiltered = selectedPlatforms.length > 0;
+
+    try {
+      if (!isFiltered) {
+        const res = await axios.get(`${PLANS_API}?page=${page}`);
+        if (fetchIdRef.current !== thisFetchId) return;
+        const results = Array.isArray(res.data.results)
+          ? res.data.results
+          : Array.isArray(res.data)
+          ? res.data
+          : [];
+        setPlans((prev) => page === 1 ? uniqueBy(results, getKey) : [...prev, ...results]);
+        setHasNext(Boolean(res.data.next));
+      } else {
+        const promises = selectedPlatforms.map((platformKey) =>
+          axios.post(PLATFORMS_API, { platform: platformKey })
+        );
+        const settled = await Promise.allSettled(promises);
+        if (fetchIdRef.current !== thisFetchId) return;
+
+        const merged = [];
+        settled.forEach((r) => {
+          if (r.status === "fulfilled") {
+            const data = r.value.data;
+            if (Array.isArray(data)) merged.push(...data);
+            else if (Array.isArray(data?.results)) merged.push(...data.results);
+            else if (data) merged.push(data);
+          }
+        });
+        setPlans(uniqueBy(merged, getKey));
+        setHasNext(false);
       }
-    };
+    } catch (e) {
+      setPlans([]);
+      setFetchError("Failed to load platforms or plans.");
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
+  useEffect(() => {
     fetchPlatforms();
   }, []);
 
   useEffect(() => {
-    const fetchPlans = async () => {
-      const thisFetchId = ++fetchIdRef.current;
-      setLoadingPlans(true);
-      setError(null);
-      setPlatformErrors([]);
-
-      const isFiltered = selectedPlatforms.length > 0;
-
-      try {
-        if (!isFiltered) {
-          if (page > 1 && plans.length > 0) {
-            lastKeyRef.current = getKey(plans[plans.length - 1]);
-          } else {
-            lastKeyRef.current = null;
-          }
-
-          const res = await axios.get(`${PLANS_API}?page=${page}`);
-          if (fetchIdRef.current !== thisFetchId) return; // stale
-          const results = Array.isArray(res.data.results)
-            ? res.data.results
-            : Array.isArray(res.data)
-            ? res.data
-            : [];
-
-          setPlans((prev) => {
-            if (page === 1) {
-              return uniqueBy(results, getKey);
-            } else {
-              const existingKeys = new Set(prev.map((p) => getKey(p)));
-              const newItems = results.filter((r) => !existingKeys.has(getKey(r)));
-              if (newItems.length === 0) return prev;
-              return [...prev, ...newItems];
-            }
-          });
-
-          setHasNext(Boolean(res.data.next));
-
-          if (page > 1 && lastKeyRef.current) {
-            setTimeout(() => {
-              const key = lastKeyRef.current;
-              lastKeyRef.current = null;
-              if (!key) return;
-              const el = document.querySelector(`[data-uid="${key}"]`);
-              if (el && typeof el.scrollIntoView === "function") {
-                el.scrollIntoView({ block: "end", behavior: "smooth" });
-              }
-            }, 80);
-          }
-        } else {
-          const promises = selectedPlatforms.map((platformKey) =>
-            axios.post(PLATFORMS_API, { platform: platformKey })
-          );
-
-          const settled = await Promise.allSettled(promises);
-          if (fetchIdRef.current !== thisFetchId) return; // stale
-
-          const merged = [];
-          const errors = [];
-
-          settled.forEach((r, idx) => {
-            const platformKey = selectedPlatforms[idx];
-            if (r.status === "fulfilled") {
-              const data = r.value.data;
-              if (Array.isArray(data)) merged.push(...data);
-              else if (Array.isArray(data?.results)) merged.push(...data.results);
-              else if (data) merged.push(data);
-            } else {
-              const status = r.reason?.response?.status || null;
-              errors.push({ platform: platformKey, status, message: r.reason?.message });
-            }
-          });
-
-          const unique = uniqueBy(merged, getKey);
-          setPlans(unique);
-          setHasNext(false);
-          setPlatformErrors(errors);
-          if (errors.length === selectedPlatforms.length && unique.length === 0) {
-            setError("No plans found for selected platforms.");
-          }
-        }
-      } catch (e) {
-        setPlans([]);
-        setError(e.response?.data?.error || "Failed to load plans.");
-      } finally {
-        setLoadingPlans(false);
-      }
-    };
-
     fetchPlans();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPlatforms, page]);
 
   const togglePlatform = (code) => {
     setSelectedPlatforms((prev) => {
       const next = prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code];
       setPage(1);
-      setPlatformErrors([]);
-      setError(null);
       return next;
     });
   };
@@ -175,8 +127,6 @@ export default function PlatformPlans() {
       const all = platforms.map((p) => p[0]);
       const next = prev.length === platforms.length ? [] : all;
       setPage(1);
-      setPlatformErrors([]);
-      setError(null);
       return next;
     });
   };
@@ -192,21 +142,33 @@ export default function PlatformPlans() {
   };
 
   const handleCreated = (result) => {
-    console.log("Deployment creation result:", result);
-    if (result?.ok) {
-      closeModal();
-    } else {
-      console.warn("Service creation failed:", result?.error);
-    }
+    if (result?.ok) closeModal();
+  };
+
+  const retryAll = () => {
+    fetchPlatforms();
+    fetchPlans();
   };
 
   return (
     <div className="pp-container">
       <h2 className="pp-heading">Select Platforms</h2>
 
-      {loadingPlatforms && <p className="pp-muted">Loading platforms...</p>}
+      {(fetchError || (!platforms.length && !loadingPlatforms)) && (
+        <div className="pp-alert">
+          <div>{fetchError}</div>
+          <button
+            type="button"
+            onClick={retryAll}
+            className="btn btn-lg btn-primary w-100"
+            style={{ marginTop: 12 }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
-      {!loadingPlatforms && platforms.length > 0 && (
+      {!fetchError && platforms.length > 0 && (
         <>
           <div className="pp-actions-row">
             <button type="button" onClick={toggleSelectAll} className="btn btn-sm btn-secondary">
@@ -214,7 +176,6 @@ export default function PlatformPlans() {
             </button>
             <div className="pp-spacer" />
           </div>
-
           <div className="pp-chips">
             {platforms.map(([key, display]) => {
               const isSelected = selectedPlatforms.includes(key);
@@ -234,14 +195,10 @@ export default function PlatformPlans() {
         </>
       )}
 
-      <hr className="pp-sep" />
-
-      {error && <div className="pp-alert">{error}</div>}
-
       <h3 className="pp-subheading">Plans {selectedPlatforms.length > 0 ? "(filtered)" : "(all)"}</h3>
 
       {loadingPlans && <p className="pp-muted">Loading plans...</p>}
-      {!loadingPlans && !error && plans.length === 0 && <p className="pp-muted">No plans found.</p>}
+      {!loadingPlans && !fetchError && plans.length === 0 && <p className="pp-muted">No plans found.</p>}
 
       {!loadingPlans && plans.length > 0 && (
         <div className="plans-grid">
@@ -304,7 +261,6 @@ export default function PlatformPlans() {
         </div>
       )}
 
-      {/* Modal overlay */}
       {modalOpen && (
         <div className="modal-backdrop-pp" role="dialog" aria-modal="true" onClick={closeModal}>
           <div className="modal-card-pp" onClick={(e) => e.stopPropagation()}>
