@@ -548,7 +548,7 @@ export default function ServiceDetail() {
     }
   };
 
-  const openServiceInNewTab = () => { if (!service || !service.name) return; const host = `${service.name}${DOMAIN_SUFFIX}`; window.open(`http://${host}`, "_blank"); };
+  const openServiceInNewTab = () => { if (!service || !service.name) return; const host = `${service.service_name}${DOMAIN_SUFFIX}`; window.open(`http://${host}`, "_blank"); };
   const goBackToServices = () => navigate("/services");
 
   /* ---------------- auto-refresh effect ---------------- */
@@ -764,7 +764,7 @@ export default function ServiceDetail() {
 
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 12, color: "#6b7280" }}>Domain</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{service ? `${service.name}${DOMAIN_SUFFIX}` : "-"}</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{service ? `${service.service_name}${DOMAIN_SUFFIX}` : "-"}</div>
               </div>
             </div>
 
@@ -772,8 +772,8 @@ export default function ServiceDetail() {
               <div style={{ fontSize: 12, color: "#6b7280" }}>URL</div>
               <div style={{ fontSize: 14 }}>
                 {service ? (
-                  <a href={`http://${service.name}${DOMAIN_SUFFIX}`} target="_blank" rel="noreferrer" style={{ color: "#2563eb", textDecoration: "underline" }}>
-                    {service.name}{DOMAIN_SUFFIX}
+                  <a href={`http://${service.service_name}${DOMAIN_SUFFIX}`} target="_blank" rel="noreferrer" style={{ color: "#2563eb", textDecoration: "underline" }}>
+                    {service.service_name}{DOMAIN_SUFFIX}
                   </a>
                 ) : <span style={{ color: "#9ca3af" }}>—</span>}
               </div>
