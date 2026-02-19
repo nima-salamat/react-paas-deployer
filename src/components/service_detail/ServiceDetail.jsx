@@ -142,7 +142,13 @@ export default function ServiceDetail() {
   const [planDetail, setPlanDetail] = useState(null);
   const [plansLoading, setPlansLoading] = useState(false);
 
+  // new state for status snapshot
   const [serviceRunning, setServiceRunning] = useState(null);
+  const [serviceCpu, setServiceCpu] = useState(null); // percent
+  const [serviceRam, setServiceRam] = useState(null); // percent
+  // separate loading flags: manual (user clicked) vs silent (auto-refresh)
+  const [serviceStatusLoadingManual, setServiceStatusLoadingManual] = useState(false);
+  const [serviceStatusLoadingSilent, setServiceStatusLoadingSilent] = useState(false);
 
   const DOMAIN_SUFFIX = ".local";
 
@@ -153,12 +159,13 @@ export default function ServiceDetail() {
   const zipInputRef = useRef(null);
   const editZipInputRef = useRef(null);
 
-  /* ---------- auto-refresh settings ---------- */
+  // auto-refresh control: use timeout-loop to avoid overlapping
   const REFRESH_CHOICES = [0, 1, 2, 5, 10, 20, 30, 60];
   const [refreshIntervalSec, setRefreshIntervalSec] = useState(2);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [showIntervalMenu, setShowIntervalMenu] = useState(false);
-  const intervalTimerRef = useRef(null);
+  const autoRefreshTimerRef = useRef(null);
+  const autoRefreshRunningRef = useRef(false); // prevent overlap
 
   // helper to mutate actionState safely
   const setAction = (deployId, patch) => {
@@ -496,13 +503,50 @@ export default function ServiceDetail() {
     }
   };
 
-  const checkServiceRunning = async () => {
+  // helper to pick color for percent
+  const colorForPercent = (p) => {
+    const pct = Number(p) || 0;
+    if (pct >= 90) return "#ef4444"; // red
+    if (pct >= 70) return "#f59e0b"; // amber/yellow
+    if (pct >= 40) return "#10b981"; // green
+    return "#3b82f6"; // blue
+  };
+
+  // new: check service running + cpu/ram snapshot
+  // silent=true => called by auto-refresh; should NOT affect manual button UI
+  const checkServiceRunning = async (silent = false) => {
     if (!id) return;
+    if (silent) {
+      if (serviceStatusLoadingSilent) return; // already running silent
+      setServiceStatusLoadingSilent(true);
+    } else {
+      if (serviceStatusLoadingManual) return; // already running manual
+      setServiceStatusLoadingManual(true);
+    }
+
     try {
       const resp = await apiRequest({ method: "POST", url: `${SERVICE_ACTION_ROOT}service_status/`, data: { service_id: id } });
-      if (resp.status === 200 && resp.data) setServiceRunning(!!resp.data.running);
-      else setServiceRunning(false);
-    } catch (err) { console.error("checkServiceRunning err:", err); setServiceRunning(false); }
+      if (resp.status === 200 && resp.data) {
+        const running = !!resp.data.running;
+        const cpu = typeof resp.data.cpu === "number" ? resp.data.cpu : Number(resp.data.cpu) || 0;
+        const ram = typeof resp.data.ram === "number" ? resp.data.ram : Number(resp.data.ram) || 0;
+        setServiceRunning(running);
+        setServiceCpu(Math.round(cpu * 100) / 100); // round to 2 decimals
+        setServiceRam(Math.round(ram * 100) / 100);
+      } else {
+        setServiceRunning(false);
+        setServiceCpu(0);
+        setServiceRam(0);
+      }
+    } catch (err) {
+      console.error("checkServiceRunning err:", err);
+      setServiceRunning(false);
+      setServiceCpu(0);
+      setServiceRam(0);
+    } finally {
+      if (silent) setServiceStatusLoadingSilent(false);
+      else setServiceStatusLoadingManual(false);
+    }
   };
 
   /* ---------------- edit helpers & pagination ---------------- */
@@ -551,23 +595,61 @@ export default function ServiceDetail() {
   const openServiceInNewTab = () => { if (!service || !service.name) return; const host = `${service.service_name}${DOMAIN_SUFFIX}`; window.open(`http://${host}`, "_blank"); };
   const goBackToServices = () => navigate("/services");
 
-  /* ---------------- auto-refresh effect ---------------- */
+  /* ---------------- auto-refresh loop (no overlap + skip when tab hidden) ---------------- */
   useEffect(() => {
-    if (intervalTimerRef.current) {
-      clearInterval(intervalTimerRef.current);
-      intervalTimerRef.current = null;
+    // clear previous timer
+    if (autoRefreshTimerRef.current) {
+      clearTimeout(autoRefreshTimerRef.current);
+      autoRefreshTimerRef.current = null;
     }
-    if (!autoRefreshEnabled) return;
-    if (!refreshIntervalSec || refreshIntervalSec <= 0) return;
-    intervalTimerRef.current = setInterval(() => {
-      fetchService(true);
-      fetchDeploys(pageInfo.page || 1, true);
-    }, refreshIntervalSec * 1000);
-    return () => {
-      if (intervalTimerRef.current) {
-        clearInterval(intervalTimerRef.current);
-        intervalTimerRef.current = null;
+
+    // stop if disabled or zero
+    if (!autoRefreshEnabled || !refreshIntervalSec || refreshIntervalSec <= 0) return;
+
+    let cancelled = false;
+
+    const loop = async () => {
+      if (cancelled) return;
+      if (autoRefreshRunningRef.current) {
+        // if previous iteration still running, schedule next run later (avoid piling up)
+        autoRefreshTimerRef.current = setTimeout(loop, refreshIntervalSec * 1000);
+        return;
       }
+
+      // skip when tab not visible (reduce noise)
+      if (typeof document !== "undefined" && document.hidden) {
+        autoRefreshTimerRef.current = setTimeout(loop, refreshIntervalSec * 1000);
+        return;
+      }
+
+      try {
+        autoRefreshRunningRef.current = true;
+        // prefer running fetches in parallel (but we prevented overlap by flag)
+        await Promise.all([
+          fetchService(true),
+          fetchDeploys(pageInfo.page || 1, true),
+          checkServiceRunning(true)
+        ]);
+      } catch (e) {
+        // ignore - silent
+        console.debug("autoRefresh loop error:", e);
+      } finally {
+        autoRefreshRunningRef.current = false;
+        if (cancelled) return;
+        autoRefreshTimerRef.current = setTimeout(loop, refreshIntervalSec * 1000);
+      }
+    };
+
+    // start loop
+    autoRefreshTimerRef.current = setTimeout(loop, refreshIntervalSec * 1000);
+
+    return () => {
+      cancelled = true;
+      if (autoRefreshTimerRef.current) {
+        clearTimeout(autoRefreshTimerRef.current);
+        autoRefreshTimerRef.current = null;
+      }
+      autoRefreshRunningRef.current = false;
     };
   }, [autoRefreshEnabled, refreshIntervalSec, pageInfo.page, fetchService]);
 
@@ -576,9 +658,23 @@ export default function ServiceDetail() {
     if (!id) return;
     fetchService();
     fetchDeploys(1);
+    // initial silent status check
+    checkServiceRunning(true);
   }, [id]);
 
   /* ---------------- UI render ---------------- */
+
+  // small spinner element for manual checks
+  const ManualSpinner = () => (
+    <span aria-hidden="true" className="manual-spinner" style={{ display: "inline-block", width: 14, height: 14, marginLeft: 8, verticalAlign: "middle" }}>
+      <svg viewBox="0 0 50 50" style={{ width: 14, height: 14, display: "block" }}>
+        <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeDasharray="31.4 31.4" style={{ opacity: 0.9 }}>
+          <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.9s" repeatCount="indefinite" />
+        </circle>
+      </svg>
+    </span>
+  );
+
   return (
     <div className="service-detail-root">
       <div className="service-detail-container">
@@ -790,11 +886,69 @@ export default function ServiceDetail() {
             <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
               <button className="primary-btn" onClick={startService} disabled={!service || serviceLoading || (service && ["queued","deploying","stopping"].includes(String(service.status)))}>{serviceLoading ? "Working..." : "Start Service"}</button>
               <button className="secondary-btn" onClick={stopService} disabled={!service || serviceLoading || (service && ["queued","deploying","stopping"].includes(String(service.status)))}>{serviceLoading ? "Working..." : "Stop Service"}</button>
-              <button className="secondary-btn" onClick={checkServiceRunning}>Check running</button>
+
+              {/* Check running button: only show manual loading on this button.
+                  silent auto-refresh updates won't make this button flash. */}
+              <button
+                className={`secondary-btn check-btn ${serviceStatusLoadingManual ? "checking" : ""}`}
+                onClick={() => checkServiceRunning(false)}
+                disabled={!service || serviceStatusLoadingManual}
+                title="Check service running and resource snapshot"
+                aria-pressed={serviceStatusLoadingManual}
+              >
+                {serviceStatusLoadingManual ? "Checking..." : "Check running"}
+                {/* spinner only for manual checks (small and unobtrusive) */}
+                {serviceStatusLoadingManual && <ManualSpinner />}
+              </button>
+
+              {/* show a subtle silent indicator when auto-refresh updates are in progress */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {serviceStatusLoadingSilent ? (
+                  <div className="silent-dot" title="Auto-refresh updating" aria-hidden="true" />
+                ) : null}
+              </div>
             </div>
 
             {serviceRunning !== null && (
-              <div className="info" style={{ marginBottom: 8 }}>{serviceRunning ? "Service appears to be running." : "Service is not running."}</div>
+              <div style={{ marginBottom: 8 }}>
+                <div className="info" style={{ marginBottom: 6 }}>{serviceRunning ? "Service appears to be running." : "Service is not running."}</div>
+
+                {/* CPU bar */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, color: "#374151" }}>CPU</div>
+                    <div style={{ fontSize: 12, color: "#374151" }}>{serviceCpu !== null ? `${serviceCpu}%` : "-"}</div>
+                  </div>
+                  <div style={{ height: 12, background: "#e6edf8", borderRadius: 6, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        width: `${Math.min(Math.max(serviceCpu || 0, 0), 100)}%`,
+                        height: "100%",
+                        background: colorForPercent(serviceCpu),
+                        transition: "width 300ms ease",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* RAM bar */}
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, color: "#374151" }}>RAM</div>
+                    <div style={{ fontSize: 12, color: "#374151" }}>{serviceRam !== null ? `${serviceRam}%` : "-"}</div>
+                  </div>
+                  <div style={{ height: 12, background: "#e6edf8", borderRadius: 6, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        width: `${Math.min(Math.max(serviceRam || 0, 0), 100)}%`,
+                        height: "100%",
+                        background: colorForPercent(serviceRam),
+                        transition: "width 300ms ease",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
 
             <hr style={{ margin: "12px 0", borderColor: "#eef2f7" }} />
