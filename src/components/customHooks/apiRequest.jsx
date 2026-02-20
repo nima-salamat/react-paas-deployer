@@ -6,9 +6,13 @@ const apiRequest = async ({ method = 'GET', url, data = {}, params = {} }) => {
   const accessToken = localStorage.getItem('access');
 
   try {
-    // build headers only if token exists
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {};
+
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+    if (!(data instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     const response = await axios({
       method,
@@ -28,6 +32,7 @@ const apiRequest = async ({ method = 'GET', url, data = {}, params = {} }) => {
     }
   }
 };
+
 
 const handleRefreshTokenAndRetry = async ({ method, url, data, params }) => {
   const refreshToken = localStorage.getItem('refresh');

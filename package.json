@@ -10,10 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.8",
+    "@mui/material": "^7.3.8",
+    "@mui/x-date-pickers": "^8.27.0",
     "axios": "^1.11.0",
     "bootstrap": "^5.3.7",
+    "date-fns": "^4.1.0",
     "framer-motion": "^12.23.12",
     "react": "^19.1.0",
+    "react-avatar-editor": "^14.0.0",
+    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1"
   },
