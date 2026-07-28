@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const REFRESH_URL = 'http://127.0.0.1:8000/auth/api/login/token/refresh/';
+const REFRESH_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api/login/token/refresh/`;
 
 const apiRequest = async ({ method = 'GET', url, data = {}, params = {} }) => {
   const accessToken = localStorage.getItem('access');

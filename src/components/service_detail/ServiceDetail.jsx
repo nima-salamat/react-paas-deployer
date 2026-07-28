@@ -61,7 +61,7 @@ import Inventory2Icon from "@mui/icons-material/Inventory2";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEPLOY_BASE = `${API_BASE}/deploy/`;
 const SERVICE_BASE = `${API_BASE}/services/service/`;
 const SERVICE_ACTION_ROOT = `${API_BASE}/services/`;

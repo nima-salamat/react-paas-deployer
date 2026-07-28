@@ -45,7 +45,7 @@ import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightne
 import defaultUserIcon from "../../assets/icons/user.svg";
 import { useProfiles } from "../profile/profile.jsx";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 
 const navItems = [
   { path: "/", label: "Home", icon: HomeOutlinedIcon },

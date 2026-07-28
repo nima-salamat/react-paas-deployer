@@ -32,10 +32,12 @@ import AddIcon from "@mui/icons-material/Add";
 import apiRequest from "../customHooks/apiRequest";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE = "http://127.0.0.1:8000";
-const PLANS_API = `${API_BASE}/plans/`;
-const PLATFORMS_API = `${API_BASE}/plans/platforms/`;
-const NETWORK_API_ROOT = `${API_BASE}/services/networks/`;
+
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
+const PLANS_API = `https://${import.meta.env.VITE_API_BASE}/plans/`;
+const PLATFORMS_API = `https://${import.meta.env.VITE_API_BASE}/plans/platforms/`;
+const NETWORK_API_ROOT = `https://${import.meta.env.VITE_API_BASE}/services/networks/`;
+
 
 export default function ServicesListMui({
   apiUrl = "/services/service/",

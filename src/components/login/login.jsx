@@ -32,7 +32,8 @@ import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import EmailOutlined from "@mui/icons-material/EmailOutlined";
 import PhoneOutlined from "@mui/icons-material/PhoneOutlined";
 
-const BASE_URL = "http://127.0.0.1:8000/auth/api";
+const BASE_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api`;
+
 
 // Motion-enabled Paper for subtle appear/hover animations
 const MotionPaper = motion(Paper);

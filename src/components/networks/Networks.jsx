@@ -26,8 +26,10 @@ import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import apiRequest from "../customHooks/apiRequest";
 
-const API_BASE = "http://127.0.0.1:8000";
-const NETWORK_ROOT = `${API_BASE}/services/networks/`;
+
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
+const NETWORK_ROOT = `https://${import.meta.env.VITE_API_BASE}/services/networks/`;
+
 
 const DEFAULT_FORM = {
   name: "",

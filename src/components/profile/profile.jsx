@@ -37,7 +37,7 @@ import ReactAvatarEditor from 'react-avatar-editor';
 import { format, parseISO } from 'date-fns';
 import apiRequest from "../customHooks/apiRequest";
 
-const API_BASE = 'http://127.0.0.1:8000/users/';
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
 
 const ProfileContext = createContext();
 

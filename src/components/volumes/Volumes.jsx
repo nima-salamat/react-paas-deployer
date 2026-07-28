@@ -32,7 +32,8 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import apiRequest from "../customHooks/apiRequest";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
+
 const VOLUME_ROOT = `${API_BASE}/services/volume/`;
 const SERVICE_ROOT = `${API_BASE}/services/service/`;
 const MODE_OPTIONS = [

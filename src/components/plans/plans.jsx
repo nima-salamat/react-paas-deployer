@@ -37,8 +37,8 @@ import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 
 const CreateDeploymentModal = lazy(() => import("./CreateDeploymentModal"));
 
-const PLATFORMS_API = "http://127.0.0.1:8000/plans/platforms/";
-const PLANS_API = "http://127.0.0.1:8000/plans/";
+const PLATFORMS_API = `https://${import.meta.env.VITE_API_BASE}/plans/platforms/`;
+const PLANS_API = `https://${import.meta.env.VITE_API_BASE}/plans/`;
 
 /* ── helpers ── */
 
