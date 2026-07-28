@@ -15,6 +15,7 @@ import {
   Alert,
   FormControl,
   InputLabel,
+  InputAdornment,
   Paper,
   Dialog,
   DialogActions,
@@ -29,12 +30,14 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import EditIcon from '@mui/icons-material/Edit';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import ReactAvatarEditor from 'react-avatar-editor';
 import { format, parseISO } from 'date-fns';
 import apiRequest from "../customHooks/apiRequest";
 
-const API_BASE = 'http://127.0.0.1:8000/users/api/';
+const API_BASE = 'http://127.0.0.1:8000/users/';
 
 const ProfileContext = createContext();
 
@@ -98,6 +101,13 @@ const Profile = () => {
   });
 
   const [loadingUser, setLoadingUser] = useState(true);
+  const [passwordStatusLoading, setPasswordStatusLoading] = useState(true);
+  const [hasPassword, setHasPassword] = useState(null);
+  const [passwordOperationLoading, setPasswordOperationLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showDeletePassword, setShowDeletePassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editMode, setEditMode] = useState(false);
@@ -147,6 +157,7 @@ const Profile = () => {
 
   useEffect(() => {
     fetchUserData();
+    fetchPasswordStatus();
   }, []);
 
   useEffect(() => {
@@ -277,6 +288,19 @@ const Profile = () => {
     }
   };
 
+  const fetchPasswordStatus = async () => {
+    setPasswordStatusLoading(true);
+    try {
+      const response = await apiRequest({ url: `${API_BASE}password-status/`, method: 'GET' });
+      setHasPassword(Boolean(response.data?.has_password));
+    } catch (err) {
+      setError('Failed to verify password configuration');
+      setHasPassword(false);
+    } finally {
+      setPasswordStatusLoading(false);
+    }
+  };
+
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPasswordData((prev) => ({ ...prev, [name]: value }));
@@ -288,32 +312,87 @@ const Profile = () => {
   };
 
   const handleSetPassword = async () => {
+    if (passwordData.new_password !== passwordData.new_confirm_password) {
+      setError('New password and confirmation do not match.');
+      return;
+    }
+    setPasswordOperationLoading(true);
     try {
       await apiRequest({
-        url: `${API_BASE}password/set/`,
+        url: `${API_BASE}set-password/`,
         method: 'POST',
-        data: passwordData,
+        data: {
+          new_password: passwordData.new_password,
+          new_confirm_password: passwordData.new_confirm_password,
+        },
       });
-      setSuccess('Password changed');
+      setSuccess('Password has been set.');
       setPasswordDialogOpen(false);
       setPasswordData({ password: '', confirm_password: '', new_password: '', new_confirm_password: '' });
+      await fetchPasswordStatus();
     } catch (err) {
-      setError('Failed to change password');
+      console.error('handleSetPassword error:', err);
+      setError(err.response?.data?.errors || err.response?.data?.message || 'Failed to set password');
+    } finally {
+      setPasswordOperationLoading(false);
     }
   };
 
-  const handleDeletePassword = async () => {
+  const handleChangePassword = async () => {
+    if (passwordData.password !== passwordData.confirm_password) {
+      setError('Current password confirmation does not match.');
+      return;
+    }
+    if (passwordData.new_password !== passwordData.new_confirm_password) {
+      setError('New password and confirmation do not match.');
+      return;
+    }
+    setPasswordOperationLoading(true);
     try {
       await apiRequest({
-        url: `${API_BASE}password/delete/`,
+        url: `${API_BASE}change-password/`,
         method: 'POST',
-        data: deletePasswordData,
+        data: {
+          current_password: passwordData.password,
+          new_password: passwordData.new_password,
+          new_confirm_password: passwordData.new_confirm_password,
+        },
       });
-      setSuccess('Password deleted');
+      setSuccess('Password changed successfully.');
+      setPasswordDialogOpen(false);
+      setPasswordData({ password: '', confirm_password: '', new_password: '', new_confirm_password: '' });
+      await fetchPasswordStatus();
+    } catch (err) {
+      console.error('handleChangePassword error:', err);
+      setError(err.response?.data?.errors || err.response?.data?.message || 'Failed to change password');
+    } finally {
+      setPasswordOperationLoading(false);
+    }
+  };
+
+  const handleRemovePassword = async () => {
+    if (deletePasswordData.password !== deletePasswordData.confirm_password) {
+      setError('Password confirmation does not match.');
+      return;
+    }
+    setPasswordOperationLoading(true);
+    try {
+      await apiRequest({
+        url: `${API_BASE}remove-password/`,
+        method: 'DELETE',
+        data: {
+          current_password: deletePasswordData.password,
+        },
+      });
+      setSuccess('Password removed successfully.');
       setDeletePasswordDialogOpen(false);
       setDeletePasswordData({ password: '', confirm_password: '' });
+      await fetchPasswordStatus();
     } catch (err) {
-      setError('Failed to delete password');
+      console.error('handleRemovePassword error:', err);
+      setError(err.response?.data?.errors || err.response?.data?.message || 'Failed to remove password');
+    } finally {
+      setPasswordOperationLoading(false);
     }
   };
 
@@ -635,94 +714,162 @@ const Profile = () => {
           <Typography variant="h5" gutterBottom sx={{ fontWeight: 'medium' }}>
             Password Management
           </Typography>
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-start' }}>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => setPasswordDialogOpen(true)}
-              sx={{ mr: 2 }}
-            >
-              Change Password
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={() => setDeletePasswordDialogOpen(true)}
-            >
-              Delete Password
-            </Button>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {passwordStatusLoading
+              ? 'Checking password configuration...'
+              : hasPassword
+                ? 'A password is configured. You can change or remove it.'
+                : 'No password is configured. Set a password to secure your account.'}
+          </Typography>
+          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+            {hasPassword ? (
+              <>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => setPasswordDialogOpen(true)}
+                  sx={{ mr: 2 }}
+                >
+                  Change Password
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDeletePasswordDialogOpen(true)}
+                >
+                  Remove Password
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => setPasswordDialogOpen(true)}
+              >
+                Set Password
+              </Button>
+            )}
           </Box>
 
           <Dialog open={passwordDialogOpen} onClose={() => setPasswordDialogOpen(false)} maxWidth="sm" fullWidth>
-            <DialogTitle>Change Password</DialogTitle>
+            <DialogTitle>{hasPassword ? 'Change Password' : 'Set Password'}</DialogTitle>
             <DialogContent>
-              <TextField
-                label="Current Password"
-                name="password"
-                type="password"
-                value={passwordData.password}
-                onChange={handlePasswordChange}
-                fullWidth
-                variant="outlined"
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                label="Confirm Current Password"
-                name="confirm_password"
-                type="password"
-                value={passwordData.confirm_password}
-                onChange={handlePasswordChange}
-                fullWidth
-                variant="outlined"
-                sx={{ mb: 2 }}
-              />
+              {hasPassword && (
+                <>
+                  <TextField
+                    label="Current Password"
+                    name="password"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordData.password}
+                    onChange={handlePasswordChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton edge="end" onClick={() => setShowCurrentPassword((prev) => !prev)}>
+                            {showCurrentPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                  <TextField
+                    label="Confirm Current Password"
+                    name="confirm_password"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={passwordData.confirm_password}
+                    onChange={handlePasswordChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{ mb: 2 }}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton edge="end" onClick={() => setShowCurrentPassword((prev) => !prev)}>
+                            {showCurrentPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </>
+              )}
               <TextField
                 label="New Password"
                 name="new_password"
-                type="password"
+                type={showNewPassword ? 'text' : 'password'}
                 value={passwordData.new_password}
                 onChange={handlePasswordChange}
                 fullWidth
                 variant="outlined"
                 sx={{ mb: 2 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton edge="end" onClick={() => setShowNewPassword((prev) => !prev)}>
+                        {showNewPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
               <TextField
                 label="Confirm New Password"
                 name="new_confirm_password"
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 value={passwordData.new_confirm_password}
                 onChange={handlePasswordChange}
                 fullWidth
                 variant="outlined"
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton edge="end" onClick={() => setShowConfirmPassword((prev) => !prev)}>
+                        {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </DialogContent>
             <DialogActions>
               <Button onClick={() => setPasswordDialogOpen(false)} color="secondary">
                 Cancel
               </Button>
-              <Button onClick={handleSetPassword} color="primary" variant="contained">
-                Save
+              <Button onClick={hasPassword ? handleChangePassword : handleSetPassword} color="primary" variant="contained" disabled={passwordOperationLoading}>
+                {hasPassword ? 'Save Changes' : 'Set Password'}
               </Button>
             </DialogActions>
           </Dialog>
 
           <Dialog open={deletePasswordDialogOpen} onClose={() => setDeletePasswordDialogOpen(false)} maxWidth="sm" fullWidth>
-            <DialogTitle>Delete Password</DialogTitle>
+            <DialogTitle>Remove Password</DialogTitle>
             <DialogContent>
               <TextField
                 label="Current Password"
                 name="password"
-                type="password"
+                type={showDeletePassword ? 'text' : 'password'}
                 value={deletePasswordData.password}
                 onChange={handleDeletePasswordChange}
                 fullWidth
                 variant="outlined"
                 sx={{ mb: 2 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton edge="end" onClick={() => setShowDeletePassword((prev) => !prev)}>
+                        {showDeletePassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
               <TextField
                 label="Confirm Current Password"
                 name="confirm_password"
-                type="password"
+                type={showDeletePassword ? 'text' : 'password'}
                 value={deletePasswordData.confirm_password}
                 onChange={handleDeletePasswordChange}
                 fullWidth
@@ -733,8 +880,8 @@ const Profile = () => {
               <Button onClick={() => setDeletePasswordDialogOpen(false)} color="secondary">
                 Cancel
               </Button>
-              <Button onClick={handleDeletePassword} color="error" variant="contained">
-                Delete
+              <Button onClick={handleRemovePassword} color="error" variant="contained" disabled={passwordOperationLoading}>
+                Remove Password
               </Button>
             </DialogActions>
           </Dialog>

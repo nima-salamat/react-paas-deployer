@@ -1,47 +1,78 @@
-import React, { useEffect, useRef, useState, useCallback, Suspense, lazy, memo } from "react";
+import React, {
+  Suspense,
+  lazy,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import axios from "axios";
-import { Link as RouterLink} from "react-router-dom";
-
-import { motion } from "framer-motion";
+import { Link as RouterLink } from "react-router-dom";
 import {
+  alpha,
   Box,
-  Grid,
-  Chip,
-  Typography,
   Button,
-  Skeleton,
-  Paper,
-  Modal,
-  Backdrop,
-  useTheme,
+  Chip,
+  CircularProgress,
+  Divider,
+  Drawer,
+  Grid,
   IconButton,
+  Paper,
+  Skeleton,
   Stack,
   Tooltip,
+  Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
 import LaunchIcon from "@mui/icons-material/Launch";
+import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 
-// lazy modal (same as your CreateDeploymentModal)
 const CreateDeploymentModal = lazy(() => import("./CreateDeploymentModal"));
 
-// API endpoints (adjust if needed)
 const PLATFORMS_API = "http://127.0.0.1:8000/plans/platforms/";
 const PLANS_API = "http://127.0.0.1:8000/plans/";
 
-/* ============================
-   Helpers
-   ============================ */
+/* ── helpers ── */
+
 const getKey = (p) => {
   if (!p) return "null";
-  if (p.id !== undefined && p.id !== null) return String(p.id);
-  const name = typeof p.name === "string" ? p.name : JSON.stringify(p.name ?? "");
-  const platform = p.platform ?? "";
-  const cpu = p.max_cpu ?? "";
-  const ram = p.max_ram ?? "";
-  const price = p.price_per_hour ?? "";
-  return `${platform}|${name}|${cpu}|${ram}|${price}`;
+  if (p.id != null) return String(p.id);
+  return [
+    p.platform ?? "",
+    typeof p.name === "string" ? p.name : JSON.stringify(p.name ?? ""),
+    p.max_cpu ?? "",
+    p.max_ram ?? "",
+    p.price_per_hour ?? "",
+  ].join("|");
+};
+
+const normalizeArray = (v) => {
+  if (Array.isArray(v)) return v;
+  if (Array.isArray(v?.results)) return v.results;
+  if (Array.isArray(v?.data)) return v.data;
+  return [];
+};
+
+const normalizePlatformItem = (item) => {
+  if (Array.isArray(item)) {
+    return [String(item[0] ?? ""), String(item[1] ?? item[0] ?? "")];
+  }
+  if (item && typeof item === "object") {
+    const key = String(
+      item.key ?? item.value ?? item.code ?? item.platform ?? item.id ?? item.pk ?? ""
+    );
+    const label = String(item.label ?? item.name ?? item.title ?? item.platform ?? key);
+    return [key, label];
+  }
+  return [String(item ?? ""), String(item ?? "")];
 };
 
 const uniqueBy = (arr, keyFn) => {
@@ -57,144 +88,152 @@ const uniqueBy = (arr, keyFn) => {
   return out;
 };
 
-// smart merge to avoid re-render / flicker: reuse references when fields unchanged
-const mergePlansSmart = (existing = [], incoming = []) => {
-  try {
-    if (!Array.isArray(incoming)) return existing;
-    if (!Array.isArray(existing)) return incoming;
-    if (existing.length === incoming.length) {
-      let changed = false;
-      const out = incoming.map((inc, i) => {
-        const ex = existing[i];
-        if (!ex || String(ex.id) !== String(inc.id)) {
-          changed = true;
-          return inc;
-        }
-        // shallow compare important fields
-        const f1 = getKey(ex);
-        const f2 = getKey(inc);
-        if (f1 === f2) return ex; // reuse exact object if key identical
-        changed = true;
-        return inc;
-      });
-      if (!changed) return existing;
-      return out;
-    }
-  } catch (e) {
-    console.debug("mergePlansSmart err", e);
+const getErrorMessage = (error, fallback = "Something went wrong.") => {
+  if (axios.isCancel?.(error) || error?.name === "CanceledError") return null;
+  if (typeof error === "string") return error;
+  const data = error?.response?.data;
+  if (typeof data === "string" && data.trim()) return data;
+  if (data?.detail) return String(data.detail);
+  if (data?.message) return String(data.message);
+  if (data && typeof data === "object") {
+    const first = Object.values(data).find(
+      (v) => typeof v === "string" || Array.isArray(v)
+    );
+    if (Array.isArray(first)) return first.join(", ");
+    if (first) return String(first);
   }
-  return incoming;
+  return error?.message || fallback;
 };
 
-/* ============================
-   Presentational subcomponents
-   ============================ */
-const PlanCard = memo(
-  function PlanCard({ plan, idx, onCreate }) {
-    const isFeatured = !!plan.featured;
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.99 }}
-        transition={{ duration: 0.28, delay: Math.min(idx * 0.03, 0.4) }}
-        style={{ width: "100%" }}
-      >
-        <Paper
-          elevation={isFeatured ? 8 : 2}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") onCreate(plan);
-          }}
-          onClick={() => onCreate(plan)}
-          sx={(theme) => ({
-            cursor: "pointer",
-            borderRadius: 2,
-            p: 2,
-            display: "flex",
-            flexDirection: "column",
-            gap: 1.5,
-            // glass effect
-            bgcolor: theme.palette.mode === "dark" ? "rgba(12,12,12,0.56)" : "rgba(255,255,255,0.72)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            border: isFeatured ? "1px solid rgba(25,135,84,0.12)" : "1px solid rgba(13,110,253,0.06)",
-            transition: "transform 220ms cubic-bezier(.2,.9,.3,1), box-shadow 220ms ease",
-            '&:hover': { transform: 'translateY(-6px)', boxShadow: isFeatured ? '0 20px 60px rgba(8,25,58,0.10)' : '0 12px 36px rgba(8,25,58,0.06)' },
-            outline: 'none',
-          })}
-        >
-          <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
-            <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "primary.main" }}>
-                {plan.name}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {plan.plan_type ? `${plan.plan_type} • ${plan.storage_type || ""}` : plan.platform}
-              </Typography>
-            </Box>
+/* ── card ── */
 
-            <Box textAlign="right">
-              <Typography variant="subtitle2" sx={{ fontWeight: 900, color: "success.main" }}>
-                {plan.price_per_hour}{" "}
-                <Typography component="span" variant="caption" color="text.secondary">/ hr</Typography>
-              </Typography>
-            </Box>
-          </Stack>
+const PlanCard = memo(function PlanCard({ plan, onCreate }) {
+  return (
+    <Paper
+      elevation={0}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onCreate(plan);
+      }}
+      onClick={() => onCreate(plan)}
+      sx={(theme) => ({
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        borderRadius: 1,
+        border: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.paper",
+        cursor: "pointer",
+        transition: "border-color 120ms ease, background-color 120ms ease",
+        "&:hover": {
+          borderColor: "primary.main",
+          bgcolor:
+            theme.palette.mode === "dark"
+              ? alpha(theme.palette.primary.main, 0.06)
+              : alpha(theme.palette.primary.main, 0.03),
+        },
+        "&:focus-visible": {
+          outline: `2px solid ${theme.palette.primary.main}`,
+          outlineOffset: 1,
+        },
+      })}
+    >
+      <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
+              {plan.platform ?? "Platform"}
+            </Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
+              {plan.name ?? "Unnamed"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {plan.plan_type
+                ? `${plan.plan_type}${plan.storage_type ? ` · ${plan.storage_type}` : ""}`
+                : plan.platform}
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "success.main" }}>
+              {plan.price_per_hour ?? "—"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              /hr
+            </Typography>
+          </Box>
+        </Stack>
+      </Box>
 
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Box sx={{ px: 1.25, py: 0.6, borderRadius: 1, border: "1px solid rgba(15,23,36,0.04)", minWidth: 64, textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{plan.max_cpu}</Typography>
-              <Typography variant="caption" color="text.secondary">CPU</Typography>
-            </Box>
-            <Box sx={{ px: 1.25, py: 0.6, borderRadius: 1, border: "1px solid rgba(15,23,36,0.04)", minWidth: 64, textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{plan.max_ram}</Typography>
-              <Typography variant="caption" color="text.secondary">MB RAM</Typography>
-            </Box>
-            <Box sx={{ px: 1.25, py: 0.6, borderRadius: 1, border: "1px solid rgba(15,23,36,0.04)", minWidth: 64, textAlign: 'center' }}>
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>{plan.max_storage}</Typography>
-              <Typography variant="caption" color="text.secondary">GB</Typography>
-            </Box>
-          </Stack>
-
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreate(plan);
+      <Box sx={{ p: 2, flex: 1, display: "flex", flexDirection: "column", gap: 1.5 }}>
+        <Stack direction="row" spacing={1}>
+          {[
+            { label: "CPU", value: plan.max_cpu },
+            { label: "RAM", value: plan.max_ram, unit: "MB" },
+            { label: "Disk", value: plan.max_storage, unit: "GB" },
+          ].map((m) => (
+            <Box
+              key={m.label}
+              sx={{
+                flex: 1,
+                py: 1,
+                px: 0.75,
+                textAlign: "center",
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 0.5,
               }}
             >
-              Create
-            </Button>
-            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: "60%" }}>
-              {plan.description ?? ""}
-            </Typography>
-          </Stack>
-        </Paper>
-      </motion.div>
-    );
-  },
-  (a, b) => {
-    // compare by stable key to avoid re-renders
-    try {
-      return getKey(a.plan) === getKey(b.plan) && a.idx === b.idx;
-    } catch (e) {
-      return a.plan === b.plan && a.idx === b.idx;
-    }
-  }
-);
+              <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
+                {m.value ?? "—"}
+                {m.unit && m.value != null ? ` ${m.unit}` : ""}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {m.label}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
 
-/* ============================
-   Main component
-   ============================ */
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{
+            flex: 1,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {plan.description ?? "—"}
+        </Typography>
+
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCreate(plan);
+          }}
+          sx={{ borderRadius: 0.5, alignSelf: "flex-start" }}
+        >
+          Create
+        </Button>
+      </Box>
+    </Paper>
+  );
+});
+
+/* ── main ── */
+
 export default function PlatformPlans() {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  const [platforms, setPlatforms] = useState([]); // array of [key, label]
+  const [platforms, setPlatforms] = useState([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [plans, setPlans] = useState([]);
   const [loadingPlatforms, setLoadingPlatforms] = useState(false);
@@ -202,134 +241,155 @@ export default function PlatformPlans() {
   const [fetchError, setFetchError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
-
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalInitial, setModalInitial] = useState(null);
+  const [modalInitial, setModalInitial] = useState({});
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const fetchIdRef = useRef(0);
-  const lastPlansRef = useRef(null); // keep last array of keys to avoid updating state if same
-  const lastPlatformsRef = useRef(null);
+  const lastPlansSig = useRef(null);
+  const lastPlatformsSig = useRef(null);
 
-  /* ------------ fetch platforms ------------ */
-  const fetchPlatforms = useCallback(async () => {
+  const selectedLabels = useMemo(() => {
+    const map = new Map(platforms.map(([k, l]) => [String(k), l]));
+    return selectedPlatforms.map((k) => map.get(String(k)) ?? String(k));
+  }, [platforms, selectedPlatforms]);
+
+  const allKeys = useMemo(() => platforms.map(([k]) => String(k)), [platforms]);
+  const allSelected = platforms.length > 0 && selectedPlatforms.length === platforms.length;
+
+  const fetchPlatforms = useCallback(async (signal) => {
     setLoadingPlatforms(true);
     setFetchError(null);
     try {
-      const res = await axios.get(PLATFORMS_API);
-      const data = Array.isArray(res.data) ? res.data : [];
-      const normalized = data.map((p) => p);
-      const keySig = JSON.stringify(normalized);
-      if (lastPlatformsRef.current === keySig) {
-        // no change -> do nothing to avoid flicker
-      } else {
-        lastPlatformsRef.current = keySig;
+      const res = await axios.get(PLATFORMS_API, { signal });
+      const normalized = uniqueBy(
+        normalizeArray(res.data).map(normalizePlatformItem).filter(([k]) => k),
+        (i) => i[0]
+      );
+      const sig = JSON.stringify(normalized);
+      if (lastPlatformsSig.current !== sig) {
+        lastPlatformsSig.current = sig;
         setPlatforms(normalized);
       }
+      setSelectedPlatforms((cur) => {
+        if (!cur.length) return [];
+        const valid = new Set(normalized.map(([k]) => String(k)));
+        return cur.filter((k) => valid.has(String(k)));
+      });
     } catch (e) {
-      console.error("fetchPlatforms", e);
+      if (axios.isCancel?.(e) || e?.name === "CanceledError") return;
+      setFetchError(getErrorMessage(e, "Failed to load platforms."));
       setPlatforms([]);
-      setFetchError("Failed to load platforms or plans.");
     } finally {
       setLoadingPlatforms(false);
     }
   }, []);
 
-  /* ------------ fetch plans ------------ */
-  const fetchPlans = useCallback(async () => {
-    const thisFetch = ++fetchIdRef.current;
-    setLoadingPlans(true);
-    setFetchError(null);
+  const fetchPlans = useCallback(
+    async (signal) => {
+      const id = ++fetchIdRef.current;
+      setLoadingPlans(true);
+      setFetchError(null);
+      const filtered = selectedPlatforms.length > 0;
 
-    const isFiltered = selectedPlatforms.length > 0;
-
-    try {
-      if (!isFiltered) {
-        const res = await axios.get(`${PLANS_API}?page=${page}`);
-        if (fetchIdRef.current !== thisFetch) return; // stale
-        const results = Array.isArray(res.data.results) ? res.data.results : Array.isArray(res.data) ? res.data : [];
-        const incoming = page === 1 ? uniqueBy(results, getKey) : [...(lastPlansRef.current?.raw ?? []), ...results];
-        const deduped = uniqueBy(incoming, getKey);
-        const keySig = JSON.stringify(deduped.map(getKey));
-        if (lastPlansRef.current?.sig === keySig) {
-          // nothing changed -> reuse
-        } else {
-          lastPlansRef.current = { sig: keySig, raw: deduped };
-          setPlans((prev) => mergePlansSmart(prev, deduped));
-        }
-        setHasNext(Boolean(res.data.next));
-      } else {
-        const promises = selectedPlatforms.map((p) => axios.post(PLATFORMS_API, { platform: p }));
-        const settled = await Promise.allSettled(promises);
-        if (fetchIdRef.current !== thisFetch) return; // stale
-        const merged = [];
-        settled.forEach((r) => {
-          if (r.status === "fulfilled") {
-            const data = r.value?.data;
-            if (Array.isArray(data)) merged.push(...data);
-            else if (Array.isArray(data?.results)) merged.push(...data.results);
-            else if (data) merged.push(data);
+      try {
+        if (!filtered) {
+          const res = await axios.get(PLANS_API, { params: { page }, signal });
+          if (fetchIdRef.current !== id) return;
+          const results = normalizeArray(res.data);
+          const prev = lastPlansSig.current?.raw ? JSON.parse(lastPlansSig.current.raw) : [];
+          const merged = uniqueBy(page === 1 ? results : [...prev, ...results], getKey);
+          const sig = JSON.stringify(merged.map(getKey));
+          if (lastPlansSig.current?.sig !== sig) {
+            lastPlansSig.current = { sig, raw: JSON.stringify(merged) };
+            setPlans(merged);
           }
-        });
-        const unique = uniqueBy(merged, getKey);
-        const keySig = JSON.stringify(unique.map(getKey));
-        if (lastPlansRef.current?.sig === keySig) {
-          // no update
+          setHasNext(Boolean(res.data?.next ?? res.data?.has_next));
         } else {
-          lastPlansRef.current = { sig: keySig, raw: unique };
-          setPlans(unique);
+          const settled = await Promise.allSettled(
+            selectedPlatforms.map((p) =>
+              axios.post(PLATFORMS_API, { platform: p }, { signal })
+            )
+          );
+          if (fetchIdRef.current !== id) return;
+          const merged = [];
+          settled.forEach((r) => {
+            if (r.status === "fulfilled") {
+              const d = r.value?.data;
+              if (Array.isArray(d)) merged.push(...d);
+              else if (Array.isArray(d?.results)) merged.push(...d.results);
+              else if (d) merged.push(d);
+            }
+          });
+          const unique = uniqueBy(merged, getKey);
+          const sig = JSON.stringify(unique.map(getKey));
+          if (lastPlansSig.current?.sig !== sig) {
+            lastPlansSig.current = { sig, raw: JSON.stringify(unique) };
+            setPlans(unique);
+          }
+          setHasNext(false);
         }
-        setHasNext(false);
+      } catch (e) {
+        if (axios.isCancel?.(e) || e?.name === "CanceledError") return;
+        setFetchError(getErrorMessage(e, "Failed to load plans."));
+        setPlans([]);
+      } finally {
+        if (fetchIdRef.current === id) setLoadingPlans(false);
       }
-    } catch (e) {
-      console.error("fetchPlans", e);
-      setPlans([]);
-      setFetchError("Failed to load platforms or plans.");
-    } finally {
-      setLoadingPlans(false);
-    }
-  }, [page, selectedPlatforms]);
+    },
+    [page, selectedPlatforms]
+  );
 
   useEffect(() => {
-    fetchPlatforms();
+    const c = new AbortController();
+    fetchPlatforms(c.signal);
+    return () => c.abort();
   }, [fetchPlatforms]);
 
-  // re-fetch plans when filters or page change
   useEffect(() => {
-    fetchPlans();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchPlans, page, selectedPlatforms]);
+    const c = new AbortController();
+    fetchPlans(c.signal);
+    return () => c.abort();
+  }, [fetchPlans]);
 
-  /* ------------ toggles ------------ */
   const togglePlatform = (code) => {
+    const key = String(code);
     setSelectedPlatforms((prev) => {
-      const next = prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code];
+      const next = prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key];
       setPage(1);
       return next;
     });
+  };
+
+  const clearFilters = () => {
+    setSelectedPlatforms([]);
+    setPage(1);
   };
 
   const toggleSelectAll = () => {
     setSelectedPlatforms((prev) => {
-      const all = platforms.map((p) => p[0]);
-      const next = prev.length === platforms.length ? [] : all;
+      const next = prev.length === platforms.length ? [] : allKeys;
       setPage(1);
       return next;
     });
   };
 
-  /* ------------ modal ------------ */
   const openCreate = (plan) => {
-    setModalInitial(plan ? { name: plan.platform, type: plan.name, id: plan.id } : {});
+    setModalInitial(
+      plan
+        ? { name: plan.platform ?? "", type: plan.name ?? "", id: plan.id ?? plan.pk ?? null }
+        : {}
+    );
     setModalOpen(true);
   };
+
   const closeModal = () => {
     setModalOpen(false);
-    setModalInitial(null);
+    setModalInitial({});
   };
-  const handleCreated = (result) => {
-    if (result?.ok) {
-      closeModal();
-    }
+
+  const handleCreated = (r) => {
+    if (r?.ok) closeModal();
   };
 
   const retryAll = () => {
@@ -337,157 +397,340 @@ export default function PlatformPlans() {
     fetchPlans();
   };
 
-  /* ------------ small UI helpers ------------ */
-  const platformChipSx = (selected) => ({
-    borderRadius: 999,
-    px: 2,
-    py: 1,
-    cursor: "pointer",
-    fontWeight: 700,
-    boxShadow: selected ? (theme.palette.mode === "dark" ? "0 10px 30px rgba(13,110,253,0.08)" : "0 10px 30px rgba(13,110,253,0.08)") : "0 6px 18px rgba(8,25,58,0.03)",
-    bgcolor: selected ? "primary.main" : (theme.palette.mode === "dark" ? "rgba(255,255,255,0.02)" : "#fff"),
-    color: selected ? "#fff" : "text.primary",
-    border: selected ? "1px solid rgba(13,110,253,0.18)" : "1px solid rgba(15,23,36,0.06)",
-    transition: "transform .18s cubic-bezier(.2,.9,.3,1), box-shadow .18s",
-    '&:hover': { transform: 'translateY(-3px)' },
-  });
+  /* filter UI */
+
+  const filterContent = (
+    <Stack spacing={1.5}>
+      <Box>
+        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+          Platforms
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          Filter the plan list
+        </Typography>
+      </Box>
+
+      <Stack direction="row" spacing={1}>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={toggleSelectAll}
+          disabled={!platforms.length || loadingPlatforms}
+          sx={{ borderRadius: 0.5 }}
+        >
+          {allSelected ? "Deselect all" : "Select all"}
+        </Button>
+        <Button
+          size="small"
+          onClick={clearFilters}
+          disabled={!selectedPlatforms.length}
+          sx={{ borderRadius: 0.5 }}
+        >
+          Clear
+        </Button>
+      </Stack>
+
+      <Divider />
+
+      {loadingPlatforms ? (
+        <Stack spacing={0.75}>
+          <Skeleton height={32} />
+          <Skeleton height={32} />
+          <Skeleton height={32} />
+        </Stack>
+      ) : platforms.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          No platforms
+        </Typography>
+      ) : (
+        <Stack spacing={0.75}>
+          {platforms.map(([key, label]) => {
+            const selected = selectedPlatforms.includes(String(key));
+            return (
+              <Button
+                key={key}
+                fullWidth
+                size="small"
+                variant={selected ? "contained" : "outlined"}
+                onClick={() => togglePlatform(key)}
+                sx={{
+                  borderRadius: 0.5,
+                  justifyContent: "flex-start",
+                  fontWeight: selected ? 700 : 500,
+                }}
+              >
+                {label}
+              </Button>
+            );
+          })}
+        </Stack>
+      )}
+    </Stack>
+  );
 
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 2, md: 4 } }}>
-      <Paper sx={{ p: 2, mb: 2, borderRadius: 3, bgcolor: theme.palette.mode === 'dark' ? 'rgba(5,7,10,0.4)' : 'linear-gradient(180deg, rgba(250,252,255,0.6), rgba(255,255,255,0.8))', boxShadow: '0 12px 36px rgba(8,25,58,0.06)' }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="center" spacing={2} sx={{ mb: 1 }}>
-          <Box sx={{ flex: '0 0 auto' }}>
-            <Typography variant="h6">Select Platforms</Typography>
-            <Typography variant="caption" color="text.secondary">Choose one or multiple platforms to filter plans</Typography>
-          </Box>
-
-          <Box sx={{ flex: 1 }} />
+    <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 1.5, sm: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
+      {/* header */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          mb: 2,
+          borderRadius: 1,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          justifyContent="space-between"
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                display: "grid",
+                placeItems: "center",
+                bgcolor: "primary.main",
+                color: "#fff",
+                borderRadius: 0.5,
+                flexShrink: 0,
+              }}
+            >
+              <LayersOutlinedIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+                Plans
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Select a plan and create a deployment
+              </Typography>
+            </Box>
+          </Stack>
 
           <Stack direction="row" spacing={1}>
-            <Tooltip title="Retry fetch">
-              <IconButton onClick={retryAll} size="small"><RefreshIcon /></IconButton>
-            </Tooltip>
-             <Button variant="outlined" startIcon={<LaunchIcon />} fullWidth component={RouterLink} to="/services" >
-                Services
-              </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={retryAll}
+              disabled={loadingPlatforms || loadingPlans}
+              sx={{ borderRadius: 0.5 }}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<LaunchIcon />}
+              component={RouterLink}
+              to="/services"
+              sx={{ borderRadius: 0.5 }}
+            >
+              Services
+            </Button>
           </Stack>
         </Stack>
-
-        { (fetchError || (!platforms.length && !loadingPlatforms)) && (
-          <Paper sx={{ p: 2, mb: 2, bgcolor: "background.paper", borderRadius: 2 }}>
-            <Typography color="error">{fetchError || "No platforms available."}</Typography>
-            <Box sx={{ mt: 1 }}>
-              <Button variant="contained" onClick={retryAll}>Retry</Button>
-            </Box>
-          </Paper>
-        ) }
-
-        {!fetchError && platforms.length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-              <Button size="small" variant="outlined" onClick={toggleSelectAll}>
-                {selectedPlatforms.length === platforms.length ? "Deselect All" : "Select All"}
-              </Button>
-              <Box sx={{ flex: 1 }} />
-            </Stack>
-
-            <Stack direction="row" spacing={1} flexWrap="wrap">
-              {platforms.map(([key, label]) => {
-                const selected = selectedPlatforms.includes(key);
-                return (
-                  <Chip
-                    key={key}
-                    label={label}
-                    onClick={() => togglePlatform(key)}
-                    clickable
-                    variant={selected ? 'filled' : 'outlined'}
-                    sx={platformChipSx(selected)}
-                    color={selected ? "primary" : "default"}
-                    aria-pressed={selected}
-                  />
-                );
-              })}
-            </Stack>
-          </Box>
-        )}
-
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-          <Typography variant="subtitle1">Plans {selectedPlatforms.length > 0 ? "(filtered)" : "(all)"}</Typography>
-          <Typography variant="caption" color="text.secondary">{loadingPlans ? "Loading..." : `${plans.length} results`}</Typography>
-        </Box>
-
-        {loadingPlans && (
-          <Grid container spacing={2}>
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Grid item xs={12} sm={6} md={4} key={i}>
-                <Skeleton variant="rounded" height={160} sx={{ borderRadius: 2 }} />
-              </Grid>
-            ))}
-          </Grid>
-        )}
-
-        {!loadingPlans && !fetchError && plans.length === 0 && (
-          <Typography color="text.secondary">No plans found.</Typography>
-        )}
-
-        {!loadingPlans && plans.length > 0 && (
-          <Grid container spacing={2} sx={{ mt: 0.5 }}>
-            {plans.map((plan, idx) => (
-              <Grid item xs={12} sm={6} md={4} key={getKey(plan)}>
-                <PlanCard plan={plan} idx={idx} onCreate={openCreate} />
-              </Grid>
-            ))}
-          </Grid>
-        )}
-
-        {hasNext && selectedPlatforms.length === 0 && (
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-            <Button variant="contained" onClick={() => setPage((p) => p + 1)} disabled={loadingPlans}>
-              {loadingPlans ? "Loading..." : "Load More"}
-            </Button>
-          </Box>
-        )}
-
       </Paper>
 
-      {/* Modal (glass backdrop, lazy loaded content) */}
-      <Modal
-        open={modalOpen}
-        onClose={closeModal}
-        closeAfterTransition
-        slots={{ backdrop: Backdrop }}
-        slotProps={{ backdrop: { timeout: 300, sx: { backdropFilter: "blur(4px)", backgroundColor: "rgba(2,6,23,0.55)" } } }}
-        aria-labelledby="create-deploy-modal"
+      {/* body */}
+      <Box
+        sx={{
+          display: { xs: "block", md: "grid" },
+          gridTemplateColumns: { md: "240px 1fr" },
+          gap: 2,
+          alignItems: "start",
+        }}
       >
-        <Box
+        {/* desktop filters */}
+        <Paper
+          elevation={0}
           sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            width: { xs: "94%", sm: 720 },
-            maxHeight: "86vh",
-            overflow: "auto",
-            borderRadius: 2,
+            display: { xs: "none", md: "block" },
             p: 2,
-            bgcolor: theme.palette.mode === "dark" ? "rgba(12,12,12,0.6)" : "rgba(255,255,255,0.92)",
-            backdropFilter: "blur(6px)",
-            boxShadow: 24,
-            border: "1px solid rgba(13,110,253,0.06)",
+            borderRadius: 1,
+            border: "1px solid",
+            borderColor: "divider",
+            position: "sticky",
+            top: 88,
           }}
-          role="dialog"
-          aria-modal="true"
         >
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-            <Typography variant="h6">Create Deployment</Typography>
-            <IconButton onClick={closeModal}><CloseIcon /></IconButton>
+          {filterContent}
+        </Paper>
+
+        {/* content */}
+        <Box>
+          {/* mobile filter bar */}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ display: { xs: "flex", md: "none" }, mb: 1.5 }}
+          >
+            <Button
+              fullWidth
+              variant="outlined"
+              startIcon={<FilterAltOutlinedIcon />}
+              onClick={() => setMobileFilterOpen(true)}
+              sx={{ borderRadius: 0.5 }}
+            >
+              Filters
+              {selectedPlatforms.length > 0 ? ` (${selectedPlatforms.length})` : ""}
+            </Button>
+            <IconButton onClick={retryAll} sx={{ borderRadius: 0.5, border: "1px solid", borderColor: "divider" }}>
+              <RefreshIcon />
+            </IconButton>
           </Stack>
 
-          <Suspense fallback={<Typography color="text.secondary">Loading deployment form...</Typography>}>
-            <CreateDeploymentModal initialData={modalInitial} onCancel={closeModal} onCreate={handleCreated} />
-          </Suspense>
+          {selectedLabels.length > 0 && isMobile && (
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+              {selectedLabels.map((l) => (
+                <Chip key={l} label={l} size="small" sx={{ borderRadius: 0.5 }} />
+              ))}
+            </Stack>
+          )}
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 1,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 2 }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                {selectedPlatforms.length > 0 ? "Filtered plans" : "All plans"}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {loadingPlans ? "Loading…" : `${plans.length} result${plans.length === 1 ? "" : "s"}`}
+              </Typography>
+            </Stack>
+
+            {fetchError && (
+              <Box
+                sx={{
+                  p: 1.5,
+                  mb: 2,
+                  border: "1px solid",
+                  borderColor: "error.main",
+                  bgcolor: alpha(theme.palette.error.main, 0.06),
+                  borderRadius: 0.5,
+                }}
+              >
+                <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                  {fetchError}
+                </Typography>
+                <Button size="small" variant="contained" color="error" onClick={retryAll} sx={{ borderRadius: 0.5 }}>
+                  Retry
+                </Button>
+              </Box>
+            )}
+
+            {loadingPlans ? (
+              <Grid container spacing={1.5}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Grid item xs={12} sm={6} lg={4} key={i}>
+                    <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 0.5 }} />
+                  </Grid>
+                ))}
+              </Grid>
+            ) : plans.length === 0 && !fetchError ? (
+              <Box sx={{ py: 6, textAlign: "center" }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                  No plans found
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Change filters or refresh.
+                </Typography>
+                <Button variant="contained" onClick={retryAll} sx={{ borderRadius: 0.5 }}>
+                  Refresh
+                </Button>
+              </Box>
+            ) : (
+              <Grid container spacing={1.5}>
+                {plans.map((plan) => (
+                  <Grid item xs={12} sm={6} lg={4} key={getKey(plan)}>
+                    <PlanCard plan={plan} onCreate={openCreate} />
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+
+            {hasNext && selectedPlatforms.length === 0 && (
+              <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => setPage((p) => p + 1)}
+                  disabled={loadingPlans}
+                  sx={{ borderRadius: 0.5 }}
+                >
+                  {loadingPlans ? "Loading…" : "Load more"}
+                </Button>
+              </Box>
+            )}
+          </Paper>
         </Box>
-      </Modal>
+      </Box>
+
+      {/* mobile drawer */}
+      <Drawer
+        anchor="bottom"
+        open={mobileFilterOpen}
+        onClose={() => setMobileFilterOpen(false)}
+        PaperProps={{
+          sx: {
+            borderTopLeftRadius: 0,
+            borderTopRightRadius: 0,
+            maxHeight: "80vh",
+            p: 2,
+          },
+        }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+            Filters
+          </Typography>
+          <IconButton onClick={() => setMobileFilterOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Stack>
+        <Divider sx={{ mb: 1.5 }} />
+        {filterContent}
+        <Button
+          fullWidth
+          variant="contained"
+          onClick={() => setMobileFilterOpen(false)}
+          sx={{ mt: 2, borderRadius: 0.5 }}
+        >
+          Done
+        </Button>
+      </Drawer>
+
+      <Suspense
+        fallback={
+          <Box sx={{ display: "grid", placeItems: "center", py: 4 }}>
+            <CircularProgress size={28} />
+          </Box>
+        }
+      >
+        <CreateDeploymentModal
+          open={modalOpen}
+          initialData={modalInitial}
+          onCancel={closeModal}
+          onCreate={handleCreated}
+          notifyOnSuccess
+        />
+      </Suspense>
     </Box>
   );
 }

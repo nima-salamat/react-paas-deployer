@@ -1,59 +1,179 @@
-// App.jsx
-import React from "react";
-import { Routes, Route, BrowserRouter as Router, Outlet, Link } from "react-router-dom";
-import { Box } from "@mui/material";
+import React, { useEffect, useMemo, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
+import { Box, CssBaseline, ThemeProvider, alpha, createTheme } from "@mui/material";
 
-import Home from './components/home/home.jsx';
-import Services from './components/service/Services.jsx';
-import Login from './components/login/login.jsx';
-import Plans from './components/plans/plans.jsx';
-import Navbar from './components/layout/Navbar.jsx';
-import Footer from './components/layout/Footer.jsx';
-import AboutUs from './components/aboutUs/aboutUs.jsx';
+import Navbar from "./components/layout/Navbar.jsx";
+import Home from "./components/home/home.jsx";
+import Services from "./components/service/Services.jsx";
+import Login from "./components/login/login.jsx";
+import Plans from "./components/plans/plans.jsx";
+import Footer from "./components/layout/Footer.jsx";
+import AboutUs from "./components/aboutUs/aboutUs.jsx";
 import ServiceDetail from "./components/service_detail/ServiceDetail.jsx";
-import Profile from  "./components/profile/profile.jsx";
+import Profile from "./components/profile/profile.jsx";
+import Volumes from "./components/volumes/Volumes.jsx";
+import Networks from "./components/networks/Networks.jsx";
 import FloatingNav from "./components/layout/FloatingNav";
 
-const Layout = ({ toggleTheme, themeMode }) => {
-  const loggedIn = Boolean(localStorage.getItem("access"));
+const THEME_STORAGE_KEY = "paas-theme-mode";
+const allowedThemeModes = new Set(["light", "dark", "system"]);
+
+const normalizeThemeMode = (value) => (allowedThemeModes.has(value) ? value : null);
+
+const getInitialThemeMode = () => {
+  if (typeof window === "undefined") return "system";
+
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return normalizeThemeMode(stored) || "system";
+  } catch {
+    return "system";
+  }
+};
+
+const getSystemTheme = () => {
+  if (typeof window === "undefined" || !window.matchMedia) return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
+
+const Layout = ({ themeMode, setThemeMode }) => {
+  const loggedIn = typeof window !== "undefined" && Boolean(window.localStorage.getItem("access"));
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      
-      {/* Navbar */}
-      <Navbar toggleTheme={toggleTheme} themeMode={themeMode} />
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100vh",
+        minWidth: 0,
+        overflowX: "hidden",
+        bgcolor: "background.default",
+        color: "text.primary",
+      }}
+    >
+      <Navbar themeMode={themeMode} onThemeModeChange={setThemeMode} />
 
-      {/* Page content */}
-      <Box component="main" sx={{ flex: 1 }}>
+      <Box component="main" sx={{ flex: 1, minHeight: 0, width: "100%" }}>
         <Outlet />
       </Box>
 
-      {/* Footer */}
       <Footer />
-
-      {/* Floating Action Panel */}
       <FloatingNav loggedIn={loggedIn} />
-
     </Box>
   );
 };
 
-function App({ toggleTheme, themeMode }) {
+function App() {
+  const [themeMode, setThemeMode] = useState(getInitialThemeMode);
+  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+    } catch {
+      // localStorage may be unavailable in some environments; fail silently.
+    }
+  }, [themeMode]);
+
+  const resolvedMode = themeMode === "system" ? systemTheme : themeMode;
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.dataset.theme = resolvedMode;
+    document.documentElement.style.colorScheme = resolvedMode;
+  }, [resolvedMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const updateSystemTheme = () => setSystemTheme(mediaQuery.matches ? "dark" : "light");
+
+    updateSystemTheme();
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateSystemTheme);
+      return () => mediaQuery.removeEventListener("change", updateSystemTheme);
+    }
+
+    mediaQuery.addListener(updateSystemTheme);
+    return () => mediaQuery.removeListener(updateSystemTheme);
+  }, []);
+
+  const appTheme = useMemo(
+    () =>
+      createTheme({
+        palette: {
+          mode: resolvedMode,
+          primary: {
+            main: resolvedMode === "dark" ? "#8ab4ff" : "#2f66ff",
+          },
+          secondary: {
+            main: resolvedMode === "dark" ? "#b08cff" : "#6d5efc",
+          },
+          background: {
+            default: resolvedMode === "dark" ? "#0b1020" : "#f7f9fc",
+            paper: resolvedMode === "dark" ? "#111827" : "#ffffff",
+          },
+          divider: alpha(resolvedMode === "dark" ? "#ffffff" : "#0f172a", 0.08),
+        },
+        shape: {
+          borderRadius: 16,
+        },
+        typography: {
+          fontFamily:
+            '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          button: {
+            textTransform: "none",
+            fontWeight: 600,
+          },
+        },
+        components: {
+          MuiCssBaseline: {
+            styleOverrides: {
+              body: {
+                transition: "background-color 180ms ease, color 180ms ease",
+              },
+            },
+          },
+          MuiButton: {
+            styleOverrides: {
+              root: {
+                borderRadius: 14,
+              },
+            },
+          },
+          MuiPaper: {
+            styleOverrides: {
+              root: {
+                backgroundImage: "none",
+              },
+            },
+          },
+        },
+      }),
+    [resolvedMode]
+  );
+
   return (
-    <Router>
-      <Routes>
-        {/* forward the props down to Layout */}
-        <Route path="/" element={<Layout toggleTheme={toggleTheme} themeMode={themeMode} />}>
-          <Route index element={<Home />} />
-          <Route path="services" element={<Services />} />
-          <Route path="plans" element={<Plans />} />
-          <Route path="login" element={<Login />} />
-          <Route path="aboutUs" element={<AboutUs />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="/service/:id" element={<ServiceDetail />} />
-        </Route>
-      </Routes>
-    </Router>
+    <ThemeProvider theme={appTheme}>
+      <CssBaseline enableColorScheme />
+      <Router>
+        <Routes>
+          <Route path="/" element={<Layout themeMode={themeMode} setThemeMode={setThemeMode} />}>
+            <Route index element={<Home />} />
+            <Route path="services" element={<Services />} />
+            <Route path="volumes" element={<Volumes />} />
+            <Route path="networks" element={<Networks />} />
+            <Route path="plans" element={<Plans />} />
+            <Route path="login" element={<Login />} />
+            <Route path="aboutUs" element={<AboutUs />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="service/:id" element={<ServiceDetail />} />
+          </Route>
+        </Routes>
+      </Router>
+    </ThemeProvider>
   );
 }
 
