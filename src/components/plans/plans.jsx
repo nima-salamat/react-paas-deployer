@@ -375,9 +375,14 @@ export default function PlatformPlans() {
   };
 
   const openCreate = (plan) => {
-    setModalInitial(
+   setModalInitial(
       plan
-        ? { name: plan.platform ?? "", type: plan.name ?? "", id: plan.id ?? plan.pk ?? null }
+        ? {
+            name: "",                         
+            plan_id: plan.id ?? plan.pk ?? null,
+            plan_name: plan.name ?? "—",       
+            platform: plan.platform ?? "",
+          }
         : {}
     );
     setModalOpen(true);
