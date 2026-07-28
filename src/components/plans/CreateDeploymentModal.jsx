@@ -119,7 +119,9 @@ export default function CreateServiceWizard({
   const [activeStep, setActiveStep] = useState(0);
   const [name, setName] = useState(initialData.name ?? "");
   const [network, setNetwork] = useState(initialData.network ?? "");
-  const [plan] = useState(initialData.id ?? initialData.plan_id ?? null);
+  
+  // FIX: Added setPlan to update the state when initialData changes
+  const [plan, setPlan] = useState(initialData.id ?? initialData.plan_id ?? null);
 
   const [networks, setNetworks] = useState([]);
   const [networksLoading, setNetworksLoading] = useState(false);
@@ -148,6 +150,10 @@ export default function CreateServiceWizard({
     setActiveStep(0);
     setName(initialData.name ?? "");
     setNetwork(initialData.network ?? "");
+    
+    // FIX: Update plan state when the modal opens with new initialData
+    setPlan(initialData.id ?? initialData.plan_id ?? null);
+    
     setError(null);
     setSubmissionResult(null);
     setCreateNetworkError(null);
