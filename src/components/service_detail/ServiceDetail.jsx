@@ -29,6 +29,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Menu,
   useTheme,
   Snackbar,
   Avatar,
@@ -60,6 +61,8 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEPLOY_BASE = `${API_BASE}/deploy/`;
@@ -71,8 +74,18 @@ const PLANS_BASE = `${API_BASE}/plans/`;
 const SERVICE_LOG_MAX_LINES = 5000;
 const DEPLOY_LOG_PAGE_SIZE = 10;
 const DEPLOY_LOG_POLL_INTERVAL = 4000;
+const DEFAULT_REFRESH_INTERVAL_MS = 2000;
+const REFRESH_INTERVAL_OPTIONS = [
+  { label: "2s", value: 2000 },
+  { label: "5s", value: 5000 },
+  { label: "10s", value: 10000 },
+  { label: "15s", value: 15000 },
+  { label: "30s", value: 30000 },
+  { label: "60s", value: 60000 },
+];
 
 const TABS = [
+  { value: "overview", label: "Overview", icon: <Inventory2Icon fontSize="small" /> },
   { value: "create", label: "Create deploy", icon: <AddCircleOutlineIcon fontSize="small" /> },
   { value: "logs", label: "Logs", icon: <SubjectIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsIcon fontSize="small" /> },
@@ -300,14 +313,14 @@ const DeployCard = memo(function DeployCard({
       variant="outlined"
       sx={{
         p: { xs: 1.5, sm: 1.75 },
-        borderRadius: 2.5,
+        borderRadius: 1.5,
         height: "100%",
         maxWidth: "100%",
         bgcolor:
           theme.palette.mode === "dark"
             ? "rgba(255,255,255,0.03)"
             : "rgba(255,255,255,0.9)",
-        boxShadow: "0 6px 18px rgba(0,0,0,0.05)",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.05)",
       }}
     >
       <Stack spacing={1.25} sx={{ height: "100%" }}>
@@ -457,7 +470,7 @@ const LogRow = memo(function LogRow({ entry }) {
         borderLeft: 3,
         borderColor,
         bgcolor: bg,
-        borderRadius: 1.5,
+        borderRadius: 1,
         px: 1,
         py: 0.75,
         display: "flex",
@@ -659,12 +672,12 @@ function LogPanel({
       elevation={1}
       sx={{
         p: { xs: 1.5, sm: 2 },
-        borderRadius: 3,
+        borderRadius: 2,
         backgroundImage:
           theme.palette.mode === "dark"
             ? "linear-gradient(180deg, rgba(11,15,18,0.98), rgba(17,24,39,0.98))"
             : "linear-gradient(180deg, #ffffff, #f7fbff)",
-        boxShadow: 4,
+        boxShadow: 3,
         overflow: "hidden",
         height: "100%",
         maxWidth: "100%",
@@ -808,7 +821,7 @@ function LogPanel({
           minHeight: { xs: 240, sm: 280 },
           maxHeight: { xs: 360, sm: 420, md: 480 },
           overflowY: "auto",
-          borderRadius: 2.5,
+          borderRadius: 1.5,
           bgcolor:
             theme.palette.mode === "dark"
               ? "rgba(0,0,0,0.18)"
@@ -857,8 +870,8 @@ function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCo
       sx={{
         position: "sticky",
         top: 16,
-        borderRadius: 3,
-        boxShadow: 4,
+        borderRadius: 2,
+        boxShadow: 3,
         maxHeight: "calc(100vh - 32px)",
         overflow: "auto",
         backgroundImage:
@@ -903,12 +916,12 @@ function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCo
         <Divider sx={{ my: 1.5 }} />
 
         <Stack spacing={1}>
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5 }}>
               {service?.name || "Service"}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-              {service?.service_name ? `${service.service_name}.local` : "—"}
+              {service?.service_name ? `${service.service_name}.${import.meta.DEPLOY_BASE}` : "—"}
             </Typography>
             <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
               <Chip
@@ -926,7 +939,7 @@ function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCo
             </Stack>
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
               Deploys
             </Typography>
@@ -935,7 +948,7 @@ function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCo
             </Typography>
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
               Network
             </Typography>
@@ -944,7 +957,7 @@ function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCo
             </Typography>
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
+          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
               Volumes
             </Typography>
@@ -964,7 +977,10 @@ export default function ServiceDetail() {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
-  const [activeTab, setActiveTab] = useState("create");
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const [refreshIntervalMs, setRefreshIntervalMs] = useState(DEFAULT_REFRESH_INTERVAL_MS);
+  const [intervalMenuAnchor, setIntervalMenuAnchor] = useState(null);
 
   const [service, setService] = useState(null);
   const [planDetail, setPlanDetail] = useState(null);
@@ -1038,6 +1054,9 @@ export default function ServiceDetail() {
   const mountedRef = useRef(false);
   const fetchIdRef = useRef(0);
   const fetchDeploysLock = useRef(false);
+  const refreshIntervalRef = useRef(null);
+  const pageInfoRef = useRef(pageInfo);
+  const autoRefreshBusyRef = useRef(false);
 
   const zipInputRef = useRef(null);
   const editZipInputRef = useRef(null);
@@ -1224,14 +1243,40 @@ export default function ServiceDetail() {
         ? data
         : [];
 
-      setDeploys((prev) => mergeObjects(prev ?? [], results));
+      setDeploys((prev) => {
+        if (
+          Array.isArray(prev) &&
+          prev.length === results.length &&
+          JSON.stringify(prev) === JSON.stringify(results)
+        ) {
+          return prev;
+        }
+        return results;
+      });
       if (!silent) {
-        setPageInfo({
-          next: data.next,
-          previous: data.previous,
-          count: data.count,
-          page,
+        setPageInfo((prev) => {
+          const next = {
+            next: data.next,
+            previous: data.previous,
+            count: data.count,
+            page,
+          };
+          if (
+            prev.next === next.next &&
+            prev.previous === next.previous &&
+            prev.count === next.count &&
+            prev.page === next.page
+          ) {
+            return prev;
+          }
+          return next;
         });
+      } else if (data.count != null) {
+        setPageInfo((prev) =>
+          prev.count === data.count && prev.page === page
+            ? prev
+            : { ...prev, count: data.count, page }
+        );
       }
     } catch (err) {
       console.error("fetchDeploys error:", err);
@@ -1281,7 +1326,12 @@ export default function ServiceDetail() {
         params: { service: id, page_size: 100 },
       });
       const data = resp.data;
-      setAttachedVolumes(Array.isArray(data) ? data : data.results || []);
+      const next = Array.isArray(data) ? data : data.results || [];
+      setAttachedVolumes((prev) =>
+        Array.isArray(prev) && JSON.stringify(prev) === JSON.stringify(next)
+          ? prev
+          : next
+      );
     } catch (err) {
       console.error("fetchAttachedVolumes error:", err);
     }
@@ -1718,8 +1768,12 @@ export default function ServiceDetail() {
   }, [activeTab, deployLogDeployId, deployLogNewestCursorRef.current, service?.status, pollNewDeployLogs]);
 
   useEffect(() => {
-    if (!isDesktop) setActiveTab((current) => current || "create");
+    if (!isDesktop) setActiveTab((current) => current || "overview");
   }, [isDesktop]);
+
+  useEffect(() => {
+    pageInfoRef.current = pageInfo;
+  }, [pageInfo]);
 
   const setAction = useCallback((deployId, patch) => {
     setActionState((prev) => ({
@@ -1728,18 +1782,71 @@ export default function ServiceDetail() {
     }));
   }, []);
 
-  const refreshAll = async () => {
+  const silentRefresh = useCallback(async () => {
+    if (!id || !mountedRef.current) return;
+    if (autoRefreshBusyRef.current) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+
+    autoRefreshBusyRef.current = true;
+    try {
+      await Promise.allSettled([
+        fetchService(true),
+        fetchDeploys(pageInfoRef.current?.page || 1, true),
+        checkServiceRunning(true),
+        fetchAttachedVolumes(),
+      ]);
+    } catch (err) {
+      console.error("silentRefresh error:", err);
+    } finally {
+      autoRefreshBusyRef.current = false;
+    }
+  }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAttachedVolumes]);
+
+  const refreshAll = useCallback(async () => {
     await Promise.allSettled([
-      fetchService(),
-      fetchDeploys(pageInfo.page || 1),
+      fetchService(true),
+      fetchDeploys(pageInfoRef.current?.page || 1, true),
       checkServiceRunning(true),
       fetchAttachedVolumes(),
       fetchAvailableNetworks(),
       fetchAvailableVolumes(),
       activeTab === "logs" ? refreshServiceLogs() : Promise.resolve(),
-      activeTab === "logs" && deployLogDeployId ? fetchDeployLogsInitial(deployLogDeployId) : Promise.resolve(),
+      activeTab === "logs" && deployLogDeployId
+        ? fetchDeployLogsInitial(deployLogDeployId)
+        : Promise.resolve(),
     ]);
-  };
+  }, [
+    fetchService,
+    fetchDeploys,
+    checkServiceRunning,
+    fetchAttachedVolumes,
+    fetchAvailableNetworks,
+    fetchAvailableVolumes,
+    activeTab,
+    refreshServiceLogs,
+    deployLogDeployId,
+    fetchDeployLogsInitial,
+  ]);
+
+  useEffect(() => {
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
+
+    if (!id || !refreshIntervalMs || refreshIntervalMs < 1000) return undefined;
+
+    refreshIntervalRef.current = setInterval(() => {
+      silentRefresh();
+    }, refreshIntervalMs);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+  }, [id, refreshIntervalMs, silentRefresh]);
 
   const openConfirm = (type, deployId, title, message) => {
     setConfirmDialog({
@@ -2273,7 +2380,7 @@ export default function ServiceDetail() {
 
   const openServiceInNewTab = () => {
     if (!service?.service_name) return;
-    const host = `${service.service_name}.local`;
+    const host = `${service.service_name}.${import.meta.DEPLOY_BASE}`;
     window.open(`http://${host}`, "_blank", "noopener,noreferrer");
   };
 
@@ -2321,7 +2428,7 @@ export default function ServiceDetail() {
 
   const createDeployPanel = (
     <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ maxWidth: 960 }}>
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3, boxShadow: 4 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
         <Box
           sx={{
             display: "flex",
@@ -2477,7 +2584,7 @@ export default function ServiceDetail() {
         </Box>
       </Paper>
 
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3, boxShadow: 4 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
         <Box
           sx={{
             display: "flex",
@@ -2561,7 +2668,7 @@ export default function ServiceDetail() {
         emptyText="No service logs yet."
       />
 
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3, boxShadow: 4 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.25}
@@ -2648,116 +2755,322 @@ export default function ServiceDetail() {
     </Stack>
   );
 
-  const settingsPanel = (
-    <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ maxWidth: 960 }}>
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3, boxShadow: 4 }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 1,
-            flexWrap: "wrap",
-            mb: 1.5,
-          }}
-        >
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Service overview
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Clean status and quick controls.
-            </Typography>
-          </Box>
-          <Chip
-            label={serviceRunning === null ? "Unknown" : serviceRunning ? "Running" : "Stopped"}
-            color={serviceRunning === null ? "default" : serviceRunning ? "success" : "default"}
-            size="small"
-          />
+  const globalServiceControls = (
+    <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3, mb: 2 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 1,
+          flexWrap: "wrap",
+          mb: 1.5,
+        }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+            {service?.name || "Service"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+            {service?.service_name ? `${service.service_name}.${import.meta.DEPLOY_BASE}` : "—"}
+          </Typography>
         </Box>
+        <Chip
+          label={serviceRunning === null ? "Unknown" : serviceRunning ? "Running" : "Stopped"}
+          color={serviceRunning === null ? "default" : serviceRunning ? "success" : "default"}
+          size="small"
+        />
+      </Box>
 
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mb: 1.5 }}>
-          <Button
-            variant="contained"
-            startIcon={<PlayArrowIcon />}
-            onClick={startService}
-            disabled={
-              !service ||
-              serviceLoading ||
-              ["queued", "deploying", "stopping"].includes(String(service?.status))
-            }
-            fullWidth
-          >
-            Start service
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<StopIcon />}
-            onClick={stopService}
-            disabled={
-              !service ||
-              serviceLoading ||
-              ["queued", "deploying", "stopping"].includes(String(service?.status))
-            }
-            fullWidth
-          >
-            Stop service
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => checkServiceRunning(false)}
-            disabled={!service || serviceStatusLoadingManual}
-            fullWidth
-          >
-            {serviceStatusLoadingManual ? "Checking..." : "Check status"}
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={openServiceInNewTab}
-            disabled={!service?.service_name}
-            startIcon={<LinkIcon />}
-            fullWidth
-          >
-            Open service
-          </Button>
-        </Stack>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 1.5 }}>
+        <Button
+          variant="contained"
+          startIcon={<PlayArrowIcon />}
+          onClick={startService}
+          disabled={
+            !service ||
+            serviceLoading ||
+            ["queued", "deploying", "stopping"].includes(String(service?.status))
+          }
+          fullWidth
+          size="small"
+        >
+          Start
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<StopIcon />}
+          onClick={stopService}
+          disabled={
+            !service ||
+            serviceLoading ||
+            ["queued", "deploying", "stopping"].includes(String(service?.status))
+          }
+          fullWidth
+          size="small"
+        >
+          Stop
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={() => checkServiceRunning(false)}
+          disabled={!service || serviceStatusLoadingManual}
+          fullWidth
+          size="small"
+        >
+          {serviceStatusLoadingManual ? "Checking..." : "Check status"}
+        </Button>
+        <Button
+          variant="outlined"
+          onClick={openServiceInNewTab}
+          disabled={!service?.service_name}
+          startIcon={<LinkIcon />}
+          fullWidth
+          size="small"
+        >
+          Open
+        </Button>
+      </Stack>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mb: 1.5 }} flexWrap="wrap">
-          <Chip label={`Status: ${service?.status || "—"}`} variant="outlined" />
-          <Chip label={`Deploys: ${deployCount}`} variant="outlined" />
-          <Chip label={`Volumes: ${volumeCount}`} variant="outlined" />
-          <Chip label={`Network: ${networkName}`} variant="outlined" />
-          {selectedDeploy ? <Chip label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`} color="success" /> : null}
-        </Stack>
-
-        <Stack spacing={1}>
-          <Typography variant="caption">CPU {serviceCpu !== null ? `${serviceCpu}%` : "—"}</Typography>
-          <LinearProgress
-            variant="determinate"
-            value={Math.min(Math.max(serviceCpu || 0, 0), 100)}
-            sx={{
-              height: 10,
-              borderRadius: 2,
-              bgcolor: "grey.200",
-              "& .MuiLinearProgress-bar": { bgcolor: colorForPercent(serviceCpu) },
-            }}
+      <Stack direction="row" spacing={1} sx={{ mb: 1.25 }} flexWrap="wrap" useFlexGap>
+        <Chip label={`Status: ${service?.status || "—"}`} size="small" variant="outlined" />
+        <Chip label={`Deploys: ${deployCount}`} size="small" variant="outlined" />
+        <Chip label={`Volumes: ${volumeCount}`} size="small" variant="outlined" />
+        <Chip label={`Network: ${networkName}`} size="small" variant="outlined" />
+        {selectedDeploy ? (
+          <Chip
+            label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`}
+            size="small"
+            color="success"
           />
+        ) : null}
+      </Stack>
 
-          <Typography variant="caption">RAM {serviceRam !== null ? `${serviceRam}%` : "—"}</Typography>
-          <LinearProgress
-            variant="determinate"
-            value={Math.min(Math.max(serviceRam || 0, 0), 100)}
-            sx={{
-              height: 10,
-              borderRadius: 2,
-              bgcolor: "grey.200",
-              "& .MuiLinearProgress-bar": { bgcolor: colorForPercent(serviceRam) },
-            }}
-          />
-        </Stack>
+      <Stack spacing={0.75}>
+        <Typography variant="caption">
+          CPU {serviceCpu !== null ? `${serviceCpu}%` : "—"}
+        </Typography>
+        <LinearProgress
+          variant="determinate"
+          value={Math.min(Math.max(serviceCpu || 0, 0), 100)}
+          sx={{
+            height: 8,
+            borderRadius: 1,
+            bgcolor: "grey.200",
+            "& .MuiLinearProgress-bar": { bgcolor: colorForPercent(serviceCpu) },
+          }}
+        />
+        <Typography variant="caption">
+          RAM {serviceRam !== null ? `${serviceRam}%` : "—"}
+        </Typography>
+        <LinearProgress
+          variant="determinate"
+          value={Math.min(Math.max(serviceRam || 0, 0), 100)}
+          sx={{
+            height: 8,
+            borderRadius: 1,
+            bgcolor: "grey.200",
+            "& .MuiLinearProgress-bar": { bgcolor: colorForPercent(serviceRam) },
+          }}
+        />
+      </Stack>
+    </Paper>
+  );
+
+  const overviewPanel = (
+    <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ maxWidth: 960 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
+          Service details
+        </Typography>
+        <Box sx={{ fontSize: 13, color: "text.secondary" }}>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Name:</strong> {service?.name || "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Host:</strong>{" "}
+            {service?.service_name
+              ? `${service.service_name}.${import.meta.DEPLOY_BASE}`
+              : "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Status:</strong> {service?.status || "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Running:</strong>{" "}
+            {serviceRunning === null ? "—" : serviceRunning ? "Yes" : "No"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Selected deploy:</strong>{" "}
+            {selectedDeploy
+              ? `${selectedDeploy.name || selectedDeploy.id}${
+                  selectedDeploy.version ? ` (v${selectedDeploy.version})` : ""
+                }`
+              : "None"}
+          </Box>
+          {service?.created_at ? (
+            <Box sx={{ mb: 0.75 }}>
+              <strong>Created:</strong> {formatDate(service.created_at)}
+            </Box>
+          ) : null}
+          {service?.updated_at ? (
+            <Box sx={{ mb: 0.75 }}>
+              <strong>Updated:</strong> {formatDate(service.updated_at)}
+            </Box>
+          ) : null}
+        </Box>
       </Paper>
 
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3, boxShadow: 4 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
+          Plan
+        </Typography>
+        <Box sx={{ fontSize: 13, color: "text.secondary" }}>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Name:</strong> {planDetail?.name ?? service?.plan?.name ?? "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Platform:</strong>{" "}
+            {planDetail?.platform ?? service?.plan?.platform ?? "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>CPU:</strong> {planDetail?.max_cpu ?? service?.plan?.max_cpu ?? "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>RAM:</strong> {planDetail?.max_ram ?? service?.plan?.max_ram ?? "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Storage:</strong>{" "}
+            {planDetail?.max_storage ?? service?.plan?.max_storage ?? "—"}
+          </Box>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Price:</strong>{" "}
+            {planDetail?.price_per_hour ?? service?.plan?.price_per_hour ?? "—"}
+          </Box>
+        </Box>
+      </Paper>
+
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
+          Network
+        </Typography>
+        <Box sx={{ fontSize: 13, color: "text.secondary" }}>
+          <Box sx={{ mb: 0.75 }}>
+            <strong>Name:</strong> {networkName}
+          </Box>
+          {(networkDetail?.network?.cidr ?? networkDetail?.cidr) && (
+            <Box sx={{ mb: 0.75 }}>
+              <strong>CIDR:</strong>{" "}
+              {networkDetail?.network?.cidr ?? networkDetail?.cidr}
+            </Box>
+          )}
+          {(networkDetail?.network?.driver ?? networkDetail?.driver) && (
+            <Box sx={{ mb: 0.75 }}>
+              <strong>Driver:</strong>{" "}
+              {networkDetail?.network?.driver ?? networkDetail?.driver}
+            </Box>
+          )}
+        </Box>
+      </Paper>
+
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
+          Volumes ({volumeCount})
+        </Typography>
+        {attachedVolumes.length ? (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+              gap: 1.25,
+            }}
+          >
+            {attachedVolumes.map((volume) => (
+              <Paper key={volume.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {volume.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Bind: {volume.bind || "—"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Mode: {volume.mode || "—"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Size: {volume.size_mb != null ? `${volume.size_mb} MB` : "—"}
+                </Typography>
+              </Paper>
+            ))}
+          </Box>
+        ) : (
+          <Typography color="text.secondary">No volumes attached.</Typography>
+        )}
+      </Paper>
+
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
+          Deploys ({deployCount})
+        </Typography>
+        {deploys.length ? (
+          <Stack spacing={1}>
+            {deploys.slice(0, 8).map((deploy) => {
+              const isSelected =
+                selectedDeployId !== "" &&
+                String(selectedDeployId) === String(deploy.id);
+              return (
+                <Paper
+                  key={deploy.id ?? deploy.pk}
+                  variant="outlined"
+                  sx={{ p: 1.25, borderRadius: 1.5 }}
+                >
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    justifyContent="space-between"
+                    flexWrap="wrap"
+                    useFlexGap
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        {deploy.name || "Unnamed"}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        v{deploy.version || "—"} · {formatDate(deploy.created_at)}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                      {isSelected ? (
+                        <Chip label="Selected" size="small" color="success" />
+                      ) : null}
+                      {deploy.status || deploy.stage ? (
+                        <Chip
+                          label={deploy.status || deploy.stage}
+                          size="small"
+                          variant="outlined"
+                        />
+                      ) : null}
+                    </Stack>
+                  </Stack>
+                </Paper>
+              );
+            })}
+            {deploys.length > 8 ? (
+              <Typography variant="caption" color="text.secondary">
+                Showing 8 of {deploys.length}. Open Create deploy for the full list.
+              </Typography>
+            ) : null}
+          </Stack>
+        ) : (
+          <Typography color="text.secondary">No deploys for this service.</Typography>
+        )}
+      </Paper>
+    </Stack>
+  );
+
+  const settingsPanel = (
+    <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ maxWidth: 960 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
           Plan
         </Typography>
@@ -2796,7 +3109,7 @@ export default function ServiceDetail() {
         </Box>
       </Paper>
 
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3, boxShadow: 4 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
           Network
         </Typography>
@@ -2886,7 +3199,7 @@ export default function ServiceDetail() {
         </Stack>
       </Paper>
 
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3, boxShadow: 4 }}>
+      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
           Volumes
         </Typography>
@@ -3001,9 +3314,47 @@ export default function ServiceDetail() {
           </Typography>
         </Box>
 
-        <Button variant="outlined" size={isDesktop ? "medium" : "small"} startIcon={<RefreshIcon />} onClick={refreshAll}>
-          Refresh
-        </Button>
+        <Stack direction="row" spacing={0.75} alignItems="center">
+          <Button
+            variant="outlined"
+            size={isDesktop ? "medium" : "small"}
+            startIcon={<RefreshIcon />}
+            onClick={refreshAll}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            size={isDesktop ? "medium" : "small"}
+            startIcon={<AccessTimeIcon />}
+            endIcon={<ArrowDropDownIcon />}
+            onClick={(e) => setIntervalMenuAnchor(e.currentTarget)}
+            aria-haspopup="true"
+            aria-expanded={Boolean(intervalMenuAnchor) ? "true" : undefined}
+          >
+            {REFRESH_INTERVAL_OPTIONS.find((o) => o.value === refreshIntervalMs)?.label || "2s"}
+          </Button>
+          <Menu
+            anchorEl={intervalMenuAnchor}
+            open={Boolean(intervalMenuAnchor)}
+            onClose={() => setIntervalMenuAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            {REFRESH_INTERVAL_OPTIONS.map((opt) => (
+              <MenuItem
+                key={opt.value}
+                selected={opt.value === refreshIntervalMs}
+                onClick={() => {
+                  setRefreshIntervalMs(opt.value);
+                  setIntervalMenuAnchor(null);
+                }}
+              >
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Menu>
+        </Stack>
       </Box>
 
       <Box
@@ -3015,66 +3366,14 @@ export default function ServiceDetail() {
         }}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Paper elevation={1} sx={{ p: 2, borderRadius: 3, boxShadow: 4, mb: 2 }}>
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 1.5,
-                flexWrap: "wrap",
-              }}
-            >
-              <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                  <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
-                    {service?.name || "Service"}
-                  </Typography>
-                  <Chip
-                    label={service?.status || "unknown"}
-                    color={
-                      ["running", "success"].includes(String(service?.status))
-                        ? "success"
-                        : ["queued", "deploying", "stopping"].includes(String(service?.status))
-                        ? "warning"
-                        : "default"
-                    }
-                    size="small"
-                  />
-                  {selectedDeploy ? (
-                    <Chip label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`} size="small" variant="outlined" />
-                  ) : null}
-                </Stack>
-                <Typography variant="body2" color="text.secondary">
-                  {service?.service_name ? `${service.service_name}.local` : "—"}
-                </Typography>
-              </Stack>
-
-              <Button
-                variant="contained"
-                startIcon={<LinkIcon />}
-                onClick={openServiceInNewTab}
-                disabled={!service?.service_name}
-              >
-                Open service
-              </Button>
-            </Box>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 2 }} flexWrap="wrap">
-              <Chip label={`Deploys: ${deployCount}`} variant="outlined" />
-              <Chip label={`Volumes: ${volumeCount}`} variant="outlined" />
-              <Chip label={`Network: ${networkName}`} variant="outlined" />
-              <Chip label={`CPU: ${serviceCpu !== null ? `${serviceCpu}%` : "—"}`} variant="outlined" />
-              <Chip label={`RAM: ${serviceRam !== null ? `${serviceRam}%` : "—"}`} variant="outlined" />
-            </Stack>
-          </Paper>
+          {globalServiceControls}
 
           {!isDesktop ? (
             <Paper
               elevation={1}
               sx={{
-                borderRadius: 3,
-                boxShadow: 4,
+                borderRadius: 2,
+                boxShadow: 3,
                 mb: 2,
                 position: "sticky",
                 top: 8,
@@ -3102,6 +3401,7 @@ export default function ServiceDetail() {
           ) : null}
 
           <Box>
+            {activeTab === "overview" ? overviewPanel : null}
             {activeTab === "create" ? createDeployPanel : null}
             {activeTab === "logs" ? logsPanel : null}
             {activeTab === "settings" ? settingsPanel : null}
