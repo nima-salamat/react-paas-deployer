@@ -31,7 +31,6 @@ import {
   InputLabel,
 } from "@mui/material";
 
-// Icons
 import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -56,13 +55,12 @@ const PLANS_API = `https://${import.meta.env.VITE_API_BASE}/plans/`;
 const PLATFORMS_API = `https://${import.meta.env.VITE_API_BASE}/plans/platforms/`;
 const NETWORK_API_ROOT = `https://${import.meta.env.VITE_API_BASE}/services/networks/`;
 
-// Custom Hook for Local Storage
 function useLocalStorage(key, initialValue) {
   const [storedValue, setStoredValue] = useState(() => {
     try {
       const item = window.localStorage.getItem(key);
       return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
+    } catch {
       return initialValue;
     }
   });
@@ -79,6 +77,297 @@ function useLocalStorage(key, initialValue) {
   return [storedValue, setValue];
 }
 
+// ==================== ServiceItem (خارج از کامپوننت اصلی تا memo کار کند) ====================
+const ServiceItem = memo(function ServiceItem({
+  s,
+  layout,
+  isReadOnly,
+  planCache,
+  networkCache,
+  loadPlan,
+  loadNetwork,
+  onToggleStatus,
+  onEdit,
+  onDelete,
+  onOpen,
+}) {
+  const planIsObj = s.plan && typeof s.plan === "object";
+  const netIsObj = s.network && typeof s.network === "object";
+  const planId = planIsObj ? s.plan.id ?? s.plan.pk : s.plan;
+  const networkId = netIsObj ? s.network.id ?? s.network.pk : s.network;
+
+  useEffect(() => {
+    if (planId && !planCache[planId]) loadPlan(planId);
+  }, [planId, planCache, loadPlan]);
+
+  useEffect(() => {
+    if (networkId && !networkCache[networkId]) loadNetwork(networkId);
+  }, [networkId, networkCache, loadNetwork]);
+
+  const networkName = netIsObj ? s.network.name : networkCache[networkId]?.name ?? "—";
+  const cpu = planIsObj ? s.plan.max_cpu : planCache[planId]?.max_cpu;
+  const ram = planIsObj ? s.plan.max_ram : planCache[planId]?.max_ram;
+  const storage = planIsObj ? s.plan.max_storage : planCache[planId]?.max_storage;
+  const price = planIsObj ? s.plan.price_per_hour : planCache[planId]?.price_per_hour;
+
+  const isUpdating = s.status === "updating...";
+  const isRunning = s.status === "running";
+
+  const commonStats = (
+    <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1 }}>
+      {cpu && <Chip size="small" icon={<ComputerIcon fontSize="small" />} label={`${cpu} Cores`} />}
+      {ram && <Chip size="small" icon={<MemoryIcon fontSize="small" />} label={`${ram} MB`} />}
+      {storage && <Chip size="small" icon={<StorageIcon fontSize="small" />} label={`${storage} GB`} />}
+      {price && (
+        <Chip
+          size="small"
+          icon={<AttachMoneyIcon fontSize="small" />}
+          label={`${price}/hr`}
+          color="success"
+          variant="outlined"
+        />
+      )}
+    </Box>
+  );
+
+  // دکمه‌ها با عرض و ارتفاع کاملاً ثابت + بدون transform
+  const actionButtons = !isReadOnly && (
+    <Box
+      sx={{
+        display: "flex",
+        gap: 1,
+        flexWrap: "nowrap",
+        justifyContent: layout === "row" ? "flex-end" : "flex-start",
+        mt: layout === "row" ? 0 : 2,
+        minWidth: layout === "row" ? 340 : "auto",
+        alignItems: "center",
+        flexShrink: 0,
+      }}
+    >
+      <Button
+        size="small"
+        variant="contained"
+        color={isRunning ? "error" : "success"}
+        disabled={isUpdating}
+        startIcon={isRunning ? <StopIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleStatus(s, s.status);
+        }}
+        sx={{
+          minWidth: 96,
+          width: 96,
+          height: 32,
+          px: 1,
+          transition: "background-color 0.15s ease, box-shadow 0.15s ease",
+          "&:hover": {
+            transform: "none !important",
+          },
+          "& .MuiButton-startIcon": {
+            marginRight: "6px",
+            marginLeft: 0,
+          },
+        }}
+      >
+        {isUpdating ? "..." : isRunning ? "Stop" : "Start"}
+      </Button>
+
+      <Button
+        size="small"
+        variant="outlined"
+        startIcon={<EditIcon fontSize="small" />}
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit(s, networkId, planId);
+        }}
+        sx={{
+          minWidth: 82,
+          width: 82,
+          height: 32,
+          transition: "background-color 0.15s ease",
+          "&:hover": { transform: "none !important" },
+        }}
+      >
+        Edit
+      </Button>
+
+      <Button
+        size="small"
+        variant="outlined"
+        color="error"
+        startIcon={<DeleteIcon fontSize="small" />}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(s.id ?? s.pk);
+        }}
+        sx={{
+          minWidth: 90,
+          width: 90,
+          height: 32,
+          transition: "background-color 0.15s ease",
+          "&:hover": { transform: "none !important" },
+        }}
+      >
+        Delete
+      </Button>
+
+      <Button
+        size="small"
+        variant="contained"
+        startIcon={<LaunchIcon fontSize="small" />}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen(s);
+        }}
+        sx={{
+          minWidth: 86,
+          width: 86,
+          height: 32,
+          transition: "background-color 0.15s ease, box-shadow 0.15s ease",
+          "&:hover": { transform: "none !important" },
+        }}
+      >
+        Open
+      </Button>
+    </Box>
+  );
+
+  if (layout === "row") {
+    return (
+      <Card
+        elevation={1}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          p: 2,
+          mb: 1,
+          flexWrap: "wrap",
+          transition: "none",
+          "&:hover": { transform: "none" },
+        }}
+      >
+        <Box sx={{ flex: 1, minWidth: 180, mb: { xs: 2, md: 0 } }}>
+          <Typography variant="subtitle1" fontWeight={700}>
+            {s.name || "(no name)"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {networkName}
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            flex: 2,
+            display: "flex",
+            justifyContent: { xs: "flex-start", md: "center" },
+            minWidth: 220,
+            mb: { xs: 2, md: 0 },
+          }}
+        >
+          {commonStats}
+        </Box>
+
+        <Box
+          sx={{
+            flex: "0 0 auto",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: { xs: "flex-start", md: "flex-end" },
+            minWidth: 340,
+          }}
+        >
+          <Chip
+            label={s.status ?? "unknown"}
+            color={isRunning ? "success" : "default"}
+            size="small"
+            sx={{ mb: 1, minWidth: 80, height: 24 }}
+          />
+          {actionButtons}
+        </Box>
+      </Card>
+    );
+  }
+
+  return (
+    <Card
+      elevation={3}
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        minWidth: layout === "carousel" ? 300 : "auto",
+        transition: "none",
+        "&:hover": { transform: "none" },
+      }}
+    >
+      <CardContent sx={{ flexGrow: 1 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box>
+            <Typography variant="subtitle1" fontWeight={700}>
+              {s.name || "(no name)"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {networkName}
+            </Typography>
+          </Box>
+          <Chip
+            label={s.status ?? "unknown"}
+            color={isRunning ? "success" : "default"}
+            size="small"
+            sx={{ minWidth: 80, height: 24 }}
+          />
+        </Box>
+
+        {layout === "carousel" ? (
+          commonStats
+        ) : (
+          <Box sx={{ mt: 2 }}>
+            {cpu && (
+              <Typography variant="body2">
+                CPU: <strong>{cpu}</strong> cores
+              </Typography>
+            )}
+            {ram && (
+              <Typography variant="body2">
+                RAM: <strong>{ram}</strong> MB
+              </Typography>
+            )}
+            {storage && (
+              <Typography variant="body2">
+                Storage: <strong>{storage}</strong> GB
+              </Typography>
+            )}
+            {price && (
+              <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                Price/hr: <strong>{price}</strong>
+              </Typography>
+            )}
+          </Box>
+        )}
+      </CardContent>
+
+      {(!isReadOnly || (isReadOnly && layout !== "row")) && (
+        <Box
+          sx={{
+            p: 2,
+            display: "flex",
+            gap: 1,
+            justifyContent: "flex-end",
+            backgroundColor: "rgba(0,0,0,0.02)",
+            minHeight: 56,
+            alignItems: "center",
+            flexShrink: 0,
+          }}
+        >
+          {actionButtons}
+        </Box>
+      )}
+    </Card>
+  );
+});
+
+// ==================== کامپوننت اصلی ====================
 export default function ServicesListMui({
   apiUrl = "/services/service/",
   pageSize = 10,
@@ -89,14 +378,12 @@ export default function ServicesListMui({
   const theme = useTheme();
   const navigate = useNavigate();
 
-  // Settings & View states
   const [viewMode, setViewMode] = useLocalStorage("services_view_mode", "cards");
   const [autoRefresh, setAutoRefresh] = useLocalStorage("services_auto_refresh", false);
   const [refreshInterval, setRefreshInterval] = useLocalStorage("services_refresh_interval", 2000);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
 
-  // Data states
   const [services, setServices] = useState([]);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
@@ -105,11 +392,8 @@ export default function ServicesListMui({
   const [loadingMore, setLoadingMore] = useState(false);
   const [servicesFetchError, setServicesFetchError] = useState(null);
 
-  // Caches
   const [planCache, setPlanCache] = useState({});
-  const [planCacheErrors, setPlanCacheErrors] = useState({});
   const [networkCache, setNetworkCache] = useState({});
-  const [networkCacheErrors, setNetworkCacheErrors] = useState({});
 
   const [networks, setNetworks] = useState([]);
   const [networksLoading, setNetworksLoading] = useState(false);
@@ -178,7 +462,6 @@ export default function ServicesListMui({
     [page, pageSize, query]
   );
 
-  // Core fetching logic
   const fetchServices = useCallback(
     async (isBackground = false) => {
       if (!isBackground) {
@@ -201,13 +484,24 @@ export default function ServicesListMui({
 
         setServices((prev) => {
           if (isBackground) {
-            const isDifferent = JSON.stringify(prev) !== JSON.stringify(results);
-            return isDifferent ? results : prev;
-          } else {
-            return page === 1
-              ? results
-              : [...prev, ...results.filter((r) => !prev.some((p) => getKey(p) === getKey(r)))];
+            // فقط اگر واقعاً تغییر کرده باشد جایگزین کن
+            if (prev.length !== results.length) return results;
+            const changed = results.some((r, i) => {
+              const p = prev[i];
+              if (!p) return true;
+              return (
+                getKey(p) !== getKey(r) ||
+                p.status !== r.status ||
+                p.name !== r.name ||
+                JSON.stringify(p.plan) !== JSON.stringify(r.plan) ||
+                JSON.stringify(p.network) !== JSON.stringify(r.network)
+              );
+            });
+            return changed ? results : prev;
           }
+          return page === 1
+            ? results
+            : [...prev, ...results.filter((r) => !prev.some((p) => getKey(p) === getKey(r)))];
         });
 
         if (!isBackground) {
@@ -235,12 +529,10 @@ export default function ServicesListMui({
     [page, pageSize, apiUrl, extraQueryParams, buildUrl, handleAuthError]
   );
 
-  // Initial and paginated fetching
   useEffect(() => {
     fetchServices(false);
   }, [page, query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Safe Auto-Refresh Background Polling
   useEffect(() => {
     if (!autoRefresh) return;
 
@@ -291,14 +583,8 @@ export default function ServicesListMui({
   const loadPlan = useCallback(
     async (planId) => {
       if (!planId) return;
-      setPlanCache((prev) => {
-        if (prev[planId]) return prev;
-        return prev;
-      });
-      // Check again inside to avoid race
       setPlanCache((current) => {
         if (current[planId]) return current;
-        // fire and forget
         (async () => {
           try {
             const res = await apiRequest({ method: "GET", url: `${PLANS_API}?id=${planId}` });
@@ -306,7 +592,6 @@ export default function ServicesListMui({
             setPlanCache((p) => ({ ...p, [planId]: res.data }));
           } catch (e) {
             handleAuthError(e);
-            setPlanCacheErrors((s) => ({ ...s, [planId]: e?.message || "Failed to load plan." }));
           }
         })();
         return current;
@@ -327,7 +612,6 @@ export default function ServicesListMui({
             setNetworkCache((n) => ({ ...n, [networkId]: res.data }));
           } catch (e) {
             handleAuthError(e);
-            setNetworkCacheErrors((s) => ({ ...s, [networkId]: e?.message || "Failed to load network." }));
           }
         })();
         return current;
@@ -338,11 +622,14 @@ export default function ServicesListMui({
 
   const getServiceDetailUrl = (id) => `${API_BASE}${apiUrl.endsWith("/") ? apiUrl : apiUrl + "/"}${id}/`;
 
-  const handleOpen = (svc) => {
-    const id = svc.id ?? svc.pk;
-    if (id) navigate(`/service/${id}`);
-    else if (onOpen) onOpen(svc);
-  };
+  const handleOpen = useCallback(
+    (svc) => {
+      const id = svc.id ?? svc.pk;
+      if (id) navigate(`/service/${id}`);
+      else if (onOpen) onOpen(svc);
+    },
+    [navigate, onOpen]
+  );
 
   const updateService = async (serviceId, payload) => {
     setActionLoading(true);
@@ -367,47 +654,51 @@ export default function ServicesListMui({
     }
   };
 
-  const toggleServiceStatus = async (service, currentStatus) => {
-    const serviceId = service.id ?? service.pk;
-    const newStatus = currentStatus === "running" ? "stopped" : "running";
+  const toggleServiceStatus = useCallback(
+    async (service, currentStatus) => {
+      const serviceId = service.id ?? service.pk;
+      const newStatus = currentStatus === "running" ? "stopped" : "running";
 
-    // Optimistic UI update
-    setServices((prev) =>
-      prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: "updating..." } : s))
-    );
-
-    try {
-      await apiRequest({ method: "PATCH", url: getServiceDetailUrl(serviceId), data: { status: newStatus } });
       setServices((prev) =>
-        prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: newStatus } : s))
+        prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: "updating..." } : s))
       );
-    } catch (e) {
-      if (handleAuthError(e)) return;
-      // Revert on failure
-      setServices((prev) =>
-        prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: currentStatus } : s))
-      );
-      setAlertState({ severity: "error", message: "Failed to change service status." });
-      setTimeout(() => setAlertState(null), 3000);
-    }
-  };
 
-  const deleteService = async (serviceId) => {
-    if (!window.confirm("Are you sure you want to delete this service?")) return;
-    setActionLoading(true);
-    try {
-      await apiRequest({ method: "DELETE", url: getServiceDetailUrl(serviceId) });
-      setServices((prev) => prev.filter((s) => String(s.id ?? s.pk) !== String(serviceId)));
-      setAlertState({ severity: "success", message: "Service deleted." });
-      setTimeout(() => setAlertState(null), 2000);
-    } catch (e) {
-      if (handleAuthError(e)) return;
-      setAlertState({ severity: "error", message: e?.message || "Failed to delete." });
-      setTimeout(() => setAlertState(null), 3000);
-    } finally {
-      setActionLoading(false);
-    }
-  };
+      try {
+        await apiRequest({ method: "PATCH", url: getServiceDetailUrl(serviceId), data: { status: newStatus } });
+        setServices((prev) =>
+          prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: newStatus } : s))
+        );
+      } catch (e) {
+        if (handleAuthError(e)) return;
+        setServices((prev) =>
+          prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: currentStatus } : s))
+        );
+        setAlertState({ severity: "error", message: "Failed to change service status." });
+        setTimeout(() => setAlertState(null), 3000);
+      }
+    },
+    [handleAuthError]
+  );
+
+  const deleteService = useCallback(
+    async (serviceId) => {
+      if (!window.confirm("Are you sure you want to delete this service?")) return;
+      setActionLoading(true);
+      try {
+        await apiRequest({ method: "DELETE", url: getServiceDetailUrl(serviceId) });
+        setServices((prev) => prev.filter((s) => String(s.id ?? s.pk) !== String(serviceId)));
+        setAlertState({ severity: "success", message: "Service deleted." });
+        setTimeout(() => setAlertState(null), 2000);
+      } catch (e) {
+        if (handleAuthError(e)) return;
+        setAlertState({ severity: "error", message: e?.message || "Failed to delete." });
+        setTimeout(() => setAlertState(null), 3000);
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [handleAuthError]
+  );
 
   const fetchPlansForPlatform = async (platform) => {
     if (!platform || plansForPlatform[platform]) return plansForPlatform[platform] || [];
@@ -470,255 +761,16 @@ export default function ServicesListMui({
     fetchServices(false);
   };
 
-  // ==================== Service Item (memoized + no side-effect in render) ====================
-  const ServiceItem = memo(function ServiceItem({ s, layout, isReadOnly }) {
-    const planIsObj = s.plan && typeof s.plan === "object";
-    const netIsObj = s.network && typeof s.network === "object";
-    const planId = planIsObj ? s.plan.id ?? s.plan.pk : s.plan;
-    const networkId = netIsObj ? s.network.id ?? s.network.pk : s.network;
-
-    // Load plan/network safely with useEffect (no side-effect during render)
-    useEffect(() => {
-      if (planId && !planCache[planId]) loadPlan(planId);
-    }, [planId, planCache, loadPlan]);
-
-    useEffect(() => {
-      if (networkId && !networkCache[networkId]) loadNetwork(networkId);
-    }, [networkId, networkCache, loadNetwork]);
-
-    const networkName = netIsObj ? s.network.name : networkCache[networkId]?.name ?? "—";
-    const cpu = planIsObj ? s.plan.max_cpu : planCache[planId]?.max_cpu;
-    const ram = planIsObj ? s.plan.max_ram : planCache[planId]?.max_ram;
-    const storage = planIsObj ? s.plan.max_storage : planCache[planId]?.max_storage;
-    const price = planIsObj ? s.plan.price_per_hour : planCache[planId]?.price_per_hour;
-
-    const isUpdating = s.status === "updating...";
-    const isRunning = s.status === "running";
-
-    const commonStats = (
-      <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1 }}>
-        {cpu && <Chip size="small" icon={<ComputerIcon fontSize="small" />} label={`${cpu} Cores`} />}
-        {ram && <Chip size="small" icon={<MemoryIcon fontSize="small" />} label={`${ram} MB`} />}
-        {storage && <Chip size="small" icon={<StorageIcon fontSize="small" />} label={`${storage} GB`} />}
-        {price && (
-          <Chip
-            size="small"
-            icon={<AttachMoneyIcon fontSize="small" />}
-            label={`${price}/hr`}
-            color="success"
-            variant="outlined"
-          />
-        )}
-      </Box>
-    );
-
-    // Fixed widths prevent jump on hover / status change
-    const actionButtons = !isReadOnly && (
-      <Box
-        sx={{
-          display: "flex",
-          gap: 1,
-          flexWrap: "wrap",
-          justifyContent: layout === "row" ? "flex-end" : "flex-start",
-          mt: layout === "row" ? 0 : 2,
-          minWidth: layout === "row" ? 320 : "auto",
-          alignItems: "center",
-        }}
-      >
-        <Button
-          size="small"
-          variant="contained"
-          color={isRunning ? "error" : "success"}
-          disabled={isUpdating}
-          startIcon={isRunning ? <StopIcon /> : <PlayArrowIcon />}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleServiceStatus(s, s.status);
-          }}
-          sx={{
-            minWidth: 92, 
-            transition: "none",
-          }}
-        >
-          {isUpdating ? "..." : isRunning ? "Stop" : "Start"}
-        </Button>
-
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<EditIcon />}
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditingService({
-              service: s,
-              selectedNetwork: networkId ?? null,
-              selectedPlanId: planId ?? null,
-            });
-          }}
-          sx={{ minWidth: 80 }}
-        >
-          Edit
-        </Button>
-
-        <Button
-          size="small"
-          variant="outlined"
-          color="error"
-          startIcon={<DeleteIcon />}
-          onClick={(e) => {
-            e.stopPropagation();
-            deleteService(s.id ?? s.pk);
-          }}
-          sx={{ minWidth: 90 }}
-        >
-          Delete
-        </Button>
-
-        <Button
-          size="small"
-          variant="contained"
-          startIcon={<LaunchIcon />}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpen(s);
-          }}
-          sx={{ minWidth: 85 }}
-        >
-          Open
-        </Button>
-      </Box>
-    );
-
-    if (layout === "row") {
-      return (
-        <Card
-          elevation={1}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            p: 2,
-            mb: 1,
-            flexWrap: "wrap",
-            transition: "none",
-          }}
-        >
-          <Box sx={{ flex: 1, minWidth: 200, mb: { xs: 2, md: 0 } }}>
-            <Typography variant="subtitle1" fontWeight={700}>
-              {s.name || "(no name)"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {networkName}
-            </Typography>
-          </Box>
-          <Box
-            sx={{
-              flex: 2,
-              display: "flex",
-              justifyContent: { xs: "flex-start", md: "center" },
-              minWidth: 250,
-              mb: { xs: 2, md: 0 },
-            }}
-          >
-            {commonStats}
-          </Box>
-          <Box
-            sx={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: { xs: "flex-start", md: "flex-end" },
-            }}
-          >
-            <Chip
-              label={s.status ?? "unknown"}
-              color={isRunning ? "success" : "default"}
-              size="small"
-              sx={{ mb: 1, minWidth: 80 }}
-            />
-            {actionButtons}
-          </Box>
-        </Card>
-      );
-    }
-
-    return (
-      <Card
-        elevation={3}
-        sx={{
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          minWidth: layout === "carousel" ? "300px" : "auto",
-          transition: "none",
-        }}
-      >
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <Box>
-              <Typography variant="subtitle1" fontWeight={700}>
-                {s.name || "(no name)"}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {networkName}
-              </Typography>
-            </Box>
-            <Chip
-              label={s.status ?? "unknown"}
-              color={isRunning ? "success" : "default"}
-              size="small"
-              sx={{ minWidth: 80 }}
-            />
-          </Box>
-          {layout === "carousel" ? (
-            commonStats
-          ) : (
-            <Box sx={{ mt: 2 }}>
-              {cpu && (
-                <Typography variant="body2">
-                  CPU: <strong>{cpu}</strong> cores
-                </Typography>
-              )}
-              {ram && (
-                <Typography variant="body2">
-                  RAM: <strong>{ram}</strong> MB
-                </Typography>
-              )}
-              {storage && (
-                <Typography variant="body2">
-                  Storage: <strong>{storage}</strong> GB
-                </Typography>
-              )}
-              {price && (
-                <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
-                  Price/hr: <strong>{price}</strong>
-                </Typography>
-              )}
-            </Box>
-          )}
-        </CardContent>
-        {(!isReadOnly || (isReadOnly && layout !== "row")) && (
-          <Box
-            sx={{
-              p: 2,
-              display: "flex",
-              gap: 1,
-              justifyContent: "flex-end",
-              backgroundColor: "rgba(0,0,0,0.02)",
-              minHeight: 56,
-              alignItems: "center",
-            }}
-          >
-            {actionButtons}
-          </Box>
-        )}
-      </Card>
-    );
-  });
+  const handleEdit = useCallback((s, networkId, planId) => {
+    setEditingService({
+      service: s,
+      selectedNetwork: networkId ?? null,
+      selectedPlanId: planId ?? null,
+    });
+  }, []);
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      {/* Header Area */}
       <Box
         sx={{
           display: "flex",
@@ -793,7 +845,6 @@ export default function ServicesListMui({
         </Box>
       </Box>
 
-      {/* Filter and Search Bar Row */}
       {showSearch && (
         <Paper
           elevation={1}
@@ -848,7 +899,6 @@ export default function ServicesListMui({
         </Paper>
       )}
 
-      {/* Alerts */}
       {alertState && (
         <Snackbar open autoHideDuration={3000} onClose={() => setAlertState(null)}>
           <Alert severity={alertState.severity} onClose={() => setAlertState(null)}>
@@ -872,7 +922,6 @@ export default function ServicesListMui({
         </Paper>
       )}
 
-      {/* Services Display Logic */}
       {!loading && !servicesFetchError && (
         <Box>
           {services.length === 0 ? (
@@ -881,32 +930,66 @@ export default function ServicesListMui({
             </Typography>
           ) : (
             <>
-              {/* Cards / Overview View */}
               {(viewMode === "cards" || viewMode === "overview") && (
                 <Grid container spacing={3}>
                   {services.map((s) => (
                     <Grid item xs={12} md={6} lg={4} key={getKey(s)}>
-                      <ServiceItem s={s} layout="card" isReadOnly={viewMode === "overview"} />
+                      <ServiceItem
+                        s={s}
+                        layout="card"
+                        isReadOnly={viewMode === "overview"}
+                        planCache={planCache}
+                        networkCache={networkCache}
+                        loadPlan={loadPlan}
+                        loadNetwork={loadNetwork}
+                        onToggleStatus={toggleServiceStatus}
+                        onEdit={handleEdit}
+                        onDelete={deleteService}
+                        onOpen={handleOpen}
+                      />
                     </Grid>
                   ))}
                 </Grid>
               )}
 
-              {/* Rows View */}
               {viewMode === "rows" && (
                 <Stack spacing={0}>
                   {services.map((s) => (
-                    <ServiceItem key={getKey(s)} s={s} layout="row" isReadOnly={false} />
+                    <ServiceItem
+                      key={getKey(s)}
+                      s={s}
+                      layout="row"
+                      isReadOnly={false}
+                      planCache={planCache}
+                      networkCache={networkCache}
+                      loadPlan={loadPlan}
+                      loadNetwork={loadNetwork}
+                      onToggleStatus={toggleServiceStatus}
+                      onEdit={handleEdit}
+                      onDelete={deleteService}
+                      onOpen={handleOpen}
+                    />
                   ))}
                 </Stack>
               )}
 
-              {/* Carousel View */}
               {viewMode === "carousel" && (
                 <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 4 }}>
                   {services[carouselIndex] && (
                     <Box sx={{ width: "100%", maxWidth: 600 }}>
-                      <ServiceItem s={services[carouselIndex]} layout="carousel" isReadOnly={false} />
+                      <ServiceItem
+                        s={services[carouselIndex]}
+                        layout="carousel"
+                        isReadOnly={false}
+                        planCache={planCache}
+                        networkCache={networkCache}
+                        loadPlan={loadPlan}
+                        loadNetwork={loadNetwork}
+                        onToggleStatus={toggleServiceStatus}
+                        onEdit={handleEdit}
+                        onDelete={deleteService}
+                        onOpen={handleOpen}
+                      />
                     </Box>
                   )}
                   <Box sx={{ mt: 4, display: "flex", alignItems: "center", gap: 3 }}>
@@ -952,7 +1035,6 @@ export default function ServicesListMui({
         </Box>
       )}
 
-      {/* ==================== EDIT DIALOG ==================== */}
       <Dialog
         open={Boolean(editingService)}
         onClose={() => setEditingService(null)}
@@ -1022,7 +1104,6 @@ export default function ServicesListMui({
   );
 }
 
-/* ====================== EditorInside ====================== */
 function EditorInside({
   editingService,
   setEditingService,
@@ -1064,7 +1145,6 @@ function EditorInside({
 
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 340px" }, gap: 3 }}>
-      {/* Left Column - Network & Plans */}
       <Box>
         <Typography variant="h6" fontWeight={700} gutterBottom>
           Network
@@ -1220,7 +1300,6 @@ function EditorInside({
         </Box>
       </Box>
 
-      {/* Right Column - Read Only Service Info */}
       <Box>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700}>
