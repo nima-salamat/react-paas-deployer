@@ -921,7 +921,7 @@ function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCo
               {service?.name || "Service"}
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-              {service?.service_name ? `${service.service_name}.${import.meta.DEPLOY_BASE}` : "—"}
+              {service?.service_name ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}` : "—"}
             </Typography>
             <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
               <Chip
@@ -2380,7 +2380,7 @@ export default function ServiceDetail() {
 
   const openServiceInNewTab = () => {
     if (!service?.service_name) return;
-    const host = `${service.service_name}.${import.meta.DEPLOY_BASE}`;
+    const host = `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`;
     window.open(`http://${host}`, "_blank", "noopener,noreferrer");
   };
 
@@ -2772,7 +2772,7 @@ export default function ServiceDetail() {
             {service?.name || "Service"}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-            {service?.service_name ? `${service.service_name}.${import.meta.DEPLOY_BASE}` : "—"}
+            {service?.service_name ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}` : "—"}
           </Typography>
         </Box>
         <Chip
@@ -2890,7 +2890,7 @@ export default function ServiceDetail() {
           <Box sx={{ mb: 0.75 }}>
             <strong>Host:</strong>{" "}
             {service?.service_name
-              ? `${service.service_name}.${import.meta.DEPLOY_BASE}`
+              ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`
               : "—"}
           </Box>
           <Box sx={{ mb: 0.75 }}>
