@@ -1,3 +1,4 @@
+// ServicesListMui.jsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
@@ -22,12 +23,12 @@ import {
   Alert,
   useTheme,
   Paper,
-  Tabs,
-  Tab,
   Menu,
   FormControlLabel,
   Switch,
   Tooltip,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 
 // Icons
@@ -89,7 +90,7 @@ export default function ServicesListMui({
   const navigate = useNavigate();
 
   // Settings & View states
-  const [viewMode, setViewMode] = useState("cards"); // 'cards', 'rows', 'carousel', 'overview'
+  const [viewMode, setViewMode] = useLocalStorage("services_view_mode", "cards"); // Filter-like view selection
   const [autoRefresh, setAutoRefresh] = useLocalStorage("services_auto_refresh", false);
   const [refreshInterval, setRefreshInterval] = useLocalStorage("services_refresh_interval", 2000);
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -100,7 +101,7 @@ export default function ServicesListMui({
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Only for initial manual loads
   const [loadingMore, setLoadingMore] = useState(false);
   const [servicesFetchError, setServicesFetchError] = useState(null);
 
@@ -120,7 +121,6 @@ export default function ServicesListMui({
   const [plansForPlatformErrors, setPlansForPlatformErrors] = useState({});
 
   const [alertState, setAlertState] = useState(null);
-  const fetchIdRef = useRef(0);
   const isComponentMounted = useRef(true);
 
   useEffect(() => {
@@ -141,7 +141,7 @@ export default function ServicesListMui({
     (e) => {
       if (e?.response?.status === 401 || e?.response?.status === 403) {
         setAlertState({ severity: "error", message: "You're not authenticated. Redirecting to login..." });
-        setAutoRefresh(false); // Stop aggressive polling immediately
+        setAutoRefresh(false); 
         setTimeout(() => {
           if (isComponentMounted.current) navigate("/login");
         }, 2000);
@@ -181,9 +181,6 @@ export default function ServicesListMui({
   // Core fetching logic
   const fetchServices = useCallback(
     async (isBackground = false) => {
-      const thisFetchId = ++fetchIdRef.current;
-      
-      // If it's a manual/initial fetch, show loading states. Background fetch skips this to avoid blinking.
       if (!isBackground) {
         setLoading(page === 1);
         setLoadingMore(page > 1);
@@ -191,7 +188,6 @@ export default function ServicesListMui({
       }
 
       try {
-        // For background updates, we fetch all visible items at once to sync existing pages efficiently
         const targetPage = isBackground ? 1 : page;
         const targetPageSize = isBackground ? page * pageSize : pageSize;
 
@@ -199,26 +195,16 @@ export default function ServicesListMui({
         const res = await apiRequest({ method: "GET", url });
         
         if (!isComponentMounted.current) return;
-        if (!isBackground && fetchIdRef.current !== thisFetchId) return;
 
         const data = res.data;
         const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
 
         setServices((prev) => {
           if (isBackground) {
-            // Intelligent Merge to avoid React re-renders on identical data
-            let changed = false;
-            const updated = prev.map((p) => {
-              const incoming = results.find((r) => getKey(r) === getKey(p));
-              if (incoming && JSON.stringify(p) !== JSON.stringify(incoming)) {
-                changed = true;
-                return incoming; // Swap reference only if data changed
-              }
-              return p; // Keep old reference to avoid visual shift
-            });
-            return changed ? updated : prev;
+            // Smart update: Only replace array if data string differs to prevent DOM unmounting
+            const isDifferent = JSON.stringify(prev) !== JSON.stringify(results);
+            return isDifferent ? results : prev;
           } else {
-            // Standard Pagination append
             return page === 1
               ? results
               : [...prev, ...results.filter((r) => !prev.some((p) => getKey(p) === getKey(r)))];
@@ -236,7 +222,7 @@ export default function ServicesListMui({
           setServicesFetchError(
             e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load services."
           );
-          setServices([]);
+          if (page === 1) setServices([]);
           setHasNext(false);
         }
       } finally {
@@ -253,16 +239,29 @@ export default function ServicesListMui({
   // Initial and paginated fetching
   useEffect(() => {
     fetchServices(false);
-  }, [fetchServices]);
+  }, [page, query]); // Trigger manual fetch when page or query changes
 
-  // Auto-Refresh Background Polling
+  // Safe Auto-Refresh Background Polling (Prevents Network Loop & "Node cannot be found")
   useEffect(() => {
     if (!autoRefresh) return;
-    const timer = setInterval(() => {
-      fetchServices(true);
-    }, refreshInterval);
+    
+    let timerId;
+    let isPolling = true;
 
-    return () => clearInterval(timer);
+    const pollData = async () => {
+      if (!isPolling) return;
+      await fetchServices(true); // Wait for API to finish completely
+      if (isPolling) {
+        timerId = setTimeout(pollData, refreshInterval); // ONLY schedule next fetch AFTER previous one finishes
+      }
+    };
+
+    timerId = setTimeout(pollData, refreshInterval);
+
+    return () => {
+      isPolling = false;
+      clearTimeout(timerId);
+    };
   }, [autoRefresh, refreshInterval, fetchServices]);
 
 
@@ -503,15 +502,15 @@ export default function ServicesListMui({
 
     if (layout === "row") {
       return (
-        <Card elevation={1} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1 }}>
-          <Box sx={{ flex: 1 }}>
+        <Card elevation={1} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1, flexWrap: 'wrap' }}>
+          <Box sx={{ flex: 1, minWidth: 200, mb: { xs: 2, md: 0 } }}>
             <Typography variant="subtitle1" fontWeight={700}>{s.name || "(no name)"}</Typography>
             <Typography variant="body2" color="text.secondary">{networkName}</Typography>
           </Box>
-          <Box sx={{ flex: 2, display: 'flex', justifyContent: 'center' }}>
+          <Box sx={{ flex: 2, display: 'flex', justifyContent: { xs: 'flex-start', md: 'center' }, minWidth: 250, mb: { xs: 2, md: 0 } }}>
              {commonStats}
           </Box>
-          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: { xs: "flex-start", md: "flex-end" } }}>
             <Chip label={s.status ?? "unknown"} color={isRunning ? "success" : "default"} size="small" sx={{ mb: 1 }} />
             {actionButtons}
           </Box>
@@ -534,7 +533,7 @@ export default function ServicesListMui({
               {cpu && <Typography variant="body2">CPU: <strong>{cpu}</strong> cores</Typography>}
               {ram && <Typography variant="body2">RAM: <strong>{ram}</strong> MB</Typography>}
               {storage && <Typography variant="body2">Storage: <strong>{storage}</strong> GB</Typography>}
-              {price && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>Price/hr: <strong>{price}</strong> toman</Typography>}
+              {price && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>Price/hr: <strong>{price}</strong></Typography>}
             </Box>
           )}
         </CardContent>
@@ -551,11 +550,11 @@ export default function ServicesListMui({
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header Area */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5">My Services</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="h5" fontWeight="bold">My Services</Typography>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Tooltip title="Refresh Now">
-            <IconButton onClick={() => fetchServices(false)} disabled={loading}>
+            <IconButton onClick={() => { setPage(1); fetchServices(false); }} disabled={loading}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
@@ -565,7 +564,14 @@ export default function ServicesListMui({
               <SettingsIcon />
             </IconButton>
           </Tooltip>
-          <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={() => setMenuAnchorEl(null)} sx={{ mt: 1 }}>
+          
+          <Menu 
+            anchorEl={menuAnchorEl} 
+            open={Boolean(menuAnchorEl)} 
+            onClose={() => setMenuAnchorEl(null)} 
+            sx={{ mt: 1 }}
+            disableScrollLock={true} // Prevents DOM shifting when menu opens
+          >
             <Box sx={{ px: 2, py: 1, minWidth: 200 }}>
               <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Settings</Typography>
               <FormControlLabel 
@@ -573,7 +579,7 @@ export default function ServicesListMui({
                 label="Auto Refresh" 
               />
               <Box sx={{ mt: 2 }}>
-                <Typography variant="caption" color="text.secondary">Refresh Interval</Typography>
+                <Typography variant="caption" color="text.secondary" display="block" mb={1}>Refresh Interval</Typography>
                 <Select fullWidth size="small" value={refreshInterval} onChange={(e) => setRefreshInterval(e.target.value)} disabled={!autoRefresh}>
                   <MenuItem value={2000}>2 Seconds</MenuItem>
                   <MenuItem value={5000}>5 Seconds</MenuItem>
@@ -585,24 +591,28 @@ export default function ServicesListMui({
         </Box>
       </Box>
 
-      {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={viewMode} onChange={(e, val) => { setViewMode(val); setCarouselIndex(0); }} variant="scrollable" scrollButtons="auto">
-          <Tab label="Cards" value="cards" />
-          <Tab label="Rows" value="rows" />
-          <Tab label="Carousel" value="carousel" />
-          <Tab label="Overview (Read-Only)" value="overview" />
-        </Tabs>
-      </Box>
-
-      {/* Search Bar */}
+      {/* Filter and Search Bar Row */}
       {showSearch && (
-        <Box component="form" onSubmit={(e) => { e.preventDefault(); setPage(1); fetchServices(false); }} mb={3}>
-          <Box sx={{ display: "flex", gap: 1 }}>
+        <Paper elevation={1} sx={{ p: 2, mb: 4, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', backgroundColor: 'background.default' }}>
+          <Box component="form" onSubmit={(e) => { e.preventDefault(); setPage(1); fetchServices(false); }} sx={{ display: "flex", gap: 1, flexGrow: 1 }}>
             <TextField fullWidth variant="outlined" size="small" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search service name..." />
-            <Button variant="contained" type="submit">Search</Button>
+            <Button variant="contained" type="submit" disableElevation>Search</Button>
           </Box>
-        </Box>
+          
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>View Display Mode</InputLabel>
+            <Select 
+              value={viewMode} 
+              onChange={(e) => { setViewMode(e.target.value); setCarouselIndex(0); }} 
+              label="View Display Mode"
+            >
+              <MenuItem value="cards">Card View</MenuItem>
+              <MenuItem value="rows">List View (Rows)</MenuItem>
+              <MenuItem value="carousel">Carousel View</MenuItem>
+              <MenuItem value="overview">Overview (Read-Only)</MenuItem>
+            </Select>
+          </FormControl>
+        </Paper>
       )}
 
       {/* Alerts */}
@@ -614,14 +624,14 @@ export default function ServicesListMui({
 
       {loading && <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>}
 
-      {servicesFetchError && (
+      {servicesFetchError && !loading && (
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography color="error">{servicesFetchError}</Typography>
           <Button variant="contained" onClick={retryAll} sx={{ mt: 2 }}>Retry</Button>
         </Paper>
       )}
 
-      {/* Services Display Logic based on ViewMode */}
+      {/* Services Display Logic */}
       {!loading && !servicesFetchError && (
         <Box>
           {services.length === 0 ? (
@@ -652,11 +662,11 @@ export default function ServicesListMui({
               {viewMode === 'carousel' && (
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
                    {services[carouselIndex] && (
-                     <Box sx={{ width: '100%', maxWidth: 500 }}>
+                     <Box sx={{ width: '100%', maxWidth: 600 }}>
                         <RenderServiceItem s={services[carouselIndex]} layout="carousel" isReadOnly={false} />
                      </Box>
                    )}
-                   <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                   <Box sx={{ mt: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
                      <Button 
                         variant="outlined" 
                         onClick={() => setCarouselIndex(i => Math.max(0, i - 1))} 
@@ -665,7 +675,7 @@ export default function ServicesListMui({
                      >
                        Prev
                      </Button>
-                     <Typography variant="body2" color="text.secondary">
+                     <Typography variant="body2" color="text.secondary" fontWeight="bold">
                        {carouselIndex + 1} of {services.length}
                      </Typography>
                      <Button 
@@ -684,16 +694,16 @@ export default function ServicesListMui({
         </Box>
       )}
 
-      {hasNext && viewMode !== 'carousel' && (
+      {hasNext && viewMode !== 'carousel' && !loading && (
         <Box sx={{ textAlign: "center", mt: 4 }}>
-          <Button variant="contained" onClick={() => setPage((p) => p + 1)} disabled={loadingMore}>
+          <Button variant="contained" onClick={() => { setPage((p) => p + 1); fetchServices(false); }} disabled={loadingMore}>
             {loadingMore ? "Loading..." : "Load more"}
           </Button>
         </Box>
       )}
 
       {/* ==================== EDIT DIALOG ==================== */}
-      <Dialog open={Boolean(editingService)} onClose={() => setEditingService(null)} fullWidth maxWidth="lg">
+      <Dialog open={Boolean(editingService)} onClose={() => setEditingService(null)} fullWidth maxWidth="lg" disableScrollLock={true}>
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           Edit Service — {editingService?.service?.name}
           <IconButton onClick={() => setEditingService(null)}><CloseIcon /></IconButton>
