@@ -1,5 +1,5 @@
 // ServicesListMui.jsx
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, memo } from "react";
 import {
   Box,
   Grid,
@@ -90,7 +90,7 @@ export default function ServicesListMui({
   const navigate = useNavigate();
 
   // Settings & View states
-  const [viewMode, setViewMode] = useLocalStorage("services_view_mode", "cards"); // Filter-like view selection
+  const [viewMode, setViewMode] = useLocalStorage("services_view_mode", "cards");
   const [autoRefresh, setAutoRefresh] = useLocalStorage("services_auto_refresh", false);
   const [refreshInterval, setRefreshInterval] = useLocalStorage("services_refresh_interval", 2000);
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -101,7 +101,7 @@ export default function ServicesListMui({
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false); // Only for initial manual loads
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [servicesFetchError, setServicesFetchError] = useState(null);
 
@@ -141,7 +141,7 @@ export default function ServicesListMui({
     (e) => {
       if (e?.response?.status === 401 || e?.response?.status === 403) {
         setAlertState({ severity: "error", message: "You're not authenticated. Redirecting to login..." });
-        setAutoRefresh(false); 
+        setAutoRefresh(false);
         setTimeout(() => {
           if (isComponentMounted.current) navigate("/login");
         }, 2000);
@@ -193,7 +193,7 @@ export default function ServicesListMui({
 
         const url = buildUrl(apiUrl, extraQueryParams, targetPage, targetPageSize);
         const res = await apiRequest({ method: "GET", url });
-        
+
         if (!isComponentMounted.current) return;
 
         const data = res.data;
@@ -201,7 +201,6 @@ export default function ServicesListMui({
 
         setServices((prev) => {
           if (isBackground) {
-            // Smart update: Only replace array if data string differs to prevent DOM unmounting
             const isDifferent = JSON.stringify(prev) !== JSON.stringify(results);
             return isDifferent ? results : prev;
           } else {
@@ -217,7 +216,7 @@ export default function ServicesListMui({
       } catch (e) {
         if (!isComponentMounted.current) return;
         if (handleAuthError(e)) return;
-        
+
         if (!isBackground) {
           setServicesFetchError(
             e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load services."
@@ -239,20 +238,20 @@ export default function ServicesListMui({
   // Initial and paginated fetching
   useEffect(() => {
     fetchServices(false);
-  }, [page, query]); // Trigger manual fetch when page or query changes
+  }, [page, query]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Safe Auto-Refresh Background Polling (Prevents Network Loop & "Node cannot be found")
+  // Safe Auto-Refresh Background Polling
   useEffect(() => {
     if (!autoRefresh) return;
-    
+
     let timerId;
     let isPolling = true;
 
     const pollData = async () => {
       if (!isPolling) return;
-      await fetchServices(true); // Wait for API to finish completely
+      await fetchServices(true);
       if (isPolling) {
-        timerId = setTimeout(pollData, refreshInterval); // ONLY schedule next fetch AFTER previous one finishes
+        timerId = setTimeout(pollData, refreshInterval);
       }
     };
 
@@ -264,7 +263,6 @@ export default function ServicesListMui({
     };
   }, [autoRefresh, refreshInterval, fetchServices]);
 
-
   const fetchNetworks = useCallback(async () => {
     setNetworksLoading(true);
     setNetworksFetchError(null);
@@ -274,7 +272,9 @@ export default function ServicesListMui({
       const items = Array.isArray(res.data?.results) ? res.data.results : Array.isArray(res.data) ? res.data : [];
       setNetworks(items);
       const cache = {};
-      items.forEach((n) => { cache[n.id ?? n.pk] = n; });
+      items.forEach((n) => {
+        cache[n.id ?? n.pk] = n;
+      });
       setNetworkCache((prev) => ({ ...prev, ...cache }));
     } catch (e) {
       if (handleAuthError(e)) return;
@@ -284,29 +284,57 @@ export default function ServicesListMui({
     }
   }, [buildUrl, handleAuthError]);
 
-  useEffect(() => { fetchNetworks(); }, [fetchNetworks]);
+  useEffect(() => {
+    fetchNetworks();
+  }, [fetchNetworks]);
 
-  const loadPlan = useCallback(async (planId) => {
-    if (!planId || planCache[planId]) return;
-    try {
-      const res = await apiRequest({ method: "GET", url: `${PLANS_API}?id=${planId}` });
-      setPlanCache((p) => ({ ...p, [planId]: res.data }));
-    } catch (e) {
-      handleAuthError(e);
-      setPlanCacheErrors((s) => ({ ...s, [planId]: e?.message || "Failed to load plan." }));
-    }
-  }, [planCache, handleAuthError]);
+  const loadPlan = useCallback(
+    async (planId) => {
+      if (!planId) return;
+      setPlanCache((prev) => {
+        if (prev[planId]) return prev;
+        return prev;
+      });
+      // Check again inside to avoid race
+      setPlanCache((current) => {
+        if (current[planId]) return current;
+        // fire and forget
+        (async () => {
+          try {
+            const res = await apiRequest({ method: "GET", url: `${PLANS_API}?id=${planId}` });
+            if (!isComponentMounted.current) return;
+            setPlanCache((p) => ({ ...p, [planId]: res.data }));
+          } catch (e) {
+            handleAuthError(e);
+            setPlanCacheErrors((s) => ({ ...s, [planId]: e?.message || "Failed to load plan." }));
+          }
+        })();
+        return current;
+      });
+    },
+    [handleAuthError]
+  );
 
-  const loadNetwork = useCallback(async (networkId) => {
-    if (!networkId || networkCache[networkId]) return;
-    try {
-      const res = await apiRequest({ method: "GET", url: `${NETWORK_API_ROOT}${networkId}/` });
-      setNetworkCache((n) => ({ ...n, [networkId]: res.data }));
-    } catch (e) {
-      handleAuthError(e);
-      setNetworkCacheErrors((s) => ({ ...s, [networkId]: e?.message || "Failed to load network." }));
-    }
-  }, [networkCache, handleAuthError]);
+  const loadNetwork = useCallback(
+    async (networkId) => {
+      if (!networkId) return;
+      setNetworkCache((current) => {
+        if (current[networkId]) return current;
+        (async () => {
+          try {
+            const res = await apiRequest({ method: "GET", url: `${NETWORK_API_ROOT}${networkId}/` });
+            if (!isComponentMounted.current) return;
+            setNetworkCache((n) => ({ ...n, [networkId]: res.data }));
+          } catch (e) {
+            handleAuthError(e);
+            setNetworkCacheErrors((s) => ({ ...s, [networkId]: e?.message || "Failed to load network." }));
+          }
+        })();
+        return current;
+      });
+    },
+    [handleAuthError]
+  );
 
   const getServiceDetailUrl = (id) => `${API_BASE}${apiUrl.endsWith("/") ? apiUrl : apiUrl + "/"}${id}/`;
 
@@ -328,7 +356,10 @@ export default function ServicesListMui({
       return true;
     } catch (e) {
       if (handleAuthError(e)) return false;
-      setAlertState({ severity: "error", message: e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to save." });
+      setAlertState({
+        severity: "error",
+        message: e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to save.",
+      });
       setTimeout(() => setAlertState(null), 3000);
       return false;
     } finally {
@@ -339,17 +370,23 @@ export default function ServicesListMui({
   const toggleServiceStatus = async (service, currentStatus) => {
     const serviceId = service.id ?? service.pk;
     const newStatus = currentStatus === "running" ? "stopped" : "running";
-    
+
     // Optimistic UI update
-    setServices((prev) => prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: 'updating...' } : s)));
-    
+    setServices((prev) =>
+      prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: "updating..." } : s))
+    );
+
     try {
       await apiRequest({ method: "PATCH", url: getServiceDetailUrl(serviceId), data: { status: newStatus } });
-      setServices((prev) => prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: newStatus } : s)));
+      setServices((prev) =>
+        prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: newStatus } : s))
+      );
     } catch (e) {
       if (handleAuthError(e)) return;
       // Revert on failure
-      setServices((prev) => prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: currentStatus } : s)));
+      setServices((prev) =>
+        prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: currentStatus } : s))
+      );
       setAlertState({ severity: "error", message: "Failed to change service status." });
       setTimeout(() => setAlertState(null), 3000);
     }
@@ -433,16 +470,21 @@ export default function ServicesListMui({
     fetchServices(false);
   };
 
-
-  // Reusable Service Item Renderer Component
-  const RenderServiceItem = ({ s, layout, isReadOnly }) => {
+  // ==================== Service Item (memoized + no side-effect in render) ====================
+  const ServiceItem = memo(function ServiceItem({ s, layout, isReadOnly }) {
     const planIsObj = s.plan && typeof s.plan === "object";
     const netIsObj = s.network && typeof s.network === "object";
-    const planId = planIsObj ? (s.plan.id ?? s.plan.pk) : s.plan;
-    const networkId = netIsObj ? (s.network.id ?? s.network.pk) : s.network;
+    const planId = planIsObj ? s.plan.id ?? s.plan.pk : s.plan;
+    const networkId = netIsObj ? s.network.id ?? s.network.pk : s.network;
 
-    if (planId && !planCache[planId]) loadPlan(planId);
-    if (networkId && !networkCache[networkId]) loadNetwork(networkId);
+    // Load plan/network safely with useEffect (no side-effect during render)
+    useEffect(() => {
+      if (planId && !planCache[planId]) loadPlan(planId);
+    }, [planId, planCache, loadPlan]);
+
+    useEffect(() => {
+      if (networkId && !networkCache[networkId]) loadNetwork(networkId);
+    }, [networkId, networkCache, loadNetwork]);
 
     const networkName = netIsObj ? s.network.name : networkCache[networkId]?.name ?? "—";
     const cpu = planIsObj ? s.plan.max_cpu : planCache[planId]?.max_cpu;
@@ -454,47 +496,94 @@ export default function ServicesListMui({
     const isRunning = s.status === "running";
 
     const commonStats = (
-      <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+      <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1 }}>
         {cpu && <Chip size="small" icon={<ComputerIcon fontSize="small" />} label={`${cpu} Cores`} />}
         {ram && <Chip size="small" icon={<MemoryIcon fontSize="small" />} label={`${ram} MB`} />}
         {storage && <Chip size="small" icon={<StorageIcon fontSize="small" />} label={`${storage} GB`} />}
-        {price && <Chip size="small" icon={<AttachMoneyIcon fontSize="small" />} label={`${price}/hr`} color="success" variant="outlined" />}
+        {price && (
+          <Chip
+            size="small"
+            icon={<AttachMoneyIcon fontSize="small" />}
+            label={`${price}/hr`}
+            color="success"
+            variant="outlined"
+          />
+        )}
       </Box>
     );
 
+    // Fixed widths prevent jump on hover / status change
     const actionButtons = !isReadOnly && (
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: layout === "row" ? "flex-end" : "flex-start", mt: layout === "row" ? 0 : 2 }}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 1,
+          flexWrap: "wrap",
+          justifyContent: layout === "row" ? "flex-end" : "flex-start",
+          mt: layout === "row" ? 0 : 2,
+          minWidth: layout === "row" ? 320 : "auto",
+          alignItems: "center",
+        }}
+      >
         <Button
           size="small"
           variant="contained"
           color={isRunning ? "error" : "success"}
           disabled={isUpdating}
           startIcon={isRunning ? <StopIcon /> : <PlayArrowIcon />}
-          onClick={(e) => { e.stopPropagation(); toggleServiceStatus(s, s.status); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleServiceStatus(s, s.status);
+          }}
+          sx={{
+            minWidth: 92, 
+            transition: "none",
+          }}
         >
           {isUpdating ? "..." : isRunning ? "Stop" : "Start"}
         </Button>
+
         <Button
           size="small"
           variant="outlined"
           startIcon={<EditIcon />}
           onClick={(e) => {
             e.stopPropagation();
-            setEditingService({ service: s, selectedNetwork: networkId ?? null, selectedPlanId: planId ?? null });
+            setEditingService({
+              service: s,
+              selectedNetwork: networkId ?? null,
+              selectedPlanId: planId ?? null,
+            });
           }}
+          sx={{ minWidth: 80 }}
         >
           Edit
         </Button>
+
         <Button
           size="small"
           variant="outlined"
           color="error"
           startIcon={<DeleteIcon />}
-          onClick={(e) => { e.stopPropagation(); deleteService(s.id ?? s.pk); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteService(s.id ?? s.pk);
+          }}
+          sx={{ minWidth: 90 }}
         >
           Delete
         </Button>
-        <Button size="small" variant="contained" startIcon={<LaunchIcon />} onClick={(e) => { e.stopPropagation(); handleOpen(s); }}>
+
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<LaunchIcon />}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpen(s);
+          }}
+          sx={{ minWidth: 85 }}
+        >
           Open
         </Button>
       </Box>
@@ -502,16 +591,51 @@ export default function ServicesListMui({
 
     if (layout === "row") {
       return (
-        <Card elevation={1} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1, flexWrap: 'wrap' }}>
+        <Card
+          elevation={1}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            p: 2,
+            mb: 1,
+            flexWrap: "wrap",
+            transition: "none",
+          }}
+        >
           <Box sx={{ flex: 1, minWidth: 200, mb: { xs: 2, md: 0 } }}>
-            <Typography variant="subtitle1" fontWeight={700}>{s.name || "(no name)"}</Typography>
-            <Typography variant="body2" color="text.secondary">{networkName}</Typography>
+            <Typography variant="subtitle1" fontWeight={700}>
+              {s.name || "(no name)"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {networkName}
+            </Typography>
           </Box>
-          <Box sx={{ flex: 2, display: 'flex', justifyContent: { xs: 'flex-start', md: 'center' }, minWidth: 250, mb: { xs: 2, md: 0 } }}>
-             {commonStats}
+          <Box
+            sx={{
+              flex: 2,
+              display: "flex",
+              justifyContent: { xs: "flex-start", md: "center" },
+              minWidth: 250,
+              mb: { xs: 2, md: 0 },
+            }}
+          >
+            {commonStats}
           </Box>
-          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: { xs: "flex-start", md: "flex-end" } }}>
-            <Chip label={s.status ?? "unknown"} color={isRunning ? "success" : "default"} size="small" sx={{ mb: 1 }} />
+          <Box
+            sx={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: { xs: "flex-start", md: "flex-end" },
+            }}
+          >
+            <Chip
+              label={s.status ?? "unknown"}
+              color={isRunning ? "success" : "default"}
+              size="small"
+              sx={{ mb: 1, minWidth: 80 }}
+            />
             {actionButtons}
           </Box>
         </Card>
@@ -519,68 +643,146 @@ export default function ServicesListMui({
     }
 
     return (
-      <Card elevation={3} sx={{ height: "100%", display: "flex", flexDirection: "column", minWidth: layout === 'carousel' ? '300px' : 'auto' }}>
+      <Card
+        elevation={3}
+        sx={{
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          minWidth: layout === "carousel" ? "300px" : "auto",
+          transition: "none",
+        }}
+      >
         <CardContent sx={{ flexGrow: 1 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <Box>
-              <Typography variant="subtitle1" fontWeight={700}>{s.name || "(no name)"}</Typography>
-              <Typography variant="body2" color="text.secondary">{networkName}</Typography>
+              <Typography variant="subtitle1" fontWeight={700}>
+                {s.name || "(no name)"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {networkName}
+              </Typography>
             </Box>
-            <Chip label={s.status ?? "unknown"} color={isRunning ? "success" : "default"} size="small" />
+            <Chip
+              label={s.status ?? "unknown"}
+              color={isRunning ? "success" : "default"}
+              size="small"
+              sx={{ minWidth: 80 }}
+            />
           </Box>
-          {layout === "carousel" ? commonStats : (
+          {layout === "carousel" ? (
+            commonStats
+          ) : (
             <Box sx={{ mt: 2 }}>
-              {cpu && <Typography variant="body2">CPU: <strong>{cpu}</strong> cores</Typography>}
-              {ram && <Typography variant="body2">RAM: <strong>{ram}</strong> MB</Typography>}
-              {storage && <Typography variant="body2">Storage: <strong>{storage}</strong> GB</Typography>}
-              {price && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>Price/hr: <strong>{price}</strong></Typography>}
+              {cpu && (
+                <Typography variant="body2">
+                  CPU: <strong>{cpu}</strong> cores
+                </Typography>
+              )}
+              {ram && (
+                <Typography variant="body2">
+                  RAM: <strong>{ram}</strong> MB
+                </Typography>
+              )}
+              {storage && (
+                <Typography variant="body2">
+                  Storage: <strong>{storage}</strong> GB
+                </Typography>
+              )}
+              {price && (
+                <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                  Price/hr: <strong>{price}</strong>
+                </Typography>
+              )}
             </Box>
           )}
         </CardContent>
-        {(!isReadOnly || (isReadOnly && layout !== 'row')) && (
-          <Box sx={{ p: 2, display: "flex", gap: 1, justifyContent: "flex-end", backgroundColor: 'rgba(0,0,0,0.02)' }}>
+        {(!isReadOnly || (isReadOnly && layout !== "row")) && (
+          <Box
+            sx={{
+              p: 2,
+              display: "flex",
+              gap: 1,
+              justifyContent: "flex-end",
+              backgroundColor: "rgba(0,0,0,0.02)",
+              minHeight: 56,
+              alignItems: "center",
+            }}
+          >
             {actionButtons}
           </Box>
         )}
       </Card>
     );
-  };
-
+  });
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header Area */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h5" fontWeight="bold">My Services</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+          flexWrap: "wrap",
+          gap: 2,
+        }}
+      >
+        <Typography variant="h5" fontWeight="bold">
+          My Services
+        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Tooltip title="Refresh Now">
-            <IconButton onClick={() => { setPage(1); fetchServices(false); }} disabled={loading}>
+            <IconButton
+              onClick={() => {
+                setPage(1);
+                fetchServices(false);
+              }}
+              disabled={loading}
+            >
               <RefreshIcon />
             </IconButton>
           </Tooltip>
-          
+
           <Tooltip title="Settings">
             <IconButton onClick={(e) => setMenuAnchorEl(e.currentTarget)}>
               <SettingsIcon />
             </IconButton>
           </Tooltip>
-          
-          <Menu 
-            anchorEl={menuAnchorEl} 
-            open={Boolean(menuAnchorEl)} 
-            onClose={() => setMenuAnchorEl(null)} 
+
+          <Menu
+            anchorEl={menuAnchorEl}
+            open={Boolean(menuAnchorEl)}
+            onClose={() => setMenuAnchorEl(null)}
             sx={{ mt: 1 }}
-            disableScrollLock={true} // Prevents DOM shifting when menu opens
+            disableScrollLock={true}
           >
             <Box sx={{ px: 2, py: 1, minWidth: 200 }}>
-              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Settings</Typography>
-              <FormControlLabel 
-                control={<Switch checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} size="small" />} 
-                label="Auto Refresh" 
+              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                Settings
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={autoRefresh}
+                    onChange={(e) => setAutoRefresh(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label="Auto Refresh"
               />
               <Box sx={{ mt: 2 }}>
-                <Typography variant="caption" color="text.secondary" display="block" mb={1}>Refresh Interval</Typography>
-                <Select fullWidth size="small" value={refreshInterval} onChange={(e) => setRefreshInterval(e.target.value)} disabled={!autoRefresh}>
+                <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                  Refresh Interval
+                </Typography>
+                <Select
+                  fullWidth
+                  size="small"
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(e.target.value)}
+                  disabled={!autoRefresh}
+                >
                   <MenuItem value={2000}>2 Seconds</MenuItem>
                   <MenuItem value={5000}>5 Seconds</MenuItem>
                   <MenuItem value={10000}>10 Seconds</MenuItem>
@@ -593,17 +795,48 @@ export default function ServicesListMui({
 
       {/* Filter and Search Bar Row */}
       {showSearch && (
-        <Paper elevation={1} sx={{ p: 2, mb: 4, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', backgroundColor: 'background.default' }}>
-          <Box component="form" onSubmit={(e) => { e.preventDefault(); setPage(1); fetchServices(false); }} sx={{ display: "flex", gap: 1, flexGrow: 1 }}>
-            <TextField fullWidth variant="outlined" size="small" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search service name..." />
-            <Button variant="contained" type="submit" disableElevation>Search</Button>
+        <Paper
+          elevation={1}
+          sx={{
+            p: 2,
+            mb: 4,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 2,
+            alignItems: "center",
+            backgroundColor: "background.default",
+          }}
+        >
+          <Box
+            component="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setPage(1);
+              fetchServices(false);
+            }}
+            sx={{ display: "flex", gap: 1, flexGrow: 1 }}
+          >
+            <TextField
+              fullWidth
+              variant="outlined"
+              size="small"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search service name..."
+            />
+            <Button variant="contained" type="submit" disableElevation>
+              Search
+            </Button>
           </Box>
-          
+
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel>View Display Mode</InputLabel>
-            <Select 
-              value={viewMode} 
-              onChange={(e) => { setViewMode(e.target.value); setCarouselIndex(0); }} 
+            <Select
+              value={viewMode}
+              onChange={(e) => {
+                setViewMode(e.target.value);
+                setCarouselIndex(0);
+              }}
               label="View Display Mode"
             >
               <MenuItem value="cards">Card View</MenuItem>
@@ -618,16 +851,24 @@ export default function ServicesListMui({
       {/* Alerts */}
       {alertState && (
         <Snackbar open autoHideDuration={3000} onClose={() => setAlertState(null)}>
-          <Alert severity={alertState.severity} onClose={() => setAlertState(null)}>{alertState.message}</Alert>
+          <Alert severity={alertState.severity} onClose={() => setAlertState(null)}>
+            {alertState.message}
+          </Alert>
         </Snackbar>
       )}
 
-      {loading && <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>}
+      {loading && (
+        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+          <CircularProgress />
+        </Box>
+      )}
 
       {servicesFetchError && !loading && (
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography color="error">{servicesFetchError}</Typography>
-          <Button variant="contained" onClick={retryAll} sx={{ mt: 2 }}>Retry</Button>
+          <Button variant="contained" onClick={retryAll} sx={{ mt: 2 }}>
+            Retry
+          </Button>
         </Paper>
       )}
 
@@ -635,58 +876,60 @@ export default function ServicesListMui({
       {!loading && !servicesFetchError && (
         <Box>
           {services.length === 0 ? (
-            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>No services found.</Typography>
+            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+              No services found.
+            </Typography>
           ) : (
             <>
               {/* Cards / Overview View */}
-              {(viewMode === 'cards' || viewMode === 'overview') && (
+              {(viewMode === "cards" || viewMode === "overview") && (
                 <Grid container spacing={3}>
                   {services.map((s) => (
                     <Grid item xs={12} md={6} lg={4} key={getKey(s)}>
-                      <RenderServiceItem s={s} layout="card" isReadOnly={viewMode === 'overview'} />
+                      <ServiceItem s={s} layout="card" isReadOnly={viewMode === "overview"} />
                     </Grid>
                   ))}
                 </Grid>
               )}
 
               {/* Rows View */}
-              {viewMode === 'rows' && (
+              {viewMode === "rows" && (
                 <Stack spacing={0}>
                   {services.map((s) => (
-                    <RenderServiceItem key={getKey(s)} s={s} layout="row" isReadOnly={false} />
+                    <ServiceItem key={getKey(s)} s={s} layout="row" isReadOnly={false} />
                   ))}
                 </Stack>
               )}
 
               {/* Carousel View */}
-              {viewMode === 'carousel' && (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-                   {services[carouselIndex] && (
-                     <Box sx={{ width: '100%', maxWidth: 600 }}>
-                        <RenderServiceItem s={services[carouselIndex]} layout="carousel" isReadOnly={false} />
-                     </Box>
-                   )}
-                   <Box sx={{ mt: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
-                     <Button 
-                        variant="outlined" 
-                        onClick={() => setCarouselIndex(i => Math.max(0, i - 1))} 
-                        disabled={carouselIndex === 0} 
-                        startIcon={<ChevronLeftIcon />}
-                     >
-                       Prev
-                     </Button>
-                     <Typography variant="body2" color="text.secondary" fontWeight="bold">
-                       {carouselIndex + 1} of {services.length}
-                     </Typography>
-                     <Button 
-                        variant="outlined" 
-                        onClick={() => setCarouselIndex(i => Math.min(services.length - 1, i + 1))} 
-                        disabled={carouselIndex === services.length - 1} 
-                        endIcon={<ChevronRightIcon />}
-                     >
-                       Next
-                     </Button>
-                   </Box>
+              {viewMode === "carousel" && (
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 4 }}>
+                  {services[carouselIndex] && (
+                    <Box sx={{ width: "100%", maxWidth: 600 }}>
+                      <ServiceItem s={services[carouselIndex]} layout="carousel" isReadOnly={false} />
+                    </Box>
+                  )}
+                  <Box sx={{ mt: 4, display: "flex", alignItems: "center", gap: 3 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={() => setCarouselIndex((i) => Math.max(0, i - 1))}
+                      disabled={carouselIndex === 0}
+                      startIcon={<ChevronLeftIcon />}
+                    >
+                      Prev
+                    </Button>
+                    <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                      {carouselIndex + 1} of {services.length}
+                    </Typography>
+                    <Button
+                      variant="outlined"
+                      onClick={() => setCarouselIndex((i) => Math.min(services.length - 1, i + 1))}
+                      disabled={carouselIndex === services.length - 1}
+                      endIcon={<ChevronRightIcon />}
+                    >
+                      Next
+                    </Button>
+                  </Box>
                 </Box>
               )}
             </>
@@ -694,19 +937,34 @@ export default function ServicesListMui({
         </Box>
       )}
 
-      {hasNext && viewMode !== 'carousel' && !loading && (
+      {hasNext && viewMode !== "carousel" && !loading && (
         <Box sx={{ textAlign: "center", mt: 4 }}>
-          <Button variant="contained" onClick={() => { setPage((p) => p + 1); fetchServices(false); }} disabled={loadingMore}>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setPage((p) => p + 1);
+              fetchServices(false);
+            }}
+            disabled={loadingMore}
+          >
             {loadingMore ? "Loading..." : "Load more"}
           </Button>
         </Box>
       )}
 
       {/* ==================== EDIT DIALOG ==================== */}
-      <Dialog open={Boolean(editingService)} onClose={() => setEditingService(null)} fullWidth maxWidth="lg" disableScrollLock={true}>
+      <Dialog
+        open={Boolean(editingService)}
+        onClose={() => setEditingService(null)}
+        fullWidth
+        maxWidth="lg"
+        disableScrollLock={true}
+      >
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           Edit Service — {editingService?.service?.name}
-          <IconButton onClick={() => setEditingService(null)}><CloseIcon /></IconButton>
+          <IconButton onClick={() => setEditingService(null)}>
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
 
         <DialogContent dividers>
@@ -737,12 +995,12 @@ export default function ServicesListMui({
               const svc = editingService.service;
               const payload = {};
 
-              const originalNet = svc.network ? (svc.network.id ?? svc.network.pk ?? svc.network) : null;
+              const originalNet = svc.network ? svc.network.id ?? svc.network.pk ?? svc.network : null;
               if ((editingService.selectedNetwork ?? null) !== (originalNet ?? null)) {
                 payload.network = editingService.selectedNetwork ?? null;
               }
 
-              const originalPlan = svc.plan ? (svc.plan.id ?? svc.plan.pk ?? svc.plan) : null;
+              const originalPlan = svc.plan ? svc.plan.id ?? svc.plan.pk ?? svc.plan : null;
               if (editingService.selectedPlanId && String(editingService.selectedPlanId) !== String(originalPlan)) {
                 payload.plan = editingService.selectedPlanId;
               }
@@ -780,9 +1038,8 @@ function EditorInside({
   loadPlan,
 }) {
   const svc = editingService.service;
-  const platform = svc.plan && typeof svc.plan === "object"
-    ? (svc.plan.platform ?? svc.plan.name)
-    : svc.platform;
+  const platform =
+    svc.plan && typeof svc.plan === "object" ? svc.plan.platform ?? svc.plan.name : svc.platform;
 
   const [availablePlans, setAvailablePlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
@@ -809,13 +1066,17 @@ function EditorInside({
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 340px" }, gap: 3 }}>
       {/* Left Column - Network & Plans */}
       <Box>
-        <Typography variant="h6" fontWeight={700} gutterBottom>Network</Typography>
+        <Typography variant="h6" fontWeight={700} gutterBottom>
+          Network
+        </Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
           <Select
             fullWidth
             size="small"
             value={editingService.selectedNetwork ?? ""}
-            onChange={(e) => setEditingService((es) => ({ ...es, selectedNetwork: e.target.value || null }))}
+            onChange={(e) =>
+              setEditingService((es) => ({ ...es, selectedNetwork: e.target.value || null }))
+            }
           >
             <MenuItem value="">(No Network)</MenuItem>
             {networks.map((n) => (
@@ -825,7 +1086,11 @@ function EditorInside({
             ))}
           </Select>
 
-          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setEditingService((es) => ({ ...es, creatingNetwork: { name: "" } }))}>
+          <Button
+            variant="outlined"
+            startIcon={<AddIcon />}
+            onClick={() => setEditingService((es) => ({ ...es, creatingNetwork: { name: "" } }))}
+          >
             Create
           </Button>
 
@@ -845,16 +1110,32 @@ function EditorInside({
 
         {editingService.creatingNetwork && (
           <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
-            <Typography fontWeight={700} gutterBottom>Network Name</Typography>
+            <Typography fontWeight={700} gutterBottom>
+              Network Name
+            </Typography>
             <TextField
               fullWidth
               size="small"
               autoFocus
               value={editingService.creatingNetwork.name}
-              onChange={(e) => setEditingService((es) => ({ ...es, creatingNetwork: { name: e.target.value } }))}
+              onChange={(e) =>
+                setEditingService((es) => ({
+                  ...es,
+                  creatingNetwork: { name: e.target.value },
+                }))
+              }
             />
             <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
-              <Button size="small" onClick={() => setEditingService((es) => { const copy = { ...es }; delete copy.creatingNetwork; return copy; })}>
+              <Button
+                size="small"
+                onClick={() =>
+                  setEditingService((es) => {
+                    const copy = { ...es };
+                    delete copy.creatingNetwork;
+                    return copy;
+                  })
+                }
+              >
                 Cancel
               </Button>
               <Button
@@ -864,7 +1145,11 @@ function EditorInside({
                   const created = await createNetworkInline(editingService.creatingNetwork);
                   if (created) {
                     const nid = created.id ?? created.pk;
-                    setEditingService((es) => ({ ...es, selectedNetwork: nid, creatingNetwork: undefined }));
+                    setEditingService((es) => ({
+                      ...es,
+                      selectedNetwork: nid,
+                      creatingNetwork: undefined,
+                    }));
                   }
                 }}
               >
@@ -884,7 +1169,14 @@ function EditorInside({
           ) : (
             <>
               {plansForPlatformErrors[platform] && (
-                <Alert severity="error" action={<Button size="small" onClick={() => fetchPlansForPlatform(platform)}>Retry</Button>}>
+                <Alert
+                  severity="error"
+                  action={
+                    <Button size="small" onClick={() => fetchPlansForPlatform(platform)}>
+                      Retry
+                    </Button>
+                  }
+                >
                   {plansForPlatformErrors[platform]}
                 </Alert>
               )}
@@ -902,7 +1194,9 @@ function EditorInside({
                           variant="outlined"
                           onClick={() => onPickPlan(pid)}
                           sx={{
-                            p: 2, cursor: "pointer", border: isSelected ? "2px solid" : "1px solid",
+                            p: 2,
+                            cursor: "pointer",
+                            border: isSelected ? "2px solid" : "1px solid",
                             borderColor: isSelected ? "primary.main" : "divider",
                             bgcolor: isSelected ? "action.selected" : "background.paper",
                           }}
@@ -929,16 +1223,30 @@ function EditorInside({
       {/* Right Column - Read Only Service Info */}
       <Box>
         <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" fontWeight={700}>Service Overview</Typography>
-          <Typography sx={{ mt: 2 }}><strong>Status:</strong> {svc.status}</Typography>
-          <Typography><strong>Network:</strong> {svc.network?.name ?? svc.network ?? "(none)"}</Typography>
-          <Typography><strong>Plan:</strong> {svc.plan?.name ?? svc.plan ?? "(none)"}</Typography>
+          <Typography variant="h6" fontWeight={700}>
+            Service Overview
+          </Typography>
+          <Typography sx={{ mt: 2 }}>
+            <strong>Status:</strong> {svc.status}
+          </Typography>
+          <Typography>
+            <strong>Network:</strong> {svc.network?.name ?? svc.network ?? "(none)"}
+          </Typography>
+          <Typography>
+            <strong>Plan:</strong> {svc.plan?.name ?? svc.plan ?? "(none)"}
+          </Typography>
         </Paper>
 
         <Box sx={{ mt: 3 }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-            <Typography variant="subtitle1" fontWeight={700}>All Networks</Typography>
-            {networksFetchError && <Button size="small" onClick={retryNetworks}>Retry</Button>}
+            <Typography variant="subtitle1" fontWeight={700}>
+              All Networks
+            </Typography>
+            {networksFetchError && (
+              <Button size="small" onClick={retryNetworks}>
+                Retry
+              </Button>
+            )}
           </Box>
           {networksLoading ? (
             <CircularProgress size={20} />
@@ -946,7 +1254,9 @@ function EditorInside({
             <Typography>No networks yet</Typography>
           ) : (
             networks.map((n) => (
-              <Typography key={n.id ?? n.pk} sx={{ py: 0.5 }}>{n.name}</Typography>
+              <Typography key={n.id ?? n.pk} sx={{ py: 0.5 }}>
+                {n.name}
+              </Typography>
             ))
           )}
         </Box>
