@@ -1,4 +1,3 @@
-// ServicesListMui.jsx
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
@@ -23,21 +22,61 @@ import {
   Alert,
   useTheme,
   Paper,
+  Tabs,
+  Tab,
+  Menu,
+  FormControlLabel,
+  Switch,
+  Tooltip,
 } from "@mui/material";
+
+// Icons
 import CloseIcon from "@mui/icons-material/Close";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import LaunchIcon from "@mui/icons-material/Launch";
 import AddIcon from "@mui/icons-material/Add";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import StopIcon from "@mui/icons-material/Stop";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import SettingsIcon from "@mui/icons-material/Settings";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ComputerIcon from "@mui/icons-material/Computer";
+import MemoryIcon from "@mui/icons-material/Memory";
+import StorageIcon from "@mui/icons-material/Storage";
+import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
+
 import apiRequest from "../customHooks/apiRequest";
 import { useNavigate } from "react-router-dom";
-
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const PLANS_API = `https://${import.meta.env.VITE_API_BASE}/plans/`;
 const PLATFORMS_API = `https://${import.meta.env.VITE_API_BASE}/plans/platforms/`;
 const NETWORK_API_ROOT = `https://${import.meta.env.VITE_API_BASE}/services/networks/`;
 
+// Custom Hook for Local Storage
+function useLocalStorage(key, initialValue) {
+  const [storedValue, setStoredValue] = useState(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      return initialValue;
+    }
+  });
+
+  const setValue = (value) => {
+    try {
+      const valueToStore = value instanceof Function ? value(storedValue) : value;
+      setStoredValue(valueToStore);
+      window.localStorage.setItem(key, JSON.stringify(valueToStore));
+    } catch (error) {
+      console.error("Error saving to localStorage", error);
+    }
+  };
+  return [storedValue, setValue];
+}
 
 export default function ServicesListMui({
   apiUrl = "/services/service/",
@@ -49,7 +88,14 @@ export default function ServicesListMui({
   const theme = useTheme();
   const navigate = useNavigate();
 
-  // data states
+  // Settings & View states
+  const [viewMode, setViewMode] = useState("cards"); // 'cards', 'rows', 'carousel', 'overview'
+  const [autoRefresh, setAutoRefresh] = useLocalStorage("services_auto_refresh", false);
+  const [refreshInterval, setRefreshInterval] = useLocalStorage("services_refresh_interval", 2000);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+
+  // Data states
   const [services, setServices] = useState([]);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
@@ -58,7 +104,7 @@ export default function ServicesListMui({
   const [loadingMore, setLoadingMore] = useState(false);
   const [servicesFetchError, setServicesFetchError] = useState(null);
 
-  // caches
+  // Caches
   const [planCache, setPlanCache] = useState({});
   const [planCacheErrors, setPlanCacheErrors] = useState({});
   const [networkCache, setNetworkCache] = useState({});
@@ -69,12 +115,20 @@ export default function ServicesListMui({
   const [networksFetchError, setNetworksFetchError] = useState(null);
 
   const [actionLoading, setActionLoading] = useState(false);
-  const [editingService, setEditingService] = useState(null); // { service, selectedNetwork, selectedPlanId, creatingNetwork? }
+  const [editingService, setEditingService] = useState(null);
   const [plansForPlatform, setPlansForPlatform] = useState({});
   const [plansForPlatformErrors, setPlansForPlatformErrors] = useState({});
 
   const [alertState, setAlertState] = useState(null);
   const fetchIdRef = useRef(0);
+  const isComponentMounted = useRef(true);
+
+  useEffect(() => {
+    isComponentMounted.current = true;
+    return () => {
+      isComponentMounted.current = false;
+    };
+  }, []);
 
   const getKey = (s) => {
     if (!s) return "null";
@@ -83,24 +137,29 @@ export default function ServicesListMui({
     return `${s.name || ""}|${(s.plan && s.plan.platform) || ""}`;
   };
 
-  const uniqueBy = (arr, keyFn) => {
-    const seen = new Set();
-    return arr.filter((item) => {
-      const k = keyFn(item);
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-  };
+  const handleAuthError = useCallback(
+    (e) => {
+      if (e?.response?.status === 401 || e?.response?.status === 403) {
+        setAlertState({ severity: "error", message: "You're not authenticated. Redirecting to login..." });
+        setAutoRefresh(false); // Stop aggressive polling immediately
+        setTimeout(() => {
+          if (isComponentMounted.current) navigate("/login");
+        }, 2000);
+        return true;
+      }
+      return false;
+    },
+    [navigate, setAutoRefresh]
+  );
 
   const buildUrl = useCallback(
-    (basePath, extra = {}) => {
+    (basePath, extra = {}, customPage = page, customPageSize = pageSize) => {
       try {
         const isAbsolute = String(basePath).startsWith("http");
         const base = isAbsolute ? basePath : `${API_BASE}${basePath.startsWith("/") ? basePath : "/" + basePath}`;
         const url = new URL(base);
-        url.searchParams.set("page", String(page));
-        url.searchParams.set("page_size", String(pageSize));
+        url.searchParams.set("page", String(customPage));
+        url.searchParams.set("page_size", String(customPageSize));
         if (query) url.searchParams.set("q_search", query);
         Object.entries(extra).forEach(([k, v]) => {
           if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
@@ -108,7 +167,7 @@ export default function ServicesListMui({
         return url.href;
       } catch {
         let base = `${API_BASE}${basePath.startsWith("/") ? basePath : "/" + basePath}`;
-        let qs = `page=${page}&page_size=${pageSize}`;
+        let qs = `page=${customPage}&page_size=${customPageSize}`;
         if (query) qs += `&q_search=${encodeURIComponent(query)}`;
         Object.entries(extra).forEach(([k, v]) => {
           if (v !== undefined && v !== null && v !== "") qs += `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
@@ -119,51 +178,99 @@ export default function ServicesListMui({
     [page, pageSize, query]
   );
 
-  // fetch services
-  useEffect(() => {
-    let mounted = true;
-    const thisFetchId = ++fetchIdRef.current;
-    setLoading(page === 1);
-    setLoadingMore(page > 1);
-    setServicesFetchError(null);
+  // Core fetching logic
+  const fetchServices = useCallback(
+    async (isBackground = false) => {
+      const thisFetchId = ++fetchIdRef.current;
+      
+      // If it's a manual/initial fetch, show loading states. Background fetch skips this to avoid blinking.
+      if (!isBackground) {
+        setLoading(page === 1);
+        setLoadingMore(page > 1);
+        setServicesFetchError(null);
+      }
 
-    (async () => {
       try {
-        const url = buildUrl(apiUrl, extraQueryParams);
+        // For background updates, we fetch all visible items at once to sync existing pages efficiently
+        const targetPage = isBackground ? 1 : page;
+        const targetPageSize = isBackground ? page * pageSize : pageSize;
+
+        const url = buildUrl(apiUrl, extraQueryParams, targetPage, targetPageSize);
         const res = await apiRequest({ method: "GET", url });
-        if (!mounted || fetchIdRef.current !== thisFetchId) return;
+        
+        if (!isComponentMounted.current) return;
+        if (!isBackground && fetchIdRef.current !== thisFetchId) return;
 
         const data = res.data;
         const results = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
 
-        setServices((prev) =>
-          page === 1
-            ? uniqueBy(results, getKey)
-            : [...prev, ...results.filter((r) => !prev.some((p) => getKey(p) === getKey(r)))]
-        );
+        setServices((prev) => {
+          if (isBackground) {
+            // Intelligent Merge to avoid React re-renders on identical data
+            let changed = false;
+            const updated = prev.map((p) => {
+              const incoming = results.find((r) => getKey(r) === getKey(p));
+              if (incoming && JSON.stringify(p) !== JSON.stringify(incoming)) {
+                changed = true;
+                return incoming; // Swap reference only if data changed
+              }
+              return p; // Keep old reference to avoid visual shift
+            });
+            return changed ? updated : prev;
+          } else {
+            // Standard Pagination append
+            return page === 1
+              ? results
+              : [...prev, ...results.filter((r) => !prev.some((p) => getKey(p) === getKey(r)))];
+          }
+        });
 
-        setHasNext(Boolean(data?.next));
+        if (!isBackground) {
+          setHasNext(Boolean(data?.next));
+        }
       } catch (e) {
-        if (!mounted) return;
-        setServicesFetchError(e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load services.");
-        setServices([]);
-        setHasNext(false);
+        if (!isComponentMounted.current) return;
+        if (handleAuthError(e)) return;
+        
+        if (!isBackground) {
+          setServicesFetchError(
+            e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load services."
+          );
+          setServices([]);
+          setHasNext(false);
+        }
       } finally {
-        if (!mounted) return;
-        setLoading(false);
-        setLoadingMore(false);
+        if (!isComponentMounted.current) return;
+        if (!isBackground) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    })();
+    },
+    [page, pageSize, apiUrl, extraQueryParams, buildUrl, handleAuthError]
+  );
 
-    return () => { mounted = false; };
-  }, [page, apiUrl, buildUrl, JSON.stringify(extraQueryParams), query]);
+  // Initial and paginated fetching
+  useEffect(() => {
+    fetchServices(false);
+  }, [fetchServices]);
 
-  // fetch networks
+  // Auto-Refresh Background Polling
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const timer = setInterval(() => {
+      fetchServices(true);
+    }, refreshInterval);
+
+    return () => clearInterval(timer);
+  }, [autoRefresh, refreshInterval, fetchServices]);
+
+
   const fetchNetworks = useCallback(async () => {
     setNetworksLoading(true);
     setNetworksFetchError(null);
     try {
-      const url = buildUrl(NETWORK_API_ROOT, { page_size: 100 });
+      const url = buildUrl(NETWORK_API_ROOT, { page_size: 100 }, 1, 100);
       const res = await apiRequest({ method: "GET", url });
       const items = Array.isArray(res.data?.results) ? res.data.results : Array.isArray(res.data) ? res.data : [];
       setNetworks(items);
@@ -171,11 +278,12 @@ export default function ServicesListMui({
       items.forEach((n) => { cache[n.id ?? n.pk] = n; });
       setNetworkCache((prev) => ({ ...prev, ...cache }));
     } catch (e) {
+      if (handleAuthError(e)) return;
       setNetworksFetchError(e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to load networks.");
     } finally {
       setNetworksLoading(false);
     }
-  }, [buildUrl]);
+  }, [buildUrl, handleAuthError]);
 
   useEffect(() => { fetchNetworks(); }, [fetchNetworks]);
 
@@ -185,9 +293,10 @@ export default function ServicesListMui({
       const res = await apiRequest({ method: "GET", url: `${PLANS_API}?id=${planId}` });
       setPlanCache((p) => ({ ...p, [planId]: res.data }));
     } catch (e) {
+      handleAuthError(e);
       setPlanCacheErrors((s) => ({ ...s, [planId]: e?.message || "Failed to load plan." }));
     }
-  }, [planCache]);
+  }, [planCache, handleAuthError]);
 
   const loadNetwork = useCallback(async (networkId) => {
     if (!networkId || networkCache[networkId]) return;
@@ -195,9 +304,10 @@ export default function ServicesListMui({
       const res = await apiRequest({ method: "GET", url: `${NETWORK_API_ROOT}${networkId}/` });
       setNetworkCache((n) => ({ ...n, [networkId]: res.data }));
     } catch (e) {
+      handleAuthError(e);
       setNetworkCacheErrors((s) => ({ ...s, [networkId]: e?.message || "Failed to load network." }));
     }
-  }, [networkCache]);
+  }, [networkCache, handleAuthError]);
 
   const getServiceDetailUrl = (id) => `${API_BASE}${apiUrl.endsWith("/") ? apiUrl : apiUrl + "/"}${id}/`;
 
@@ -218,11 +328,31 @@ export default function ServicesListMui({
       setTimeout(() => setAlertState(null), 2000);
       return true;
     } catch (e) {
+      if (handleAuthError(e)) return false;
       setAlertState({ severity: "error", message: e?.response?.data ? JSON.stringify(e.response.data) : e?.message || "Failed to save." });
       setTimeout(() => setAlertState(null), 3000);
       return false;
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const toggleServiceStatus = async (service, currentStatus) => {
+    const serviceId = service.id ?? service.pk;
+    const newStatus = currentStatus === "running" ? "stopped" : "running";
+    
+    // Optimistic UI update
+    setServices((prev) => prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: 'updating...' } : s)));
+    
+    try {
+      await apiRequest({ method: "PATCH", url: getServiceDetailUrl(serviceId), data: { status: newStatus } });
+      setServices((prev) => prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: newStatus } : s)));
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      // Revert on failure
+      setServices((prev) => prev.map((s) => (String(s.id ?? s.pk) === String(serviceId) ? { ...s, status: currentStatus } : s)));
+      setAlertState({ severity: "error", message: "Failed to change service status." });
+      setTimeout(() => setAlertState(null), 3000);
     }
   };
 
@@ -235,6 +365,7 @@ export default function ServicesListMui({
       setAlertState({ severity: "success", message: "Service deleted." });
       setTimeout(() => setAlertState(null), 2000);
     } catch (e) {
+      if (handleAuthError(e)) return;
       setAlertState({ severity: "error", message: e?.message || "Failed to delete." });
       setTimeout(() => setAlertState(null), 3000);
     } finally {
@@ -250,6 +381,7 @@ export default function ServicesListMui({
       setPlansForPlatform((p) => ({ ...p, [platform]: plans }));
       return plans;
     } catch (e) {
+      handleAuthError(e);
       setPlansForPlatformErrors((s) => ({ ...s, [platform]: e?.message || "Failed to load plans." }));
       return [];
     }
@@ -264,7 +396,8 @@ export default function ServicesListMui({
       setAlertState({ severity: "success", message: "Network created." });
       setTimeout(() => setAlertState(null), 2000);
       return res.data;
-    } catch {
+    } catch (e) {
+      if (handleAuthError(e)) return null;
       setAlertState({ severity: "error", message: "Failed to create network." });
       setTimeout(() => setAlertState(null), 3000);
       return null;
@@ -285,7 +418,8 @@ export default function ServicesListMui({
       setAlertState({ severity: "success", message: "Network deleted." });
       setTimeout(() => setAlertState(null), 2000);
       return true;
-    } catch {
+    } catch (e) {
+      if (handleAuthError(e)) return false;
       setAlertState({ severity: "error", message: "Failed to delete network." });
       setTimeout(() => setAlertState(null), 3000);
       return false;
@@ -297,33 +431,184 @@ export default function ServicesListMui({
     setNetworksFetchError(null);
     fetchNetworks();
     setPage(1);
+    fetchServices(false);
   };
+
+
+  // Reusable Service Item Renderer Component
+  const RenderServiceItem = ({ s, layout, isReadOnly }) => {
+    const planIsObj = s.plan && typeof s.plan === "object";
+    const netIsObj = s.network && typeof s.network === "object";
+    const planId = planIsObj ? (s.plan.id ?? s.plan.pk) : s.plan;
+    const networkId = netIsObj ? (s.network.id ?? s.network.pk) : s.network;
+
+    if (planId && !planCache[planId]) loadPlan(planId);
+    if (networkId && !networkCache[networkId]) loadNetwork(networkId);
+
+    const networkName = netIsObj ? s.network.name : networkCache[networkId]?.name ?? "—";
+    const cpu = planIsObj ? s.plan.max_cpu : planCache[planId]?.max_cpu;
+    const ram = planIsObj ? s.plan.max_ram : planCache[planId]?.max_ram;
+    const storage = planIsObj ? s.plan.max_storage : planCache[planId]?.max_storage;
+    const price = planIsObj ? s.plan.price_per_hour : planCache[planId]?.price_per_hour;
+
+    const isUpdating = s.status === "updating...";
+    const isRunning = s.status === "running";
+
+    const commonStats = (
+      <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        {cpu && <Chip size="small" icon={<ComputerIcon fontSize="small" />} label={`${cpu} Cores`} />}
+        {ram && <Chip size="small" icon={<MemoryIcon fontSize="small" />} label={`${ram} MB`} />}
+        {storage && <Chip size="small" icon={<StorageIcon fontSize="small" />} label={`${storage} GB`} />}
+        {price && <Chip size="small" icon={<AttachMoneyIcon fontSize="small" />} label={`${price}/hr`} color="success" variant="outlined" />}
+      </Box>
+    );
+
+    const actionButtons = !isReadOnly && (
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", justifyContent: layout === "row" ? "flex-end" : "flex-start", mt: layout === "row" ? 0 : 2 }}>
+        <Button
+          size="small"
+          variant="contained"
+          color={isRunning ? "error" : "success"}
+          disabled={isUpdating}
+          startIcon={isRunning ? <StopIcon /> : <PlayArrowIcon />}
+          onClick={(e) => { e.stopPropagation(); toggleServiceStatus(s, s.status); }}
+        >
+          {isUpdating ? "..." : isRunning ? "Stop" : "Start"}
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<EditIcon />}
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditingService({ service: s, selectedNetwork: networkId ?? null, selectedPlanId: planId ?? null });
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          startIcon={<DeleteIcon />}
+          onClick={(e) => { e.stopPropagation(); deleteService(s.id ?? s.pk); }}
+        >
+          Delete
+        </Button>
+        <Button size="small" variant="contained" startIcon={<LaunchIcon />} onClick={(e) => { e.stopPropagation(); handleOpen(s); }}>
+          Open
+        </Button>
+      </Box>
+    );
+
+    if (layout === "row") {
+      return (
+        <Card elevation={1} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", p: 2, mb: 1 }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700}>{s.name || "(no name)"}</Typography>
+            <Typography variant="body2" color="text.secondary">{networkName}</Typography>
+          </Box>
+          <Box sx={{ flex: 2, display: 'flex', justifyContent: 'center' }}>
+             {commonStats}
+          </Box>
+          <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+            <Chip label={s.status ?? "unknown"} color={isRunning ? "success" : "default"} size="small" sx={{ mb: 1 }} />
+            {actionButtons}
+          </Box>
+        </Card>
+      );
+    }
+
+    return (
+      <Card elevation={3} sx={{ height: "100%", display: "flex", flexDirection: "column", minWidth: layout === 'carousel' ? '300px' : 'auto' }}>
+        <CardContent sx={{ flexGrow: 1 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>{s.name || "(no name)"}</Typography>
+              <Typography variant="body2" color="text.secondary">{networkName}</Typography>
+            </Box>
+            <Chip label={s.status ?? "unknown"} color={isRunning ? "success" : "default"} size="small" />
+          </Box>
+          {layout === "carousel" ? commonStats : (
+            <Box sx={{ mt: 2 }}>
+              {cpu && <Typography variant="body2">CPU: <strong>{cpu}</strong> cores</Typography>}
+              {ram && <Typography variant="body2">RAM: <strong>{ram}</strong> MB</Typography>}
+              {storage && <Typography variant="body2">Storage: <strong>{storage}</strong> GB</Typography>}
+              {price && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>Price/hr: <strong>{price}</strong> toman</Typography>}
+            </Box>
+          )}
+        </CardContent>
+        {(!isReadOnly || (isReadOnly && layout !== 'row')) && (
+          <Box sx={{ p: 2, display: "flex", gap: 1, justifyContent: "flex-end", backgroundColor: 'rgba(0,0,0,0.02)' }}>
+            {actionButtons}
+          </Box>
+        )}
+      </Card>
+    );
+  };
+
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h5" mb={2}>My Services</Typography>
+      {/* Header Area */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="h5">My Services</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Tooltip title="Refresh Now">
+            <IconButton onClick={() => fetchServices(false)} disabled={loading}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+          
+          <Tooltip title="Settings">
+            <IconButton onClick={(e) => setMenuAnchorEl(e.currentTarget)}>
+              <SettingsIcon />
+            </IconButton>
+          </Tooltip>
+          <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={() => setMenuAnchorEl(null)} sx={{ mt: 1 }}>
+            <Box sx={{ px: 2, py: 1, minWidth: 200 }}>
+              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Settings</Typography>
+              <FormControlLabel 
+                control={<Switch checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} size="small" />} 
+                label="Auto Refresh" 
+              />
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="caption" color="text.secondary">Refresh Interval</Typography>
+                <Select fullWidth size="small" value={refreshInterval} onChange={(e) => setRefreshInterval(e.target.value)} disabled={!autoRefresh}>
+                  <MenuItem value={2000}>2 Seconds</MenuItem>
+                  <MenuItem value={5000}>5 Seconds</MenuItem>
+                  <MenuItem value={10000}>10 Seconds</MenuItem>
+                </Select>
+              </Box>
+            </Box>
+          </Menu>
+        </Box>
+      </Box>
 
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={viewMode} onChange={(e, val) => { setViewMode(val); setCarouselIndex(0); }} variant="scrollable" scrollButtons="auto">
+          <Tab label="Cards" value="cards" />
+          <Tab label="Rows" value="rows" />
+          <Tab label="Carousel" value="carousel" />
+          <Tab label="Overview (Read-Only)" value="overview" />
+        </Tabs>
+      </Box>
+
+      {/* Search Bar */}
       {showSearch && (
-        <Box component="form" onSubmit={(e) => { e.preventDefault(); setPage(1); }} mb={3}>
+        <Box component="form" onSubmit={(e) => { e.preventDefault(); setPage(1); fetchServices(false); }} mb={3}>
           <Box sx={{ display: "flex", gap: 1 }}>
-            <TextField
-              fullWidth
-              variant="outlined"
-              size="small"
-              value={query}
-              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-              placeholder="Search service name..."
-            />
+            <TextField fullWidth variant="outlined" size="small" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search service name..." />
             <Button variant="contained" type="submit">Search</Button>
           </Box>
         </Box>
       )}
 
+      {/* Alerts */}
       {alertState && (
         <Snackbar open autoHideDuration={3000} onClose={() => setAlertState(null)}>
-          <Alert severity={alertState.severity} onClose={() => setAlertState(null)}>
-            {alertState.message}
-          </Alert>
+          <Alert severity={alertState.severity} onClose={() => setAlertState(null)}>{alertState.message}</Alert>
         </Snackbar>
       )}
 
@@ -336,87 +621,70 @@ export default function ServicesListMui({
         </Paper>
       )}
 
+      {/* Services Display Logic based on ViewMode */}
       {!loading && !servicesFetchError && (
-        <Grid container spacing={3}>
-          {services.map((s) => {
-            const planIsObj = s.plan && typeof s.plan === "object";
-            const netIsObj = s.network && typeof s.network === "object";
-            const planId = planIsObj ? (s.plan.id ?? s.plan.pk) : s.plan;
-            const networkId = netIsObj ? (s.network.id ?? s.network.pk) : s.network;
+        <Box>
+          {services.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ py: 4 }}>No services found.</Typography>
+          ) : (
+            <>
+              {/* Cards / Overview View */}
+              {(viewMode === 'cards' || viewMode === 'overview') && (
+                <Grid container spacing={3}>
+                  {services.map((s) => (
+                    <Grid item xs={12} md={6} lg={4} key={getKey(s)}>
+                      <RenderServiceItem s={s} layout="card" isReadOnly={viewMode === 'overview'} />
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
 
-            if (planId && !planCache[planId]) loadPlan(planId);
-            if (networkId && !networkCache[networkId]) loadNetwork(networkId);
+              {/* Rows View */}
+              {viewMode === 'rows' && (
+                <Stack spacing={0}>
+                  {services.map((s) => (
+                    <RenderServiceItem key={getKey(s)} s={s} layout="row" isReadOnly={false} />
+                  ))}
+                </Stack>
+              )}
 
-            const planPlatform = planIsObj ? (s.plan.platform ?? s.plan.name) : (planCache[planId]?.platform ?? planCache[planId]?.name ?? "—");
-            const networkName = netIsObj ? s.network.name : networkCache[networkId]?.name ?? "—";
-
-            const cpu = planIsObj ? s.plan.max_cpu : planCache[planId]?.max_cpu;
-            const ram = planIsObj ? s.plan.max_ram : planCache[planId]?.max_ram;
-            const storage = planIsObj ? s.plan.max_storage : planCache[planId]?.max_storage;
-            const price = planIsObj ? s.plan.price_per_hour : planCache[planId]?.price_per_hour;
-
-            return (
-              <Grid item xs={12} md={6} lg={4} key={getKey(s)}>
-                <Card elevation={3} sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                  <CardContent sx={{ flexGrow: 1 }}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight={700}>{s.name || "(no name)"}</Typography>
-                        <Typography variant="body2" color="text.secondary">{networkName}</Typography>
-                      </Box>
-                      <Chip label={s.status ?? "unknown"} color={s.status === "running" ? "success" : "default"} size="small" />
-                    </Box>
-
-                    <Box sx={{ mt: 2 }}>
-                      {cpu && <Typography variant="body2">CPU: <strong>{cpu}</strong> cores</Typography>}
-                      {ram && <Typography variant="body2">RAM: <strong>{ram}</strong> MB</Typography>}
-                      {storage && <Typography variant="body2">Storage: <strong>{storage}</strong> GB</Typography>}
-                      {price && <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>Price/hr: <strong>{price}</strong> toman</Typography>}
-                    </Box>
-                  </CardContent>
-
-                  <Box sx={{ p: 2, display: "flex", gap: 1, justifyContent: "flex-end" }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<EditIcon />}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingService({
-                          service: s,
-                          selectedNetwork: networkId ?? null,
-                          selectedPlanId: planId ?? null,
-                        });
-                      }}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={(e) => { e.stopPropagation(); deleteService(s.id ?? s.pk); }}
-                    >
-                      Delete
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      startIcon={<LaunchIcon />}
-                      onClick={(e) => { e.stopPropagation(); handleOpen(s); }}
-                    >
-                      Open
-                    </Button>
-                  </Box>
-                </Card>
-              </Grid>
-            );
-          })}
-        </Grid>
+              {/* Carousel View */}
+              {viewMode === 'carousel' && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+                   {services[carouselIndex] && (
+                     <Box sx={{ width: '100%', maxWidth: 500 }}>
+                        <RenderServiceItem s={services[carouselIndex]} layout="carousel" isReadOnly={false} />
+                     </Box>
+                   )}
+                   <Box sx={{ mt: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
+                     <Button 
+                        variant="outlined" 
+                        onClick={() => setCarouselIndex(i => Math.max(0, i - 1))} 
+                        disabled={carouselIndex === 0} 
+                        startIcon={<ChevronLeftIcon />}
+                     >
+                       Prev
+                     </Button>
+                     <Typography variant="body2" color="text.secondary">
+                       {carouselIndex + 1} of {services.length}
+                     </Typography>
+                     <Button 
+                        variant="outlined" 
+                        onClick={() => setCarouselIndex(i => Math.min(services.length - 1, i + 1))} 
+                        disabled={carouselIndex === services.length - 1} 
+                        endIcon={<ChevronRightIcon />}
+                     >
+                       Next
+                     </Button>
+                   </Box>
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
       )}
 
-      {hasNext && (
+      {hasNext && viewMode !== 'carousel' && (
         <Box sx={{ textAlign: "center", mt: 4 }}>
           <Button variant="contained" onClick={() => setPage((p) => p + 1)} disabled={loadingMore}>
             {loadingMore ? "Loading..." : "Load more"}
@@ -425,17 +693,10 @@ export default function ServicesListMui({
       )}
 
       {/* ==================== EDIT DIALOG ==================== */}
-      <Dialog
-        open={Boolean(editingService)}
-        onClose={() => setEditingService(null)}
-        fullWidth
-        maxWidth="lg"
-      >
+      <Dialog open={Boolean(editingService)} onClose={() => setEditingService(null)} fullWidth maxWidth="lg">
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           Edit Service — {editingService?.service?.name}
-          <IconButton onClick={() => setEditingService(null)}>
-            <CloseIcon />
-          </IconButton>
+          <IconButton onClick={() => setEditingService(null)}><CloseIcon /></IconButton>
         </DialogTitle>
 
         <DialogContent dividers>
@@ -466,13 +727,11 @@ export default function ServicesListMui({
               const svc = editingService.service;
               const payload = {};
 
-              // Network change
               const originalNet = svc.network ? (svc.network.id ?? svc.network.pk ?? svc.network) : null;
               if ((editingService.selectedNetwork ?? null) !== (originalNet ?? null)) {
                 payload.network = editingService.selectedNetwork ?? null;
               }
 
-              // Plan change
               const originalPlan = svc.plan ? (svc.plan.id ?? svc.plan.pk ?? svc.plan) : null;
               if (editingService.selectedPlanId && String(editingService.selectedPlanId) !== String(originalPlan)) {
                 payload.plan = editingService.selectedPlanId;
@@ -556,11 +815,7 @@ function EditorInside({
             ))}
           </Select>
 
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => setEditingService((es) => ({ ...es, creatingNetwork: { name: "" } }))}
-          >
+          <Button variant="outlined" startIcon={<AddIcon />} onClick={() => setEditingService((es) => ({ ...es, creatingNetwork: { name: "" } }))}>
             Create
           </Button>
 
@@ -578,7 +833,6 @@ function EditorInside({
           )}
         </Box>
 
-        {/* Create new network inline */}
         {editingService.creatingNetwork && (
           <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>
             <Typography fontWeight={700} gutterBottom>Network Name</Typography>
@@ -587,22 +841,10 @@ function EditorInside({
               size="small"
               autoFocus
               value={editingService.creatingNetwork.name}
-              onChange={(e) =>
-                setEditingService((es) => ({
-                  ...es,
-                  creatingNetwork: { name: e.target.value },
-                }))
-              }
+              onChange={(e) => setEditingService((es) => ({ ...es, creatingNetwork: { name: e.target.value } }))}
             />
             <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
-              <Button
-                size="small"
-                onClick={() => setEditingService((es) => {
-                  const copy = { ...es };
-                  delete copy.creatingNetwork;
-                  return copy;
-                })}
-              >
+              <Button size="small" onClick={() => setEditingService((es) => { const copy = { ...es }; delete copy.creatingNetwork; return copy; })}>
                 Cancel
               </Button>
               <Button
@@ -622,7 +864,6 @@ function EditorInside({
           </Paper>
         )}
 
-        {/* Plans */}
         <Box sx={{ mt: 4 }}>
           <Typography variant="h6" fontWeight={700} gutterBottom>
             Plans for {platform || "this service"}
@@ -651,9 +892,7 @@ function EditorInside({
                           variant="outlined"
                           onClick={() => onPickPlan(pid)}
                           sx={{
-                            p: 2,
-                            cursor: "pointer",
-                            border: isSelected ? "2px solid" : "1px solid",
+                            p: 2, cursor: "pointer", border: isSelected ? "2px solid" : "1px solid",
                             borderColor: isSelected ? "primary.main" : "divider",
                             bgcolor: isSelected ? "action.selected" : "background.paper",
                           }}
@@ -677,7 +916,7 @@ function EditorInside({
         </Box>
       </Box>
 
-      {/* Right Column - Overview */}
+      {/* Right Column - Read Only Service Info */}
       <Box>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" fontWeight={700}>Service Overview</Typography>
