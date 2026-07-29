@@ -376,7 +376,7 @@ export default function CreateServiceWizard({
                 <Button
                   variant="contained"
                   size="small"
-                  onClick={() => (window.location.href = "/login")}
+                  onClick={() => (window.location.href = "/signin_or_signup")}
                   sx={{ borderRadius: 0.5 }}
                 >
                   Login

@@ -121,7 +121,7 @@ export default function FloatingNav({
       localStorage.removeItem("refresh");
       try { window.dispatchEvent(new Event("auth")); } catch (e) {}
       setLoggedIn(false);
-      navigate("/login");
+      navigate("/signin_or_signup");
       close();
     }
   };
@@ -177,11 +177,11 @@ export default function FloatingNav({
                 </>
               ) : (
                 <>
-                  <Button component={RouterLink} to="/login" startIcon={<LoginIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
+                  <Button component={RouterLink} to="/signin_or_signup" startIcon={<LoginIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
                     Sign in
                   </Button>
 
-                  <Button component={RouterLink} to="/login?signup=1" startIcon={<PersonAddIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
+                  <Button component={RouterLink} to="/signin_or_signup?signup=1" startIcon={<PersonAddIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
                     Create account
                   </Button>
                 </>

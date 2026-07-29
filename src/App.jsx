@@ -5,7 +5,7 @@ import { Box, CssBaseline, ThemeProvider, alpha, createTheme } from "@mui/materi
 import Navbar from "./components/layout/Navbar.jsx";
 import Home from "./components/home/home.jsx";
 import Services from "./components/service/Services.jsx";
-import Login from "./components/login/login.jsx";
+import SigninOrSignup from "./components/signin_or_signup/signin_or_signup.jsx";
 import Plans from "./components/plans/plans.jsx";
 import Footer from "./components/layout/Footer.jsx";
 import AboutUs from "./components/aboutUs/aboutUs.jsx";
@@ -166,7 +166,7 @@ function App() {
             <Route path="volumes" element={<Volumes />} />
             <Route path="networks" element={<Networks />} />
             <Route path="plans" element={<Plans />} />
-            <Route path="login" element={<Login />} />
+            <Route path="signin_or_signup" element={<SigninOrSignup />} />
             <Route path="aboutUs" element={<AboutUs />} />
             <Route path="profile" element={<Profile />} />
             <Route path="service/:id" element={<ServiceDetail />} />

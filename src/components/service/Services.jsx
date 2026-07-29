@@ -427,7 +427,7 @@ export default function ServicesListMui({
         setAlertState({ severity: "error", message: "You're not authenticated. Redirecting to login..." });
         setAutoRefresh(false);
         setTimeout(() => {
-          if (isComponentMounted.current) navigate("/login");
+          if (isComponentMounted.current) navigate("/signin_or_signup");
         }, 2000);
         return true;
       }

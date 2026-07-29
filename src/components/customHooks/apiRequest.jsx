@@ -55,7 +55,7 @@ const handleRefreshTokenAndRetry = async ({ method, url, data, params }) => {
     } else {
       localStorage.removeItem('access');
       localStorage.removeItem('refresh');
-      window.location.href = '/login';
+      window.location.href = '/signin_or_signup';
       throw new Error('Refresh token invalid');
     }
 
@@ -64,7 +64,7 @@ const handleRefreshTokenAndRetry = async ({ method, url, data, params }) => {
       if (error.response.status === 401) {
         localStorage.removeItem('access');
         localStorage.removeItem('refresh');
-        window.location.href = '/login';
+        window.location.href = '/signin_or_signup';
       }
     } else {
       console.error('Network error or server unreachable:', error.message);

@@ -34,13 +34,11 @@ import PhoneOutlined from "@mui/icons-material/PhoneOutlined";
 
 const BASE_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api`;
 
-
-// Motion-enabled Paper for subtle appear/hover animations
 const MotionPaper = motion(Paper);
 
 const fadeUp = { hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } };
 
-export default function Login() {
+export default function SigninOrSignup() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -60,6 +58,12 @@ export default function Login() {
     const from = location.state?.from;
     if (!from) return null;
     return typeof from === "string" ? from : from.pathname || null;
+  };
+
+  const notifyAuthChanged = () => {
+    try {
+      window.dispatchEvent(new Event("auth-changed"));
+    } catch {}
   };
 
   const validateAccessToken = async (accessToken) => {
@@ -89,6 +93,8 @@ export default function Login() {
           timeout: 5000,
         });
       } catch {}
+
+      notifyAuthChanged();
 
       const returnPath = getReturnPath();
       if (returnPath) navigate(returnPath, { replace: true });
@@ -120,7 +126,6 @@ export default function Login() {
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -181,6 +186,15 @@ export default function Login() {
     return await finishLoginFromExistingToken();
   };
 
+  const completeLogin = (access, refresh) => {
+    if (access) localStorage.setItem("access", access);
+    if (refresh) localStorage.setItem("refresh", refresh);
+    notifyAuthChanged();
+    const returnPath = getReturnPath();
+    if (returnPath) navigate(returnPath, { replace: true });
+    else navigate("/", { replace: true });
+  };
+
   const handleCredentials = async (e) => {
     e.preventDefault();
     setError("");
@@ -221,11 +235,7 @@ export default function Login() {
     try {
       const res = await axios.post(`${BASE_URL}/login/validate/`, { ...getPayload(), code: form.code.trim() });
       if (!res.data.twofactor) {
-        if (res.data.access) localStorage.setItem("access", res.data.access);
-        if (res.data.refresh) localStorage.setItem("refresh", res.data.refresh);
-        const returnPath = getReturnPath();
-        if (returnPath) navigate(returnPath, { replace: true });
-        else navigate("/", { replace: true });
+        completeLogin(res.data.access, res.data.refresh);
       } else setShowPasswordPopup(true);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Invalid verification code");
@@ -248,13 +258,13 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      const res = await axios.post(`${BASE_URL}/login/token/`, { ...getPayload(), code: form.code.trim(), password: form.password });
-      if (res.data.access) localStorage.setItem("access", res.data.access);
-      if (res.data.refresh) localStorage.setItem("refresh", res.data.refresh);
+      const res = await axios.post(`${BASE_URL}/login/token/`, {
+        ...getPayload(),
+        code: form.code.trim(),
+        password: form.password,
+      });
       setShowPasswordPopup(false);
-      const returnPath = getReturnPath();
-      if (returnPath) navigate(returnPath, { replace: true });
-      else navigate("/", { replace: true });
+      completeLogin(res.data.access, res.data.refresh);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Login failed");
       setSnackOpen(true);
@@ -275,10 +285,10 @@ export default function Login() {
     }
   };
 
-  // Background gradients based on theme mode
-  const bgGradient = theme.palette.mode === "dark"
-    ? `linear-gradient(135deg, rgba(10,25,47,0.9) 0%, rgba(22,32,54,0.85) 50%, rgba(7,16,32,0.95) 100%)`
-    : `linear-gradient(135deg, ${theme.palette.primary.light} 0%, rgba(255,255,255,0.85) 30%, ${theme.palette.secondary.light} 100%)`;
+  const bgGradient =
+    theme.palette.mode === "dark"
+      ? `linear-gradient(135deg, rgba(10,25,47,0.9) 0%, rgba(22,32,54,0.85) 50%, rgba(7,16,32,0.95) 100%)`
+      : `linear-gradient(135deg, ${theme.palette.primary.light} 0%, rgba(255,255,255,0.85) 30%, ${theme.palette.secondary.light} 100%)`;
 
   return (
     <Box
@@ -294,7 +304,6 @@ export default function Login() {
         overflow: "hidden",
       }}
     >
-      {/* Decorative floating circles for subtle motion */}
       <motion.div
         style={{
           position: "absolute",
@@ -359,10 +368,9 @@ export default function Login() {
         </Typography>
 
         <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
-          Login or sign up with a verification code. We keep it simple and secure.
+          Sign in or sign up with a verification code. We keep it simple and secure.
         </Typography>
 
-        {/* Step: Credentials */}
         {step === "credentials" && (
           <Box component="form" onSubmit={handleCredentials} noValidate>
             <TextField
@@ -431,7 +439,6 @@ export default function Login() {
           </Box>
         )}
 
-        {/* Step: Code */}
         {step === "code" && (
           <Box component="form" onSubmit={handleCode}>
             <TextField
@@ -476,7 +483,6 @@ export default function Login() {
         )}
       </MotionPaper>
 
-      {/* Password Popup (2FA) */}
       <Dialog open={showPasswordPopup} onClose={handlePasswordClose} maxWidth="xs" fullWidth TransitionComponent={Slide}>
         <DialogTitle>Enter Password</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
