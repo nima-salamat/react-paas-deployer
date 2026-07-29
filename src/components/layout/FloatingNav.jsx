@@ -1,8 +1,6 @@
-// components/ui/FloatingNav.jsx
 import React, { useState, useEffect, useCallback } from "react";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import Fab from "@mui/material/Fab";
 import Collapse from "@mui/material/Collapse";
@@ -10,62 +8,72 @@ import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme, alpha } from "@mui/material/styles";
-import Divider from "@mui/material/Divider";
+import ClickAwayListener from "@mui/material/ClickAwayListener";
 
 import HomeIcon from "@mui/icons-material/Home";
 import StorageIcon from "@mui/icons-material/Storage";
 import PriceChangeIcon from "@mui/icons-material/PriceChange";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import CloseIcon from "@mui/icons-material/Close";
 import LoginIcon from "@mui/icons-material/Login";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import LogoutIcon from "@mui/icons-material/Logout";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
 
 import { motion } from "framer-motion";
 
-/**
- * FloatingNav with animated hamburger -> X icon
- */
-function AnimatedMenuIcon({ open = false, size = 20, stroke = "currentColor", strokeWidth = 2.2 }) {
-  // coords are inside 24x24 viewBox, origin for rotation is center (12,12)
+function AnimatedMenuIcon({ open = false, size = 22, stroke = "currentColor", strokeWidth = 2.2 }) {
   const transition = { duration: 0.22, ease: "easeInOut" };
 
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden focusable="false">
-      {/* top line */}
+    <Box
+      component="svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      aria-hidden
+      focusable="false"
+      sx={{ display: "block" }}
+    >
       <motion.line
-        x1="4" y1="7" x2="20" y2="7"
+        x1="4"
+        x2="20"
+        y1="7"
+        y2="7"
         stroke={stroke}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         initial={false}
-        animate={open ? { y: 5, rotate: 45 } : { y: 0, rotate: 0 }}
+        animate={open ? { y1: 12, y2: 12, rotate: 45 } : { y1: 7, y2: 7, rotate: 0 }}
         transition={transition}
-        style={{ originX: "12px", originY: "12px" }}
+        style={{ transformOrigin: "12px 12px" }}
       />
-      {/* middle line */}
       <motion.line
-        x1="4" y1="12" x2="20" y2="12"
+        x1="4"
+        x2="20"
+        y1="12"
+        y2="12"
         stroke={stroke}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         initial={false}
-        animate={open ? { opacity: 0, scaleX: 0.6 } : { opacity: 1, scaleX: 1 }}
+        animate={open ? { opacity: 0, scaleX: 0.4 } : { opacity: 1, scaleX: 1 }}
         transition={transition}
-        style={{ originX: "12px", originY: "12px" }}
+        style={{ transformOrigin: "12px 12px" }}
       />
-      {/* bottom line */}
       <motion.line
-        x1="4" y1="17" x2="20" y2="17"
+        x1="4"
+        x2="20"
+        y1="17"
+        y2="17"
         stroke={stroke}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         initial={false}
-        animate={open ? { y: -5, rotate: -45 } : { y: 0, rotate: 0 }}
+        animate={open ? { y1: 12, y2: 12, rotate: -45 } : { y1: 17, y2: 17, rotate: 0 }}
         transition={transition}
-        style={{ originX: "12px", originY: "12px" }}
+        style={{ transformOrigin: "12px 12px" }}
       />
-    </svg>
+    </Box>
   );
 }
 
@@ -78,139 +86,235 @@ export default function FloatingNav({
   const theme = useTheme();
   const isSm = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const initialLoggedIn = typeof loggedInProp === "boolean"
-    ? loggedInProp
-    : Boolean(localStorage.getItem("access"));
+  const readLoggedIn = () => Boolean(window.localStorage.getItem("access"));
 
   const [open, setOpen] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(initialLoggedIn);
-
-  useEffect(() => { if (typeof loggedInProp === "boolean") setLoggedIn(loggedInProp); }, [loggedInProp]);
+  const [loggedIn, setLoggedIn] = useState(() =>
+    typeof loggedInProp === "boolean" ? loggedInProp : readLoggedIn()
+  );
 
   useEffect(() => {
-    const onStorage = (e) => { if (e.key === "access") setLoggedIn(Boolean(localStorage.getItem("access"))); };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    if (typeof loggedInProp === "boolean") setLoggedIn(loggedInProp);
+  }, [loggedInProp]);
+
+  useEffect(() => {
+    const sync = () => setLoggedIn(readLoggedIn());
+
+    window.addEventListener("auth-changed", sync);
+    window.addEventListener("auth", sync);
+    window.addEventListener("storage", (e) => {
+      if (e.key === "access" || e.key === "refresh") sync();
+    });
+
+    return () => {
+      window.removeEventListener("auth-changed", sync);
+      window.removeEventListener("auth", sync);
+    };
   }, []);
 
   useEffect(() => {
-    const onAuth = () => setLoggedIn(Boolean(localStorage.getItem("access")));
-    window.addEventListener("auth", onAuth);
-    return () => window.removeEventListener("auth", onAuth);
-  }, []);
+    setOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
-    if (open) window.addEventListener("keydown", onKey);
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
   const close = useCallback(() => setOpen(false), []);
 
   const toggle = useCallback(() => {
-    const current = Boolean(localStorage.getItem("access"));
-    setLoggedIn(current);
+    setLoggedIn(readLoggedIn());
     setOpen((s) => !s);
   }, []);
 
   const handleLogout = () => {
-    if (typeof onLogout === "function") onLogout();
-    else {
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
-      try { window.dispatchEvent(new Event("auth")); } catch (e) {}
-      setLoggedIn(false);
-      navigate("/signin_or_signup");
+    if (typeof onLogout === "function") {
+      onLogout();
       close();
+      return;
     }
+
+    window.localStorage.removeItem("access");
+    window.localStorage.removeItem("refresh");
+    setLoggedIn(false);
+    try {
+      window.dispatchEvent(new Event("auth-changed"));
+      window.dispatchEvent(new Event("auth"));
+    } catch {}
+    navigate("/signin_or_signup");
+    close();
   };
 
   const bottom = anchorOffset?.bottom ?? 24;
   const right = anchorOffset?.right ?? 24;
-  const containerSx = position === "bottom-center"
-    ? { left: "50%", transform: "translateX(-50%)", right: "auto" }
-    : { right: right, left: "auto" };
+
+  const containerSx =
+    position === "bottom-center"
+      ? { left: "50%", transform: "translateX(-50%)", right: "auto" }
+      : { right, left: "auto" };
+
+  // لیست آیتم‌ها برای کاربران مهمان (لاگین نکرده)
+  const guestItems = [
+    { to: "/", label: "Home", icon: <HomeIcon /> },
+    { to: "/plans", label: "Plans", icon: <PriceChangeIcon /> },
+    {
+      to: "/signin_or_signup",
+      label: "Sign in / Sign up",
+      icon: <LoginIcon />,
+      onClick: () => {
+        try {
+          window.localStorage.setItem("auth_mode", "signin_or_signup");
+        } catch {}
+      },
+    },
+  ];
+
+  // لیست آیتم‌ها برای کاربران لاگین کرده
+  const authItems = [
+    { to: "/", label: "Home", icon: <HomeIcon /> },
+    { to: "/services", label: "Services", icon: <StorageIcon /> },
+    { to: "/volumes", label: "Volumes", icon: <Inventory2OutlinedIcon /> },
+    { to: "/networks", label: "Networks", icon: <LanOutlinedIcon /> },
+    { to: "/plans", label: "Plans", icon: <PriceChangeIcon /> },
+    { to: "/profile", label: "Profile", icon: <AccountCircleIcon /> },
+    {
+      to: "#",
+      label: "Logout",
+      icon: <LogoutIcon />,
+      color: "error",
+      onClick: handleLogout,
+    },
+  ];
+
+  const items = loggedIn ? authItems : guestItems;
 
   return (
     <Box
       sx={{
         position: "fixed",
         zIndex: 1400,
-        bottom: bottom,
+        bottom,
         ...containerSx,
         pointerEvents: "none",
       }}
-      aria-hidden={false}
     >
-      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1, pointerEvents: "auto" }}>
-        <Collapse in={open} timeout="auto" unmountOnExit>
-          <Paper elevation={8} sx={{
-            px: 1.5,
-            py: 1,
-            borderRadius: 2,
-            minWidth: 180,
-            bgcolor: alpha(theme.palette.background.paper, 0.98),
-            boxShadow: `0 8px 30px ${alpha(theme.palette.common.black, 0.12)}`,
-          }}>
-            <Stack spacing={1}>
-              {loggedIn ? (
-                <>
-                  <Button component={RouterLink} to="/" startIcon={<HomeIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
-                    Home
-                  </Button>
-                  <Button component={RouterLink} to="/services" startIcon={<StorageIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
-                    Services
-                  </Button>
-                  <Button component={RouterLink} to="/plans" startIcon={<PriceChangeIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
-                    Plans
-                  </Button>
-                  <Button component={RouterLink} to="/profile" startIcon={<AccountCircleIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
-                    Profile
-                  </Button>
-
-                  <Divider />
-
-                  <Button onClick={handleLogout} startIcon={<LogoutIcon />} color="inherit" sx={{ justifyContent: "flex-start", textTransform: "none" }}>
-                    Logout
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button component={RouterLink} to="/signin_or_signup" startIcon={<LoginIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
-                    Sign in
-                  </Button>
-
-                  <Button component={RouterLink} to="/signin_or_signup?signup=1" startIcon={<PersonAddIcon />} onClick={close} sx={{ justifyContent: "flex-start", textTransform: "none" }}>
-                    Create account
-                  </Button>
-                </>
-              )}
+      <ClickAwayListener onClickAway={() => open && close()}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            pointerEvents: "auto",
+          }}
+        >
+          <Collapse in={open} timeout={220} unmountOnExit>
+            {/* استک حاوی دکمه‌های کشیده شونده */}
+            <Stack spacing={1} sx={{ mb: 2, alignItems: "flex-end" }}>
+              {items.map((item, index) => (
+                <Button
+                  key={index}
+                  component={item.to === "#" ? "button" : RouterLink}
+                  to={item.to === "#" ? undefined : item.to}
+                  onClick={(e) => {
+                    if (item.to === "#") e.preventDefault();
+                    if (item.onClick) item.onClick();
+                    if (item.to !== "#") close();
+                  }}
+                  sx={{
+                    minWidth: 48,
+                    maxWidth: 48, // عرض اولیه حالت بسته
+                    height: 48,
+                    borderRadius: "24px",
+                    p: 0,
+                    display: "flex",
+                    flexDirection: "row-reverse", // قرارگیری آیکن در سمت راست
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    bgcolor: alpha(theme.palette.background.paper, 0.95),
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    boxShadow:
+                      theme.palette.mode === "dark"
+                        ? "0 4px 12px rgba(0,0,0,0.4)"
+                        : "0 4px 12px rgba(15,23,42,0.12)",
+                    border: "1px solid",
+                    borderColor: alpha(theme.palette.divider, 0.08),
+                    color: item.color === "error" ? "error.main" : "text.primary",
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    transition: "max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s",
+                    "&:hover": {
+                      maxWidth: 240, // باز شدن کادر تا این مقدار موقع هاور
+                      bgcolor: theme.palette.background.paper,
+                    },
+                    "&:hover .nav-label": {
+                      opacity: 1, // نمایش متن موقع هاور
+                    },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {item.icon}
+                  </Box>
+                  <Box
+                    className="nav-label"
+                    sx={{
+                      opacity: 0,
+                      pr: 0.5,
+                      pl: 2.5,
+                      fontWeight: 600,
+                      fontSize: "0.875rem",
+                      transition: "opacity 0.2s ease 0.1s",
+                    }}
+                  >
+                    {item.label}
+                  </Box>
+                </Button>
+              ))}
             </Stack>
-          </Paper>
-        </Collapse>
+          </Collapse>
 
-        <Tooltip title={open ? "Close quick menu" : (loggedIn ? "Quick actions" : "Account actions")}>
-          <Fab
-            onClick={toggle}
-            size={isSm ? "medium" : "large"}
-            color="primary"
-            aria-expanded={open}
-            aria-label="open quick actions"
-            sx={{
-              pointerEvents: "auto",
-              boxShadow: 6,
-              borderRadius: 3,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+          <Tooltip
+            title={open ? "Close menu" : loggedIn ? "Quick navigation" : "Account & navigation"}
+            placement="left"
           >
-            {/* single animated icon that morphs hamburger <-> X */}
-            <AnimatedMenuIcon open={open} size={22} stroke="#fff" strokeWidth={2.2} />
-          </Fab>
-        </Tooltip>
-      </Box>
+            <Fab
+              onClick={toggle}
+              size={isSm ? "medium" : "large"}
+              color="primary"
+              aria-expanded={open}
+              aria-label={open ? "Close quick menu" : "Open quick menu"}
+              sx={{
+                pointerEvents: "auto",
+                boxShadow:
+                  theme.palette.mode === "dark"
+                    ? "0 8px 28px rgba(0,0,0,0.5)"
+                    : "0 8px 28px rgba(37,99,235,0.35)",
+                borderRadius: 3,
+                width: isSm ? 52 : 56,
+                height: isSm ? 52 : 56,
+              }}
+            >
+              <AnimatedMenuIcon open={open} size={22} stroke="#fff" strokeWidth={2.2} />
+            </Fab>
+          </Tooltip>
+        </Box>
+      </ClickAwayListener>
     </Box>
   );
 }

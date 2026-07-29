@@ -458,17 +458,39 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
               <Box
                 sx={{
                   display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
+                  alignItems: "center",
+                  gap: 1.25,
                   minWidth: 0,
                 }}
               >
-                <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>
-                  PaaS Deployer
-                </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  Modern control panel
-                </Typography>
+                <Box
+                  component="img"
+                  src={DEFAULT_ICON}
+                  alt="PaaS Deployer"
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 2,
+                    flexShrink: 0,
+                    objectFit: "contain",
+                    display: "block",
+                  }}
+                />
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    minWidth: 0,
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>
+                    PaaS Deployer
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    Modern control panel
+                  </Typography>
+                </Box>
               </Box>
             </Button>
           </Box>
@@ -563,21 +585,22 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
             sx={{ color: "inherit", textDecoration: "none", minWidth: 0 }}
           >
             <Box
+              component="img"
+              src={DEFAULT_ICON}
+              alt="PaaS Deployer"
               sx={{
                 width: 44,
                 height: 44,
-                borderRadius: 3,
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 900,
-                color: "#fff",
-                background: "linear-gradient(135deg, #2f66ff 0%, #7c5cff 100%)",
-                boxShadow: "0 12px 24px rgba(47,102,255,0.28)",
+                borderRadius: 2.5,
                 flexShrink: 0,
+                objectFit: "contain",
+                display: "block",
+                boxShadow:
+                  theme.palette.mode === "dark"
+                    ? "0 8px 20px rgba(0,0,0,0.35)"
+                    : "0 8px 20px rgba(47,102,255,0.18)",
               }}
-            >
-              PD
-            </Box>
+            />
 
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>

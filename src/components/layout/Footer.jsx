@@ -11,15 +11,26 @@ const FooterMui = () => {
       sx={{
         bgcolor: theme.palette.mode === "dark" ? "grey.900" : "grey.100",
         color: theme.palette.text.secondary,
-        py: 2,
+        py: 2.5,
         textAlign: "center",
-        // optional: keep a subtle top border to separate from content
         borderTop: 1,
         borderColor: theme.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.06)",
       }}
     >
-      <Typography variant="body2" component="small">
-        © 2026 PAAS Deployer
+      <Typography 
+        variant="body2" 
+        component="p"
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 0.75,
+          flexWrap: "wrap",
+        }}
+      >
+        <span>Built with AI, coffee, and good vibes</span>
+        <span style={{ opacity: 0.5 }}>•</span>
+        <span>PaaS Deployer</span>
       </Typography>
     </Box>
   );
