@@ -861,7 +861,7 @@ function LogPanel({
   );
 }
 
-function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCount, volumeCount, networkName }) {
+function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCount, volumeCount, networkName, serviceRunning }) {
   const theme = useTheme();
 
   return (
@@ -925,12 +925,16 @@ function TabSidebar({ activeTab, setActiveTab, service, selectedDeploy, deployCo
             </Typography>
             <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap">
               <Chip
-                label={service?.status || "unknown"}
+                label={
+                  serviceRunning === true
+                    ? "running"
+                    : service?.status || "unknown"
+                }
                 size="small"
                 color={
-                  ["running", "success"].includes(String(service?.status))
+                  serviceRunning === true || ["running", "success"].includes(String(service?.status || ""))
                     ? "success"
-                    : ["queued", "deploying", "stopping"].includes(String(service?.status))
+                    : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
                     ? "warning"
                     : "default"
                 }
@@ -1337,6 +1341,14 @@ export default function ServiceDetail() {
     }
   }, [id]);
 
+  const normalizePercent = useCallback((raw) => {
+    let n = typeof raw === "number" ? raw : Number(raw);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    // Backend (container_manager) returns 0..100 already.
+    // Do NOT scale values <= 1 — real idle CPU can be 0.3%.
+    return Math.round(Math.min(n, 100) * 100) / 100;
+  }, []);
+
   const checkServiceRunning = useCallback(
     async (silent = false) => {
       if (!id) return;
@@ -1352,44 +1364,41 @@ export default function ServiceDetail() {
         });
 
         if (resp.status === 200 && resp.data) {
-          const running = !!resp.data.running;
-          const cpu =
-            typeof resp.data.cpu === "number"
-              ? resp.data.cpu
-              : Number(resp.data.cpu) || 0;
-          const ram =
-            typeof resp.data.ram === "number"
-              ? resp.data.ram
-              : Number(resp.data.ram) || 0;
+          const running = Boolean(resp.data.running);
+          const cpu = normalizePercent(resp.data.cpu);
+          const ram = normalizePercent(resp.data.ram);
 
           setServiceRunning((prev) => (prev === running ? prev : running));
           setServiceCpu((prev) =>
             typeof prev === "number" &&
             Math.round(prev * 100) / 100 === Math.round(cpu * 100) / 100
               ? prev
-              : Math.round(cpu * 100) / 100
+              : cpu
           );
           setServiceRam((prev) =>
             typeof prev === "number" &&
             Math.round(prev * 100) / 100 === Math.round(ram * 100) / 100
               ? prev
-              : Math.round(ram * 100) / 100
+              : ram
           );
-        } else {
+        } else if (!silent) {
           setServiceRunning(false);
           setServiceCpu(0);
           setServiceRam(0);
         }
       } catch (err) {
         console.error("checkServiceRunning err:", err);
-        setServiceRunning(false);
-        setServiceCpu(0);
-        setServiceRam(0);
+        // Don't force Stopped on transient errors during silent auto-refresh
+        if (!silent) {
+          setServiceRunning(false);
+          setServiceCpu(0);
+          setServiceRam(0);
+        }
       } finally {
         if (!silent) setServiceStatusLoadingManual(false);
       }
     },
-    [id, serviceStatusLoadingManual]
+    [id, serviceStatusLoadingManual, normalizePercent]
   );
 
   const fetchServiceLogs = useCallback(async () => {
@@ -2169,6 +2178,16 @@ export default function ServiceDetail() {
       if (resp.status === 202) {
         safeSetSnackbar("success", "Service start requested.");
         await fetchService();
+        // Live status updates after deploy task progresses
+        setTimeout(() => {
+          if (mountedRef.current) checkServiceRunning(true);
+        }, 1500);
+        setTimeout(() => {
+          if (mountedRef.current) {
+            fetchService(true);
+            checkServiceRunning(true);
+          }
+        }, 4000);
       } else {
         setError("Failed to start service.");
       }
@@ -2193,6 +2212,15 @@ export default function ServiceDetail() {
       if (resp.status === 202) {
         safeSetSnackbar("success", "Service stop requested.");
         await fetchService();
+        setTimeout(() => {
+          if (mountedRef.current) checkServiceRunning(true);
+        }, 1500);
+        setTimeout(() => {
+          if (mountedRef.current) {
+            fetchService(true);
+            checkServiceRunning(true);
+          }
+        }, 4000);
       } else {
         setError("Failed to stop service.");
       }
@@ -2776,8 +2804,22 @@ export default function ServiceDetail() {
           </Typography>
         </Box>
         <Chip
-          label={serviceRunning === null ? "Unknown" : serviceRunning ? "Running" : "Stopped"}
-          color={serviceRunning === null ? "default" : serviceRunning ? "success" : "default"}
+          label={
+            serviceRunning === true
+              ? "Running"
+              : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
+              ? String(service.status)
+              : serviceRunning === false
+              ? "Stopped"
+              : service?.status || "Unknown"
+          }
+          color={
+            serviceRunning === true || ["running", "success"].includes(String(service?.status || ""))
+              ? "success"
+              : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
+              ? "warning"
+              : "default"
+          }
           size="small"
         />
       </Box>
@@ -3417,6 +3459,7 @@ export default function ServiceDetail() {
             deployCount={deployCount}
             volumeCount={volumeCount}
             networkName={networkName}
+            serviceRunning={serviceRunning}
           />
         ) : null}
       </Box>
