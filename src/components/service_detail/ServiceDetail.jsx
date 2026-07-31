@@ -84,6 +84,105 @@ const REFRESH_INTERVAL_OPTIONS = [
   { label: "60s", value: 60000 },
 ];
 
+/** Platforms routed to DBDeployer / run_db_deploy (must match backend DB_PLATFORMS). */
+const DB_PLATFORMS = new Set([
+  "mysql",
+  "mariadb",
+  "postgresql",
+  "postgres",
+  "mongodb",
+  "mongo",
+  "redis",
+  "oracle",
+]);
+
+const APP_PLATFORM_OPTIONS = [
+  { value: "docker", label: "Docker / app (zip)" },
+];
+
+const DB_PLATFORM_OPTIONS = [
+  { value: "mysql", label: "MySQL" },
+  { value: "mariadb", label: "MariaDB" },
+  { value: "postgresql", label: "PostgreSQL" },
+  { value: "mongodb", label: "MongoDB" },
+  { value: "redis", label: "Redis" },
+  { value: "oracle", label: "Oracle" },
+];
+
+/** Mutable credential keys accepted by PATCH /deploy/<pk>/update_db_config/ */
+const MUTABLE_DB_CONFIG_KEYS = [
+  "root_password",
+  "password",
+  "username",
+  "database",
+  "port",
+  "env",
+];
+
+function parseDeployConfig(raw) {
+  if (raw == null || raw === "") return {};
+  if (typeof raw === "object" && !Array.isArray(raw)) return { ...raw };
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch {
+      /* plain text config */
+    }
+  }
+  return {};
+}
+
+function getDeployPlatform(deploy) {
+  const cfg = parseDeployConfig(deploy?.config);
+  const p = String(cfg.platform || deploy?.platform || "").toLowerCase().trim();
+  return p || "docker";
+}
+
+function isDbPlatform(platformOrDeploy) {
+  if (platformOrDeploy == null) return false;
+  if (typeof platformOrDeploy === "string") {
+    return DB_PLATFORMS.has(platformOrDeploy.toLowerCase().trim());
+  }
+  return DB_PLATFORMS.has(getDeployPlatform(platformOrDeploy));
+}
+
+function buildConfigPayload(platform, { configText, dbFields, isDb }) {
+  if (isDb) {
+    const out = { platform };
+    for (const key of MUTABLE_DB_CONFIG_KEYS) {
+      const v = dbFields?.[key];
+      if (v === undefined || v === null || String(v).trim() === "") continue;
+      if (key === "port") {
+        const n = Number(v);
+        if (!Number.isNaN(n)) out.port = n;
+        else out.port = v;
+      } else if (key === "env") {
+        try {
+          out.env = typeof v === "string" ? JSON.parse(v || "{}") : v;
+        } catch {
+          out.env = v;
+        }
+      } else {
+        out[key] = v;
+      }
+    }
+    return JSON.stringify(out);
+  }
+  const text = String(configText || "").trim();
+  if (!text) return JSON.stringify({ platform: platform || "docker" });
+  try {
+    const obj = JSON.parse(text);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      if (!obj.platform) obj.platform = platform || "docker";
+      return JSON.stringify(obj);
+    }
+  } catch {
+    /* free-form text */
+  }
+  return text;
+}
+
 const TABS = [
   { value: "overview", label: "Overview", icon: <Inventory2Icon fontSize="small" /> },
   { value: "create", label: "Create deploy", icon: <AddCircleOutlineIcon fontSize="small" /> },
@@ -347,6 +446,18 @@ const DeployCard = memo(function DeployCard({
                   {deploy?.name || "Unnamed deploy"}
                 </Typography>
                 {isSelected ? <Chip label="Selected" size="small" color="success" /> : null}
+                {(() => {
+                  const p = getDeployPlatform(deploy);
+                  const db = isDbPlatform(p);
+                  return p ? (
+                    <Chip
+                      label={`${db ? "DB" : "App"} · ${p}`}
+                      size="small"
+                      color={db ? "info" : "default"}
+                      variant="outlined"
+                    />
+                  ) : null;
+                })()}
                 {statusText ? <Chip label={statusText} size="small" variant="outlined" /> : null}
               </Stack>
 
@@ -1015,14 +1126,41 @@ export default function ServiceDetail() {
   const [version, setVersion] = useState("");
   const [config, setConfig] = useState("");
   const [zipFile, setZipFile] = useState(null);
+  const [createPlatform, setCreatePlatform] = useState("docker");
+  const [createDbFields, setCreateDbFields] = useState({
+    root_password: "",
+    password: "",
+    username: "",
+    database: "",
+    port: "",
+    env: "",
+  });
 
   const [submitting, setSubmitting] = useState(false);
   const [actionState, setActionState] = useState({});
+  const [rebuildLoading, setRebuildLoading] = useState(false);
+  const [dbConfigSaving, setDbConfigSaving] = useState(false);
+  const [dbConfigFields, setDbConfigFields] = useState({
+    root_password: "",
+    password: "",
+    username: "",
+    database: "",
+    port: "",
+    env: "",
+  });
 
   const [editingDeployId, setEditingDeployId] = useState(null);
-  const [editData, setEditData] = useState({ name: "", version: "", config: "" });
+  const [editData, setEditData] = useState({ name: "", version: "", config: "", platform: "docker" });
   const [editOriginalName, setEditOriginalName] = useState("");
   const [editZipFile, setEditZipFile] = useState(null);
+  const [editDbFields, setEditDbFields] = useState({
+    root_password: "",
+    password: "",
+    username: "",
+    database: "",
+    port: "",
+    env: "",
+  });
 
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -1644,6 +1782,54 @@ export default function ServiceDetail() {
     return deploys.find((d) => String(d.id ?? d.pk ?? "") === selectedDeployId) || null;
   }, [deploys, selectedDeployId]);
 
+  const selectedPlatform = useMemo(
+    () => (selectedDeploy ? getDeployPlatform(selectedDeploy) : ""),
+    [selectedDeploy]
+  );
+  const selectedIsDb = useMemo(
+    () => (selectedDeploy ? isDbPlatform(selectedDeploy) : false),
+    [selectedDeploy]
+  );
+  const createIsDb = isDbPlatform(createPlatform);
+  const editIsDb = isDbPlatform(editData.platform || "docker");
+
+  const serviceBusy = useMemo(
+    () =>
+      Boolean(
+        service &&
+          ["queued", "deploying", "stopping"].includes(String(service.status || "").toLowerCase())
+      ),
+    [service]
+  );
+
+  useEffect(() => {
+    if (!selectedDeploy || !selectedIsDb) {
+      setDbConfigFields({
+        root_password: "",
+        password: "",
+        username: "",
+        database: "",
+        port: "",
+        env: "",
+      });
+      return;
+    }
+    const cfg = parseDeployConfig(selectedDeploy.config);
+    setDbConfigFields({
+      root_password: cfg.root_password != null ? String(cfg.root_password) : "",
+      password: cfg.password != null ? String(cfg.password) : "",
+      username: cfg.username != null ? String(cfg.username) : "",
+      database: cfg.database != null ? String(cfg.database) : "",
+      port: cfg.port != null ? String(cfg.port) : "",
+      env:
+        cfg.env != null
+          ? typeof cfg.env === "string"
+            ? cfg.env
+            : JSON.stringify(cfg.env, null, 2)
+          : "",
+    });
+  }, [selectedDeploy, selectedIsDb]);
+
   const currentDeployForLogs = useMemo(() => {
     if (!deployLogDeployId) return null;
     return deploys.find((d) => String(d.id ?? d.pk ?? "") === String(deployLogDeployId)) || null;
@@ -1880,11 +2066,33 @@ export default function ServiceDetail() {
   };
 
   const handleEditClick = useCallback((deploy) => {
+    const platform = getDeployPlatform(deploy);
+    const cfg = parseDeployConfig(deploy.config);
+
     setEditingDeployId(deploy.id);
     setEditData({
       name: deploy.name || "",
       version: deploy.version || "",
-      config: deploy.config || "",
+      config:
+        typeof deploy.config === "string"
+          ? deploy.config
+          : deploy.config
+          ? JSON.stringify(deploy.config, null, 2)
+          : "",
+      platform,
+    });
+    setEditDbFields({
+      root_password: cfg.root_password != null ? String(cfg.root_password) : "",
+      password: cfg.password != null ? String(cfg.password) : "",
+      username: cfg.username != null ? String(cfg.username) : "",
+      database: cfg.database != null ? String(cfg.database) : "",
+      port: cfg.port != null ? String(cfg.port) : "",
+      env:
+        cfg.env != null
+          ? typeof cfg.env === "string"
+            ? cfg.env
+            : JSON.stringify(cfg.env, null, 2)
+          : "",
     });
     setEditOriginalName(deploy.name || "");
     setEditZipFile(null);
@@ -1895,7 +2103,15 @@ export default function ServiceDetail() {
 
   const handleCancelEdit = useCallback(() => {
     setEditingDeployId(null);
-    setEditData({ name: "", version: "", config: "" });
+    setEditData({ name: "", version: "", config: "", platform: "docker" });
+    setEditDbFields({
+      root_password: "",
+      password: "",
+      username: "",
+      database: "",
+      port: "",
+      env: "",
+    });
     setEditOriginalName("");
     setEditZipFile(null);
     if (editZipInputRef.current) editZipInputRef.current.value = "";
@@ -1911,6 +2127,17 @@ export default function ServiceDetail() {
       return;
     }
 
+    const configPayload = buildConfigPayload(createPlatform, {
+      configText: config,
+      dbFields: createDbFields,
+      isDb: createIsDb,
+    });
+
+    if (!createIsDb && !zipFile) {
+      setError("App deploys require a .zip source package.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const available = await checkDeployNameAvailable(name);
@@ -1920,8 +2147,13 @@ export default function ServiceDetail() {
         return;
       }
 
-      if (!zipFile) {
-        const payload = { name, service: id, version, config };
+      if (createIsDb || !zipFile) {
+        const payload = {
+          name,
+          service: id,
+          version,
+          config: configPayload,
+        };
         const createResp = await apiRequest({
           method: "POST",
           url: `${DEPLOY_BASE}`,
@@ -1929,11 +2161,19 @@ export default function ServiceDetail() {
         });
 
         if (createResp.status === 201) {
-          safeSetSnackbar("success", "Deploy created.");
+          safeSetSnackbar("success", createIsDb ? "DB deploy created." : "Deploy created.");
           await fetchDeploys(1);
           setName("");
           setVersion("");
           setConfig("");
+          setCreateDbFields({
+            root_password: "",
+            password: "",
+            username: "",
+            database: "",
+            port: "",
+            env: "",
+          });
         } else {
           setError("Create request failed.");
         }
@@ -1942,7 +2182,7 @@ export default function ServiceDetail() {
         fd.append("name", name);
         fd.append("service", id);
         if (version) fd.append("version", version);
-        if (config) fd.append("config", config);
+        if (configPayload) fd.append("config", configPayload);
         fd.append("zip_file", zipFile);
 
         const access = localStorage.getItem("access");
@@ -1951,7 +2191,7 @@ export default function ServiceDetail() {
         const resp = await axios.post(`${DEPLOY_BASE}`, fd, { headers });
 
         if (resp.status === 201) {
-          safeSetSnackbar("success", "Deploy created.");
+          safeSetSnackbar("success", "App deploy created.");
           await fetchDeploys(1);
           setName("");
           setVersion("");
@@ -1993,11 +2233,17 @@ export default function ServiceDetail() {
         return;
       }
 
-      if (!editZipFile) {
+      const configPayload = buildConfigPayload(editData.platform || "docker", {
+        configText: editData.config,
+        dbFields: editDbFields,
+        isDb: editIsDb,
+      });
+
+      if (editIsDb || !editZipFile) {
         const payload = {
           name: editData.name,
           version: editData.version,
-          config: editData.config,
+          config: configPayload,
         };
         const resp = await apiRequest({
           method: "PUT",
@@ -2017,7 +2263,7 @@ export default function ServiceDetail() {
         fd.append("name", editData.name);
         fd.append("service", id);
         if (editData.version) fd.append("version", editData.version);
-        if (editData.config) fd.append("config", editData.config);
+        if (configPayload) fd.append("config", configPayload);
         fd.append("zip_file", editZipFile);
 
         const access = localStorage.getItem("access");
@@ -2163,22 +2409,28 @@ export default function ServiceDetail() {
     [id, pageInfo.page, safeSetSnackbar]
   );
 
-  const startService = async () => {
+  const startService = async ({ forceRebuild = false } = {}) => {
     if (!id) return;
     setError(null);
     setSnackbar(null);
+    if (forceRebuild) setRebuildLoading(true);
 
     try {
       const resp = await apiRequest({
         method: "POST",
         url: `${SERVICE_ACTION_ROOT}start_service/`,
-        data: { service_id: id },
+        data: {
+          service_id: id,
+          ...(forceRebuild ? { force_rebuild: true } : {}),
+        },
       });
 
       if (resp.status === 202) {
-        safeSetSnackbar("success", "Service start requested.");
+        const detail =
+          resp.data?.detail ||
+          (forceRebuild ? "Rebuild queued." : "Service start requested.");
+        safeSetSnackbar("success", detail);
         await fetchService();
-        // Live status updates after deploy task progresses
         setTimeout(() => {
           if (mountedRef.current) checkServiceRunning(true);
         }, 1500);
@@ -2189,11 +2441,134 @@ export default function ServiceDetail() {
           }
         }, 4000);
       } else {
-        setError("Failed to start service.");
+        setError(forceRebuild ? "Failed to rebuild service." : "Failed to start service.");
       }
     } catch (err) {
       console.error("startService err:", err);
-      setError(err.response ? JSON.stringify(err.response.data) : "Error starting service");
+      setError(
+        err.response?.data?.detail ||
+          (err.response ? JSON.stringify(err.response.data) : "Error starting service")
+      );
+    } finally {
+      if (forceRebuild && mountedRef.current) setRebuildLoading(false);
+    }
+  };
+
+  /**
+   * Rebuild selected deploy.
+   * Prefers POST /deploy/<pk>/rebuild/; falls back to start_service force_rebuild.
+   * DB: container only removed (volumes preserved). App: container + image removed.
+   */
+  const rebuildService = async () => {
+    if (!id) return;
+    setError(null);
+    setSnackbar(null);
+    setRebuildLoading(true);
+
+    const deployId = selectedDeployId || selectedDeploy?.id || selectedDeploy?.pk;
+
+    try {
+      if (deployId) {
+        try {
+          const resp = await apiRequest({
+            method: "POST",
+            url: `${DEPLOY_BASE}${deployId}/rebuild/`,
+          });
+          if (resp.status === 202 || resp.data?.result === "success") {
+            safeSetSnackbar(
+              "success",
+              resp.data?.detail ||
+                (selectedIsDb
+                  ? "DB rebuild queued (volumes preserved)."
+                  : "App rebuild queued (image rebuilt from zip).")
+            );
+            await fetchService();
+            setTimeout(() => {
+              if (mountedRef.current) checkServiceRunning(true);
+            }, 1500);
+            setTimeout(() => {
+              if (mountedRef.current) {
+                fetchService(true);
+                checkServiceRunning(true);
+              }
+            }, 4000);
+            return;
+          }
+        } catch (rebuildErr) {
+          console.warn("deploy rebuild endpoint failed, falling back:", rebuildErr);
+        }
+      }
+
+      await startService({ forceRebuild: true });
+    } catch (err) {
+      console.error("rebuildService err:", err);
+      setError(
+        err.response?.data?.detail ||
+          (err.response ? JSON.stringify(err.response.data) : "Error rebuilding service")
+      );
+    } finally {
+      if (mountedRef.current) setRebuildLoading(false);
+    }
+  };
+
+  /** PATCH /deploy/<pk>/update_db_config/ */
+  const handleUpdateDbConfig = async () => {
+    const deployId = selectedDeployId || selectedDeploy?.id || selectedDeploy?.pk;
+    if (!deployId || !selectedIsDb) {
+      setError("Select a DB deploy first.");
+      return;
+    }
+
+    setDbConfigSaving(true);
+    setError(null);
+    try {
+      const body = {};
+      for (const key of MUTABLE_DB_CONFIG_KEYS) {
+        const v = dbConfigFields[key];
+        if (v === undefined || v === null || String(v).trim() === "") continue;
+        if (key === "port") {
+          const n = Number(v);
+          body.port = Number.isNaN(n) ? v : n;
+        } else if (key === "env") {
+          try {
+            body.env = JSON.parse(v);
+          } catch {
+            body.env = v;
+          }
+        } else {
+          body[key] = v;
+        }
+      }
+
+      if (!Object.keys(body).length) {
+        setError("Provide at least one credential field to update.");
+        return;
+      }
+
+      const resp = await apiRequest({
+        method: "PATCH",
+        url: `${DEPLOY_BASE}${deployId}/update_db_config/`,
+        data: body,
+      });
+
+      if (resp.status === 200 || resp.data?.result === "success") {
+        safeSetSnackbar(
+          "success",
+          resp.data?.detail || "DB config updated. Use Rebuild to apply credentials."
+        );
+        await fetchDeploys(pageInfo.page);
+        await fetchService(true);
+      } else {
+        setError(resp.data?.detail || "Failed to update DB config.");
+      }
+    } catch (err) {
+      console.error("handleUpdateDbConfig err:", err);
+      setError(
+        err.response?.data?.detail ||
+          (err.response ? JSON.stringify(err.response.data) : "Error updating DB config")
+      );
+    } finally {
+      if (mountedRef.current) setDbConfigSaving(false);
     }
   };
 
@@ -2518,56 +2893,145 @@ export default function ServiceDetail() {
             sx={{ mb: 1.25 }}
           />
 
-          <TextField
-            fullWidth
-            label="Config"
-            size="small"
-            multiline
-            rows={4}
-            value={editingDeployId ? editData.config : config}
-            onChange={(e) =>
-              editingDeployId
-                ? setEditData((d) => ({ ...d, config: e.target.value }))
-                : setConfig(e.target.value)
-            }
-            sx={{ mb: 1.25 }}
-          />
+          <FormControl fullWidth size="small" sx={{ mb: 1.25 }}>
+            <InputLabel>Platform</InputLabel>
+            <Select
+              label="Platform"
+              value={editingDeployId ? editData.platform || "docker" : createPlatform}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (editingDeployId) setEditData((d) => ({ ...d, platform: v }));
+                else setCreatePlatform(v);
+              }}
+              disabled={Boolean(editingDeployId)}
+            >
+              <MenuItem disabled value="">
+                — App —
+              </MenuItem>
+              {APP_PLATFORM_OPTIONS.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+              <MenuItem disabled value="__db_sep">
+                — Database —
+              </MenuItem>
+              {DB_PLATFORM_OPTIONS.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-          <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1.25, flexWrap: "wrap" }}>
-            {!editingDeployId ? (
-              <>
-                <Button variant="outlined" component="label" size="small">
-                  Choose .zip
-                  <input
-                    type="file"
-                    hidden
-                    accept=".zip"
-                    ref={zipInputRef}
-                    onChange={(e) => setZipFile(e.target.files?.[0] || null)}
+          {(editingDeployId ? editIsDb : createIsDb) ? (
+            <Box sx={{ mb: 1.25 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                DB credentials (stored in deploy config). After changing a running DB, call Rebuild to
+                apply — volumes/data are preserved.
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  gap: 1.25,
+                }}
+              >
+                {["username", "password", "root_password", "database", "port"].map((field) => (
+                  <TextField
+                    key={field}
+                    fullWidth
+                    size="small"
+                    type={field.includes("password") ? "password" : "text"}
+                    label={field.replace(/_/g, " ")}
+                    value={
+                      editingDeployId
+                        ? editDbFields[field] || ""
+                        : createDbFields[field] || ""
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (editingDeployId) {
+                        setEditDbFields((f) => ({ ...f, [field]: val }));
+                      } else {
+                        setCreateDbFields((f) => ({ ...f, [field]: val }));
+                      }
+                    }}
                   />
-                </Button>
-                <Typography variant="body2" color="text.secondary">
-                  {zipFile ? `${zipFile.name} (${Math.round(zipFile.size / 1024)} KB)` : "No file selected"}
-                </Typography>
-              </>
-            ) : (
-              <>
-                <Button variant="outlined" component="label" size="small">
-                  Replace .zip
-                  <input
-                    type="file"
-                    hidden
-                    accept=".zip"
-                    ref={editZipInputRef}
-                    onChange={(e) => setEditZipFile(e.target.files?.[0] || null)}
-                  />
-                </Button>
-                <Typography variant="body2" color="text.secondary">
-                  {editZipFile ? editZipFile.name : "No file selected"}
-                </Typography>
-              </>
-            )}
-          </Box>
+                ))}
+              </Box>
+              <TextField
+                fullWidth
+                size="small"
+                multiline
+                rows={2}
+                label="Extra env (JSON object)"
+                sx={{ mt: 1.25 }}
+                value={editingDeployId ? editDbFields.env || "" : createDbFields.env || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (editingDeployId) setEditDbFields((f) => ({ ...f, env: val }));
+                  else setCreateDbFields((f) => ({ ...f, env: val }));
+                }}
+              />
+            </Box>
+          ) : (
+            <>
+              <TextField
+                fullWidth
+                label="Config (JSON)"
+                size="small"
+                multiline
+                rows={4}
+                value={editingDeployId ? editData.config : config}
+                onChange={(e) =>
+                  editingDeployId
+                    ? setEditData((d) => ({ ...d, config: e.target.value }))
+                    : setConfig(e.target.value)
+                }
+                helperText='Optional JSON. "platform" is set automatically for app deploys.'
+                sx={{ mb: 1.25 }}
+              />
+
+              <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 1.25, flexWrap: "wrap" }}>
+                {!editingDeployId ? (
+                  <>
+                    <Button variant="outlined" component="label" size="small">
+                      Choose .zip
+                      <input
+                        type="file"
+                        hidden
+                        accept=".zip"
+                        ref={zipInputRef}
+                        onChange={(e) => setZipFile(e.target.files?.[0] || null)}
+                      />
+                    </Button>
+                    <Typography variant="body2" color="text.secondary">
+                      {zipFile
+                        ? `${zipFile.name} (${Math.round(zipFile.size / 1024)} KB)`
+                        : "Required for app deploys"}
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outlined" component="label" size="small">
+                      Replace .zip
+                      <input
+                        type="file"
+                        hidden
+                        accept=".zip"
+                        ref={editZipInputRef}
+                        onChange={(e) => setEditZipFile(e.target.files?.[0] || null)}
+                      />
+                    </Button>
+                    <Typography variant="body2" color="text.secondary">
+                      {editZipFile ? editZipFile.name : "Optional — leave empty to keep current"}
+                    </Typography>
+                  </>
+                )}
+              </Box>
+            </>
+          )}
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="flex-end">
             {!editingDeployId ? (
@@ -2582,6 +3046,15 @@ export default function ServiceDetail() {
                     setVersion("");
                     setConfig("");
                     setZipFile(null);
+                    setCreatePlatform("docker");
+                    setCreateDbFields({
+                      root_password: "",
+                      password: "",
+                      username: "",
+                      database: "",
+                      port: "",
+                      env: "",
+                    });
                     if (zipInputRef.current) zipInputRef.current.value = "";
                   }}
                 >
@@ -2828,12 +3301,8 @@ export default function ServiceDetail() {
         <Button
           variant="contained"
           startIcon={<PlayArrowIcon />}
-          onClick={startService}
-          disabled={
-            !service ||
-            serviceLoading ||
-            ["queued", "deploying", "stopping"].includes(String(service?.status))
-          }
+          onClick={() => startService()}
+          disabled={!service || serviceLoading || serviceBusy || !selectedDeployId}
           fullWidth
           size="small"
         >
@@ -2841,13 +3310,24 @@ export default function ServiceDetail() {
         </Button>
         <Button
           variant="outlined"
+          color="warning"
+          startIcon={<RefreshIcon />}
+          onClick={rebuildService}
+          disabled={!service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId}
+          fullWidth
+          size="small"
+        >
+          {rebuildLoading
+            ? "Rebuilding..."
+            : selectedIsDb
+            ? "Rebuild DB"
+            : "Rebuild"}
+        </Button>
+        <Button
+          variant="outlined"
           startIcon={<StopIcon />}
           onClick={stopService}
-          disabled={
-            !service ||
-            serviceLoading ||
-            ["queued", "deploying", "stopping"].includes(String(service?.status))
-          }
+          disabled={!service || serviceLoading || serviceBusy}
           fullWidth
           size="small"
         >
@@ -2865,10 +3345,11 @@ export default function ServiceDetail() {
         <Button
           variant="outlined"
           onClick={openServiceInNewTab}
-          disabled={!service?.service_name}
+          disabled={!service?.service_name || selectedIsDb}
           startIcon={<LinkIcon />}
           fullWidth
           size="small"
+          title={selectedIsDb ? "DB services are not opened in browser" : undefined}
         >
           Open
         </Button>
@@ -2884,6 +3365,14 @@ export default function ServiceDetail() {
             label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`}
             size="small"
             color="success"
+          />
+        ) : null}
+        {selectedPlatform ? (
+          <Chip
+            label={`${selectedIsDb ? "DB" : "App"} · ${selectedPlatform}`}
+            size="small"
+            color={selectedIsDb ? "info" : "default"}
+            variant="outlined"
           />
         ) : null}
       </Stack>
@@ -3112,6 +3601,69 @@ export default function ServiceDetail() {
 
   const settingsPanel = (
     <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ maxWidth: 960 }}>
+      {selectedIsDb && selectedDeploy ? (
+        <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, mb: 0.5 }}>
+            DB credentials
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+            Updates deploy config via PATCH /deploy/&lt;id&gt;/update_db_config/. Does not restart
+            automatically — click Rebuild DB to apply. Named volumes are preserved.
+          </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+              gap: 1.25,
+              mb: 1.25,
+            }}
+          >
+            {["username", "password", "root_password", "database", "port"].map((field) => (
+              <TextField
+                key={field}
+                fullWidth
+                size="small"
+                type={field.includes("password") ? "password" : "text"}
+                label={field.replace(/_/g, " ")}
+                value={dbConfigFields[field] || ""}
+                onChange={(e) =>
+                  setDbConfigFields((f) => ({ ...f, [field]: e.target.value }))
+                }
+              />
+            ))}
+          </Box>
+          <TextField
+            fullWidth
+            size="small"
+            multiline
+            rows={2}
+            label="Extra env (JSON object)"
+            value={dbConfigFields.env || ""}
+            onChange={(e) => setDbConfigFields((f) => ({ ...f, env: e.target.value }))}
+            sx={{ mb: 1.5 }}
+          />
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Button
+              variant="contained"
+              onClick={handleUpdateDbConfig}
+              disabled={dbConfigSaving || serviceBusy}
+              fullWidth
+            >
+              {dbConfigSaving ? "Saving..." : "Save DB config"}
+            </Button>
+            <Button
+              variant="outlined"
+              color="warning"
+              onClick={rebuildService}
+              disabled={rebuildLoading || serviceBusy || !selectedDeployId}
+              fullWidth
+            >
+              {rebuildLoading ? "Rebuilding..." : "Rebuild to apply"}
+            </Button>
+          </Stack>
+        </Paper>
+      ) : null}
+
       <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, mb: 1.5 }}>
           Plan
