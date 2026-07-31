@@ -148,6 +148,7 @@ function isDbPlatform(platformOrDeploy) {
 }
 
 function buildConfigPayload(platform, { configText, dbFields, isDb }) {
+  // Always return a plain object for JSONField backends (not a double-encoded string).
   if (isDb) {
     const out = { platform };
     for (const key of MUTABLE_DB_CONFIG_KEYS) {
@@ -167,18 +168,26 @@ function buildConfigPayload(platform, { configText, dbFields, isDb }) {
         out[key] = v;
       }
     }
-    return JSON.stringify(out);
+    // MySQL/MariaDB: password alone is enough — mirror to root_password for the backend.
+    if (
+      (platform === "mysql" || platform === "mariadb") &&
+      !String(out.root_password || "").trim() &&
+      String(out.password || "").trim()
+    ) {
+      out.root_password = String(out.password);
+    }
+    return out;
   }
   const text = String(configText || "").trim();
-  if (!text) return JSON.stringify({ platform: platform || "docker" });
+  if (!text) return { platform: platform || "docker" };
   try {
     const obj = JSON.parse(text);
     if (obj && typeof obj === "object" && !Array.isArray(obj)) {
       if (!obj.platform) obj.platform = platform || "docker";
-      return JSON.stringify(obj);
+      return obj;
     }
   } catch {
-    /* free-form text */
+    /* free-form text kept as string for non-JSON app configs */
   }
   return text;
 }
@@ -2180,6 +2189,27 @@ export default function ServiceDetail() {
       dbFields: createDbFields,
       isDb: effectiveIsDb,
     });
+
+    if (effectiveIsDb) {
+      const cfg = typeof configPayload === "object" && configPayload ? configPayload : {};
+      const p = String(effectivePlatform || "").toLowerCase();
+      if ((p === "mysql" || p === "mariadb") && !String(cfg.root_password || cfg.password || "").trim()) {
+        setError("MySQL/MariaDB requires root_password (or password).");
+        return;
+      }
+      if (p === "postgresql" && !String(cfg.password || "").trim()) {
+        setError("PostgreSQL requires password.");
+        return;
+      }
+      if (p === "mongodb" && (!String(cfg.username || "").trim() || !String(cfg.password || "").trim())) {
+        setError("MongoDB requires username and password.");
+        return;
+      }
+      if (p === "oracle" && !String(cfg.password || "").trim()) {
+        setError("Oracle requires password.");
+        return;
+      }
+    }
 
     if (!effectiveIsDb && !zipFile) {
       setError("App deploys require a .zip source package.");
