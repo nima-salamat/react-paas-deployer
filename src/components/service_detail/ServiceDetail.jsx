@@ -1280,19 +1280,45 @@ export default function ServiceDetail() {
 
   const checkDeployNameAvailable = useCallback(
     async (candidate) => {
-      if (!candidate) return false;
-      if (editingDeployId && candidate === editOriginalName) return true;
+      const name = String(candidate || "").trim();
+      if (!name) {
+        return { ok: false, detail: "Name is required." };
+      }
+      if (name.length < 4) {
+        return { ok: false, detail: "Name must be at least 4 characters." };
+      }
+      // Editing and keeping the same name is always fine
+      if (editingDeployId && name === editOriginalName) {
+        return { ok: true, detail: "Unchanged." };
+      }
 
       try {
         const resp = await apiRequest({
           method: "GET",
           url: `${DEPLOY_BASE}name_is_available/`,
-          params: { name: candidate },
+          params: {
+            name,
+            // backend may ignore; helps future exclude-self checks
+            ...(editingDeployId ? { exclude_id: String(editingDeployId) } : {}),
+          },
         });
-        return resp.data?.result === true;
+        const data = resp?.data ?? resp;
+        const ok = data?.result === true || data?.result === "true";
+        return {
+          ok,
+          detail:
+            data?.detail ||
+            (ok ? "The name is free." : "That name has already been taken."),
+        };
       } catch (err) {
         console.error("checkDeployNameAvailable:", err);
-        return false;
+        // Network/auth errors must NOT look like "name taken"
+        return {
+          ok: false,
+          detail:
+            err?.response?.data?.detail ||
+            "Could not verify name availability. Check your connection and try again.",
+        };
       }
     },
     [editingDeployId, editOriginalName]
@@ -1790,8 +1816,28 @@ export default function ServiceDetail() {
     () => (selectedDeploy ? isDbPlatform(selectedDeploy) : false),
     [selectedDeploy]
   );
-  const createIsDb = isDbPlatform(createPlatform);
-  const editIsDb = isDbPlatform(editData.platform || "docker");
+
+  // Platform always follows the service plan when known (no manual pick needed).
+  const planPlatform = useMemo(() => {
+    const raw =
+      planDetail?.platform ??
+      service?.plan?.platform ??
+      service?.plan_detail?.platform ??
+      "";
+    return String(raw || "").toLowerCase().trim();
+  }, [planDetail, service]);
+
+  useEffect(() => {
+    if (!planPlatform) return;
+    setCreatePlatform(planPlatform);
+    // When not editing, keep form aligned with plan
+    if (!editingDeployId) {
+      setEditData((d) => ({ ...d, platform: planPlatform }));
+    }
+  }, [planPlatform, editingDeployId]);
+
+  const createIsDb = isDbPlatform(createPlatform || planPlatform);
+  const editIsDb = isDbPlatform(editData.platform || createPlatform || planPlatform || "docker");
 
   const serviceBusy = useMemo(
     () =>
@@ -2127,27 +2173,29 @@ export default function ServiceDetail() {
       return;
     }
 
-    const configPayload = buildConfigPayload(createPlatform, {
+    const effectivePlatform = planPlatform || createPlatform || "docker";
+    const effectiveIsDb = isDbPlatform(effectivePlatform);
+    const configPayload = buildConfigPayload(effectivePlatform, {
       configText: config,
       dbFields: createDbFields,
-      isDb: createIsDb,
+      isDb: effectiveIsDb,
     });
 
-    if (!createIsDb && !zipFile) {
+    if (!effectiveIsDb && !zipFile) {
       setError("App deploys require a .zip source package.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const available = await checkDeployNameAvailable(name);
-      if (!available) {
-        setError("That name is already taken or not available.");
+      const nameCheck = await checkDeployNameAvailable(name);
+      if (!nameCheck.ok) {
+        setError(nameCheck.detail || "Name is not available.");
         setSubmitting(false);
         return;
       }
 
-      if (createIsDb || !zipFile) {
+      if (effectiveIsDb || !zipFile) {
         const payload = {
           name,
           service: id,
@@ -2161,7 +2209,7 @@ export default function ServiceDetail() {
         });
 
         if (createResp.status === 201) {
-          safeSetSnackbar("success", createIsDb ? "DB deploy created." : "Deploy created.");
+          safeSetSnackbar("success", effectiveIsDb ? "DB deploy created." : "Deploy created.");
           await fetchDeploys(1);
           setName("");
           setVersion("");
@@ -2226,20 +2274,23 @@ export default function ServiceDetail() {
         return;
       }
 
-      const available = await checkDeployNameAvailable(editData.name);
-      if (!available) {
-        setError("That name is already taken or not available.");
+      const nameCheck = await checkDeployNameAvailable(editData.name);
+      if (!nameCheck.ok) {
+        setError(nameCheck.detail || "Name is not available.");
         setAction(deployId, { updating: false });
         return;
       }
 
-      const configPayload = buildConfigPayload(editData.platform || "docker", {
+      const effectivePlatform =
+        editData.platform || planPlatform || createPlatform || "docker";
+      const effectiveIsDb = isDbPlatform(effectivePlatform);
+      const configPayload = buildConfigPayload(effectivePlatform, {
         configText: editData.config,
         dbFields: editDbFields,
-        isDb: editIsDb,
+        isDb: effectiveIsDb,
       });
 
-      if (editIsDb || !editZipFile) {
+      if (effectiveIsDb || !editZipFile) {
         const payload = {
           name: editData.name,
           version: editData.version,
@@ -2893,38 +2944,32 @@ export default function ServiceDetail() {
             sx={{ mb: 1.25 }}
           />
 
-          <FormControl fullWidth size="small" sx={{ mb: 1.25 }}>
-            <InputLabel>Platform</InputLabel>
-            <Select
-              label="Platform"
-              value={editingDeployId ? editData.platform || "docker" : createPlatform}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (editingDeployId) setEditData((d) => ({ ...d, platform: v }));
-                else setCreatePlatform(v);
-              }}
-              disabled={Boolean(editingDeployId)}
-            >
-              <MenuItem disabled value="">
-                — App —
-              </MenuItem>
-              {APP_PLATFORM_OPTIONS.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-              <MenuItem disabled value="__db_sep">
-                — Database —
-              </MenuItem>
-              {DB_PLATFORM_OPTIONS.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Box sx={{ mb: 1.25 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
+              Platform (from service plan)
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Chip
+                label={
+                  (planPlatform || createPlatform || "docker") +
+                  (isDbPlatform(planPlatform || createPlatform)
+                    ? " · database"
+                    : " · app")
+                }
+                color={isDbPlatform(planPlatform || createPlatform) ? "info" : "default"}
+                size="small"
+              />
+              {!planPlatform ? (
+                <Typography variant="caption" color="warning.main">
+                  Plan has no platform — defaulting to docker. Assign a plan on the service.
+                </Typography>
+              ) : null}
+            </Stack>
+          </Box>
 
-          {(editingDeployId ? editIsDb : createIsDb) ? (
+          {(editingDeployId
+            ? isDbPlatform(editData.platform || planPlatform || createPlatform)
+            : isDbPlatform(planPlatform || createPlatform)) ? (
             <Box sx={{ mb: 1.25 }}>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
                 DB credentials (stored in deploy config). After changing a running DB, call Rebuild to
@@ -3522,10 +3567,10 @@ export default function ServiceDetail() {
                   {volume.name}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Bind: {volume.bind || "—"}
+                  Bind: {volume.bind || volume.default_bind || volume.service_attachments?.[String(id)]?.bind || "—"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Mode: {volume.mode || "—"}
+                  Mode: {volume.mode || volume.default_mode || volume.service_attachments?.[String(id)]?.mode || "—"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Size: {volume.size_mb != null ? `${volume.size_mb} MB` : "—"}
@@ -3848,10 +3893,10 @@ export default function ServiceDetail() {
                         {volume.name}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Bind: {volume.bind}
+                        Bind: {volume.bind || volume.default_bind || "—"}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Mode: {volume.mode}
+                        Mode: {volume.mode || volume.default_mode || "—"}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Size: {volume.size_mb} MB
