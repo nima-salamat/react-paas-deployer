@@ -128,7 +128,7 @@ export default function CreateDeployPanel({
                     key={field}
                     fullWidth
                     size="small"
-                    type={field.includes("password") ? "password" : "text"}
+                    type="text"
                     label={field.replace(/_/g, " ")}
                     value={editingDeployId ? editDbFields[field] || "" : createDbFields[field] || ""}
                     onChange={(e) => {
@@ -164,8 +164,14 @@ export default function CreateDeployPanel({
                 label="Config (JSON)"
                 size="small"
                 multiline
-                rows={4}
-                value={editingDeployId ? editData.config : config}
+                rows={6}
+                value={
+                  editingDeployId 
+                    ? (typeof editData.config === "object" && editData.config !== null 
+                        ? JSON.stringify(editData.config, null, 2) 
+                        : editData.config || "")
+                    : config
+                }
                 onChange={(e) => editingDeployId ? setEditData((d) => ({ ...d, config: e.target.value })) : setConfig(e.target.value)}
                 helperText='Optional JSON. "platform" is set automatically for app deploys.'
                 sx={{ mb: 1.25 }}
