@@ -397,7 +397,7 @@ export default function CreateServiceWizard({
       PaperProps={{
         sx: {
           borderRadius: isMobile ? 0 : 2.5,
-          border: "1px solid",
+          border: isMobile ? "none" : "1px solid",
           borderColor: "divider",
         },
       }}
@@ -408,7 +408,7 @@ export default function CreateServiceWizard({
           alignItems: "center",
           justifyContent: "space-between",
           py: 1.5,
-          px: 2,
+          px: { xs: 2, sm: 3 }, 
         }}
       >
         <Box>
@@ -426,7 +426,7 @@ export default function CreateServiceWizard({
         </IconButton>
       </DialogTitle>
 
-      <Box sx={{ px: 2, pb: 1.5 }}>
+      <Box sx={{ px: { xs: 1, sm: 2 }, pb: 1.5 }}>
         <Stepper activeStep={activeStep} alternativeLabel={!isMobile}>
           {steps.map((label) => (
             <Step key={label}>
@@ -436,7 +436,7 @@ export default function CreateServiceWizard({
         </Stepper>
       </Box>
 
-      <DialogContent dividers sx={{ px: 2, py: 2 }}>
+      <DialogContent dividers sx={{ px: { xs: 2, sm: 3 }, py: { xs: 2, sm: 3 } }}>
         {submitting && <LinearProgress sx={{ mb: 2 }} />}
 
         {!isValidUser ? (
@@ -487,18 +487,20 @@ export default function CreateServiceWizard({
             {submissionResult.ok ? (
               <Button
                 variant="contained"
-                size="small"
+                size="large"
                 onClick={handleClose}
-                sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+                fullWidth={isMobile}
+                sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, mt: 2 }}
               >
-                Close
+                Close & Return
               </Button>
             ) : (
-              <Stack direction="row" spacing={1} justifyContent="center">
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="center" mt={2}>
                 <Button
                   variant="contained"
                   color="warning"
                   size="small"
+                  fullWidth={isMobile}
                   startIcon={<ReplayIcon />}
                   onClick={() => {
                     setSubmissionResult(null);
@@ -508,7 +510,7 @@ export default function CreateServiceWizard({
                 >
                   {submissionResult.timeout ? "Retry" : "Edit"}
                 </Button>
-                <Button size="small" variant="outlined" onClick={handleClose} sx={{ borderRadius: 1.5, textTransform: "none" }}>
+                <Button size="small" fullWidth={isMobile} variant="outlined" onClick={handleClose} sx={{ borderRadius: 1.5, textTransform: "none" }}>
                   Close
                 </Button>
               </Stack>
@@ -650,7 +652,7 @@ export default function CreateServiceWizard({
                             />
                           }
                           label={
-                            <Stack direction="row" spacing={1} alignItems="center">
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
                               <Typography variant="body2" fontWeight={600}>
                                 {v.name}
                               </Typography>
@@ -692,7 +694,7 @@ export default function CreateServiceWizard({
                     onChange={(e) => setNewVolume((p) => ({ ...p, name: e.target.value }))}
                     fullWidth
                   />
-                  <Stack direction="row" spacing={1}>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField
                       size="small"
                       label="Bind path"
@@ -708,7 +710,7 @@ export default function CreateServiceWizard({
                       type="number"
                       value={newVolume.size_mb}
                       onChange={(e) => setNewVolume((p) => ({ ...p, size_mb: e.target.value }))}
-                      sx={{ width: 120 }}
+                      sx={{ width: { xs: "100%", sm: 120 } }}
                     />
                   </Stack>
                   <Button
@@ -801,7 +803,7 @@ export default function CreateServiceWizard({
       </DialogContent>
 
       {isValidUser && !submissionResult && (
-        <DialogActions sx={{ px: 2, py: 1.5, gap: 1 }}>
+        <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 2, gap: 1 }}>
           <Button
             onClick={handleClose}
             color="inherit"

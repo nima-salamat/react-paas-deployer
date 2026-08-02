@@ -18,12 +18,10 @@ import {
   CircularProgress,
   Divider,
   Drawer,
-  Grid,
   IconButton,
   Paper,
   Skeleton,
   Stack,
-  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
@@ -39,8 +37,6 @@ const CreateDeploymentModal = lazy(() => import("./CreateDeploymentModal"));
 
 const PLATFORMS_API = `https://${import.meta.env.VITE_API_BASE}/plans/platforms/`;
 const PLANS_API = `https://${import.meta.env.VITE_API_BASE}/plans/`;
-
-/* ── helpers ── */
 
 const getKey = (p) => {
   if (!p) return "null";
@@ -105,8 +101,6 @@ const getErrorMessage = (error, fallback = "Something went wrong.") => {
   return error?.message || fallback;
 };
 
-/* ── card ── */
-
 const PlanCard = memo(function PlanCard({ plan, onCreate }) {
   return (
     <Paper
@@ -118,10 +112,12 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
       }}
       onClick={() => onCreate(plan)}
       sx={(theme) => ({
+        width: "100%",
+        boxSizing: "border-box",
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        borderRadius: 1,
+        borderRadius: 2,
         border: "1px solid",
         borderColor: "divider",
         bgcolor: "background.paper",
@@ -182,7 +178,7 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
                 textAlign: "center",
                 border: "1px solid",
                 borderColor: "divider",
-                borderRadius: 0.5,
+                borderRadius: 1,
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
@@ -218,7 +214,7 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
             e.stopPropagation();
             onCreate(plan);
           }}
-          sx={{ borderRadius: 0.5, alignSelf: "flex-start" }}
+          sx={{ borderRadius: 1, alignSelf: "flex-start" }}
         >
           Create
         </Button>
@@ -226,8 +222,6 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
     </Paper>
   );
 });
-
-/* ── main ── */
 
 export default function PlatformPlans() {
   const theme = useTheme();
@@ -374,7 +368,7 @@ export default function PlatformPlans() {
     });
   };
 
-    const openCreate = (plan) => {
+  const openCreate = (plan) => {
     const planId = plan?.id ?? plan?.pk ?? plan?.uuid ?? null;
     setModalInitial(
       plan
@@ -395,15 +389,15 @@ export default function PlatformPlans() {
   };
 
   const handleCreated = (r) => {
-    if (r?.ok) closeModal();
+    if (r?.ok) {
+      console.log("Deployment created successfully.");
+    }
   };
 
   const retryAll = () => {
     fetchPlatforms();
     fetchPlans();
   };
-
-  /* filter UI */
 
   const filterContent = (
     <Stack spacing={1.5}>
@@ -422,7 +416,7 @@ export default function PlatformPlans() {
           variant="outlined"
           onClick={toggleSelectAll}
           disabled={!platforms.length || loadingPlatforms}
-          sx={{ borderRadius: 0.5 }}
+          sx={{ borderRadius: 1 }}
         >
           {allSelected ? "Deselect all" : "Select all"}
         </Button>
@@ -430,7 +424,7 @@ export default function PlatformPlans() {
           size="small"
           onClick={clearFilters}
           disabled={!selectedPlatforms.length}
-          sx={{ borderRadius: 0.5 }}
+          sx={{ borderRadius: 1 }}
         >
           Clear
         </Button>
@@ -460,7 +454,7 @@ export default function PlatformPlans() {
                 variant={selected ? "contained" : "outlined"}
                 onClick={() => togglePlatform(key)}
                 sx={{
-                  borderRadius: 0.5,
+                  borderRadius: 1,
                   justifyContent: "flex-start",
                   fontWeight: selected ? 700 : 500,
                 }}
@@ -475,14 +469,13 @@ export default function PlatformPlans() {
   );
 
   return (
-    <Box sx={{ maxWidth: 1280, mx: "auto", px: { xs: 1.5, sm: 2, md: 3 }, py: { xs: 2, md: 3 } }}>
-      {/* header */}
+    <Box sx={{ width: "100%", maxWidth: 1280, mx: "auto", px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 }, boxSizing: "border-box" }}>
       <Paper
         elevation={0}
         sx={{
           p: 2,
           mb: 2,
-          borderRadius: 1,
+          borderRadius: 2,
           border: "1px solid",
           borderColor: "divider",
         }}
@@ -502,7 +495,7 @@ export default function PlatformPlans() {
                 placeItems: "center",
                 bgcolor: "primary.main",
                 color: "#fff",
-                borderRadius: 0.5,
+                borderRadius: 1,
                 flexShrink: 0,
               }}
             >
@@ -525,7 +518,7 @@ export default function PlatformPlans() {
               startIcon={<RefreshIcon />}
               onClick={retryAll}
               disabled={loadingPlatforms || loadingPlans}
-              sx={{ borderRadius: 0.5 }}
+              sx={{ borderRadius: 1 }}
             >
               Refresh
             </Button>
@@ -535,7 +528,7 @@ export default function PlatformPlans() {
               startIcon={<LaunchIcon />}
               component={RouterLink}
               to="/services"
-              sx={{ borderRadius: 0.5 }}
+              sx={{ borderRadius: 1 }}
             >
               Services
             </Button>
@@ -543,22 +536,22 @@ export default function PlatformPlans() {
         </Stack>
       </Paper>
 
-      {/* body */}
       <Box
         sx={{
-          display: { xs: "block", md: "grid" },
+          display: { xs: "flex", md: "grid" },
+          flexDirection: "column",
           gridTemplateColumns: { md: "240px 1fr" },
           gap: 2,
           alignItems: "start",
+          width: "100%",
         }}
       >
-        {/* desktop filters */}
         <Paper
           elevation={0}
           sx={{
             display: { xs: "none", md: "block" },
             p: 2,
-            borderRadius: 1,
+            borderRadius: 2,
             border: "1px solid",
             borderColor: "divider",
             position: "sticky",
@@ -568,9 +561,7 @@ export default function PlatformPlans() {
           {filterContent}
         </Paper>
 
-        {/* content */}
-        <Box>
-          {/* mobile filter bar */}
+        <Box sx={{ width: "100%", minWidth: 0 }}>
           <Stack
             direction="row"
             spacing={1}
@@ -581,12 +572,12 @@ export default function PlatformPlans() {
               variant="outlined"
               startIcon={<FilterAltOutlinedIcon />}
               onClick={() => setMobileFilterOpen(true)}
-              sx={{ borderRadius: 0.5 }}
+              sx={{ borderRadius: 1 }}
             >
               Filters
               {selectedPlatforms.length > 0 ? ` (${selectedPlatforms.length})` : ""}
             </Button>
-            <IconButton onClick={retryAll} sx={{ borderRadius: 0.5, border: "1px solid", borderColor: "divider" }}>
+            <IconButton onClick={retryAll} sx={{ borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
               <RefreshIcon />
             </IconButton>
           </Stack>
@@ -594,7 +585,7 @@ export default function PlatformPlans() {
           {selectedLabels.length > 0 && isMobile && (
             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
               {selectedLabels.map((l) => (
-                <Chip key={l} label={l} size="small" sx={{ borderRadius: 0.5 }} />
+                <Chip key={l} label={l} size="small" sx={{ borderRadius: 1 }} />
               ))}
             </Stack>
           )}
@@ -602,10 +593,12 @@ export default function PlatformPlans() {
           <Paper
             elevation={0}
             sx={{
-              p: 2,
-              borderRadius: 1,
+              p: { xs: 1.5, sm: 2 },
+              borderRadius: 2,
               border: "1px solid",
               borderColor: "divider",
+              width: "100%",
+              boxSizing: "border-box",
             }}
           >
             <Stack
@@ -630,26 +623,31 @@ export default function PlatformPlans() {
                   border: "1px solid",
                   borderColor: "error.main",
                   bgcolor: alpha(theme.palette.error.main, 0.06),
-                  borderRadius: 0.5,
+                  borderRadius: 1,
                 }}
               >
                 <Typography color="error" variant="body2" sx={{ mb: 1 }}>
                   {fetchError}
                 </Typography>
-                <Button size="small" variant="contained" color="error" onClick={retryAll} sx={{ borderRadius: 0.5 }}>
+                <Button size="small" variant="contained" color="error" onClick={retryAll} sx={{ borderRadius: 1 }}>
                   Retry
                 </Button>
               </Box>
             )}
 
             {loadingPlans ? (
-              <Grid container spacing={1.5}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" },
+                  gap: 2,
+                  width: "100%",
+                }}
+              >
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <Grid item xs={12} sm={6} lg={4} key={i}>
-                    <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 0.5 }} />
-                  </Grid>
+                  <Skeleton key={i} variant="rectangular" height={220} sx={{ borderRadius: 2 }} />
                 ))}
-              </Grid>
+              </Box>
             ) : plans.length === 0 && !fetchError ? (
               <Box sx={{ py: 6, textAlign: "center" }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
@@ -658,18 +656,23 @@ export default function PlatformPlans() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                   Change filters or refresh.
                 </Typography>
-                <Button variant="contained" onClick={retryAll} sx={{ borderRadius: 0.5 }}>
+                <Button variant="contained" onClick={retryAll} sx={{ borderRadius: 1 }}>
                   Refresh
                 </Button>
               </Box>
             ) : (
-              <Grid container spacing={1.5}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" },
+                  gap: 2,
+                  width: "100%",
+                }}
+              >
                 {plans.map((plan) => (
-                  <Grid item xs={12} sm={6} lg={4} key={getKey(plan)}>
-                    <PlanCard plan={plan} onCreate={openCreate} />
-                  </Grid>
+                  <PlanCard key={getKey(plan)} plan={plan} onCreate={openCreate} />
                 ))}
-              </Grid>
+              </Box>
             )}
 
             {hasNext && selectedPlatforms.length === 0 && (
@@ -678,7 +681,7 @@ export default function PlatformPlans() {
                   variant="outlined"
                   onClick={() => setPage((p) => p + 1)}
                   disabled={loadingPlans}
-                  sx={{ borderRadius: 0.5 }}
+                  sx={{ borderRadius: 1 }}
                 >
                   {loadingPlans ? "Loading…" : "Load more"}
                 </Button>
@@ -688,15 +691,14 @@ export default function PlatformPlans() {
         </Box>
       </Box>
 
-      {/* mobile drawer */}
       <Drawer
         anchor="bottom"
         open={mobileFilterOpen}
         onClose={() => setMobileFilterOpen(false)}
         PaperProps={{
           sx: {
-            borderTopLeftRadius: 0,
-            borderTopRightRadius: 0,
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
             maxHeight: "80vh",
             p: 2,
           },
@@ -716,7 +718,7 @@ export default function PlatformPlans() {
           fullWidth
           variant="contained"
           onClick={() => setMobileFilterOpen(false)}
-          sx={{ mt: 2, borderRadius: 0.5 }}
+          sx={{ mt: 2, borderRadius: 1 }}
         >
           Done
         </Button>

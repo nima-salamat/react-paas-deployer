@@ -75,7 +75,7 @@ function OrbitDots({ color, count = 16, active = true }) {
             position: "absolute",
             top: "50%",
             left: "50%",
-            width: `${d.ring}%`,
+            width: { xs: `${d.ring * 1.7}%`, sm: `${d.ring}%` },
             height: 0,
             transformOrigin: "left center",
             transform: `rotate(${d.angle}deg)`,
@@ -252,9 +252,9 @@ export default function Home() {
               mb: { xs: 5, md: 6 },
               mx: "auto",
               width: "100%",
-              pt: { xs: 2.5, md: 3.5 },
-              pb: { xs: 2.5, md: 3.5 },
-              px: { xs: 2, md: 3 },
+              pt: { xs: 1, md: 3.5 },
+              pb: { xs: 1, md: 3.5 },
+              px: { xs: 0, sm: 2, md: 3 },
               overflow: "visible",
             }}
           >
@@ -304,10 +304,11 @@ export default function Home() {
               sx={{
                 position: "relative",
                 zIndex: 2,
-                borderRadius: { xs: 3, md: 4 },
+                borderRadius: { xs: 2, sm: 3, md: 4 },
                 overflow: "hidden",
-                aspectRatio: "1376 / 768",
-                maxHeight: { xs: 280, sm: 360, md: 420 },
+                height: { xs: 420, sm: "auto" },
+                aspectRatio: { xs: "auto", sm: "1376 / 768" },
+                maxHeight: { xs: "none", sm: 360, md: 420 },
                 width: "100%",
                 border: `1px solid ${subtleBorder}`,
                 boxShadow: isDark
@@ -350,19 +351,20 @@ export default function Home() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  height: "22%",
-                  minHeight: 88,
+                  height: "auto",
+                  minHeight: { xs: "35%", sm: "25%" },
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  justifyContent: "center",
+                  justifyContent: "flex-end",
                   px: 2,
-                  pb: { xs: 1.5, md: 2 },
+                  pt: 6,
+                  pb: { xs: 2.5, md: 2 },
                   textAlign: "center",
                   zIndex: 3,
                   background: isDark
-                    ? "linear-gradient(180deg, transparent 0%, rgba(5,11,22,0.55) 40%, rgba(5,11,22,0.88) 100%)"
-                    : "linear-gradient(180deg, transparent 0%, rgba(37,99,235,0.35) 40%, rgba(30,64,175,0.72) 100%)",
+                    ? "linear-gradient(180deg, transparent 0%, rgba(5,11,22,0.6) 35%, rgba(5,11,22,0.95) 100%)"
+                    : "linear-gradient(180deg, transparent 0%, rgba(37,99,235,0.4) 35%, rgba(30,64,175,0.85) 100%)",
                 }}
               >
                 <Typography

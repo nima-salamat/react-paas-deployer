@@ -199,7 +199,7 @@ export default function FloatingNav({
     <Box
       sx={{
         position: "fixed",
-        zIndex: 1400,
+        zIndex: 20,
         bottom,
         ...containerSx,
         pointerEvents: "none",
@@ -229,7 +229,7 @@ export default function FloatingNav({
                   }}
                   sx={{
                     minWidth: 48,
-                    maxWidth: 48, // عرض اولیه حالت بسته
+                    maxWidth: isSm ? 240 : 48, // در موبایل عرض همیشه باز باشد
                     height: 48,
                     borderRadius: "24px",
                     p: 0,
@@ -251,11 +251,11 @@ export default function FloatingNav({
                     whiteSpace: "nowrap",
                     transition: "max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s",
                     "&:hover": {
-                      maxWidth: 240, // باز شدن کادر تا این مقدار موقع هاور
+                      maxWidth: 240, // باز شدن کادر تا این مقدار موقع هاور در حالت دسکتاپ
                       bgcolor: theme.palette.background.paper,
                     },
                     "&:hover .nav-label": {
-                      opacity: 1, // نمایش متن موقع هاور
+                      opacity: 1, // نمایش متن موقع هاور در حالت دسکتاپ
                     },
                   }}
                 >
@@ -274,7 +274,7 @@ export default function FloatingNav({
                   <Box
                     className="nav-label"
                     sx={{
-                      opacity: 0,
+                      opacity: isSm ? 1 : 0, // در موبایل شفافیت کامل باشد تا نوشته پنهان نشود
                       pr: 0.5,
                       pl: 2.5,
                       fontWeight: 600,

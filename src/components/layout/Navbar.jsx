@@ -518,20 +518,41 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
                 />
               </IconButton>
             ) : !checkingAuth ? (
-              <Button
-                variant="outlined"
-                onClick={() => handleSignInClick({ fromMenu: false })}
-                sx={{
-                  borderColor: alpha(theme.palette.text.primary, 0.14),
-                  color: "inherit",
-                  bgcolor: alpha(theme.palette.background.paper, 0.16),
-                  textTransform: "none",
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Sign in / Sign up
-              </Button>
+              <>
+                {/* Mobile View: Icon Only */}
+                <IconButton
+                  onClick={() => handleSignInClick({ fromMenu: false })}
+                  aria-label="Sign in"
+                  sx={{
+                    display: { xs: "flex", sm: "none" },
+                    border: "1px solid",
+                    borderColor: alpha(theme.palette.text.primary, 0.14),
+                    color: "inherit",
+                    bgcolor: alpha(theme.palette.background.paper, 0.16),
+                    borderRadius: 2,
+                  }}
+                >
+                  <LoginOutlinedIcon fontSize="small" />
+                </IconButton>
+
+                {/* Tablet/Desktop View: Full Text Button */}
+                <Button
+                  variant="outlined"
+                  onClick={() => handleSignInClick({ fromMenu: false })}
+                  startIcon={<LoginOutlinedIcon />}
+                  sx={{
+                    display: { xs: "none", sm: "flex" },
+                    borderColor: alpha(theme.palette.text.primary, 0.14),
+                    color: "inherit",
+                    bgcolor: alpha(theme.palette.background.paper, 0.16),
+                    textTransform: "none",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Sign in / Sign up
+                </Button>
+              </>
             ) : null}
           </Box>
         </Toolbar>
