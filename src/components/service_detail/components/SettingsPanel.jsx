@@ -1,0 +1,876 @@
+import React, { useState, useMemo } from "react";
+import {
+  Box,
+  Paper,
+  Typography,
+  Stack,
+  Button,
+  TextField,
+  Chip,
+  Divider,
+  Alert,
+  CircularProgress,
+  MenuItem,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Switch,
+  FormControlLabel,
+  Radio,
+  Collapse,
+} from "@mui/material";
+import HubIcon from "@mui/icons-material/Hub";
+import StorageIcon from "@mui/icons-material/Storage";
+import SpeedIcon from "@mui/icons-material/Speed";
+import AddIcon from "@mui/icons-material/Add";
+import LinkOffIcon from "@mui/icons-material/LinkOff";
+import LinkIcon from "@mui/icons-material/Link";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import MemoryIcon from "@mui/icons-material/Memory";
+import SdStorageIcon from "@mui/icons-material/SdStorage";
+
+function SectionHeader({ icon, title, subtitle, action }) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 1,
+        flexWrap: "wrap",
+        mb: 2,
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+        <Box
+          sx={{
+            width: 36,
+            height: 36,
+            borderRadius: 1.5,
+            display: "grid",
+            placeItems: "center",
+            bgcolor: (t) =>
+              t.palette.mode === "dark"
+                ? "rgba(59,130,246,0.15)"
+                : "rgba(59,130,246,0.1)",
+            color: "primary.main",
+          }}
+        >
+          {icon}
+        </Box>
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+            {title}
+          </Typography>
+          {subtitle ? (
+            <Typography variant="caption" color="text.secondary">
+              {subtitle}
+            </Typography>
+          ) : null}
+        </Box>
+      </Box>
+      {action}
+    </Box>
+  );
+}
+
+function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
+  // Current plan is not "applied" again, but clicking it clears a pending selection
+  const handleClick = () => {
+    if (isCurrent) {
+      onClearSelection?.();
+      return;
+    }
+    onSelect?.(plan);
+  };
+  return (
+    <Paper
+      elevation={0}
+      onClick={handleClick}
+      sx={{
+        p: 2,
+        borderRadius: 2,
+        border: "2px solid",
+        borderColor: isCurrent
+          ? "success.main"
+          : selected
+          ? "primary.main"
+          : "divider",
+        cursor: "pointer",
+        opacity: isCurrent && !selected ? 0.95 : 1,
+        bgcolor: (t) =>
+          isCurrent
+            ? t.palette.mode === "dark"
+              ? "rgba(34,197,94,0.08)"
+              : "rgba(34,197,94,0.06)"
+            : selected
+            ? t.palette.mode === "dark"
+              ? "rgba(59,130,246,0.1)"
+              : "rgba(59,130,246,0.05)"
+            : t.palette.mode === "dark"
+            ? "rgba(255,255,255,0.02)"
+            : "#fff",
+        transition: "border-color 0.15s, box-shadow 0.15s, background 0.15s",
+        position: "relative",
+        "&:hover": {
+              borderColor: isCurrent
+                ? "success.main"
+                : selected
+                ? "primary.main"
+                : "primary.light",
+              boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+            },
+      }}
+    >
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+          {plan.name || "Plan"}
+        </Typography>
+        {isCurrent ? (
+          <Chip
+            icon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
+            label="Current"
+            color="success"
+            size="small"
+            sx={{ fontWeight: 700, height: 24 }}
+          />
+        ) : selected ? (
+          <Radio checked size="small" color="primary" sx={{ p: 0 }} />
+        ) : (
+          <Radio checked={false} size="small" sx={{ p: 0 }} />
+        )}
+      </Box>
+
+      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.25 }}>
+        {plan.platform ? (
+          <Chip label={plan.platform} size="small" variant="outlined" sx={{ height: 22, fontSize: 11 }} />
+        ) : null}
+        {plan.plan_type ? (
+          <Chip label={plan.plan_type} size="small" variant="outlined" sx={{ height: 22, fontSize: 11 }} />
+        ) : null}
+        {plan.storage_type ? (
+          <Chip label={plan.storage_type} size="small" variant="outlined" sx={{ height: 22, fontSize: 11 }} />
+        ) : null}
+      </Stack>
+
+      <Stack spacing={0.5}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <MemoryIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+          <Typography variant="body2" color="text.secondary">
+            CPU <strong style={{ color: "inherit" }}>{plan.max_cpu ?? "—"}</strong>
+            {" · "}
+            RAM <strong>{plan.max_ram ?? "—"}</strong>
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <SdStorageIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+          <Typography variant="body2" color="text.secondary">
+            Storage <strong>{plan.max_storage ?? "—"} GB</strong>
+          </Typography>
+        </Box>
+      </Stack>
+
+      {plan.price_per_hour != null ? (
+        <Typography
+          variant="body2"
+          sx={{ mt: 1.25, fontWeight: 800, color: "primary.main" }}
+        >
+          {plan.price_per_hour} / hour
+        </Typography>
+      ) : null}
+    </Paper>
+  );
+}
+
+function NetworkCard({ network, isAttached, onAttach, onDetach, loading }) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        borderRadius: 2,
+        borderColor: isAttached ? "info.main" : "divider",
+        bgcolor: (t) =>
+          isAttached
+            ? t.palette.mode === "dark"
+              ? "rgba(6,182,212,0.08)"
+              : "rgba(6,182,212,0.05)"
+            : "transparent",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 1,
+        flexWrap: "wrap",
+      }}
+    >
+      <Box sx={{ minWidth: 0 }}>
+        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {network.name || network.id}
+          </Typography>
+          {isAttached ? (
+            <Chip label="Attached" size="small" color="info" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />
+          ) : null}
+        </Stack>
+        {network.description ? (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+            {network.description}
+          </Typography>
+        ) : null}
+      </Box>
+      {isAttached ? (
+        <Button
+          size="small"
+          color="warning"
+          variant="outlined"
+          startIcon={<LinkOffIcon />}
+          disabled={loading}
+          onClick={onDetach}
+          sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+        >
+          Detach
+        </Button>
+      ) : (
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<LinkIcon />}
+          disabled={loading}
+          onClick={() => onAttach(network)}
+          sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+        >
+          Attach
+        </Button>
+      )}
+    </Paper>
+  );
+}
+
+function VolumeCard({ volume, isAttached, onAttach, onDetach, loading }) {
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        borderRadius: 2,
+        borderColor: isAttached ? "success.main" : "divider",
+        bgcolor: (t) =>
+          isAttached
+            ? t.palette.mode === "dark"
+              ? "rgba(34,197,94,0.08)"
+              : "rgba(34,197,94,0.05)"
+            : "transparent",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 1,
+        flexWrap: "wrap",
+      }}
+    >
+      <Box sx={{ minWidth: 0 }}>
+        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {volume.name}
+          </Typography>
+          {isAttached ? (
+            <Chip label="Attached" size="small" color="success" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />
+          ) : (
+            <Chip label="Available" size="small" variant="outlined" sx={{ height: 20, fontSize: 11 }} />
+          )}
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+          {volume.size_mb != null ? `${volume.size_mb} MB` : "—"}
+          {(volume.bind || volume.default_bind) ? ` · ${volume.bind || volume.default_bind}` : ""}
+          {(volume.mode || volume.default_mode) ? ` · ${volume.mode || volume.default_mode}` : ""}
+        </Typography>
+      </Box>
+      {isAttached ? (
+        <Tooltip title="Detach from this service">
+          <span>
+            <IconButton size="small" color="warning" disabled={loading} onClick={() => onDetach(volume.id ?? volume.pk)}>
+              <LinkOffIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+      ) : (
+        <Button
+          size="small"
+          variant="contained"
+          startIcon={<LinkIcon />}
+          disabled={loading}
+          onClick={() => onAttach(volume)}
+          sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+        >
+          Attach
+        </Button>
+      )}
+    </Paper>
+  );
+}
+
+export default function SettingsPanel({
+  service,
+  planDetail,
+  networkName,
+  networkDetail,
+  selectedNetworkId,
+  setSelectedNetworkId,
+  availableNetworks,
+  networkActionLoading,
+  onAttachNetwork,
+  onDetachNetwork,
+  onCreateNetwork,
+  attachedVolumes,
+  availableVolumes,
+  selectedVolumeId,
+  setSelectedVolumeId,
+  volumeActionLoading,
+  onAttachVolume,
+  onDetachVolume,
+  onCreateVolume,
+  availablePlans,
+  plansLoading,
+  selectedPlanId,
+  setSelectedPlanId,
+  planActionLoading,
+  onApplyPlan,
+  error,
+  successMessage,
+}) {
+  const [createNetworkOpen, setCreateNetworkOpen] = useState(false);
+  const [newNetworkName, setNewNetworkName] = useState("");
+  const [newNetworkDesc, setNewNetworkDesc] = useState("");
+  const [creatingNetwork, setCreatingNetwork] = useState(false);
+
+  const [createVolumeOpen, setCreateVolumeOpen] = useState(false);
+  const [newVolumeName, setNewVolumeName] = useState("");
+  const [newVolumeSize, setNewVolumeSize] = useState("1024");
+  const [newVolumeBind, setNewVolumeBind] = useState("/data");
+  const [newVolumeMode, setNewVolumeMode] = useState("rw");
+  const [creatingVolume, setCreatingVolume] = useState(false);
+
+  const [applyImmediately, setApplyImmediately] = useState(false);
+  const [showAllNetworks, setShowAllNetworks] = useState(false);
+  const [showAvailableVolumes, setShowAvailableVolumes] = useState(true);
+
+  const currentPlatform = useMemo(() => {
+    const raw =
+      planDetail?.platform ??
+      service?.plan?.platform ??
+      service?.plan_detail?.platform ??
+      "";
+    return String(raw || "").toLowerCase().trim();
+  }, [planDetail, service]);
+
+  const currentPlanId = useMemo(() => {
+    const candidates = [
+      planDetail?.id,
+      planDetail?.pk,
+      service?.plan?.id,
+      service?.plan?.pk,
+      typeof service?.plan === "string" || typeof service?.plan === "number"
+        ? service.plan
+        : null,
+    ];
+    for (const c of candidates) {
+      if (c != null && String(c).trim() !== "") return String(c);
+    }
+    return "";
+  }, [planDetail, service]);
+
+  const samePlatformPlans = useMemo(() => {
+    if (!Array.isArray(availablePlans)) return [];
+    if (!currentPlatform) return availablePlans;
+    return availablePlans.filter(
+      (p) => String(p.platform || "").toLowerCase().trim() === currentPlatform
+    );
+  }, [availablePlans, currentPlatform]);
+
+  const currentNetworkId = useMemo(() => {
+    return String(
+      service?.network?.id ??
+        service?.network?.pk ??
+        service?.network ??
+        networkDetail?.id ??
+        networkDetail?.pk ??
+        ""
+    );
+  }, [service, networkDetail]);
+
+  const attachedVolumeIds = useMemo(() => {
+    const set = new Set();
+    (attachedVolumes || []).forEach((v) => set.add(String(v.id ?? v.pk)));
+    return set;
+  }, [attachedVolumes]);
+
+  const handleCreateNetwork = async () => {
+    if (!newNetworkName.trim()) return;
+    setCreatingNetwork(true);
+    try {
+      await onCreateNetwork?.({
+        name: newNetworkName.trim(),
+        description: newNetworkDesc.trim(),
+      });
+      setCreateNetworkOpen(false);
+      setNewNetworkName("");
+      setNewNetworkDesc("");
+    } finally {
+      setCreatingNetwork(false);
+    }
+  };
+
+  const handleCreateVolume = async () => {
+    if (!newVolumeName.trim()) return;
+    const size = Number(newVolumeSize);
+    if (!Number.isFinite(size) || size <= 0) return;
+    const bind = String(newVolumeBind || "").trim();
+    if (!bind) return;
+    setCreatingVolume(true);
+    try {
+      await onCreateVolume?.({
+        name: newVolumeName.trim(),
+        size_mb: size,
+        default_bind: bind,
+        default_mode: newVolumeMode || "rw",
+      });
+      setCreateVolumeOpen(false);
+      setNewVolumeName("");
+      setNewVolumeSize("1024");
+      setNewVolumeBind("/data");
+      setNewVolumeMode("rw");
+    } finally {
+      setCreatingVolume(false);
+    }
+  };
+
+  return (
+    <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
+      {error ? (
+        <Alert severity="error" sx={{ borderRadius: 2 }} onClose={() => {}}>
+          {error}
+        </Alert>
+      ) : null}
+      {successMessage ? (
+        <Alert severity="success" sx={{ borderRadius: 2 }}>
+          {successMessage}
+        </Alert>
+      ) : null}
+
+      {/* ═══════════════ NETWORK ═══════════════ */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <SectionHeader
+          icon={<HubIcon fontSize="small" />}
+          title="Network"
+          subtitle="One private network can be attached to this service."
+          action={
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              variant="outlined"
+              onClick={() => setCreateNetworkOpen(true)}
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+            >
+              New
+            </Button>
+          }
+        />
+
+        {/* Current */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 1.5,
+            mb: 2,
+            borderRadius: 2,
+            borderColor: currentNetworkId ? "info.main" : "divider",
+            bgcolor: (t) =>
+              currentNetworkId
+                ? t.palette.mode === "dark"
+                  ? "rgba(6,182,212,0.08)"
+                  : "rgba(6,182,212,0.05)"
+                : t.palette.mode === "dark"
+                ? "rgba(255,255,255,0.02)"
+                : "grey.50",
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap spacing={1}>
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                Currently attached
+              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 800 }}>
+                {networkName && networkName !== "—" ? networkName : "No network"}
+              </Typography>
+              {(networkDetail?.network?.cidr ?? networkDetail?.cidr) && (
+                <Typography variant="caption" color="text.secondary">
+                  CIDR: {networkDetail?.network?.cidr ?? networkDetail?.cidr}
+                </Typography>
+              )}
+            </Box>
+            {currentNetworkId ? (
+              <Button
+                size="small"
+                color="warning"
+                variant="outlined"
+                startIcon={<LinkOffIcon />}
+                disabled={networkActionLoading}
+                onClick={onDetachNetwork}
+                sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+              >
+                Detach
+              </Button>
+            ) : null}
+          </Stack>
+        </Paper>
+
+        <Button
+          size="small"
+          endIcon={showAllNetworks ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          onClick={() => setShowAllNetworks((v) => !v)}
+          sx={{ mb: 1, textTransform: "none", fontWeight: 600 }}
+        >
+          {showAllNetworks ? "Hide networks" : `Show all networks (${(availableNetworks || []).length})`}
+        </Button>
+
+        <Collapse in={showAllNetworks}>
+          <Stack spacing={1}>
+            {(availableNetworks || []).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No networks yet. Create one with the New button.
+              </Typography>
+            ) : (
+              (availableNetworks || []).map((n) => {
+                const nid = String(n.id ?? n.pk ?? "");
+                const isAttached = nid && nid === currentNetworkId;
+                return (
+                  <NetworkCard
+                    key={nid}
+                    network={n}
+                    isAttached={isAttached}
+                    loading={networkActionLoading}
+                    onDetach={onDetachNetwork}
+                    onAttach={() => onAttachNetwork?.(nid)}
+                  />
+                );
+              })
+            )}
+          </Stack>
+        </Collapse>
+      </Paper>
+
+      {/* ═══════════════ VOLUMES ═══════════════ */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <SectionHeader
+          icon={<StorageIcon fontSize="small" />}
+          title="Volumes"
+          subtitle="Attach or detach storage volumes for this service."
+          action={
+            <Button
+              size="small"
+              startIcon={<AddIcon />}
+              variant="outlined"
+              onClick={() => setCreateVolumeOpen(true)}
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+            >
+              New
+            </Button>
+          }
+        />
+
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
+          Attached ({(attachedVolumes || []).length})
+        </Typography>
+        {(attachedVolumes || []).length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            No volumes attached to this service.
+          </Typography>
+        ) : (
+          <Stack spacing={1} sx={{ mb: 2 }}>
+            {(attachedVolumes || []).map((v) => (
+              <VolumeCard
+                key={v.id ?? v.pk}
+                volume={v}
+                isAttached
+                loading={volumeActionLoading}
+                onDetach={onDetachVolume}
+              />
+            ))}
+          </Stack>
+        )}
+
+        <Button
+          size="small"
+          endIcon={showAvailableVolumes ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          onClick={() => setShowAvailableVolumes((v) => !v)}
+          sx={{ mb: 1, textTransform: "none", fontWeight: 600 }}
+        >
+          {showAvailableVolumes
+            ? "Hide available volumes"
+            : `Show available volumes (${(availableVolumes || []).length})`}
+        </Button>
+
+        <Collapse in={showAvailableVolumes}>
+          <Stack spacing={1}>
+            {(availableVolumes || []).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No unused volumes. Create one with the New button.
+              </Typography>
+            ) : (
+              (availableVolumes || []).map((v) => {
+                const vid = String(v.id ?? v.pk ?? "");
+                return (
+                  <VolumeCard
+                    key={vid}
+                    volume={v}
+                    isAttached={false}
+                    loading={volumeActionLoading}
+                    onAttach={() => onAttachVolume?.(vid)}
+                  />
+                );
+              })
+            )}
+          </Stack>
+        </Collapse>
+      </Paper>
+
+      {/* ═══════════════ PLAN ═══════════════ */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        <SectionHeader
+          icon={<SpeedIcon fontSize="small" />}
+          title="Plan"
+          subtitle={
+            currentPlatform
+              ? `Plans for platform “${currentPlatform}”. Current plan cannot be re-selected.`
+              : "Choose a plan for this service."
+          }
+        />
+
+        {plansLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : samePlatformPlans.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No plans available for this platform.
+          </Typography>
+        ) : (
+          <>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  md: "repeat(3, minmax(0, 1fr))",
+                },
+                gap: 1.5,
+                mb: 2,
+              }}
+            >
+              {samePlatformPlans.map((p) => {
+                const pid = String(p.id ?? p.pk ?? "");
+                const isCurrent = pid === currentPlanId;
+                const isSelected = pid === String(selectedPlanId || "") && !isCurrent;
+                return (
+                  <PlanCard
+                    key={pid}
+                    plan={p}
+                    isCurrent={isCurrent}
+                    selected={isSelected}
+                    onSelect={(plan) => {
+                      setSelectedPlanId?.(String(plan.id ?? plan.pk));
+                    }}
+                    onClearSelection={() => setSelectedPlanId?.("")}
+                  />
+                );
+              })}
+            </Box>
+
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="space-between"
+            >
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={applyImmediately}
+                    onChange={(e) => setApplyImmediately(e.target.checked)}
+                    size="small"
+                    disabled={!selectedPlanId || String(selectedPlanId) === currentPlanId}
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    Apply immediately (redeploy if a deploy is selected)
+                  </Typography>
+                }
+              />
+              <Button
+                variant="contained"
+                size="medium"
+                disabled={
+                  !selectedPlanId ||
+                  String(selectedPlanId) === currentPlanId ||
+                  planActionLoading
+                }
+                onClick={() => onApplyPlan?.(selectedPlanId, applyImmediately)}
+                sx={{
+                  borderRadius: 1.5,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  minWidth: 140,
+                  px: 3,
+                }}
+              >
+                {planActionLoading ? "Applying..." : "Apply plan"}
+              </Button>
+            </Stack>
+          </>
+        )}
+      </Paper>
+
+      {/* Create Network Dialog */}
+      <Dialog
+        open={createNetworkOpen}
+        onClose={() => !creatingNetwork && setCreateNetworkOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 2.5 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Create network</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ mt: 0.5 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              size="small"
+              label="Name"
+              value={newNetworkName}
+              onChange={(e) => setNewNetworkName(e.target.value)}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Description (optional)"
+              value={newNetworkDesc}
+              onChange={(e) => setNewNetworkDesc(e.target.value)}
+              multiline
+              rows={2}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCreateNetworkOpen(false)} disabled={creatingNetwork} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateNetwork}
+            disabled={!newNetworkName.trim() || creatingNetwork}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
+          >
+            {creatingNetwork ? "Creating..." : "Create"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Volume Dialog */}
+      <Dialog
+        open={createVolumeOpen}
+        onClose={() => !creatingVolume && setCreateVolumeOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 2.5 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Create volume</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ mt: 0.5 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              size="small"
+              label="Name"
+              value={newVolumeName}
+              onChange={(e) => setNewVolumeName(e.target.value)}
+              helperText="Unique volume name"
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Size (MB)"
+              type="number"
+              value={newVolumeSize}
+              onChange={(e) => setNewVolumeSize(e.target.value)}
+              inputProps={{ min: 1 }}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Bind directory"
+              value={newVolumeBind}
+              onChange={(e) => setNewVolumeBind(e.target.value)}
+              placeholder="/data"
+              helperText="Path inside the container where this volume is mounted (e.g. /data, /var/lib/mysql)"
+            />
+            <TextField
+              select
+              fullWidth
+              size="small"
+              label="Access mode"
+              value={newVolumeMode}
+              onChange={(e) => setNewVolumeMode(e.target.value)}
+              helperText="Read-write or read-only inside the container"
+            >
+              <MenuItem value="rw">Read-write (rw)</MenuItem>
+              <MenuItem value="ro">Read-only (ro)</MenuItem>
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCreateVolumeOpen(false)} disabled={creatingVolume} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateVolume}
+            disabled={!newVolumeName.trim() || !String(newVolumeBind || "").trim() || creatingVolume}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
+          >
+            {creatingVolume ? "Creating..." : "Create"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Stack>
+  );
+}

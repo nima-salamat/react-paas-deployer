@@ -63,12 +63,27 @@ export function buildConfigPayload(platform, { configText, dbFields, isDb }) {
     const obj = JSON.parse(text);
     if (obj && typeof obj === "object" && !Array.isArray(obj)) {
       if (!obj.platform) obj.platform = platform || "docker";
+      // Coerce common boolean-ish celery flags if user typed "true" as string
+      for (const key of ["celery", "celery_beat", "celery-beat"]) {
+        if (typeof obj[key] === "string") {
+          const v = obj[key].trim().toLowerCase();
+          if (v === "true" || v === "1" || v === "yes") obj[key] = true;
+          else if (v === "false" || v === "0" || v === "no") obj[key] = false;
+        }
+      }
+      // alias beat → celery_beat
+      if (obj.beat != null && obj.celery_beat == null) {
+        obj.celery_beat = Boolean(obj.beat);
+      }
       return obj;
     }
   } catch {
-    /* free-form text kept as string for non-JSON app configs */
+    /* not valid JSON */
   }
-  return text;
+  // JSONField on the API requires valid JSON — never send raw free text
+  throw new Error(
+    "Config must be valid JSON. Example: {\"celery\": true, \"platform\": \"django\"}"
+  );
 }
 
 export function shallowEqualObj(a, b) {

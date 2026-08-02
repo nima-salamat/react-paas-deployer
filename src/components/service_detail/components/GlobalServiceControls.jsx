@@ -1,9 +1,23 @@
 import React from "react";
-import { Paper, Typography, Box, Button, Stack, Chip, LinearProgress, useTheme } from "@mui/material";
+import {
+  Paper,
+  Typography,
+  Box,
+  Button,
+  Stack,
+  Chip,
+  LinearProgress,
+  useTheme,
+  Divider,
+} from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import LinkIcon from "@mui/icons-material/Launch";
+import MemoryIcon from "@mui/icons-material/Memory";
+import StorageIcon from "@mui/icons-material/Storage";
+import HubIcon from "@mui/icons-material/Hub";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
 
 export default function GlobalServiceControls({
   service,
@@ -34,55 +48,95 @@ export default function GlobalServiceControls({
     return theme.palette.primary.main;
   };
 
+  const statusLabel =
+    serviceRunning === true
+      ? "Running"
+      : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
+      ? String(service.status)
+      : serviceRunning === false
+      ? "Stopped"
+      : service?.status || "Unknown";
+
+  const statusColor =
+    serviceRunning === true || ["running", "success"].includes(String(service?.status || ""))
+      ? "success"
+      : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
+      ? "warning"
+      : "default";
+
   return (
-    <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3, mb: 2 }}>
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 2, sm: 2.5 },
+        borderRadius: 2.5,
+        mb: 2.5,
+        border: "1px solid",
+        borderColor: "divider",
+        backgroundImage: (t) =>
+          t.palette.mode === "dark"
+            ? "linear-gradient(145deg, rgba(30,41,59,0.6), rgba(15,23,42,0.8))"
+            : "linear-gradient(145deg, #ffffff, #f8fafc)",
+      }}
+    >
+      {/* Header */}
       <Box
         sx={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          gap: 1,
+          gap: 1.5,
           flexWrap: "wrap",
-          mb: 1.5,
+          mb: 2,
         }}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 800,
+              lineHeight: 1.25,
+              letterSpacing: "-0.02em",
+              mb: 0.25,
+            }}
+          >
             {service?.name || "Service"}
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-            {service?.service_name ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}` : "—"}
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontSize: 12.5,
+            }}
+          >
+            {service?.service_name
+              ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`
+              : "—"}
           </Typography>
         </Box>
         <Chip
-          label={
-            serviceRunning === true
-              ? "Running"
-              : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
-              ? String(service.status)
-              : serviceRunning === false
-              ? "Stopped"
-              : service?.status || "Unknown"
-          }
-          color={
-            serviceRunning === true || ["running", "success"].includes(String(service?.status || ""))
-              ? "success"
-              : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
-              ? "warning"
-              : "default"
-          }
-          size="small"
+          label={statusLabel}
+          color={statusColor}
+          size="medium"
+          sx={{ fontWeight: 700, height: 28 }}
         />
       </Box>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 1.5 }}>
+      {/* Action buttons */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1}
+        sx={{ mb: 2.5 }}
+      >
         <Button
           variant="contained"
           startIcon={<PlayArrowIcon />}
           onClick={() => startService()}
           disabled={!service || serviceLoading || serviceBusy || !selectedDeployId}
           fullWidth
-          size="small"
+          size="medium"
+          sx={{ borderRadius: 1.5, fontWeight: 700, textTransform: "none", py: 1 }}
         >
           Start
         </Button>
@@ -93,21 +147,20 @@ export default function GlobalServiceControls({
           onClick={rebuildService}
           disabled={!service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId}
           fullWidth
-          size="small"
+          size="medium"
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
         >
-          {rebuildLoading
-            ? "Rebuilding..."
-            : selectedIsDb
-            ? "Rebuild DB"
-            : "Rebuild"}
+          {rebuildLoading ? "Rebuilding..." : selectedIsDb ? "Rebuild DB" : "Rebuild"}
         </Button>
         <Button
           variant="outlined"
+          color="error"
           startIcon={<StopIcon />}
           onClick={stopService}
           disabled={!service || serviceLoading || serviceBusy}
           fullWidth
-          size="small"
+          size="medium"
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
         >
           Stop
         </Button>
@@ -116,7 +169,8 @@ export default function GlobalServiceControls({
           onClick={() => checkServiceRunning(false)}
           disabled={!service || serviceStatusLoadingManual}
           fullWidth
-          size="small"
+          size="medium"
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
         >
           {serviceStatusLoadingManual ? "Checking..." : "Check status"}
         </Button>
@@ -126,23 +180,49 @@ export default function GlobalServiceControls({
           disabled={!service?.service_name || selectedIsDb}
           startIcon={<LinkIcon />}
           fullWidth
-          size="small"
+          size="medium"
           title={selectedIsDb ? "DB services are not opened in browser" : undefined}
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
         >
           Open
         </Button>
       </Stack>
 
-      <Stack direction="row" spacing={1} sx={{ mb: 1.25 }} flexWrap="wrap" useFlexGap>
-        <Chip label={`Status: ${service?.status || "—"}`} size="small" variant="outlined" />
-        <Chip label={`Deploys: ${deployCount}`} size="small" variant="outlined" />
-        <Chip label={`Volumes: ${volumeCount}`} size="small" variant="outlined" />
-        <Chip label={`Network: ${networkName}`} size="small" variant="outlined" />
+      {/* Meta chips */}
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ mb: 2.5 }}
+        flexWrap="wrap"
+        useFlexGap
+      >
+        <Chip
+          icon={<Inventory2Icon sx={{ fontSize: 16 }} />}
+          label={`Deploys: ${deployCount}`}
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 1.5 }}
+        />
+        <Chip
+          icon={<StorageIcon sx={{ fontSize: 16 }} />}
+          label={`Volumes: ${volumeCount}`}
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 1.5 }}
+        />
+        <Chip
+          icon={<HubIcon sx={{ fontSize: 16 }} />}
+          label={`Network: ${networkName}`}
+          size="small"
+          variant="outlined"
+          sx={{ borderRadius: 1.5 }}
+        />
         {selectedDeploy ? (
           <Chip
             label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`}
             size="small"
             color="success"
+            sx={{ borderRadius: 1.5, fontWeight: 600 }}
           />
         ) : null}
         {selectedPlatform ? (
@@ -151,37 +231,63 @@ export default function GlobalServiceControls({
             size="small"
             color={selectedIsDb ? "info" : "default"}
             variant="outlined"
+            sx={{ borderRadius: 1.5 }}
           />
         ) : null}
       </Stack>
 
-      <Stack spacing={0.75}>
-        <Typography variant="caption">
-          CPU {serviceCpu !== null ? `${serviceCpu}%` : "—"}
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={Math.min(Math.max(serviceCpu || 0, 0), 100)}
-          sx={{
-            height: 8,
-            borderRadius: 1,
-            bgcolor: "grey.200",
-            "& .MuiLinearProgress-bar": { bgcolor: colorForPercent(serviceCpu) },
-          }}
-        />
-        <Typography variant="caption">
-          RAM {serviceRam !== null ? `${serviceRam}%` : "—"}
-        </Typography>
-        <LinearProgress
-          variant="determinate"
-          value={Math.min(Math.max(serviceRam || 0, 0), 100)}
-          sx={{
-            height: 8,
-            borderRadius: 1,
-            bgcolor: "grey.200",
-            "& .MuiLinearProgress-bar": { bgcolor: colorForPercent(serviceRam) },
-          }}
-        />
+      <Divider sx={{ mb: 2 }} />
+
+      {/* Resource meters */}
+      <Stack spacing={1.5}>
+        <Box>
+          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+              <MemoryIcon sx={{ fontSize: 14 }} /> CPU
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              {serviceCpu !== null ? `${serviceCpu}%` : "—"}
+            </Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={Math.min(Math.max(serviceCpu || 0, 0), 100)}
+            sx={{
+              height: 8,
+              borderRadius: 4,
+              bgcolor: (t) =>
+                t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "grey.200",
+              "& .MuiLinearProgress-bar": {
+                bgcolor: colorForPercent(serviceCpu),
+                borderRadius: 4,
+              },
+            }}
+          />
+        </Box>
+        <Box>
+          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+              <MemoryIcon sx={{ fontSize: 14 }} /> RAM
+            </Typography>
+            <Typography variant="caption" sx={{ fontWeight: 700 }}>
+              {serviceRam !== null ? `${serviceRam}%` : "—"}
+            </Typography>
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={Math.min(Math.max(serviceRam || 0, 0), 100)}
+            sx={{
+              height: 8,
+              borderRadius: 4,
+              bgcolor: (t) =>
+                t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "grey.200",
+              "& .MuiLinearProgress-bar": {
+                bgcolor: colorForPercent(serviceRam),
+                borderRadius: 4,
+              },
+            }}
+          />
+        </Box>
       </Stack>
     </Paper>
   );

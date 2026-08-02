@@ -1,5 +1,15 @@
 import React from "react";
-import { Stack, Paper, Box, Typography, Button, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import {
+  Stack,
+  Paper,
+  Box,
+  Typography,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+} from "@mui/material";
 import LogPanel from "./LogPanel";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
@@ -16,7 +26,7 @@ export default function LogsPanel({
   handleCopyEntries,
 }) {
   return (
-    <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ maxWidth: 960 }}>
+    <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
       <LogPanel
         title="Service logs"
         subtitle="Latest logs stay at the bottom. Scroll up for older lines."
@@ -32,7 +42,9 @@ export default function LogsPanel({
         onTogglePaused={serviceLogActions.onTogglePaused}
         onRefresh={serviceLogActions.refresh}
         onClear={serviceLogActions.clear}
-        onDownload={(entries) => handleDownloadEntries(`service-${id}-logs.txt`, entries)}
+        onDownload={(entries) =>
+          handleDownloadEntries(`service-${id}-logs.txt`, entries)
+        }
         onCopy={(entries) => handleCopyEntries(entries)}
         onJumpToLatest={() => {
           const el = serviceLogActions.scrollRef.current;
@@ -42,13 +54,21 @@ export default function LogsPanel({
         emptyText="No service logs yet."
       />
 
-      <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2, boxShadow: 3 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 1.75, sm: 2.25 },
+          borderRadius: 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+        }}
+      >
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={1.25}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", sm: "center" }}
-          sx={{ mb: 1.5 }}
+          sx={{ mb: 1.75 }}
         >
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
@@ -59,8 +79,19 @@ export default function LogsPanel({
             </Typography>
           </Box>
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" alignItems={{ xs: "stretch", sm: "center" }}>
-            <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 200 }, width: { xs: "100%", sm: "auto" } }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            flexWrap="wrap"
+            alignItems={{ xs: "stretch", sm: "center" }}
+          >
+            <FormControl
+              size="small"
+              sx={{
+                minWidth: { xs: 0, sm: 200 },
+                width: { xs: "100%", sm: "auto" },
+              }}
+            >
               <InputLabel>Deploy</InputLabel>
               <Select
                 label="Deploy"
@@ -69,9 +100,14 @@ export default function LogsPanel({
               >
                 {deploys.length ? (
                   deploys.map((deploy) => {
-                    const label = `${deploy.name || "Deploy"}${deploy.version ? ` • ${deploy.version}` : ""}`;
+                    const label = `${deploy.name || "Deploy"}${
+                      deploy.version ? ` • ${deploy.version}` : ""
+                    }`;
                     return (
-                      <MenuItem key={deploy.id ?? deploy.pk} value={String(deploy.id ?? deploy.pk ?? "")}>
+                      <MenuItem
+                        key={deploy.id ?? deploy.pk}
+                        value={String(deploy.id ?? deploy.pk ?? "")}
+                      >
                         {label}
                       </MenuItem>
                     );
@@ -90,6 +126,7 @@ export default function LogsPanel({
               onClick={() => deployLogActions.refresh(deployLogs.deployId)}
               startIcon={<RefreshIcon />}
               fullWidth={!isDesktop}
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
             >
               Refresh history
             </Button>
@@ -97,7 +134,11 @@ export default function LogsPanel({
         </Stack>
 
         <LogPanel
-          title={currentDeployForLogs ? `Deploy: ${currentDeployForLogs.name || currentDeployForLogs.id}` : "Deploy history"}
+          title={
+            currentDeployForLogs
+              ? `Deploy: ${currentDeployForLogs.name || currentDeployForLogs.id}`
+              : "Deploy history"
+          }
           subtitle="Newest at the bottom. Scroll up for older records."
           entries={deployLogs.entries}
           loading={deployLogs.loading}
@@ -111,7 +152,12 @@ export default function LogsPanel({
           onLevelChange={deployLogActions.setLevel}
           onRefresh={() => deployLogActions.refresh(deployLogs.deployId)}
           onClear={deployLogActions.clear}
-          onDownload={(entries) => handleDownloadEntries(`deploy-${deployLogs.deployId || id}-logs.txt`, entries)}
+          onDownload={(entries) =>
+            handleDownloadEntries(
+              `deploy-${deployLogs.deployId || id}-logs.txt`,
+              entries
+            )
+          }
           onCopy={(entries) => handleCopyEntries(entries)}
           onJumpToLatest={() => {
             const el = deployLogActions.scrollRef.current;

@@ -1,5 +1,22 @@
 import React, { useRef, useMemo, useCallback, useEffect } from "react";
-import { Paper, Box, Typography, Button, TextField, FormControl, InputLabel, Select, MenuItem, Stack, Chip, LinearProgress, CircularProgress, Alert, useTheme, useMediaQuery } from "@mui/material";
+import {
+  Paper,
+  Box,
+  Typography,
+  Button,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Stack,
+  Chip,
+  LinearProgress,
+  CircularProgress,
+  Alert,
+  useTheme,
+  useMediaQuery,
+} from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DownloadIcon from "@mui/icons-material/Download";
 import FileCopyIcon from "@mui/icons-material/FileCopy";
@@ -92,17 +109,24 @@ export default function LogPanel({
     onJumpToLatest?.();
   };
 
+  const btnSx = {
+    borderRadius: 1.5,
+    textTransform: "none",
+    fontWeight: 600,
+  };
+
   return (
     <Paper
-      elevation={1}
+      elevation={0}
       sx={{
-        p: { xs: 1.5, sm: 2 },
-        borderRadius: 2,
-        backgroundImage:
-          theme.palette.mode === "dark"
-            ? "linear-gradient(180deg, rgba(11,15,18,0.98), rgba(17,24,39,0.98))"
-            : "linear-gradient(180deg, #ffffff, #f7fbff)",
-        boxShadow: 3,
+        p: { xs: 1.75, sm: 2.25 },
+        borderRadius: 2.5,
+        border: "1px solid",
+        borderColor: "divider",
+        backgroundImage: (t) =>
+          t.palette.mode === "dark"
+            ? "linear-gradient(180deg, rgba(15,23,42,0.9), rgba(30,41,59,0.7))"
+            : "linear-gradient(180deg, #ffffff, #f8fafc)",
         overflow: "hidden",
         height: "100%",
         maxWidth: "100%",
@@ -113,7 +137,7 @@ export default function LogPanel({
         spacing={1}
         justifyContent="space-between"
         alignItems={{ xs: "stretch", sm: "center" }}
-        sx={{ mb: 1.5 }}
+        sx={{ mb: 1.75 }}
       >
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
@@ -126,17 +150,30 @@ export default function LogPanel({
           ) : null}
         </Box>
 
-        <Stack direction="row" spacing={0.75} flexWrap="wrap" justifyContent="flex-end" useFlexGap>
+        <Stack
+          direction="row"
+          spacing={0.75}
+          flexWrap="wrap"
+          justifyContent="flex-end"
+          useFlexGap
+        >
           {showConnectionChip ? (
             <Chip
               icon={connected ? <WifiIcon /> : <WifiOffIcon />}
               label={connected ? "Live" : "Offline"}
               color={connected ? "success" : "default"}
               size="small"
+              sx={{ fontWeight: 600 }}
             />
           ) : null}
-          <Chip label={`${visibleEntries.length}/${entries.length}`} size="small" />
-          {paused ? <Chip label="Paused" color="warning" size="small" /> : null}
+          <Chip
+            label={`${visibleEntries.length}/${entries.length}`}
+            size="small"
+            variant="outlined"
+          />
+          {paused ? (
+            <Chip label="Paused" color="warning" size="small" sx={{ fontWeight: 600 }} />
+          ) : null}
           {topActions}
         </Stack>
       </Stack>
@@ -150,10 +187,16 @@ export default function LogPanel({
             md: "repeat(auto-fit, minmax(110px, 1fr))",
           },
           gap: 1,
-          mb: 1.5,
+          mb: 1.75,
         }}
       >
-        <Button variant="contained" onClick={onRefresh} startIcon={<RefreshIcon />} size={isMobile ? "small" : "medium"}>
+        <Button
+          variant="contained"
+          onClick={onRefresh}
+          startIcon={<RefreshIcon />}
+          size={isMobile ? "small" : "medium"}
+          sx={btnSx}
+        >
           Refresh
         </Button>
         <Button
@@ -162,6 +205,7 @@ export default function LogPanel({
           startIcon={<DownloadIcon />}
           disabled={!visibleEntries.length}
           size={isMobile ? "small" : "medium"}
+          sx={btnSx}
         >
           Download
         </Button>
@@ -171,6 +215,7 @@ export default function LogPanel({
           startIcon={<FileCopyIcon />}
           disabled={!visibleEntries.length}
           size={isMobile ? "small" : "medium"}
+          sx={btnSx}
         >
           Copy
         </Button>
@@ -180,6 +225,7 @@ export default function LogPanel({
           startIcon={<ClearAllIcon />}
           disabled={!entries.length}
           size={isMobile ? "small" : "medium"}
+          sx={btnSx}
         >
           Clear
         </Button>
@@ -189,18 +235,24 @@ export default function LogPanel({
             onClick={onTogglePaused}
             startIcon={paused ? <PlayCircleIcon /> : <PauseIcon />}
             size={isMobile ? "small" : "medium"}
+            sx={btnSx}
           >
             {paused ? "Resume" : "Pause"}
           </Button>
         ) : null}
         {onJumpToLatest ? (
-          <Button variant="outlined" onClick={handleJump} size={isMobile ? "small" : "medium"}>
+          <Button
+            variant="outlined"
+            onClick={handleJump}
+            size={isMobile ? "small" : "medium"}
+            sx={btnSx}
+          >
             Jump to latest
           </Button>
         ) : null}
       </Box>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mb: 1.5 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mb: 1.75 }}>
         <TextField
           fullWidth
           label="Search logs"
@@ -210,11 +262,7 @@ export default function LogPanel({
         />
         <FormControl fullWidth size="small" sx={{ maxWidth: { sm: 180 } }}>
           <InputLabel>Level</InputLabel>
-          <Select
-            label="Level"
-            value={level}
-            onChange={(e) => onLevelChange(e.target.value)}
-          >
+          <Select label="Level" value={level} onChange={(e) => onLevelChange(e.target.value)}>
             <MenuItem value="all">All</MenuItem>
             <MenuItem value="info">Info</MenuItem>
             <MenuItem value="warning">Warning</MenuItem>
@@ -225,7 +273,7 @@ export default function LogPanel({
       </Stack>
 
       {error ? (
-        <Alert severity="error" sx={{ mb: 1.5 }}>
+        <Alert severity="error" sx={{ mb: 1.75, borderRadius: 1.5 }}>
           {error}
         </Alert>
       ) : null}
@@ -246,16 +294,16 @@ export default function LogPanel({
           minHeight: { xs: 240, sm: 280 },
           maxHeight: { xs: 360, sm: 420, md: 480 },
           overflowY: "auto",
-          borderRadius: 1.5,
-          bgcolor:
-            theme.palette.mode === "dark"
-              ? "rgba(0,0,0,0.18)"
-              : "rgba(255,255,255,0.75)",
+          borderRadius: 2,
+          bgcolor: (t) =>
+            t.palette.mode === "dark"
+              ? "rgba(0,0,0,0.2)"
+              : "rgba(248,250,252,0.9)",
         }}
       >
         {loading && !entries.length ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
-            <CircularProgress />
+            <CircularProgress size={32} />
           </Box>
         ) : visibleEntries.length ? (
           <Stack spacing={1}>
@@ -264,19 +312,22 @@ export default function LogPanel({
                 variant="text"
                 onClick={onLoadOlder}
                 disabled={loadingOlder}
-                sx={{ alignSelf: "center", mb: 0.25 }}
+                sx={{ alignSelf: "center", mb: 0.25, textTransform: "none", fontWeight: 600 }}
               >
                 {loadingOlder ? "Loading older..." : "Load older logs"}
               </Button>
             ) : null}
-            {loadingOlder ? <LinearProgress /> : null}
+            {loadingOlder ? <LinearProgress sx={{ borderRadius: 1 }} /> : null}
 
             {visibleEntries.map((entry, index) => (
-              <LogRow key={entry.key || `${index}-${entry.text.slice(0, 18)}`} entry={entry} />
+              <LogRow
+                key={entry.key || `${index}-${entry.text.slice(0, 18)}`}
+                entry={entry}
+              />
             ))}
           </Stack>
         ) : (
-          <Box sx={{ py: 4, textAlign: "center" }}>
+          <Box sx={{ py: 5, textAlign: "center" }}>
             <ArticleIcon sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
             <Typography color="text.secondary">{emptyText}</Typography>
           </Box>

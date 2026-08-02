@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import apiRequest from "../customHooks/apiRequest";
 import {
-  alpha,
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -25,66 +25,20 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  alpha,
+  Chip,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ReplayIcon from "@mui/icons-material/Replay";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import StorageIcon from "@mui/icons-material/Storage";
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, info) {
-    console.error("ErrorBoundary:", error, info);
-  }
-  componentDidUpdate(prev) {
-    if (prev.resetKey !== this.props.resetKey && this.state.hasError) {
-      this.setState({ hasError: false, error: null });
-    }
-  }
-  render() {
-    if (this.state.hasError) {
-      const e = this.state.error;
-      let message = "Unexpected error.";
-      if (e?.response?.data?.error) message = parseErrors(e.response.data.error).join("\n");
-      else if (e?.message) message = e.message;
-      else if (e) message = JSON.stringify(e);
-
-      return (
-        <Box sx={{ p: 3, textAlign: "center" }}>
-          <Typography variant="subtitle1" color="error" sx={{ fontWeight: 700, mb: 1 }}>
-            An error occurred
-          </Typography>
-          <Box component="pre" sx={{ whiteSpace: "pre-wrap", fontSize: 13, textAlign: "left", maxWidth: 480, mx: "auto" }}>
-            {String(message)}
-          </Box>
-          <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
-            <Button
-              variant="contained"
-              color="warning"
-              size="small"
-              startIcon={<ReplayIcon />}
-              onClick={() => this.setState({ hasError: false, error: null })}
-              sx={{ borderRadius: 0.5 }}
-            >
-              Retry
-            </Button>
-            <Button size="small" variant="outlined" onClick={() => this.props.onClose?.()} sx={{ borderRadius: 0.5 }}>
-              Close
-            </Button>
-          </Stack>
-        </Box>
-      );
-    }
-    return this.props.children;
-  }
-}
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
+const DEFAULT_NETWORKS = `${API_BASE}/api/networks/`;
+const DEFAULT_VOLUMES = `${API_BASE}/api/volumes/`;
+const DEFAULT_SERVICES = `${API_BASE}/services/service/`;
 
 function parseErrors(errData) {
   const messages = [];
@@ -100,27 +54,32 @@ function parseErrors(errData) {
   return messages;
 }
 
+function extractList(data) {
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
 const optionValue = (o) => String(o?.id ?? o?.pk ?? o?.uuid ?? o?.name ?? o ?? "");
 
 export default function CreateServiceWizard({
   open = false,
   onCancel,
   onCreate,
-  apiUrl = `https://${import.meta.env.VITE_API_BASE}/services/service/`,
-  networksUrl = `https://${import.meta.env.VITE_API_BASE}/services/networks/`,
+  apiUrl = DEFAULT_SERVICES,
+  networksUrl = DEFAULT_NETWORKS,
+  volumesUrl = DEFAULT_VOLUMES,
   initialData = {},
   notifyOnSuccess = false,
   resetKey = 0,
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const steps = ["Service", "Network", "Confirm"];
+  const steps = ["Service", "Network", "Volumes", "Confirm"];
 
   const [activeStep, setActiveStep] = useState(0);
   const [name, setName] = useState(initialData.name ?? "");
   const [network, setNetwork] = useState(initialData.network ?? "");
-  
-  // FIX: Added setPlan to update the state when initialData changes
   const [plan, setPlan] = useState(initialData.id ?? initialData.plan_id ?? null);
 
   const [networks, setNetworks] = useState([]);
@@ -129,6 +88,18 @@ export default function CreateServiceWizard({
   const [creatingNetwork, setCreatingNetwork] = useState(false);
   const [createNetworkError, setCreateNetworkError] = useState(null);
   const [createNetworkSuccess, setCreateNetworkSuccess] = useState(null);
+
+  const [volumes, setVolumes] = useState([]);
+  const [volumesLoading, setVolumesLoading] = useState(false);
+  const [selectedVolumeIds, setSelectedVolumeIds] = useState([]);
+  const [newVolume, setNewVolume] = useState({
+    name: "",
+    size_mb: "1024",
+    default_bind: "/data",
+    default_mode: "rw",
+  });
+  const [creatingVolume, setCreatingVolume] = useState(false);
+  const [volumeMsg, setVolumeMsg] = useState(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
@@ -150,15 +121,15 @@ export default function CreateServiceWizard({
     setActiveStep(0);
     setName(initialData.name ?? "");
     setNetwork(initialData.network ?? "");
-    
-    // FIX: Update plan state when the modal opens with new initialData
     setPlan(initialData.id ?? initialData.plan_id ?? null);
-    
+    setSelectedVolumeIds([]);
     setError(null);
     setSubmissionResult(null);
     setCreateNetworkError(null);
     setCreateNetworkSuccess(null);
     setNewNetworkName("");
+    setVolumeMsg(null);
+    setNewVolume({ name: "", size_mb: "1024", default_bind: "/data", default_mode: "rw" });
   }, [open, initialData, resetKey]);
 
   useEffect(() => {
@@ -188,8 +159,7 @@ export default function CreateServiceWizard({
     try {
       const res = await apiRequest({ method: "GET", url: networksUrl });
       if (fetchIdRef.current !== id) return;
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? [];
-      if (mountedRef.current) setNetworks(data);
+      if (mountedRef.current) setNetworks(extractList(res.data));
     } catch (err) {
       const msg = parseErrors(
         err?.response?.data?.error ?? err?.response?.data ?? err?.message ?? "Failed to load networks"
@@ -200,9 +170,22 @@ export default function CreateServiceWizard({
     }
   }, [networksUrl]);
 
+  const fetchVolumes = useCallback(async () => {
+    setVolumesLoading(true);
+    try {
+      const res = await apiRequest({ method: "GET", url: volumesUrl });
+      if (mountedRef.current) setVolumes(extractList(res.data));
+    } catch {
+      if (mountedRef.current) setVolumes([]);
+    } finally {
+      if (mountedRef.current) setVolumesLoading(false);
+    }
+  }, [volumesUrl]);
+
   useEffect(() => {
     if (activeStep === 1 && open) fetchNetworks();
-  }, [activeStep, open, fetchNetworks]);
+    if (activeStep === 2 && open) fetchVolumes();
+  }, [activeStep, open, fetchNetworks, fetchVolumes]);
 
   const validateStep = (i = activeStep) => {
     if (i === 0 && !name.trim()) return "Service name is required.";
@@ -241,7 +224,7 @@ export default function CreateServiceWizard({
     setCreatingNetwork(true);
     try {
       const res = await apiRequest({ method: "POST", url: networksUrl, data: { name: trimmed } });
-      const val = res.data?.id ?? res.data?.uuid ?? res.data?.name ?? "";
+      const val = res.data?.id ?? res.data?.pk ?? res.data?.uuid ?? "";
       setNetwork(String(val));
       setCreateNetworkSuccess("Network created and selected.");
       setNewNetworkName("");
@@ -254,6 +237,81 @@ export default function CreateServiceWizard({
       );
     } finally {
       if (mountedRef.current) setCreatingNetwork(false);
+    }
+  };
+
+  const toggleVolume = (id) => {
+    const sid = String(id);
+    setSelectedVolumeIds((prev) =>
+      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
+    );
+  };
+
+  const handleCreateVolume = async () => {
+    setVolumeMsg(null);
+    const n = newVolume.name.trim();
+    const bind = newVolume.default_bind.trim();
+    const size = Number(newVolume.size_mb);
+    if (!n) {
+      setVolumeMsg({ type: "error", text: "Volume name is required." });
+      return;
+    }
+    if (!bind.startsWith("/")) {
+      setVolumeMsg({ type: "error", text: "Bind must be absolute path, e.g. /data" });
+      return;
+    }
+    if (!size || size < 1) {
+      setVolumeMsg({ type: "error", text: "Valid size (MB) required." });
+      return;
+    }
+    setCreatingVolume(true);
+    try {
+      const res = await apiRequest({
+        method: "POST",
+        url: volumesUrl,
+        data: {
+          name: n,
+          size_mb: size,
+          default_bind: bind,
+          default_mode: newVolume.default_mode || "rw",
+        },
+      });
+      const id = String(res.data?.id ?? res.data?.pk ?? "");
+      await fetchVolumes();
+      if (id) setSelectedVolumeIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      setNewVolume({ name: "", size_mb: "1024", default_bind: "/data", default_mode: "rw" });
+      setVolumeMsg({ type: "success", text: "Volume created and selected." });
+    } catch (err) {
+      setVolumeMsg({
+        type: "error",
+        text: parseErrors(err?.response?.data ?? err?.message).join("\n") || "Failed to create volume",
+      });
+    } finally {
+      setCreatingVolume(false);
+    }
+  };
+
+  const attachVolumesToService = async (serviceId) => {
+    if (!selectedVolumeIds.length || !serviceId) return;
+    for (const vid of selectedVolumeIds) {
+      try {
+        await apiRequest({
+          method: "POST",
+          url: `${volumesUrl}${vid}/attach/`,
+          data: { service_id: serviceId },
+        });
+      } catch {
+        // try alternate payload
+        try {
+          await apiRequest({
+            method: "POST",
+            url: `${volumesUrl}${vid}/attach/`,
+            data: { service: serviceId },
+          });
+        } catch {
+          /* best-effort */
+        }
+      }
     }
   };
 
@@ -277,20 +335,34 @@ export default function CreateServiceWizard({
         setSubmitting(false);
         setSubmissionResult({ ok: false, timeout: true, message: "Request timed out." });
       }
-    }, 10000);
+    }, 20000);
 
     try {
       const res = await apiRequest({
         method: "POST",
         url: apiUrl,
-        data: { name: name.trim(), network, plan },
+        data: {
+          name: name.trim(),
+          network,
+          plan,
+        },
       });
       clearTimeout(t);
       const ok = res?.status === 201 || res?.status === 200;
+      const serviceId = res?.data?.id ?? res?.data?.pk ?? res?.data?.service?.id;
+
+      if (ok && serviceId && selectedVolumeIds.length) {
+        await attachVolumesToService(serviceId);
+      }
+
       if (!timedOut && mountedRef.current) {
         setSubmissionResult({
           ok,
-          message: ok ? "Service created successfully." : `Unexpected status ${res?.status}`,
+          message: ok
+            ? selectedVolumeIds.length
+              ? "Service created and volumes attached."
+              : "Service created successfully."
+            : `Unexpected status ${res?.status}`,
           data: res?.data ?? null,
         });
         if (ok && notifyOnSuccess) onCreate?.({ ok: true, data: res.data });
@@ -311,322 +383,465 @@ export default function CreateServiceWizard({
 
   const handleClose = () => onCancel?.();
   const selectedNet = networks.find((n) => optionValue(n) === String(network));
+  const selectedVols = volumes.filter((v) =>
+    selectedVolumeIds.includes(String(v.id ?? v.pk))
+  );
 
   return (
-    <ErrorBoundary resetKey={resetKey} onClose={handleClose}>
-      <Dialog
-        open={Boolean(open)}
-        onClose={handleClose}
-        maxWidth="sm"
-        fullWidth
-        fullScreen={isMobile}
-        PaperProps={{
-          sx: {
-            borderRadius: isMobile ? 0 : 1,
-            border: "1px solid",
-            borderColor: "divider",
-          },
+    <Dialog
+      open={Boolean(open)}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      fullScreen={isMobile}
+      PaperProps={{
+        sx: {
+          borderRadius: isMobile ? 0 : 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          py: 1.5,
+          px: 2,
         }}
       >
-        <DialogTitle
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            py: 1.5,
-            px: 2,
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              Create Service
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              3-step wizard
-            </Typography>
-          </Box>
-          <IconButton onClick={handleClose} size="small" edge="end">
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-
-        <Box sx={{ px: 2, pb: 1.5 }}>
-          <Stepper activeStep={activeStep} alternativeLabel>
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
+        <Box>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+            Create service
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {initialData.plan_name
+              ? `Plan: ${initialData.plan_name}${initialData.platform ? ` · ${initialData.platform}` : ""}`
+              : "Wizard"}
+          </Typography>
         </Box>
+        <IconButton onClick={handleClose} size="small" edge="end">
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
 
-        <DialogContent dividers sx={{ px: 2, py: 2 }}>
-          {submitting && <LinearProgress sx={{ mb: 2 }} />}
+      <Box sx={{ px: 2, pb: 1.5 }}>
+        <Stepper activeStep={activeStep} alternativeLabel={!isMobile}>
+          {steps.map((label) => (
+            <Step key={label}>
+              <StepLabel>{label}</StepLabel>
+            </Step>
+          ))}
+        </Stepper>
+      </Box>
 
-          {!isValidUser ? (
-            <Box sx={{ textAlign: "center", py: 3 }}>
-              <LockOutlinedIcon sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                Not authenticated
+      <DialogContent dividers sx={{ px: 2, py: 2 }}>
+        {submitting && <LinearProgress sx={{ mb: 2 }} />}
+
+        {!isValidUser ? (
+          <Box sx={{ textAlign: "center", py: 3 }}>
+            <LockOutlinedIcon sx={{ fontSize: 40, color: "text.secondary", mb: 1 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              Not authenticated
+            </Typography>
+            <Alert severity="warning" sx={{ mt: 1.5, textAlign: "left", borderRadius: 1.5 }}>
+              Log in to continue.
+            </Alert>
+            <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => (window.location.href = "/signin_or_signup")}
+                sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+              >
+                Login
+              </Button>
+              <Button size="small" variant="outlined" onClick={handleClose} sx={{ borderRadius: 1.5, textTransform: "none" }}>
+                Close
+              </Button>
+            </Stack>
+          </Box>
+        ) : submissionResult ? (
+          <Box sx={{ textAlign: "center", py: 2 }}>
+            {submissionResult.ok ? (
+              <CheckCircleIcon color="success" sx={{ fontSize: 44 }} />
+            ) : (
+              <Typography variant="h4" color={submissionResult.timeout ? "warning.main" : "error.main"}>
+                {submissionResult.timeout ? "⏱" : "✖"}
               </Typography>
-              <Alert severity="warning" sx={{ mt: 1.5, textAlign: "left", borderRadius: 0.5 }}>
-                Log in to continue.
-              </Alert>
-              <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
+            )}
+            <Typography
+              variant="subtitle1"
+              sx={{ mt: 1, mb: 2, fontWeight: 700 }}
+              color={
+                submissionResult.ok
+                  ? "success.main"
+                  : submissionResult.timeout
+                  ? "warning.main"
+                  : "error.main"
+              }
+            >
+              {submissionResult.message}
+            </Typography>
+            {submissionResult.ok ? (
+              <Button
+                variant="contained"
+                size="small"
+                onClick={handleClose}
+                sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+              >
+                Close
+              </Button>
+            ) : (
+              <Stack direction="row" spacing={1} justifyContent="center">
                 <Button
                   variant="contained"
+                  color="warning"
                   size="small"
-                  onClick={() => (window.location.href = "/signin_or_signup")}
-                  sx={{ borderRadius: 0.5 }}
+                  startIcon={<ReplayIcon />}
+                  onClick={() => {
+                    setSubmissionResult(null);
+                    if (submissionResult.timeout) handleSubmit();
+                  }}
+                  sx={{ borderRadius: 1.5, textTransform: "none" }}
                 >
-                  Login
+                  {submissionResult.timeout ? "Retry" : "Edit"}
                 </Button>
-                <Button size="small" variant="outlined" onClick={handleClose} sx={{ borderRadius: 0.5 }}>
+                <Button size="small" variant="outlined" onClick={handleClose} sx={{ borderRadius: 1.5, textTransform: "none" }}>
                   Close
                 </Button>
               </Stack>
-            </Box>
-          ) : submissionResult ? (
-            <Box sx={{ textAlign: "center", py: 2 }}>
-              {submissionResult.ok ? (
-                <CheckCircleIcon color="success" sx={{ fontSize: 44 }} />
-              ) : (
-                <Typography variant="h4" color={submissionResult.timeout ? "warning.main" : "error.main"}>
-                  {submissionResult.timeout ? "⏱" : "✖"}
+            )}
+          </Box>
+        ) : (
+          <Box sx={{ display: "grid", gap: 2 }}>
+            {activeStep === 0 && (
+              <TextField
+                label="Service name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. my-api"
+                fullWidth
+                autoFocus
+                disabled={submitting}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    next();
+                  }
+                }}
+              />
+            )}
+
+            {activeStep === 1 && (
+              <Box sx={{ display: "grid", gap: 1.5 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Select network
                 </Typography>
-              )}
-              <Typography
-                variant="subtitle1"
-                sx={{ mt: 1, mb: 2, fontWeight: 700 }}
-                color={
-                  submissionResult.ok
-                    ? "success.main"
-                    : submissionResult.timeout
-                      ? "warning.main"
-                      : "error.main"
-                }
-              >
-                {submissionResult.message}
-              </Typography>
-              {submissionResult.ok ? (
-                <Button variant="contained" size="small" onClick={handleClose} sx={{ borderRadius: 0.5 }}>
-                  Close
-                </Button>
-              ) : (
-                <Stack direction="row" spacing={1} justifyContent="center">
-                  <Button
-                    variant="contained"
-                    color="warning"
+                {networksLoading ? (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <CircularProgress size={18} />
+                    <Typography variant="body2" color="text.secondary">
+                      Loading…
+                    </Typography>
+                  </Stack>
+                ) : networks.length === 0 ? (
+                  <Alert severity="info" sx={{ borderRadius: 1.5 }}>
+                    No networks. Create one below.
+                  </Alert>
+                ) : (
+                  <RadioGroup value={String(network)} onChange={(e) => setNetwork(e.target.value)}>
+                    {networks.map((n) => {
+                      const val = optionValue(n);
+                      const selected = String(network) === val;
+                      return (
+                        <FormControlLabel
+                          key={val}
+                          value={val}
+                          control={<Radio size="small" />}
+                          label={n.name ?? val}
+                          sx={{
+                            mx: 0,
+                            px: 1,
+                            py: 0.5,
+                            mb: 0.5,
+                            border: "1px solid",
+                            borderColor: selected ? "primary.main" : "divider",
+                            borderRadius: 1.5,
+                            bgcolor: selected
+                              ? alpha(theme.palette.primary.main, 0.06)
+                              : "transparent",
+                          }}
+                        />
+                      );
+                    })}
+                  </RadioGroup>
+                )}
+
+                <Divider />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Or create network
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  <TextField
                     size="small"
-                    startIcon={<ReplayIcon />}
-                    onClick={() => {
-                      setSubmissionResult(null);
-                      if (submissionResult.timeout) handleSubmit();
-                    }}
-                    sx={{ borderRadius: 0.5 }}
+                    placeholder="Network name"
+                    value={newNetworkName}
+                    onChange={(e) => setNewNetworkName(e.target.value)}
+                    fullWidth
+                    disabled={creatingNetwork}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={handleCreateNetwork}
+                    disabled={creatingNetwork}
+                    sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, flexShrink: 0 }}
                   >
-                    {submissionResult.timeout ? "Retry" : "Edit"}
-                  </Button>
-                  <Button size="small" variant="outlined" onClick={handleClose} sx={{ borderRadius: 0.5 }}>
-                    Close
+                    {creatingNetwork ? "…" : "Create"}
                   </Button>
                 </Stack>
-              )}
-            </Box>
-          ) : (
-            <Box sx={{ display: "grid", gap: 2 }}>
-              {activeStep === 0 && (
-                <TextField
-                  label="Service name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. my-service"
-                  fullWidth
-                  autoFocus
-                  disabled={submitting}
-                  helperText="Short identifier"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      next();
-                    }
-                  }}
-                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0.5 } }}
-                />
-              )}
+                {createNetworkError && (
+                  <Alert severity="error" sx={{ borderRadius: 1.5 }}>
+                    {createNetworkError}
+                  </Alert>
+                )}
+                {createNetworkSuccess && (
+                  <Alert severity="success" sx={{ borderRadius: 1.5 }}>
+                    {createNetworkSuccess}
+                  </Alert>
+                )}
+              </Box>
+            )}
 
-              {activeStep === 1 && (
-                <Box sx={{ display: "grid", gap: 1.5 }}>
+            {activeStep === 2 && (
+              <Box sx={{ display: "grid", gap: 1.5 }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <StorageIcon fontSize="small" color="primary" />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Select network
+                    Attach volumes (optional)
                   </Typography>
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  Select existing volumes or create a new one. They attach after the service is created.
+                </Typography>
 
-                  {networksLoading ? (
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <CircularProgress size={18} />
-                      <Typography variant="body2" color="text.secondary">
-                        Loading…
-                      </Typography>
-                    </Stack>
-                  ) : networks.length === 0 ? (
-                    <Alert severity="info" sx={{ borderRadius: 0.5 }}>
-                      No networks. Create one below.
-                    </Alert>
-                  ) : (
-                    <RadioGroup value={String(network)} onChange={(e) => setNetwork(e.target.value)}>
-                      {networks.map((n) => {
-                        const val = optionValue(n);
-                        const selected = String(network) === val;
-                        return (
-                          <FormControlLabel
-                            key={val}
-                            value={val}
-                            control={<Radio size="small" />}
-                            label={n.name ?? val}
-                            sx={{
-                              mx: 0,
-                              px: 1,
-                              py: 0.4,
-                              mb: 0.5,
-                              border: "1px solid",
-                              borderColor: selected ? "primary.main" : "divider",
-                              borderRadius: 0.5,
-                              bgcolor: selected
-                                ? alpha(theme.palette.primary.main, 0.06)
-                                : "transparent",
-                            }}
-                          />
-                        );
-                      })}
-                    </RadioGroup>
-                  )}
+                {volumesLoading ? (
+                  <CircularProgress size={22} />
+                ) : volumes.length === 0 ? (
+                  <Alert severity="info" sx={{ borderRadius: 1.5 }}>
+                    No volumes yet. Create one below.
+                  </Alert>
+                ) : (
+                  <Box>
+                    {volumes.map((v) => {
+                      const id = String(v.id ?? v.pk);
+                      const checked = selectedVolumeIds.includes(id);
+                      return (
+                        <FormControlLabel
+                          key={id}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={checked}
+                              onChange={() => toggleVolume(id)}
+                            />
+                          }
+                          label={
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography variant="body2" fontWeight={600}>
+                                {v.name}
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={v.default_bind || v.bind || "—"}
+                                sx={{ height: 20, fontSize: 11, fontFamily: "monospace" }}
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {v.size_mb != null ? `${v.size_mb} MB` : ""}
+                              </Typography>
+                            </Stack>
+                          }
+                          sx={{
+                            display: "flex",
+                            mx: 0,
+                            mb: 0.5,
+                            px: 1,
+                            py: 0.25,
+                            borderRadius: 1.5,
+                            border: "1px solid",
+                            borderColor: checked ? "primary.main" : "divider",
+                          }}
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
 
-                  <Divider />
-
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Create new network
-                  </Typography>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <Divider />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  Create volume
+                </Typography>
+                <Stack spacing={1}>
+                  <TextField
+                    size="small"
+                    label="Name"
+                    value={newVolume.name}
+                    onChange={(e) => setNewVolume((p) => ({ ...p, name: e.target.value }))}
+                    fullWidth
+                  />
+                  <Stack direction="row" spacing={1}>
                     <TextField
                       size="small"
-                      placeholder="Network name"
-                      value={newNetworkName}
-                      onChange={(e) => setNewNetworkName(e.target.value)}
+                      label="Bind path"
+                      value={newVolume.default_bind}
+                      onChange={(e) =>
+                        setNewVolume((p) => ({ ...p, default_bind: e.target.value }))
+                      }
                       fullWidth
-                      disabled={creatingNetwork}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleCreateNetwork();
-                        }
-                      }}
-                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0.5 } }}
                     />
-                    <Button
-                      variant="outlined"
+                    <TextField
                       size="small"
-                      startIcon={<AddIcon />}
-                      onClick={handleCreateNetwork}
-                      disabled={creatingNetwork}
-                      sx={{ borderRadius: 0.5, flexShrink: 0 }}
-                    >
-                      {creatingNetwork ? "…" : "Create"}
-                    </Button>
+                      label="Size MB"
+                      type="number"
+                      value={newVolume.size_mb}
+                      onChange={(e) => setNewVolume((p) => ({ ...p, size_mb: e.target.value }))}
+                      sx={{ width: 120 }}
+                    />
                   </Stack>
-                  {createNetworkError && (
-                    <Alert severity="error" sx={{ borderRadius: 0.5 }}>{createNetworkError}</Alert>
-                  )}
-                  {createNetworkSuccess && (
-                    <Alert severity="success" sx={{ borderRadius: 0.5 }}>{createNetworkSuccess}</Alert>
-                  )}
-                </Box>
-              )}
-
-              {activeStep === 2 && (
-                <Box sx={{ display: "grid", gap: 1.5 }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                    Confirm
-                  </Typography>
-                  <Box
-                    sx={{
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 0.5,
-                      p: 1.5,
-                    }}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={handleCreateVolume}
+                    disabled={creatingVolume}
+                    sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, alignSelf: "flex-start" }}
                   >
-                    {[
-                      { label: "Service name", value: name || "—", step: 0 },
-                      {
-                        label: "Network",
-                        value: selectedNet?.name ?? network ?? "—",
-                        step: 1,
-                      },
-                      { label: "Plan", value: plan ?? "default", step: null },
-                    ].map((row, i) => (
-                      <React.Fragment key={row.label}>
-                        {i > 0 && <Divider sx={{ my: 1 }} />}
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Box>
-                            <Typography variant="caption" color="text.secondary">
-                              {row.label}
-                            </Typography>
-                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                              {row.value}
-                            </Typography>
-                          </Box>
-                          {row.step != null && (
-                            <Button size="small" onClick={() => goToStep(row.step)} sx={{ borderRadius: 0.5 }}>
-                              Edit
-                            </Button>
-                          )}
-                        </Stack>
-                      </React.Fragment>
-                    ))}
-                  </Box>
+                    {creatingVolume ? "Creating…" : "Create & select"}
+                  </Button>
+                  {volumeMsg && (
+                    <Alert severity={volumeMsg.type} sx={{ borderRadius: 1.5 }}>
+                      {volumeMsg.text}
+                    </Alert>
+                  )}
+                </Stack>
+              </Box>
+            )}
+
+            {activeStep === 3 && (
+              <Box sx={{ display: "grid", gap: 1.5 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                  Confirm
+                </Typography>
+                <Box
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 2,
+                    p: 1.5,
+                  }}
+                >
+                  {[
+                    { label: "Service name", value: name || "—", step: 0 },
+                    {
+                      label: "Network",
+                      value: selectedNet?.name ?? network ?? "—",
+                      step: 1,
+                    },
+                    {
+                      label: "Volumes",
+                      value:
+                        selectedVols.length > 0
+                          ? selectedVols.map((v) => v.name).join(", ")
+                          : "None",
+                      step: 2,
+                    },
+                    {
+                      label: "Plan",
+                      value: initialData.plan_name || plan || "—",
+                      step: null,
+                    },
+                  ].map((row, i) => (
+                    <React.Fragment key={row.label}>
+                      {i > 0 && <Divider sx={{ my: 1 }} />}
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            {row.label}
+                          </Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {row.value}
+                          </Typography>
+                        </Box>
+                        {row.step != null && (
+                          <Button
+                            size="small"
+                            onClick={() => goToStep(row.step)}
+                            sx={{ borderRadius: 1.5, textTransform: "none" }}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                      </Stack>
+                    </React.Fragment>
+                  ))}
                 </Box>
-              )}
-
-              {error && (
-                <Alert severity="error" sx={{ borderRadius: 0.5 }}>
-                  {error}
-                </Alert>
-              )}
-            </Box>
-          )}
-        </DialogContent>
-
-        {isValidUser && !submissionResult && (
-          <DialogActions sx={{ px: 2, py: 1.5, gap: 1 }}>
-            <Button onClick={handleClose} color="inherit" disabled={submitting} size="small" sx={{ borderRadius: 0.5 }}>
-              Cancel
-            </Button>
-            <Box sx={{ flex: 1 }} />
-            {activeStep > 0 && (
-              <Button onClick={back} disabled={submitting} size="small" sx={{ borderRadius: 0.5 }}>
-                Back
-              </Button>
+              </Box>
             )}
-            {activeStep < steps.length - 1 ? (
-              <Button variant="contained" onClick={next} disabled={submitting} size="small" sx={{ borderRadius: 0.5 }}>
-                Next
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                color="success"
-                onClick={handleSubmit}
-                disabled={submitting}
-                size="small"
-                sx={{ borderRadius: 0.5 }}
-              >
-                {submitting ? "Creating…" : "Create"}
-              </Button>
+
+            {error && (
+              <Alert severity="error" sx={{ borderRadius: 1.5 }}>
+                {error}
+              </Alert>
             )}
-          </DialogActions>
+          </Box>
         )}
-      </Dialog>
-    </ErrorBoundary>
+      </DialogContent>
+
+      {isValidUser && !submissionResult && (
+        <DialogActions sx={{ px: 2, py: 1.5, gap: 1 }}>
+          <Button
+            onClick={handleClose}
+            color="inherit"
+            disabled={submitting}
+            size="small"
+            sx={{ textTransform: "none" }}
+          >
+            Cancel
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          {activeStep > 0 && (
+            <Button onClick={back} disabled={submitting} size="small" sx={{ textTransform: "none" }}>
+              Back
+            </Button>
+          )}
+          {activeStep < steps.length - 1 ? (
+            <Button
+              variant="contained"
+              onClick={next}
+              disabled={submitting}
+              size="small"
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+            >
+              Next
+            </Button>
+          ) : (
+            <Button
+              variant="contained"
+              color="success"
+              onClick={handleSubmit}
+              disabled={submitting}
+              size="small"
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+            >
+              {submitting ? "Creating…" : "Create"}
+            </Button>
+          )}
+        </DialogActions>
+      )}
+    </Dialog>
   );
 }
 
@@ -636,6 +851,7 @@ CreateServiceWizard.propTypes = {
   onCreate: PropTypes.func,
   apiUrl: PropTypes.string,
   networksUrl: PropTypes.string,
+  volumesUrl: PropTypes.string,
   initialData: PropTypes.object,
   notifyOnSuccess: PropTypes.bool,
   resetKey: PropTypes.any,

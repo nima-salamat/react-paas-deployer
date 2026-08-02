@@ -34,17 +34,26 @@ export default memo(function LogRow({ entry }) {
       ? "rgba(255,255,255,0.03)"
       : "rgba(0,0,0,0.02)";
 
+  const levelColor =
+    level === "error"
+      ? "error"
+      : level === "warning"
+      ? "warning"
+      : level === "debug"
+      ? "default"
+      : "primary";
+
   return (
     <Box
       sx={{
         borderLeft: 3,
         borderColor,
         bgcolor: bg,
-        borderRadius: 1,
-        px: 1,
-        py: 0.75,
+        borderRadius: 1.5,
+        px: 1.25,
+        py: 0.85,
         display: "flex",
-        gap: 1,
+        gap: 1.25,
         alignItems: "flex-start",
       }}
     >
@@ -54,7 +63,7 @@ export default memo(function LogRow({ entry }) {
           color="text.secondary"
           sx={{
             flexShrink: 0,
-            mt: 0.2,
+            mt: 0.25,
             minWidth: 58,
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
@@ -67,12 +76,13 @@ export default memo(function LogRow({ entry }) {
       <Chip
         label={level.toUpperCase()}
         size="small"
+        color={levelColor}
         variant="outlined"
         sx={{
-          height: 22,
-          fontSize: 11,
+          height: 20,
+          fontSize: 10,
           fontWeight: 700,
-          mt: 0.1,
+          mt: 0.15,
           flexShrink: 0,
         }}
       />
@@ -83,7 +93,7 @@ export default memo(function LogRow({ entry }) {
             m: 0,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
-            fontSize: 12,
+            fontSize: 12.5,
             lineHeight: 1.55,
             fontFamily:
               'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',

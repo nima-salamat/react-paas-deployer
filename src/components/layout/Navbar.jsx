@@ -47,7 +47,7 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightnessOutlined";
 
-import { useProfiles } from "../profile/profile.jsx";
+import { useProfiles, resolveProfileImageUrl } from "../profile/profile.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_ICON = "/icon.svg";
@@ -87,7 +87,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
   const mountedRef = useRef(true);
   const previousViewedProfileIdRef = useRef(null);
 
-  const { profiles, fetchProfiles: refreshProfiles } = useProfiles();
+  const { profiles, fetchProfiles: refreshProfiles, primaryImageUrl } = useProfiles();
 
   useEffect(() => {
     mountedRef.current = true;
@@ -131,10 +131,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     return profile.id ?? profile.pk ?? profile.uuid ?? profile.user_id ?? null;
   };
 
-  const getProfileImage = (profile) => {
-    if (!profile) return null;
-    return profile.image_url ?? profile.image ?? profile.avatar ?? profile.avatar_url ?? null;
-  };
+  const getProfileImage = (profile) => resolveProfileImageUrl(profile);
 
   const getViewedProfileId = () => {
     const match = location.pathname.match(/^\/profile\/([^/]+)/);
@@ -159,9 +156,10 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     currentProfileIdRef.current = profileId;
 
     if (mountedRef.current) {
-      setUserImage((previousImage) => (previousImage === imageUrl ? previousImage : imageUrl));
+      const next = imageUrl || primaryImageUrl || null;
+      setUserImage((previousImage) => (previousImage === next ? previousImage : next));
     }
-  }, [profiles, loggedIn]);
+  }, [profiles, loggedIn, primaryImageUrl]);
 
   const loadProfilesIfNeeded = async ({ force = false, viewedProfileId = null } = {}) => {
     if (!loggedIn) return;
@@ -506,7 +504,18 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
                   borderColor: alpha(theme.palette.text.primary, 0.08),
                 }}
               >
-                <Avatar src={avatarSrc} alt="User" sx={{ width: 38, height: 38 }} />
+                <Avatar
+                  src={userImage || DEFAULT_ICON}
+                  alt="User"
+                  sx={{ width: 38, height: 38 }}
+                  imgProps={{
+                    onError: (e) => {
+                      if (e.currentTarget.src !== DEFAULT_ICON) {
+                        e.currentTarget.src = DEFAULT_ICON;
+                      }
+                    },
+                  }}
+                />
               </IconButton>
             ) : !checkingAuth ? (
               <Button

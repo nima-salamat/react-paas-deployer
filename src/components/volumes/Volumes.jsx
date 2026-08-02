@@ -1,58 +1,82 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   Box,
-  Container,
-  Paper,
-  Typography,
   Button,
-  Grid,
+  Chip,
+  CircularProgress,
+  Container,
   Dialog,
-  DialogTitle,
-  DialogContent,
   DialogActions,
-  TextField,
-  Select,
-  MenuItem,
-  InputLabel,
+  DialogContent,
+  DialogTitle,
   FormControl,
-  TableContainer,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
   Table,
+  TableBody,
+  TableCell,
+  TableContainer,
   TableHead,
   TableRow,
-  TableCell,
-  TableBody,
-  CircularProgress,
-  Alert,
-  Stack,
-  IconButton,
+  TextField,
+  Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import StorageIcon from "@mui/icons-material/Storage";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import apiRequest from "../customHooks/apiRequest";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
-
-const VOLUME_ROOT = `${API_BASE}/services/volume/`;
+const VOLUME_ROOT = `${API_BASE}/api/volumes/`;
 const SERVICE_ROOT = `${API_BASE}/services/service/`;
+
 const MODE_OPTIONS = [
-  { value: "readwrite", label: "Read / Write" },
-  { value: "read", label: "Read Only" },
-  { value: "write", label: "Write Only" },
+  { value: "rw", label: "Read / Write (rw)" },
+  { value: "ro", label: "Read Only (ro)" },
 ];
 
 const DEFAULT_FORM = {
   name: "",
-  bind: "/data",
-  mode: "readwrite",
-  size_mb: "",
-  service: "",
+  default_bind: "/data",
+  default_mode: "rw",
+  size_mb: "1024",
 };
+
+function extractList(data) {
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+function friendlyError(err, fallback = "Something went wrong.") {
+  const d = err?.response?.data;
+  if (!d) return err?.message || fallback;
+  if (typeof d === "string") return d;
+  if (d.detail) return String(d.detail);
+  if (d.error) return String(d.error);
+  if (d.message) return String(d.message);
+  try {
+    const parts = Object.entries(d).flatMap(([k, v]) =>
+      Array.isArray(v) ? v.map((x) => `${k}: ${x}`) : [`${k}: ${v}`]
+    );
+    if (parts.length) return parts.join(" · ");
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
 
 export default function Volumes() {
   const [volumes, setVolumes] = useState([]);
-  const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -64,62 +88,49 @@ export default function Volumes() {
   const [fileList, setFileList] = useState([]);
   const [fileError, setFileError] = useState(null);
   const [fileLoading, setFileLoading] = useState(false);
+  const [fileVolumeName, setFileVolumeName] = useState("");
 
   const loadVolumes = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const resp = await apiRequest({ method: "GET", url: VOLUME_ROOT });
-      const data = resp.data;
-      setVolumes(Array.isArray(data) ? data : data.results || []);
+      setVolumes(extractList(resp.data));
     } catch (err) {
-      console.error(err);
-      setError("Unable to load volumes.");
+      if (err?.response?.status === 404) setVolumes([]);
+      else setError(friendlyError(err, "Unable to load volumes."));
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const loadServices = useCallback(async () => {
-    try {
-      const resp = await apiRequest({ method: "GET", url: SERVICE_ROOT });
-      const data = resp.data;
-      setServices(Array.isArray(data) ? data : data.results || []);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
   useEffect(() => {
     loadVolumes();
-    loadServices();
-  }, [loadVolumes, loadServices]);
+  }, [loadVolumes]);
+
+  useEffect(() => {
+    if (!success) return undefined;
+    const t = setTimeout(() => setSuccess(null), 3500);
+    return () => clearTimeout(t);
+  }, [success]);
 
   const openCreateDialog = () => {
     setCurrentVolume(null);
     setFormData(DEFAULT_FORM);
     setDialogOpen(true);
     setError(null);
-    setSuccess(null);
   };
 
   const openEditDialog = (volume) => {
     setCurrentVolume(volume);
     setFormData({
-      name: volume.name,
-      bind: volume.bind || "/data",
-      mode: volume.mode || "readwrite",
+      name: volume.name || "",
+      default_bind: volume.default_bind || volume.bind || "/data",
+      default_mode: volume.default_mode || volume.mode || "rw",
       size_mb: String(volume.size_mb || ""),
-      service: volume.service || "",
     });
     setDialogOpen(true);
     setError(null);
-    setSuccess(null);
-  };
-
-  const handleFormChange = (event) => {
-    const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const closeDialog = () => {
@@ -128,25 +139,27 @@ export default function Volumes() {
     setFormData(DEFAULT_FORM);
   };
 
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleSaveVolume = async () => {
     setSaving(true);
     setError(null);
-    setSuccess(null);
     try {
       const payload = {
         name: formData.name.trim(),
-        bind: formData.bind.trim(),
-        mode: formData.mode,
+        default_bind: formData.default_bind.trim(),
+        default_mode: formData.default_mode || "rw",
         size_mb: Number(formData.size_mb),
-        service: formData.service || null,
       };
-
       if (!payload.name) {
         setError("Volume name is required.");
         return;
       }
-      if (!payload.bind) {
-        setError("Bind path is required.");
+      if (!payload.default_bind || !payload.default_bind.startsWith("/")) {
+        setError("Bind path must be an absolute container path (e.g. /data).");
         return;
       }
       if (!payload.size_mb || Number.isNaN(payload.size_mb) || payload.size_mb < 1) {
@@ -155,57 +168,66 @@ export default function Volumes() {
       }
 
       if (currentVolume) {
-        await apiRequest({ method: "PATCH", url: `${VOLUME_ROOT}${currentVolume.id}/`, data: payload });
-        setSuccess("Volume updated successfully.");
+        const id = currentVolume.id ?? currentVolume.pk;
+        // name is typically immutable
+        const { name, ...patch } = payload;
+        await apiRequest({
+          method: "PATCH",
+          url: `${VOLUME_ROOT}${id}/`,
+          data: patch,
+        });
+        setSuccess("Volume updated.");
       } else {
         await apiRequest({ method: "POST", url: VOLUME_ROOT, data: payload });
-        setSuccess("Volume created successfully.");
+        setSuccess("Volume created.");
       }
       closeDialog();
       await loadVolumes();
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.error || err.response?.data?.message || "Unable to save volume.");
+      setError(friendlyError(err, "Unable to save volume."));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteVolume = async (volume) => {
-    if (!window.confirm(`Delete volume '${volume.name}'? This cannot be undone.`)) return;
-    setError(null);
-    setSuccess(null);
+    if (!window.confirm(`Delete volume "${volume.name}"? This cannot be undone.`)) return;
     try {
-      await apiRequest({ method: "DELETE", url: `${VOLUME_ROOT}${volume.id}/` });
+      const id = volume.id ?? volume.pk;
+      await apiRequest({ method: "DELETE", url: `${VOLUME_ROOT}${id}/` });
       setSuccess("Volume deleted.");
       await loadVolumes();
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.error || err.response?.data?.detail || "Unable to delete volume.");
+      setError(friendlyError(err, "Unable to delete volume."));
     }
   };
 
   const handleViewFiles = async (volume) => {
     setFileLoading(true);
     setFileError(null);
+    setFileVolumeName(volume.name || "");
     try {
-      const resp = await apiRequest({ method: "GET", url: `${VOLUME_ROOT}${volume.id}/files/` });
-      setFileList(Array.isArray(resp.data.files) ? resp.data.files : []);
+      const id = volume.id ?? volume.pk;
+      const resp = await apiRequest({
+        method: "GET",
+        url: `${VOLUME_ROOT}${id}/files/`,
+      });
+      const files = resp.data?.files ?? resp.data?.results ?? resp.data;
+      setFileList(Array.isArray(files) ? files : []);
       setFileDialogOpen(true);
     } catch (err) {
-      console.error(err);
-      setFileError(err.response?.data?.detail || "Unable to load volume file list.");
+      setFileError(friendlyError(err, "Unable to load volume files."));
+      setFileDialogOpen(true);
     } finally {
       setFileLoading(false);
     }
   };
 
   const handleDownloadVolume = async (volume) => {
-    setError(null);
-    setSuccess(null);
     try {
       const token = localStorage.getItem("access");
-      const response = await fetch(`${VOLUME_ROOT}${volume.id}/download/`, {
+      const id = volume.id ?? volume.pk;
+      const response = await fetch(`${VOLUME_ROOT}${id}/download/`, {
         method: "GET",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -214,89 +236,182 @@ export default function Volumes() {
         throw new Error(body?.detail || "Unable to download archive.");
       }
       const blob = await response.blob();
-      const downloadUrl = URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = `${volume.name}.tar.gz`;
+      link.href = url;
+      link.download = `${volume.name || "volume"}.tar.gz`;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(downloadUrl);
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Failed to download volume archive.");
+      setError(err.message || "Failed to download volume.");
     }
   };
 
+  const attachedLabel = (v) => {
+    if (v.is_unused) return "Unused";
+    if (v.attached_services_count != null) return `${v.attached_services_count} service(s)`;
+    if (v.service_name) return v.service_name;
+    if (v.attached_services?.length) return `${v.attached_services.length} service(s)`;
+    return "—";
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3, gap: 2 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 } }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={2}
+        sx={{ mb: 3 }}
+      >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700 }}>
-            Volume Management
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 1 }}>
-            Create, edit, download and delete volumes for your services.
-          </Typography>
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2,
+                display: "grid",
+                placeItems: "center",
+                bgcolor: "primary.main",
+                color: "#fff",
+              }}
+            >
+              <StorageIcon fontSize="small" />
+            </Box>
+            <Box>
+              <Typography variant="h5" fontWeight={900} sx={{ letterSpacing: "-0.02em" }}>
+                Volumes
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Named Docker volumes for your services
+              </Typography>
+            </Box>
+          </Stack>
         </Box>
-        <Button variant="contained" onClick={openCreateDialog}>
-          Create Volume
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <IconButton
+            onClick={loadVolumes}
+            disabled={loading}
+            sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}
+          >
+            <RefreshIcon />
+          </IconButton>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openCreateDialog}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
+          >
+            Create volume
+          </Button>
+        </Stack>
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setSuccess(null)}>
+          {success}
+        </Alert>
+      )}
 
-      <Paper elevation={3} sx={{ p: 2 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+          overflow: "hidden",
+        }}
+      >
         {loading ? (
           <Box sx={{ py: 8, display: "flex", justifyContent: "center" }}>
             <CircularProgress />
           </Box>
         ) : (
           <TableContainer>
-            <Table>
+            <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Bind Path</TableCell>
-                  <TableCell>Mode</TableCell>
-                  <TableCell>Size (MB)</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Service</TableCell>
-                  <TableCell align="right">Actions</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Bind path</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Mode</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Size</TableCell>
+                  <TableCell sx={{ fontWeight: 800 }}>Status</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800 }}>
+                    Actions
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {volumes.map((volume) => (
-                  <TableRow key={volume.id}>
-                    <TableCell>{volume.name}</TableCell>
-                    <TableCell>{volume.bind}</TableCell>
-                    <TableCell>{volume.mode}</TableCell>
-                    <TableCell>{volume.size_mb}</TableCell>
-                    <TableCell>{volume.is_unused ? "Unused" : volume.service_name || "Attached"}</TableCell>
-                    <TableCell>{volume.service_name || "—"}</TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        <Button size="small" startIcon={<VisibilityIcon />} onClick={() => handleViewFiles(volume)}>
-                          Files
-                        </Button>
-                        <Button size="small" startIcon={<DownloadIcon />} onClick={() => handleDownloadVolume(volume)}>
-                          Download
-                        </Button>
-                        <IconButton size="small" onClick={() => openEditDialog(volume)} aria-label="Edit volume">
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDeleteVolume(volume)} aria-label="Delete volume">
-                          <DeleteIcon />
-                        </IconButton>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {volumes.map((volume) => {
+                  const id = volume.id ?? volume.pk;
+                  const bind = volume.default_bind || volume.bind || "—";
+                  const mode = volume.default_mode || volume.mode || "rw";
+                  return (
+                    <TableRow key={id} hover>
+                      <TableCell>
+                        <Typography fontWeight={700}>{volume.name}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontFamily="monospace">
+                          {bind}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip size="small" label={mode} sx={{ fontWeight: 700, height: 22 }} />
+                      </TableCell>
+                      <TableCell>{volume.size_mb != null ? `${volume.size_mb} MB` : "—"}</TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={attachedLabel(volume)}
+                          color={volume.is_unused ? "default" : "success"}
+                          variant={volume.is_unused ? "outlined" : "filled"}
+                          sx={{ fontWeight: 700, height: 22 }}
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                          <IconButton size="small" onClick={() => handleViewFiles(volume)} title="Files">
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" onClick={() => handleDownloadVolume(volume)} title="Download">
+                            <DownloadIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton size="small" onClick={() => openEditDialog(volume)} title="Edit">
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteVolume(volume)}
+                            title="Delete"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 {volumes.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                      No volumes found.
+                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                      <Typography color="text.secondary">No volumes yet.</Typography>
+                      <Button
+                        sx={{ mt: 1.5, textTransform: "none", fontWeight: 700 }}
+                        startIcon={<AddIcon />}
+                        onClick={openCreateDialog}
+                      >
+                        Create your first volume
+                      </Button>
                     </TableCell>
                   </TableRow>
                 )}
@@ -306,105 +421,117 @@ export default function Volumes() {
         )}
       </Paper>
 
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm">
-        <DialogTitle>{currentVolume ? "Edit Volume" : "Create Volume"}</DialogTitle>
+      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 2.5 } }}>
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          {currentVolume ? "Edit volume" : "Create volume"}
+        </DialogTitle>
         <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Volume Name"
-                name="name"
-                value={formData.name}
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Name"
+              name="name"
+              value={formData.name}
+              onChange={handleFormChange}
+              disabled={Boolean(currentVolume)}
+              helperText={currentVolume ? "Name cannot be changed" : "Unique Docker volume name"}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Bind directory"
+              name="default_bind"
+              value={formData.default_bind}
+              onChange={handleFormChange}
+              placeholder="/data"
+              helperText="Path inside the container (e.g. /var/lib/mysql)"
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="Size (MB)"
+              name="size_mb"
+              type="number"
+              value={formData.size_mb}
+              onChange={handleFormChange}
+              inputProps={{ min: 1 }}
+            />
+            <FormControl fullWidth size="small">
+              <InputLabel>Access mode</InputLabel>
+              <Select
+                name="default_mode"
+                value={formData.default_mode}
+                label="Access mode"
                 onChange={handleFormChange}
-                disabled={Boolean(currentVolume)}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Bind Path"
-                name="bind"
-                value={formData.bind}
-                onChange={handleFormChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Size (MB)"
-                name="size_mb"
-                type="number"
-                value={formData.size_mb}
-                onChange={handleFormChange}
-              />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth>
-                <InputLabel>Mode</InputLabel>
-                <Select name="mode" value={formData.mode} label="Mode" onChange={handleFormChange}>
-                  {MODE_OPTIONS.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Attach Service</InputLabel>
-                <Select name="service" value={formData.service || ""} label="Attach Service" onChange={handleFormChange}>
-                  <MenuItem value="">No service</MenuItem>
-                  {services.map((service) => (
-                    <MenuItem key={service.id} value={service.id}>
-                      {service.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+              >
+                {MODE_OPTIONS.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDialog}>Cancel</Button>
-          <Button onClick={handleSaveVolume} variant="contained" disabled={saving}>
-            {currentVolume ? "Save changes" : "Create Volume"}
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={closeDialog} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveVolume}
+            disabled={saving}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
+          >
+            {saving ? "Saving…" : currentVolume ? "Save" : "Create"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={fileDialogOpen} onClose={() => setFileDialogOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Volume Files</DialogTitle>
+      <Dialog
+        open={fileDialogOpen}
+        onClose={() => setFileDialogOpen(false)}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ sx: { borderRadius: 2.5 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          Files — {fileVolumeName || "volume"}
+        </DialogTitle>
         <DialogContent>
           {fileLoading ? (
             <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
               <CircularProgress />
             </Box>
           ) : fileError ? (
-            <Alert severity="error">{fileError}</Alert>
+            <Alert severity="error" sx={{ borderRadius: 2 }}>
+              {fileError}
+            </Alert>
           ) : (
             <TableContainer>
-              <Table>
+              <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Path</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Size</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Path</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 800 }}>Size</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {fileList.map((item, index) => (
                     <TableRow key={`${item.path}-${index}`}>
-                      <TableCell>{item.path || "./"}</TableCell>
+                      <TableCell sx={{ fontFamily: "monospace", fontSize: 13 }}>
+                        {item.path || "./"}
+                      </TableCell>
                       <TableCell>{item.type || "file"}</TableCell>
-                      <TableCell>{item.size ? `${item.size} bytes` : "-"}</TableCell>
+                      <TableCell>{item.size != null ? `${item.size} B` : "—"}</TableCell>
                     </TableRow>
                   ))}
                   {fileList.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={3} align="center">
-                        No files found in this volume.
+                      <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
+                        No files in this volume.
                       </TableCell>
                     </TableRow>
                   )}
@@ -413,8 +540,10 @@ export default function Volumes() {
             </TableContainer>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setFileDialogOpen(false)}>Close</Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setFileDialogOpen(false)} sx={{ textTransform: "none" }}>
+            Close
+          </Button>
         </DialogActions>
       </Dialog>
     </Container>

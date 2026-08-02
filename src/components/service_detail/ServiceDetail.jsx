@@ -24,6 +24,8 @@ import GlobalServiceControls from "./components/GlobalServiceControls";
 import OverviewPanel from "./components/OverviewPanel";
 import CreateDeployPanel from "./components/CreateDeployPanel";
 import LogsPanel from "./components/LogsPanel";
+import ServiceToolbar from "./components/ServiceToolbar";
+import SettingsPanel from "./components/SettingsPanel";
 
 import {
   API_BASE,
@@ -76,6 +78,12 @@ export default function ServiceDetail() {
   const [filesDialogOpen, setFilesDialogOpen] = useState(false);
   const [volumeActionLoading, setVolumeActionLoading] = useState(false);
   const [networkActionLoading, setNetworkActionLoading] = useState(false);
+
+  const [availablePlans, setAvailablePlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState("");
+  const [planActionLoading, setPlanActionLoading] = useState(false);
+  const [settingsSuccess, setSettingsSuccess] = useState(null);
 
   const [deploys, setDeploys] = useState([]);
   const [pageInfo, setPageInfo] = useState({ next: null, previous: null, count: 0, page: 1 });
@@ -318,6 +326,20 @@ export default function ServiceDetail() {
       const resp = await apiRequest({ method: "GET", url: VOLUME_API_ROOT, params: { unused: true, page_size: 100 } });
       setAvailableVolumes(Array.isArray(resp.data) ? resp.data : resp.data.results || []);
     } catch (err) {}
+  }, []);
+
+  const fetchPlans = useCallback(async () => {
+    setPlansLoading(true);
+    try {
+      const resp = await apiRequest({ method: "GET", url: PLANS_BASE, params: { page_size: 100 } });
+      const data = resp.data;
+      const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      setAvailablePlans(list);
+    } catch (err) {
+      setAvailablePlans([]);
+    } finally {
+      if (mountedRef.current) setPlansLoading(false);
+    }
   }, []);
 
   const fetchAttachedVolumes = useCallback(async () => {
@@ -574,10 +596,10 @@ export default function ServiceDetail() {
   useEffect(() => {
     if (!id) return;
     const boot = async () => {
-      await Promise.allSettled([fetchService(), fetchDeploys(1), checkServiceRunning(true), fetchAvailableNetworks(), fetchAvailableVolumes(), fetchAttachedVolumes()]);
+      await Promise.allSettled([fetchService(), fetchDeploys(1), checkServiceRunning(true), fetchAvailableNetworks(), fetchAvailableVolumes(), fetchAttachedVolumes(), fetchPlans()]);
     };
     boot();
-  }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAvailableNetworks, fetchAvailableVolumes, fetchAttachedVolumes]);
+  }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAvailableNetworks, fetchAvailableVolumes, fetchAttachedVolumes, fetchPlans]);
 
   useEffect(() => {
     if (!service?.network?.id) setSelectedNetworkId("");
@@ -690,7 +712,14 @@ export default function ServiceDetail() {
 
     const effectivePlatform = planPlatform || createPlatform || "docker";
     const effectiveIsDb = isDbPlatform(effectivePlatform);
-    const configPayload = buildConfigPayload(effectivePlatform, { configText: config, dbFields: createDbFields, isDb: effectiveIsDb });
+    let configPayload;
+    try {
+      configPayload = buildConfigPayload(effectivePlatform, { configText: config, dbFields: createDbFields, isDb: effectiveIsDb });
+    } catch (cfgErr) {
+      setError(cfgErr?.message || "Invalid config JSON.");
+      setSubmitting(false);
+      return;
+    }
 
     if (effectiveIsDb) {
       const cfg = typeof configPayload === "object" && configPayload ? configPayload : {};
@@ -721,7 +750,7 @@ export default function ServiceDetail() {
         const fd = new FormData();
         fd.append("name", name); fd.append("service", id);
         if (version) fd.append("version", version);
-        if (configPayload) fd.append("config", configPayload);
+        if (configPayload) fd.append("config", typeof configPayload === "string" ? configPayload : JSON.stringify(configPayload ?? {}));
         fd.append("zip_file", zipFile);
 
         const access = localStorage.getItem("access");
@@ -753,7 +782,14 @@ export default function ServiceDetail() {
 
       const effectivePlatform = editData.platform || planPlatform || createPlatform || "docker";
       const effectiveIsDb = isDbPlatform(effectivePlatform);
-      const configPayload = buildConfigPayload(effectivePlatform, { configText: editData.config, dbFields: editDbFields, isDb: effectiveIsDb });
+      let configPayload;
+      try {
+        configPayload = buildConfigPayload(effectivePlatform, { configText: editData.config, dbFields: editDbFields, isDb: effectiveIsDb });
+      } catch (cfgErr) {
+        setError(cfgErr?.message || "Invalid config JSON.");
+        setSubmitting(false);
+        return;
+      }
 
       if (effectiveIsDb || !editZipFile) {
         const payload = { name: editData.name, version: editData.version, config: configPayload };
@@ -764,7 +800,7 @@ export default function ServiceDetail() {
         const fd = new FormData();
         fd.append("name", editData.name); fd.append("service", id);
         if (editData.version) fd.append("version", editData.version);
-        if (configPayload) fd.append("config", configPayload);
+        if (configPayload) fd.append("config", typeof configPayload === "string" ? configPayload : JSON.stringify(configPayload ?? {}));
         fd.append("zip_file", editZipFile);
 
         const access = localStorage.getItem("access");
@@ -915,12 +951,15 @@ export default function ServiceDetail() {
     }
   };
 
-  const handleAttachNetwork = async () => {
-    if (!selectedNetworkId || !id) return;
-    setNetworkActionLoading(true); setError(null);
+  const handleAttachNetwork = async (networkIdArg) => {
+    const netId = networkIdArg != null && networkIdArg !== "" ? String(networkIdArg) : selectedNetworkId;
+    if (!netId || !id) return;
+    setNetworkActionLoading(true); setError(null); setSettingsSuccess(null);
     try {
-      await apiRequest({ method: "PATCH", url: `${SERVICE_BASE}${id}/`, data: { network: selectedNetworkId } });
+      await apiRequest({ method: "PATCH", url: `${SERVICE_BASE}${id}/`, data: { network: netId } });
+      setSelectedNetworkId(netId);
       safeSetSnackbar("success", "Network attached successfully.");
+      setSettingsSuccess("Network attached successfully.");
       await fetchService(); await fetchAvailableNetworks();
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.error || "Unable to attach network."); }
     finally { if (mountedRef.current) setNetworkActionLoading(false); }
@@ -938,12 +977,15 @@ export default function ServiceDetail() {
     finally { if (mountedRef.current) setNetworkActionLoading(false); }
   };
 
-  const handleAttachVolume = async () => {
-    if (!selectedVolumeId || !id) return;
-    setVolumeActionLoading(true); setError(null);
+  const handleAttachVolume = async (volumeIdArg) => {
+    const volId = volumeIdArg != null && volumeIdArg !== "" ? String(volumeIdArg) : selectedVolumeId;
+    if (!volId || !id) return;
+    setVolumeActionLoading(true); setError(null); setSettingsSuccess(null);
     try {
-      await apiRequest({ method: "PATCH", url: `${VOLUME_API_ROOT}${selectedVolumeId}/`, data: { service: id } });
+      await apiRequest({ method: "PATCH", url: `${VOLUME_API_ROOT}${volId}/`, data: { service: id } });
+      setSelectedVolumeId("");
       safeSetSnackbar("success", "Volume attached successfully.");
+      setSettingsSuccess("Volume attached successfully.");
       await fetchAttachedVolumes(); await fetchAvailableVolumes();
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.error || "Unable to attach volume."); }
     finally { if (mountedRef.current) setVolumeActionLoading(false); }
@@ -958,6 +1000,107 @@ export default function ServiceDetail() {
       await fetchAttachedVolumes(); await fetchAvailableVolumes();
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.error || "Unable to detach volume."); }
     finally { if (mountedRef.current) setVolumeActionLoading(false); }
+  };
+
+  const handleCreateNetwork = async ({ name, description }) => {
+    setNetworkActionLoading(true);
+    setError(null);
+    setSettingsSuccess(null);
+    try {
+      await apiRequest({
+        method: "POST",
+        url: NETWORK_API_ROOT,
+        data: { name, description: description || "" },
+      });
+      safeSetSnackbar("success", "Network created.");
+      setSettingsSuccess("Network created successfully.");
+      await fetchAvailableNetworks();
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.response?.data?.error || err.response?.data?.errors || "Unable to create network.";
+      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      throw err;
+    } finally {
+      if (mountedRef.current) setNetworkActionLoading(false);
+    }
+  };
+
+  const handleCreateVolume = async ({ name, size_mb, default_bind, default_mode }) => {
+    setVolumeActionLoading(true);
+    setError(null);
+    setSettingsSuccess(null);
+    try {
+      await apiRequest({
+        method: "POST",
+        url: VOLUME_API_ROOT,
+        data: {
+          name,
+          size_mb,
+          ...(default_bind ? { default_bind } : {}),
+          ...(default_mode ? { default_mode } : {}),
+        },
+      });
+      safeSetSnackbar("success", "Volume created.");
+      setSettingsSuccess("Volume created successfully.");
+      await fetchAvailableVolumes();
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.response?.data?.error || err.response?.data?.errors || "Unable to create volume.";
+      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      throw err;
+    } finally {
+      if (mountedRef.current) setVolumeActionLoading(false);
+    }
+  };
+
+  const handleApplyPlan = async (planId, applyImmediately = false) => {
+    if (!planId || !id) return;
+    setPlanActionLoading(true);
+    setError(null);
+    setSettingsSuccess(null);
+    try {
+      const resp = await apiRequest({
+        method: "POST",
+        url: `${PLANS_BASE}plans/${planId}/apply/`,
+        data: {
+          target_type: "service",
+          target_id: id,
+          applyImmediately: Boolean(applyImmediately),
+        },
+      });
+      const detail = resp.data?.detail || "Plan applied.";
+      safeSetSnackbar("success", detail);
+      setSettingsSuccess(detail);
+
+      // Instant UI feedback: mark the applied plan as current and clear selection
+      const applied = (availablePlans || []).find(
+        (p) => String(p.id ?? p.pk ?? "") === String(planId)
+      );
+      if (applied) {
+        setPlanDetail(applied);
+        setService((prev) =>
+          prev
+            ? {
+                ...prev,
+                plan: typeof prev.plan === "object" && prev.plan
+                  ? { ...prev.plan, ...applied }
+                  : applied,
+              }
+            : prev
+        );
+      }
+      setSelectedPlanId("");
+
+      await fetchService(true);
+      await fetchPlans();
+    } catch (err) {
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        err.response?.data?.result ||
+        "Unable to apply plan.";
+      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+    } finally {
+      if (mountedRef.current) setPlanActionLoading(false);
+    }
   };
 
   const handleDownloadEntries = useCallback((filename, entries) => {
@@ -1013,6 +1156,15 @@ export default function ServiceDetail() {
       </Box>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
+        <ServiceToolbar
+          refreshIntervalMs={refreshIntervalMs}
+          setRefreshIntervalMs={setRefreshIntervalMs}
+          intervalMenuAnchor={intervalMenuAnchor}
+          setIntervalMenuAnchor={setIntervalMenuAnchor}
+          onRefresh={silentRefresh}
+          navigate={navigate}
+        />
+
         <GlobalServiceControls
           service={service}
           serviceRunning={serviceRunning}
@@ -1073,9 +1225,35 @@ export default function ServiceDetail() {
         )}
 
         {activeTab === "settings" && (
-          <Paper elevation={1} sx={{ p: 2, borderRadius: 2 }}>
-            <Typography>No additional settings configured.</Typography>
-          </Paper>
+          <SettingsPanel
+            service={service}
+            planDetail={planDetail}
+            networkName={networkName}
+            networkDetail={networkDetail}
+            selectedNetworkId={selectedNetworkId}
+            setSelectedNetworkId={setSelectedNetworkId}
+            availableNetworks={availableNetworks}
+            networkActionLoading={networkActionLoading}
+            onAttachNetwork={handleAttachNetwork}
+            onDetachNetwork={handleDetachNetwork}
+            onCreateNetwork={handleCreateNetwork}
+            attachedVolumes={attachedVolumes}
+            availableVolumes={availableVolumes}
+            selectedVolumeId={selectedVolumeId}
+            setSelectedVolumeId={setSelectedVolumeId}
+            volumeActionLoading={volumeActionLoading}
+            onAttachVolume={handleAttachVolume}
+            onDetachVolume={handleDetachVolume}
+            onCreateVolume={handleCreateVolume}
+            availablePlans={availablePlans}
+            plansLoading={plansLoading}
+            selectedPlanId={selectedPlanId}
+            setSelectedPlanId={setSelectedPlanId}
+            planActionLoading={planActionLoading}
+            onApplyPlan={handleApplyPlan}
+            error={error}
+            successMessage={settingsSuccess}
+          />
         )}
       </Box>
 
