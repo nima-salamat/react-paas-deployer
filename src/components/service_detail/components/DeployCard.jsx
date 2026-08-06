@@ -26,6 +26,7 @@ export default memo(
     onSelect,
     onUnselect,
     onDelete,
+    onDownload,
   }) {
     const theme = useTheme();
     const busy =
@@ -43,6 +44,7 @@ export default memo(
 
     const platform = getDeployPlatform(deploy);
     const isDb = isDbPlatform(platform);
+    const hasZip = Boolean(deploy?.zip_file);
 
     return (
       <Paper
@@ -142,6 +144,15 @@ export default memo(
                       sx={{ height: 20, fontSize: 11 }}
                     />
                   ) : null}
+                  {hasZip ? (
+                    <Chip
+                      label="ZIP"
+                      size="small"
+                      color="secondary"
+                      variant="outlined"
+                      sx={{ height: 20, fontSize: 11 }}
+                    />
+                  ) : null}
                 </Stack>
 
                 <Typography
@@ -193,6 +204,7 @@ export default memo(
             >
               {busy ? "..." : isSelected ? "Unselect" : "Select"}
             </Button>
+
             <Button
               size="small"
               variant="outlined"
@@ -208,6 +220,26 @@ export default memo(
             >
               Edit
             </Button>
+
+            {hasZip ? (
+              <Button
+                size="small"
+                variant="outlined"
+                color="info"
+                onClick={() => onDownload?.(deploy)}
+                disabled={busy}
+                sx={{
+                  flex: "1 1 auto",
+                  minWidth: 56,
+                  borderRadius: 1.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
+              >
+                Download
+              </Button>
+            ) : null}
+
             <Button
               size="small"
               variant="outlined"

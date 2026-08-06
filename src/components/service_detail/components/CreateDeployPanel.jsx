@@ -71,6 +71,7 @@ export default function CreateDeployPanel({
     openConfirm,
     handlePrev,
     handleNext,
+    handleDownloadZip,
   } = deployActions;
 
   const effectivePlatform = planPlatform || createPlatform || "docker";
@@ -118,6 +119,7 @@ export default function CreateDeployPanel({
                 `Delete deploy "${d.name}"?`
               )
             }
+            onDownload={handleDownloadZip}
           />
         );
       })}

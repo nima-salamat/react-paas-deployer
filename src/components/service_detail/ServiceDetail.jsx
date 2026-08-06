@@ -196,6 +196,55 @@ export default function ServiceDetail() {
     setServiceLogsConnected(false);
   }, []);
 
+
+
+  const handleDownloadZip = useCallback(async (deploy) => {
+    const deployId = deploy?.id ?? deploy?.pk;
+    if (!deployId) return;
+
+    if (!deploy?.zip_file) {
+      safeSetSnackbar("info", "This deploy has no ZIP file.");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("access");
+      const url = `${DEPLOY_BASE}${deployId}/download/`;
+
+      const resp = await axios.get(url, {
+        responseType: "blob",
+        headers: token ? { Authorization: `Token ${token}` } : {},
+      });
+
+      const disposition = resp.headers["content-disposition"] || "";
+      let filename = `${deploy.name || "deploy"}-${deploy.version || "file"}.zip`;
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      if (match?.[1]) filename = match[1];
+
+      const blobUrl = URL.createObjectURL(
+        new Blob([resp.data], { type: "application/zip" })
+      );
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+
+      safeSetSnackbar("success", "Download started.");
+    } catch (err) {
+      const status = err?.response?.status;
+      const msg =
+        status === 404
+          ? "File not found."
+          : status === 401 || status === 403
+          ? "You do not have permission to download this file."
+          : err?.response?.data?.detail || "Download failed.";
+      safeSetSnackbar("error", typeof msg === "string" ? msg : "Download failed.");
+    }
+  }, [safeSetSnackbar]);
+
   const appendServiceLogEntries = useCallback((incoming) => {
     const next = normalizeTextEntries(incoming);
     if (!next.length) return;
@@ -1202,7 +1251,7 @@ export default function ServiceDetail() {
             editState={{ editingDeployId, editData, editDbFields, editOriginalName, editZipFile, editZipInputRef }}
             editActions={{ setEditData, setEditDbFields, setEditZipFile, handleUpdateDeploy, handleCancelEdit }}
             deployState={{ deploys, deploysLoading, pageInfo, selectedDeployId, actionState }}
-            deployActions={{ handleSelectDeploy, handleUnselectDeploy, handleEditClick, openConfirm, handlePrev, handleNext }}
+            deployActions={{ handleSelectDeploy, handleUnselectDeploy, handleEditClick, openConfirm, handlePrev, handleNext, handleDownloadZip }}
             planPlatform={planPlatform}
             service={service}
             error={error}
