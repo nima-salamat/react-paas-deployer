@@ -30,6 +30,7 @@ import SettingsPanel from "./components/SettingsPanel";
 import {
   API_BASE,
   DEPLOY_BASE,
+  DEPLOY_DOWNLOAD_BASE,
   SERVICE_BASE,
   SERVICE_ACTION_ROOT,
   NETWORK_API_ROOT,
@@ -209,7 +210,7 @@ export default function ServiceDetail() {
 
     try {
       const token = localStorage.getItem("access");
-      const url = `${DEPLOY_BASE}${deployId}/download/`;
+      const url = `${DEPLOY_DOWNLOAD_BASE}${deployId}/download/`;
 
       const resp = await axios.get(url, {
         responseType: "blob",

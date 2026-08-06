@@ -1,5 +1,6 @@
 export const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 export const DEPLOY_BASE = `${API_BASE}/deploy/`;
+export const DEPLOY_DOWNLOAD_BASE = `${API_BASE}/media/`;
 export const SERVICE_BASE = `${API_BASE}/services/service/`;
 export const SERVICE_ACTION_ROOT = `${API_BASE}/services/`;
 export const NETWORK_API_ROOT = `${API_BASE}/api/networks/`;
