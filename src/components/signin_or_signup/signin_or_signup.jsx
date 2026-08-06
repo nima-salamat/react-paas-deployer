@@ -179,7 +179,9 @@ export default function SigninOrSignup() {
         ...getPayload(),
         code: form.code.trim(),
       });
-      if (res.data.next_step === "password" || res.data.twofactor) {
+      if (res.data.next_step === "set_password") {
+        setStep("set_password");
+      } else if (res.data.next_step === "password" || res.data.twofactor) {
         setStep("password");
       } else if (res.data.access) {
         completeLogin(res.data.access, res.data.refresh);
@@ -212,7 +214,12 @@ export default function SigninOrSignup() {
         showError(res.data.message || "Unexpected response");
       }
     } catch (err) {
-      showError(err.response?.data?.message || "Login failed");
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.errors ||
+        err.message ||
+        "Login failed";
+      showError(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }
