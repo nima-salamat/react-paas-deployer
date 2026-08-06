@@ -56,6 +56,7 @@ export default function SigninOrSignup() {
   const [inviteToken, setInviteToken] = useState(inviteFromUrl);
   const [inviteInfo, setInviteInfo] = useState(null); // { valid, label, remaining_uses, ... }
   const [inviteError, setInviteError] = useState("");
+  const [accountCreated, setAccountCreated] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -157,7 +158,12 @@ export default function SigninOrSignup() {
     setLoading(true);
     try {
       const res = await axios.post(`${BASE_URL}/authentication/`, getPayload());
-      const next = res.data.next_step || "otp";
+      if (res.data.created) setAccountCreated(true);
+      let next = res.data.next_step || "otp";
+      // Safety: brand-new account without password must set one
+      if (res.data.created && (next === "password" || res.data.must_set_password)) {
+        next = "set_password";
+      }
       if (next === "done" && res.data.access) {
         completeLogin(res.data.access, res.data.refresh);
       } else {
@@ -179,12 +185,20 @@ export default function SigninOrSignup() {
         ...getPayload(),
         code: form.code.trim(),
       });
-      if (res.data.next_step === "password" || res.data.twofactor) {
+      let next = res.data.next_step;
+      // New account (or explicit flag) → always show Set Password, never "enter password"
+      if (
+        next === "set_password" ||
+        res.data.must_set_password ||
+        (accountCreated && (next === "password" || res.data.twofactor))
+      ) {
+        setStep("set_password");
+      } else if (next === "password" || res.data.twofactor) {
         setStep("password");
       } else if (res.data.access) {
         completeLogin(res.data.access, res.data.refresh);
       } else {
-        setStep(res.data.next_step || "done");
+        setStep(next || "done");
       }
     } catch (err) {
       showError(err.response?.data?.message || "Invalid code");
@@ -198,7 +212,7 @@ export default function SigninOrSignup() {
     if (!form.password.trim()) return showError("Password is required");
     setLoading(true);
     try {
-      const endpoint = step === "set_password" ? "/set-password/" : "/login/token/";
+      const endpoint = (step === "set_password" || accountCreated) ? "/set-password/" : "/login/token/";
       const res = await axios.post(`${BASE_URL}${endpoint}`, {
         ...getPayload(),
         code: form.code.trim(),
@@ -212,7 +226,12 @@ export default function SigninOrSignup() {
         showError(res.data.message || "Unexpected response");
       }
     } catch (err) {
-      showError(err.response?.data?.message || "Login failed");
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.errors ||
+        err.message ||
+        "Login failed";
+      showError(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }
@@ -268,10 +287,12 @@ export default function SigninOrSignup() {
 
   const showMethodToggle = settings.allow_email && settings.allow_phone;
 
+  const isSetPasswordStep = step === "set_password" || (step === "password" && accountCreated);
+
   const stepTitle = {
     credentials: "Welcome",
     otp: "Verification",
-    password: "Password",
+    password: isSetPasswordStep ? "Set Password" : "Password",
     set_password: "Set Password",
     recovery: "Recover Username",
     recovery_otp: "Enter Code",
@@ -281,7 +302,9 @@ export default function SigninOrSignup() {
   const stepSubtitle = {
     credentials: "Sign in or sign up with a verification code.",
     otp: "Enter the verification code we sent you.",
-    password: "This account requires a password.",
+    password: isSetPasswordStep
+      ? "Choose a secure password for your new account."
+      : "This account requires a password.",
     set_password: "Choose a secure password for your new account.",
     recovery: "Enter your email or phone to recover your username.",
     recovery_otp: "Enter the code we sent you.",
@@ -406,10 +429,12 @@ export default function SigninOrSignup() {
         )}
 
         {/* ===== PASSWORD / SET PASSWORD ===== */}
-        {(step === "password" || step === "set_password") && (
+        {(step === "password" || step === "set_password") && (() => {
+          const isSetPassword = step === "set_password" || accountCreated;
+          return (
           <Box component="form" onSubmit={handlePassword}>
             <TextField fullWidth
-              label={step === "set_password" ? "Set Password" : "Password"}
+              label={isSetPassword ? "Set Password" : "Password"}
               name="password" type={showPassword ? "text" : "password"}
               value={form.password} onChange={onChange} autoFocus margin="normal"
               InputProps={{
@@ -423,9 +448,14 @@ export default function SigninOrSignup() {
                 sx: { borderRadius: 3 },
               }}
             />
-            {step === "set_password" && (
+            {isSetPassword && (
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 This is a new account. Choose a secure password.
+              </Typography>
+            )}
+            {!isSetPassword && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                This account requires a password.
               </Typography>
             )}
             <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
@@ -433,11 +463,12 @@ export default function SigninOrSignup() {
                 onClick={() => setStep(settings.require_otp ? "otp" : "credentials")}
                 sx={{ borderRadius: 3 }}>Back</Button>
               <Button type="submit" fullWidth variant="contained" sx={{ borderRadius: 3 }}>
-                {step === "set_password" ? "Save & Login" : "Login"}
+                {isSetPassword ? "Save & Login" : "Login"}
               </Button>
             </Stack>
           </Box>
-        )}
+          );
+        })()}
 
         {/* ===== RECOVERY REQUEST ===== */}
         {step === "recovery" && (
