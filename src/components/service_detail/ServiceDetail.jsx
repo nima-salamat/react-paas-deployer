@@ -214,7 +214,7 @@ export default function ServiceDetail() {
 
       const resp = await axios.get(url, {
         responseType: "blob",
-        headers: token ? { Authorization: `Token ${token}` } : {},
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       const disposition = resp.headers["content-disposition"] || "";
