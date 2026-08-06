@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -12,6 +12,7 @@ import {
   Divider,
   Grid,
   IconButton,
+  LinearProgress,
   Paper,
   Stack,
   TextField,
@@ -59,6 +60,35 @@ function SectionHead({ icon, title, subtitle }) {
   );
 }
 
+function StorageBar({ quotaMb, usedMb }) {
+  if (quotaMb == null) return null;
+  const used = Number(usedMb) || 0;
+  const quota = Number(quotaMb) || 0;
+  const pct = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0;
+  const color = pct >= 95 ? "error" : pct >= 80 ? "warning" : "primary";
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
+      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+        <Typography variant="caption" fontWeight={700}>
+          Plan storage
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {used.toLocaleString()} / {quota.toLocaleString()} MB ({pct}%)
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        color={color}
+        sx={{ height: 8, borderRadius: 1 }}
+      />
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+        Remaining {(Math.max(0, quota - used)).toLocaleString()} MB · Volumes are exclusive (not shareable)
+      </Typography>
+    </Paper>
+  );
+}
+
 function EditBody({
   draft,
   setDraft,
@@ -82,7 +112,45 @@ function EditBody({
   const [plansLoading, setPlansLoading] = useState(false);
   const [newNetName, setNewNetName] = useState("");
   const [creatingNet, setCreatingNet] = useState(false);
+  const [volumeError, setVolumeError] = useState(null);
   const loadedPlatformRef = useRef(null);
+
+  const serviceId = String(svc.id ?? svc.pk ?? "");
+
+  // Quota from service.storage or plan.max_storage
+  const quotaMb = useMemo(() => {
+    if (svc.storage?.quota_mb != null) return Number(svc.storage.quota_mb);
+    const gb =
+      svc.plan?.max_storage ??
+      (typeof svc.plan === "object" ? svc.plan?.max_storage : null);
+    if (gb != null) return Math.round(Number(gb) * 1024);
+    return null;
+  }, [svc]);
+
+  const selectedVols = draft.selectedVolumeIds || [];
+
+  // Volumes that can appear:
+  // - already owned by this service
+  // - unused (service null / is_unused)
+  const attachableVolumes = useMemo(() => {
+    return (volumes || []).filter((v) => {
+      const owner = v.service?.id ?? v.service?.pk ?? v.service ?? null;
+      if (owner == null || v.is_unused) return true;
+      return String(owner) === serviceId;
+    });
+  }, [volumes, serviceId]);
+
+  const usedBySelection = useMemo(() => {
+    let total = 0;
+    for (const v of attachableVolumes) {
+      const id = String(v.id ?? v.pk);
+      if (selectedVols.includes(id)) total += Number(v.size_mb) || 0;
+    }
+    return total;
+  }, [attachableVolumes, selectedVols]);
+
+  const remainingMb =
+    quotaMb != null ? Math.max(0, quotaMb - usedBySelection) : null;
 
   useEffect(() => {
     if (!platform) {
@@ -115,18 +183,31 @@ function EditBody({
   const currentNetworkId = String(
     svc.network?.id ?? svc.network?.pk ?? svc.network ?? ""
   );
-  const selectedVols = draft.selectedVolumeIds || [];
 
-  const toggleVolume = (vid) => {
+  const toggleVolume = (vid, sizeMb) => {
+    setVolumeError(null);
     const id = String(vid);
     setDraft((d) => {
       const cur = d.selectedVolumeIds || [];
-      return {
-        ...d,
-        selectedVolumeIds: cur.includes(id)
-          ? cur.filter((x) => x !== id)
-          : [...cur, id],
-      };
+      if (cur.includes(id)) {
+        return { ...d, selectedVolumeIds: cur.filter((x) => x !== id) };
+      }
+      // Quota check
+      if (quotaMb != null) {
+        const other = cur.reduce((acc, id2) => {
+          const v = attachableVolumes.find(
+            (x) => String(x.id ?? x.pk) === id2
+          );
+          return acc + (Number(v?.size_mb) || 0);
+        }, 0);
+        if (other + (Number(sizeMb) || 0) > quotaMb) {
+          setVolumeError(
+            `Cannot attach: would exceed plan storage (${quotaMb} MB).`
+          );
+          return d;
+        }
+      }
+      return { ...d, selectedVolumeIds: [...cur, id] };
     });
   };
 
@@ -399,24 +480,35 @@ function EditBody({
 
         <Divider />
 
-        {/* Volumes */}
+        {/* Volumes — exclusive + quota */}
         <Box>
           <SectionHead
             icon={<StorageIcon fontSize="small" />}
             title="Volumes"
-            subtitle="Attach or detach volumes — applied on Save"
+            subtitle="Exclusive to this service. Total size limited by plan storage. Applied on Save."
           />
-          {volumesLoading && volumes.length === 0 ? (
+          <StorageBar quotaMb={quotaMb} usedMb={usedBySelection} />
+          {volumeError && (
+            <Alert severity="error" sx={{ mb: 1.5, borderRadius: 1.5 }} onClose={() => setVolumeError(null)}>
+              {volumeError}
+            </Alert>
+          )}
+          {volumesLoading && attachableVolumes.length === 0 ? (
             <CircularProgress size={22} />
-          ) : volumes.length === 0 ? (
+          ) : attachableVolumes.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              No volumes available. Create volumes from the Volumes page, then attach them here.
+              No unused volumes available. Create volumes from Settings or the Volumes page, then attach them here.
             </Typography>
           ) : (
             <Stack spacing={1}>
-              {volumes.map((v) => {
+              {attachableVolumes.map((v) => {
                 const vid = String(v.id ?? v.pk);
                 const isAttached = selectedVols.includes(vid);
+                const size = Number(v.size_mb) || 0;
+                const wouldExceed =
+                  !isAttached &&
+                  quotaMb != null &&
+                  usedBySelection + size > quotaMb;
                 return (
                   <Paper
                     key={vid}
@@ -425,7 +517,11 @@ function EditBody({
                       p: 1.5,
                       borderRadius: 2,
                       border: "1px solid",
-                      borderColor: isAttached ? "success.main" : "divider",
+                      borderColor: isAttached
+                        ? "success.main"
+                        : wouldExceed
+                        ? "error.light"
+                        : "divider",
                       bgcolor: (t) =>
                         isAttached
                           ? t.palette.mode === "dark"
@@ -437,6 +533,7 @@ function EditBody({
                       alignItems: "center",
                       gap: 1,
                       flexWrap: "wrap",
+                      opacity: wouldExceed ? 0.65 : 1,
                     }}
                   >
                     <Box sx={{ minWidth: 0 }}>
@@ -457,6 +554,14 @@ function EditBody({
                           variant={isAttached ? "filled" : "outlined"}
                           sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
                         />
+                        {wouldExceed && (
+                          <Chip
+                            label="Exceeds quota"
+                            size="small"
+                            color="error"
+                            sx={{ height: 20, fontSize: 11 }}
+                          />
+                        )}
                       </Stack>
                       <Typography
                         variant="caption"
@@ -472,7 +577,7 @@ function EditBody({
                         size="small"
                         color="warning"
                         startIcon={<LinkOffIcon />}
-                        onClick={() => toggleVolume(vid)}
+                        onClick={() => toggleVolume(vid, size)}
                         sx={{
                           textTransform: "none",
                           fontWeight: 700,
@@ -486,7 +591,8 @@ function EditBody({
                         size="small"
                         variant="contained"
                         startIcon={<LinkIcon />}
-                        onClick={() => toggleVolume(vid)}
+                        disabled={wouldExceed}
+                        onClick={() => toggleVolume(vid, size)}
                         sx={{
                           textTransform: "none",
                           fontWeight: 700,
@@ -537,6 +643,9 @@ function EditBody({
             </Typography>
             <Typography variant="body2">
               <strong>Volumes:</strong> {selectedVols.length}
+              {quotaMb != null
+                ? ` · ${usedBySelection}/${quotaMb} MB`
+                : ""}
             </Typography>
           </Stack>
         </Paper>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import apiRequest from "../customHooks/apiRequest";
 import {
@@ -62,6 +62,30 @@ function extractList(data) {
 
 const optionValue = (o) => String(o?.id ?? o?.pk ?? o?.uuid ?? o?.name ?? o ?? "");
 
+/**
+ * Plan max_storage is GB → quota in MB.
+ * Prefer initialData.storage / plan fields when available.
+ */
+function resolveQuotaMb(initialData) {
+  if (initialData?.storage?.quota_mb != null) {
+    return Number(initialData.storage.quota_mb) || 0;
+  }
+  if (initialData?.storage?.remaining_mb != null && initialData?.storage?.used_mb != null) {
+    return (
+      Number(initialData.storage.used_mb) + Number(initialData.storage.remaining_mb)
+    );
+  }
+  const gb =
+    initialData?.max_storage ??
+    initialData?.plan?.max_storage ??
+    initialData?.plan_max_storage ??
+    null;
+  if (gb != null && Number.isFinite(Number(gb))) {
+    return Math.round(Number(gb) * 1024);
+  }
+  return null; // unknown until service exists
+}
+
 export default function CreateServiceWizard({
   open = false,
   onCancel,
@@ -89,9 +113,12 @@ export default function CreateServiceWizard({
   const [createNetworkError, setCreateNetworkError] = useState(null);
   const [createNetworkSuccess, setCreateNetworkSuccess] = useState(null);
 
+  // Only unused volumes (exclusive model: service is null)
   const [volumes, setVolumes] = useState([]);
   const [volumesLoading, setVolumesLoading] = useState(false);
   const [selectedVolumeIds, setSelectedVolumeIds] = useState([]);
+  // Volumes created in this wizard session (not yet on server attached to service)
+  const [pendingNewVolumes, setPendingNewVolumes] = useState([]);
   const [newVolume, setNewVolume] = useState({
     name: "",
     size_mb: "1024",
@@ -109,6 +136,23 @@ export default function CreateServiceWizard({
   const mountedRef = useRef(false);
   const fetchIdRef = useRef(0);
 
+  const planQuotaMb = useMemo(() => resolveQuotaMb(initialData), [initialData]);
+
+  const selectedUnusedSize = useMemo(() => {
+    let total = 0;
+    for (const v of volumes) {
+      const id = String(v.id ?? v.pk);
+      if (selectedVolumeIds.includes(id)) total += Number(v.size_mb) || 0;
+    }
+    for (const p of pendingNewVolumes) {
+      total += Number(p.size_mb) || 0;
+    }
+    return total;
+  }, [volumes, selectedVolumeIds, pendingNewVolumes]);
+
+  const remainingAfterSelection =
+    planQuotaMb != null ? Math.max(0, planQuotaMb - selectedUnusedSize) : null;
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -123,6 +167,7 @@ export default function CreateServiceWizard({
     setNetwork(initialData.network ?? "");
     setPlan(initialData.id ?? initialData.plan_id ?? null);
     setSelectedVolumeIds([]);
+    setPendingNewVolumes([]);
     setError(null);
     setSubmissionResult(null);
     setCreateNetworkError(null);
@@ -173,7 +218,12 @@ export default function CreateServiceWizard({
   const fetchVolumes = useCallback(async () => {
     setVolumesLoading(true);
     try {
-      const res = await apiRequest({ method: "GET", url: volumesUrl });
+      // Exclusive model: only unused volumes can be attached to a new service
+      const res = await apiRequest({
+        method: "GET",
+        url: volumesUrl,
+        params: { unused: true, page_size: 100 },
+      });
       if (mountedRef.current) setVolumes(extractList(res.data));
     } catch {
       if (mountedRef.current) setVolumes([]);
@@ -190,6 +240,9 @@ export default function CreateServiceWizard({
   const validateStep = (i = activeStep) => {
     if (i === 0 && !name.trim()) return "Service name is required.";
     if (i === 1 && !network) return "Please select or create a network.";
+    if (i === 2 && planQuotaMb != null && selectedUnusedSize > planQuotaMb) {
+      return `Selected volumes (${selectedUnusedSize} MB) exceed plan storage (${planQuotaMb} MB).`;
+    }
     return null;
   };
 
@@ -242,9 +295,28 @@ export default function CreateServiceWizard({
 
   const toggleVolume = (id) => {
     const sid = String(id);
-    setSelectedVolumeIds((prev) =>
-      prev.includes(sid) ? prev.filter((x) => x !== sid) : [...prev, sid]
-    );
+    const vol = volumes.find((v) => String(v.id ?? v.pk) === sid);
+    const size = Number(vol?.size_mb) || 0;
+
+    setSelectedVolumeIds((prev) => {
+      if (prev.includes(sid)) return prev.filter((x) => x !== sid);
+      // Client-side quota guard
+      if (planQuotaMb != null) {
+        const other = prev.reduce((acc, id2) => {
+          const v = volumes.find((x) => String(x.id ?? x.pk) === id2);
+          return acc + (Number(v?.size_mb) || 0);
+        }, 0);
+        const pending = pendingNewVolumes.reduce((a, p) => a + (Number(p.size_mb) || 0), 0);
+        if (other + pending + size > planQuotaMb) {
+          setVolumeMsg({
+            type: "error",
+            text: `Cannot select: would exceed plan storage (${planQuotaMb} MB).`,
+          });
+          return prev;
+        }
+      }
+      return [...prev, sid];
+    });
   };
 
   const handleCreateVolume = async () => {
@@ -264,8 +336,19 @@ export default function CreateServiceWizard({
       setVolumeMsg({ type: "error", text: "Valid size (MB) required." });
       return;
     }
+    if (planQuotaMb != null && selectedUnusedSize + size > planQuotaMb) {
+      setVolumeMsg({
+        type: "error",
+        text: `Not enough plan storage. Remaining for selection: ${
+          remainingAfterSelection ?? 0
+        } MB.`,
+      });
+      return;
+    }
+
     setCreatingVolume(true);
     try {
+      // Create as UNUSED (no service yet). Attach after service is created.
       const res = await apiRequest({
         method: "POST",
         url: volumesUrl,
@@ -278,49 +361,59 @@ export default function CreateServiceWizard({
       });
       const id = String(res.data?.id ?? res.data?.pk ?? "");
       await fetchVolumes();
-      if (id) setSelectedVolumeIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      if (id) {
+        setSelectedVolumeIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+        setPendingNewVolumes((prev) => [
+          ...prev,
+          { id, name: n, size_mb: size, default_bind: bind },
+        ]);
+      }
       setNewVolume({ name: "", size_mb: "1024", default_bind: "/data", default_mode: "rw" });
-      setVolumeMsg({ type: "success", text: "Volume created and selected." });
+      setVolumeMsg({ type: "success", text: "Volume created and selected (will attach to this service only)." });
     } catch (err) {
+      const errs = err?.response?.data?.errors || err?.response?.data;
       setVolumeMsg({
         type: "error",
-        text: parseErrors(err?.response?.data ?? err?.message).join("\n") || "Failed to create volume",
+        text:
+          parseErrors(errs ?? err?.message).join("\n") ||
+          "Failed to create volume",
       });
     } finally {
       setCreatingVolume(false);
     }
   };
 
+  /**
+   * Exclusive attach: PATCH volume with service=<serviceId>
+   * (no /attach/ endpoint required).
+   */
   const attachVolumesToService = async (serviceId) => {
-    if (!selectedVolumeIds.length || !serviceId) return;
+    if (!selectedVolumeIds.length || !serviceId) return { ok: 0, fail: 0 };
+    let ok = 0;
+    let fail = 0;
     for (const vid of selectedVolumeIds) {
       try {
         await apiRequest({
-          method: "POST",
-          url: `${volumesUrl}${vid}/attach/`,
-          data: { service_id: serviceId },
+          method: "PATCH",
+          url: `${volumesUrl}${vid}/`,
+          data: { service: serviceId },
         });
-      } catch {
-        // try alternate payload
-        try {
-          await apiRequest({
-            method: "POST",
-            url: `${volumesUrl}${vid}/attach/`,
-            data: { service: serviceId },
-          });
-        } catch {
-          /* best-effort */
-        }
+        ok += 1;
+      } catch (err) {
+        fail += 1;
+        console.warn("attach volume failed", vid, err?.response?.data || err);
       }
     }
+    return { ok, fail };
   };
 
   const handleSubmit = async () => {
-    const v = validateStep(0) || validateStep(1);
+    const v = validateStep(0) || validateStep(1) || validateStep(2);
     if (v) {
       setError(v);
       if (v.includes("Service name")) goToStep(0);
-      else goToStep(1);
+      else if (v.includes("network") || v.includes("Network")) goToStep(1);
+      else goToStep(2);
       return;
     }
 
@@ -351,17 +444,23 @@ export default function CreateServiceWizard({
       const ok = res?.status === 201 || res?.status === 200;
       const serviceId = res?.data?.id ?? res?.data?.pk ?? res?.data?.service?.id;
 
+      let attachNote = "";
       if (ok && serviceId && selectedVolumeIds.length) {
-        await attachVolumesToService(serviceId);
+        const { ok: aOk, fail: aFail } = await attachVolumesToService(serviceId);
+        if (aFail && aOk) {
+          attachNote = ` ${aOk} volume(s) attached, ${aFail} failed (quota or ownership).`;
+        } else if (aFail && !aOk) {
+          attachNote = " Volumes could not be attached (check plan storage quota).";
+        } else if (aOk) {
+          attachNote = " Volumes attached exclusively to this service.";
+        }
       }
 
       if (!timedOut && mountedRef.current) {
         setSubmissionResult({
           ok,
           message: ok
-            ? selectedVolumeIds.length
-              ? "Service created and volumes attached."
-              : "Service created successfully."
+            ? `Service created successfully.${attachNote}`
             : `Unexpected status ${res?.status}`,
           data: res?.data ?? null,
         });
@@ -408,7 +507,7 @@ export default function CreateServiceWizard({
           alignItems: "center",
           justifyContent: "space-between",
           py: 1.5,
-          px: { xs: 2, sm: 3 }, 
+          px: { xs: 2, sm: 3 },
         }}
       >
         <Box>
@@ -417,7 +516,13 @@ export default function CreateServiceWizard({
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {initialData.plan_name
-              ? `Plan: ${initialData.plan_name}${initialData.platform ? ` · ${initialData.platform}` : ""}`
+              ? `Plan: ${initialData.plan_name}${
+                  initialData.platform ? ` · ${initialData.platform}` : ""
+                }${
+                  planQuotaMb != null
+                    ? ` · Storage ${planQuotaMb} MB`
+                    : ""
+                }`
               : "Wizard"}
           </Typography>
         </Box>
@@ -623,24 +728,39 @@ export default function CreateServiceWizard({
                 <Stack direction="row" spacing={1} alignItems="center">
                   <StorageIcon fontSize="small" color="primary" />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    Attach volumes (optional)
+                    Attach volumes (exclusive to this service)
                   </Typography>
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
-                  Select existing volumes or create a new one. They attach after the service is created.
+                  Only unused volumes are listed. Each volume can belong to one service only.
+                  Total size cannot exceed the plan storage limit.
                 </Typography>
+
+                {planQuotaMb != null && (
+                  <Alert severity="info" sx={{ borderRadius: 1.5 }}>
+                    Plan storage: <strong>{planQuotaMb} MB</strong>
+                    {" · "}Selected: <strong>{selectedUnusedSize} MB</strong>
+                    {" · "}Remaining:{" "}
+                    <strong>{remainingAfterSelection} MB</strong>
+                  </Alert>
+                )}
 
                 {volumesLoading ? (
                   <CircularProgress size={22} />
                 ) : volumes.length === 0 ? (
                   <Alert severity="info" sx={{ borderRadius: 1.5 }}>
-                    No volumes yet. Create one below.
+                    No unused volumes. Create one below.
                   </Alert>
                 ) : (
                   <Box>
                     {volumes.map((v) => {
                       const id = String(v.id ?? v.pk);
                       const checked = selectedVolumeIds.includes(id);
+                      const size = Number(v.size_mb) || 0;
+                      const wouldExceed =
+                        !checked &&
+                        planQuotaMb != null &&
+                        selectedUnusedSize + size > planQuotaMb;
                       return (
                         <FormControlLabel
                           key={id}
@@ -648,6 +768,7 @@ export default function CreateServiceWizard({
                             <Checkbox
                               size="small"
                               checked={checked}
+                              disabled={wouldExceed}
                               onChange={() => toggleVolume(id)}
                             />
                           }
@@ -664,6 +785,9 @@ export default function CreateServiceWizard({
                               <Typography variant="caption" color="text.secondary">
                                 {v.size_mb != null ? `${v.size_mb} MB` : ""}
                               </Typography>
+                              {wouldExceed && (
+                                <Chip size="small" color="error" label="Exceeds quota" sx={{ height: 20, fontSize: 11 }} />
+                              )}
                             </Stack>
                           }
                           sx={{
@@ -675,6 +799,7 @@ export default function CreateServiceWizard({
                             borderRadius: 1.5,
                             border: "1px solid",
                             borderColor: checked ? "primary.main" : "divider",
+                            opacity: wouldExceed ? 0.6 : 1,
                           }}
                         />
                       );
@@ -710,6 +835,10 @@ export default function CreateServiceWizard({
                       type="number"
                       value={newVolume.size_mb}
                       onChange={(e) => setNewVolume((p) => ({ ...p, size_mb: e.target.value }))}
+                      inputProps={{
+                        min: 1,
+                        max: remainingAfterSelection != null ? remainingAfterSelection : undefined,
+                      }}
                       sx={{ width: { xs: "100%", sm: 120 } }}
                     />
                   </Stack>
@@ -718,7 +847,10 @@ export default function CreateServiceWizard({
                     size="small"
                     startIcon={<AddIcon />}
                     onClick={handleCreateVolume}
-                    disabled={creatingVolume}
+                    disabled={
+                      creatingVolume ||
+                      (remainingAfterSelection != null && remainingAfterSelection <= 0)
+                    }
                     sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, alignSelf: "flex-start" }}
                   >
                     {creatingVolume ? "Creating…" : "Create & select"}
@@ -756,7 +888,7 @@ export default function CreateServiceWizard({
                       label: "Volumes",
                       value:
                         selectedVols.length > 0
-                          ? selectedVols.map((v) => v.name).join(", ")
+                          ? selectedVols.map((v) => `${v.name} (${v.size_mb || "?"} MB)`).join(", ")
                           : "None",
                       step: 2,
                     },
@@ -765,30 +897,39 @@ export default function CreateServiceWizard({
                       value: initialData.plan_name || plan || "—",
                       step: null,
                     },
-                  ].map((row, i) => (
-                    <React.Fragment key={row.label}>
-                      {i > 0 && <Divider sx={{ my: 1 }} />}
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Box>
-                          <Typography variant="caption" color="text.secondary">
-                            {row.label}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                            {row.value}
-                          </Typography>
-                        </Box>
-                        {row.step != null && (
-                          <Button
-                            size="small"
-                            onClick={() => goToStep(row.step)}
-                            sx={{ borderRadius: 1.5, textTransform: "none" }}
-                          >
-                            Edit
-                          </Button>
-                        )}
-                      </Stack>
-                    </React.Fragment>
-                  ))}
+                    planQuotaMb != null
+                      ? {
+                          label: "Storage",
+                          value: `${selectedUnusedSize} / ${planQuotaMb} MB`,
+                          step: 2,
+                        }
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .map((row, i) => (
+                      <React.Fragment key={row.label}>
+                        {i > 0 && <Divider sx={{ my: 1 }} />}
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Box>
+                            <Typography variant="caption" color="text.secondary">
+                              {row.label}
+                            </Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                              {row.value}
+                            </Typography>
+                          </Box>
+                          {row.step != null && (
+                            <Button
+                              size="small"
+                              onClick={() => goToStep(row.step)}
+                              sx={{ borderRadius: 1.5, textTransform: "none" }}
+                            >
+                              Edit
+                            </Button>
+                          )}
+                        </Stack>
+                      </React.Fragment>
+                    ))}
                 </Box>
               </Box>
             )}

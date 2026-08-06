@@ -680,45 +680,42 @@ export default function ServicesListMui({
       (editingDraft.initialVolumeIds || []).map(String)
     );
 
+    // Attach newly selected volumes (exclusive ownership via PATCH)
     for (const vid of desired) {
       if (!initial.has(vid)) {
         try {
           await apiRequest({
-            method: "POST",
-            url: `${VOLUME_API_ROOT}${vid}/attach/`,
-            data: { service_id: serviceId },
+            method: "PATCH",
+            url: `${VOLUME_API_ROOT}${vid}/`,
+            data: { service: serviceId },
           });
-        } catch {
-          try {
-            await apiRequest({
-              method: "PATCH",
-              url: `${VOLUME_API_ROOT}${vid}/`,
-              data: { service: serviceId },
-            });
-          } catch {
-            /* best-effort */
-          }
+        } catch (e) {
+          const msg =
+            e?.response?.data?.errors?.size_mb ||
+            e?.response?.data?.error ||
+            e?.response?.data?.detail ||
+            "Failed to attach volume (quota or ownership).";
+          showAlert(
+            "error",
+            typeof msg === "object" ? JSON.stringify(msg) : String(msg)
+          );
+          ok = false;
         }
       }
     }
+
+    // Detach removed volumes
     for (const vid of initial) {
       if (!desired.has(vid)) {
         try {
           await apiRequest({
-            method: "POST",
-            url: `${VOLUME_API_ROOT}${vid}/detach/`,
-            data: { service_id: serviceId },
+            method: "PATCH",
+            url: `${VOLUME_API_ROOT}${vid}/`,
+            data: { service: null },
           });
-        } catch {
-          try {
-            await apiRequest({
-              method: "PATCH",
-              url: `${VOLUME_API_ROOT}${vid}/`,
-              data: { service: null },
-            });
-          } catch {
-            /* best-effort */
-          }
+        } catch (e) {
+          showAlert("error", "Failed to detach volume.");
+          ok = false;
         }
       }
     }

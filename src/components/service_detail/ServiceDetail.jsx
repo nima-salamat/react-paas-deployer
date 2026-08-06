@@ -1074,7 +1074,7 @@ export default function ServiceDetail() {
     }
   };
 
-  const handleCreateVolume = async ({ name, size_mb, default_bind, default_mode }) => {
+  const handleCreateVolume = async ({ name, size_mb, default_bind, default_mode, service: serviceId }) => {
     setVolumeActionLoading(true);
     setError(null);
     setSettingsSuccess(null);
@@ -1087,13 +1087,22 @@ export default function ServiceDetail() {
           size_mb,
           ...(default_bind ? { default_bind } : {}),
           ...(default_mode ? { default_mode } : {}),
+          // Attach exclusively to this service so plan quota is enforced
+          ...(serviceId || id ? { service: serviceId || id } : {}),
         },
       });
-      safeSetSnackbar("success", "Volume created.");
+      safeSetSnackbar("success", "Volume created and attached to this service.");
       setSettingsSuccess("Volume created successfully.");
+      await fetchAttachedVolumes();
       await fetchAvailableVolumes();
+      await fetchService(true); // refresh storage quota on service
     } catch (err) {
-      const msg = err.response?.data?.detail || err.response?.data?.error || err.response?.data?.errors || "Unable to create volume.";
+      const msg =
+        err.response?.data?.errors?.size_mb ||
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        err.response?.data?.errors ||
+        "Unable to create volume.";
       setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
       throw err;
     } finally {

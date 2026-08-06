@@ -7,7 +7,6 @@ import {
   Button,
   TextField,
   Chip,
-  Divider,
   Alert,
   CircularProgress,
   MenuItem,
@@ -21,6 +20,7 @@ import {
   FormControlLabel,
   Radio,
   Collapse,
+  LinearProgress,
 } from "@mui/material";
 import HubIcon from "@mui/icons-material/Hub";
 import StorageIcon from "@mui/icons-material/Storage";
@@ -79,8 +79,52 @@ function SectionHeader({ icon, title, subtitle, action }) {
   );
 }
 
+function StorageQuotaBar({ storage }) {
+  if (!storage) return null;
+  const quota = Number(storage.quota_mb) || 0;
+  const used = Number(storage.used_mb) || 0;
+  const remaining = Number(storage.remaining_mb) || 0;
+  const pct = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0;
+  const color =
+    pct >= 95 ? "error" : pct >= 80 ? "warning" : "primary";
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        mb: 2,
+        borderRadius: 2,
+        borderColor: "divider",
+      }}
+    >
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+          Plan storage quota
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {used.toLocaleString()} / {quota.toLocaleString()} MB
+          {quota ? ` (${pct}%)` : ""}
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={pct}
+        color={color}
+        sx={{ height: 8, borderRadius: 1, mb: 0.75 }}
+      />
+      <Typography variant="caption" color="text.secondary">
+        Remaining: <strong>{remaining.toLocaleString()} MB</strong>
+        {storage.quota_gb != null
+          ? ` · Plan limit ${storage.quota_gb} GB`
+          : ""}
+        {" · Volumes are exclusive to this service (not shareable)."}
+      </Typography>
+    </Paper>
+  );
+}
+
 function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
-  // Current plan is not "applied" again, but clicking it clears a pending selection
   const handleClick = () => {
     if (isCurrent) {
       onClearSelection?.();
@@ -118,13 +162,13 @@ function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
         transition: "border-color 0.15s, box-shadow 0.15s, background 0.15s",
         position: "relative",
         "&:hover": {
-              borderColor: isCurrent
-                ? "success.main"
-                : selected
-                ? "primary.main"
-                : "primary.light",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-            },
+          borderColor: isCurrent
+            ? "success.main"
+            : selected
+            ? "primary.main"
+            : "primary.light",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+        },
       }}
     >
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
@@ -251,14 +295,23 @@ function NetworkCard({ network, isAttached, onAttach, onDetach, loading }) {
   );
 }
 
-function VolumeCard({ volume, isAttached, onAttach, onDetach, loading }) {
+function VolumeCard({ volume, isAttached, onAttach, onDetach, loading, remainingMb }) {
+  const size = Number(volume.size_mb) || 0;
+  const exceeds = isAttached
+    ? false
+    : remainingMb != null && size > remainingMb;
+
   return (
     <Paper
       variant="outlined"
       sx={{
         p: 1.5,
         borderRadius: 2,
-        borderColor: isAttached ? "success.main" : "divider",
+        borderColor: isAttached
+          ? "success.main"
+          : exceeds
+          ? "error.light"
+          : "divider",
         bgcolor: (t) =>
           isAttached
             ? t.palette.mode === "dark"
@@ -282,17 +335,34 @@ function VolumeCard({ volume, isAttached, onAttach, onDetach, loading }) {
           ) : (
             <Chip label="Available" size="small" variant="outlined" sx={{ height: 20, fontSize: 11 }} />
           )}
+          {exceeds ? (
+            <Chip
+              label="Exceeds quota"
+              size="small"
+              color="error"
+              sx={{ height: 20, fontSize: 11 }}
+            />
+          ) : null}
         </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
           {volume.size_mb != null ? `${volume.size_mb} MB` : "—"}
-          {(volume.bind || volume.default_bind) ? ` · ${volume.bind || volume.default_bind}` : ""}
-          {(volume.mode || volume.default_mode) ? ` · ${volume.mode || volume.default_mode}` : ""}
+          {(volume.bind || volume.default_bind)
+            ? ` · ${volume.bind || volume.default_bind}`
+            : ""}
+          {(volume.mode || volume.default_mode)
+            ? ` · ${volume.mode || volume.default_mode}`
+            : ""}
         </Typography>
       </Box>
       {isAttached ? (
         <Tooltip title="Detach from this service">
           <span>
-            <IconButton size="small" color="warning" disabled={loading} onClick={() => onDetach(volume.id ?? volume.pk)}>
+            <IconButton
+              size="small"
+              color="warning"
+              disabled={loading}
+              onClick={() => onDetach(volume.id ?? volume.pk)}
+            >
               <LinkOffIcon fontSize="small" />
             </IconButton>
           </span>
@@ -302,7 +372,7 @@ function VolumeCard({ volume, isAttached, onAttach, onDetach, loading }) {
           size="small"
           variant="contained"
           startIcon={<LinkIcon />}
-          disabled={loading}
+          disabled={loading || exceeds}
           onClick={() => onAttach(volume)}
           sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
         >
@@ -353,10 +423,42 @@ export default function SettingsPanel({
   const [newVolumeBind, setNewVolumeBind] = useState("/data");
   const [newVolumeMode, setNewVolumeMode] = useState("rw");
   const [creatingVolume, setCreatingVolume] = useState(false);
+  const [createVolumeError, setCreateVolumeError] = useState(null);
 
   const [applyImmediately, setApplyImmediately] = useState(false);
   const [showAllNetworks, setShowAllNetworks] = useState(false);
   const [showAvailableVolumes, setShowAvailableVolumes] = useState(true);
+
+  const storage = useMemo(() => {
+    return (
+      service?.storage ||
+      (planDetail?.max_storage != null
+        ? {
+            quota_mb: Math.round(Number(planDetail.max_storage) * 1024),
+            used_mb: (attachedVolumes || []).reduce(
+              (s, v) => s + (Number(v.size_mb) || 0),
+              0
+            ),
+            remaining_mb: 0,
+            quota_gb: Number(planDetail.max_storage),
+          }
+        : null)
+    );
+  }, [service, planDetail, attachedVolumes]);
+
+  // Fill remaining if missing
+  const storageNormalized = useMemo(() => {
+    if (!storage) return null;
+    const quota = Number(storage.quota_mb) || 0;
+    const used = Number(storage.used_mb) || 0;
+    const remaining =
+      storage.remaining_mb != null
+        ? Number(storage.remaining_mb)
+        : Math.max(0, quota - used);
+    return { ...storage, remaining_mb: remaining };
+  }, [storage]);
+
+  const remainingMb = storageNormalized?.remaining_mb ?? null;
 
   const currentPlatform = useMemo(() => {
     const raw =
@@ -402,12 +504,6 @@ export default function SettingsPanel({
     );
   }, [service, networkDetail]);
 
-  const attachedVolumeIds = useMemo(() => {
-    const set = new Set();
-    (attachedVolumes || []).forEach((v) => set.add(String(v.id ?? v.pk)));
-    return set;
-  }, [attachedVolumes]);
-
   const handleCreateNetwork = async () => {
     if (!newNetworkName.trim()) return;
     setCreatingNetwork(true);
@@ -425,24 +521,54 @@ export default function SettingsPanel({
   };
 
   const handleCreateVolume = async () => {
+    setCreateVolumeError(null);
     if (!newVolumeName.trim()) return;
     const size = Number(newVolumeSize);
-    if (!Number.isFinite(size) || size <= 0) return;
+    if (!Number.isFinite(size) || size <= 0) {
+      setCreateVolumeError("Size must be a positive number (MB).");
+      return;
+    }
     const bind = String(newVolumeBind || "").trim();
-    if (!bind) return;
+    if (!bind) {
+      setCreateVolumeError("Bind directory is required.");
+      return;
+    }
+
+    // Client-side quota check (server still enforces)
+    if (remainingMb != null && size > remainingMb) {
+      setCreateVolumeError(
+        `Not enough storage on this plan. Requested ${size} MB, remaining ${remainingMb} MB.`
+      );
+      return;
+    }
+
     setCreatingVolume(true);
     try {
+      // Create and attach to current service in one step
       await onCreateVolume?.({
         name: newVolumeName.trim(),
         size_mb: size,
         default_bind: bind,
         default_mode: newVolumeMode || "rw",
+        // Attach to this service so quota applies immediately
+        service: service?.id ?? service?.pk ?? undefined,
       });
       setCreateVolumeOpen(false);
       setNewVolumeName("");
       setNewVolumeSize("1024");
       setNewVolumeBind("/data");
       setNewVolumeMode("rw");
+    } catch (err) {
+      const msg =
+        err?.response?.data?.errors?.size_mb ||
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Unable to create volume.";
+      setCreateVolumeError(
+        typeof msg === "object" ? JSON.stringify(msg) : String(msg)
+      );
+      throw err;
     } finally {
       setCreatingVolume(false);
     }
@@ -451,7 +577,7 @@ export default function SettingsPanel({
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
       {error ? (
-        <Alert severity="error" sx={{ borderRadius: 2 }} onClose={() => {}}>
+        <Alert severity="error" sx={{ borderRadius: 2 }}>
           {error}
         </Alert>
       ) : null}
@@ -488,7 +614,6 @@ export default function SettingsPanel({
           }
         />
 
-        {/* Current */}
         <Paper
           variant="outlined"
           sx={{
@@ -506,7 +631,14 @@ export default function SettingsPanel({
                 : "grey.50",
           }}
         >
-          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap spacing={1}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            spacing={1}
+          >
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
                 Currently attached
@@ -514,11 +646,6 @@ export default function SettingsPanel({
               <Typography variant="body1" sx={{ fontWeight: 800 }}>
                 {networkName && networkName !== "—" ? networkName : "No network"}
               </Typography>
-              {(networkDetail?.network?.cidr ?? networkDetail?.cidr) && (
-                <Typography variant="caption" color="text.secondary">
-                  CIDR: {networkDetail?.network?.cidr ?? networkDetail?.cidr}
-                </Typography>
-              )}
             </Box>
             {currentNetworkId ? (
               <Button
@@ -542,7 +669,9 @@ export default function SettingsPanel({
           onClick={() => setShowAllNetworks((v) => !v)}
           sx={{ mb: 1, textTransform: "none", fontWeight: 600 }}
         >
-          {showAllNetworks ? "Hide networks" : `Show all networks (${(availableNetworks || []).length})`}
+          {showAllNetworks
+            ? "Hide networks"
+            : `Show all networks (${(availableNetworks || []).length})`}
         </Button>
 
         <Collapse in={showAllNetworks}>
@@ -584,19 +713,25 @@ export default function SettingsPanel({
         <SectionHeader
           icon={<StorageIcon fontSize="small" />}
           title="Volumes"
-          subtitle="Attach or detach storage volumes for this service."
+          subtitle="Exclusive storage for this service. Total size cannot exceed the plan limit. Volumes are not shareable."
           action={
             <Button
               size="small"
               startIcon={<AddIcon />}
               variant="outlined"
-              onClick={() => setCreateVolumeOpen(true)}
+              onClick={() => {
+                setCreateVolumeError(null);
+                setCreateVolumeOpen(true);
+              }}
+              disabled={remainingMb != null && remainingMb <= 0}
               sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
             >
               New
             </Button>
           }
         />
+
+        <StorageQuotaBar storage={storageNormalized} />
 
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
           Attached ({(attachedVolumes || []).length})
@@ -614,6 +749,7 @@ export default function SettingsPanel({
                 isAttached
                 loading={volumeActionLoading}
                 onDetach={onDetachVolume}
+                remainingMb={remainingMb}
               />
             ))}
           </Stack>
@@ -634,7 +770,7 @@ export default function SettingsPanel({
           <Stack spacing={1}>
             {(availableVolumes || []).length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                No unused volumes. Create one with the New button.
+                No unused volumes. Create one with the New button (counts against this plan quota).
               </Typography>
             ) : (
               (availableVolumes || []).map((v) => {
@@ -646,6 +782,7 @@ export default function SettingsPanel({
                     isAttached={false}
                     loading={volumeActionLoading}
                     onAttach={() => onAttachVolume?.(vid)}
+                    remainingMb={remainingMb}
                   />
                 );
               })
@@ -699,7 +836,8 @@ export default function SettingsPanel({
               {samePlatformPlans.map((p) => {
                 const pid = String(p.id ?? p.pk ?? "");
                 const isCurrent = pid === currentPlanId;
-                const isSelected = pid === String(selectedPlanId || "") && !isCurrent;
+                const isSelected =
+                  pid === String(selectedPlanId || "") && !isCurrent;
                 return (
                   <PlanCard
                     key={pid}
@@ -727,7 +865,9 @@ export default function SettingsPanel({
                     checked={applyImmediately}
                     onChange={(e) => setApplyImmediately(e.target.checked)}
                     size="small"
-                    disabled={!selectedPlanId || String(selectedPlanId) === currentPlanId}
+                    disabled={
+                      !selectedPlanId || String(selectedPlanId) === currentPlanId
+                    }
                   />
                 }
                 label={
@@ -791,7 +931,11 @@ export default function SettingsPanel({
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateNetworkOpen(false)} disabled={creatingNetwork} sx={{ textTransform: "none" }}>
+          <Button
+            onClick={() => setCreateNetworkOpen(false)}
+            disabled={creatingNetwork}
+            sx={{ textTransform: "none" }}
+          >
             Cancel
           </Button>
           <Button
@@ -816,6 +960,19 @@ export default function SettingsPanel({
         <DialogTitle sx={{ fontWeight: 800 }}>Create volume</DialogTitle>
         <DialogContent>
           <Stack spacing={1.5} sx={{ mt: 0.5 }}>
+            {storageNormalized ? (
+              <Alert severity="info" sx={{ borderRadius: 1.5 }}>
+                Remaining quota:{" "}
+                <strong>{storageNormalized.remaining_mb.toLocaleString()} MB</strong>
+                {" "}(plan {storageNormalized.quota_gb ?? "—"} GB). This volume
+                will be exclusive to this service.
+              </Alert>
+            ) : null}
+            {createVolumeError ? (
+              <Alert severity="error" sx={{ borderRadius: 1.5 }}>
+                {createVolumeError}
+              </Alert>
+            ) : null}
             <TextField
               autoFocus
               fullWidth
@@ -832,7 +989,19 @@ export default function SettingsPanel({
               type="number"
               value={newVolumeSize}
               onChange={(e) => setNewVolumeSize(e.target.value)}
-              inputProps={{ min: 1 }}
+              inputProps={{
+                min: 1,
+                max: remainingMb != null ? remainingMb : undefined,
+              }}
+              helperText={
+                remainingMb != null
+                  ? `Max allowed by remaining quota: ${remainingMb} MB`
+                  : undefined
+              }
+              error={
+                remainingMb != null &&
+                Number(newVolumeSize) > remainingMb
+              }
             />
             <TextField
               fullWidth
@@ -841,7 +1010,7 @@ export default function SettingsPanel({
               value={newVolumeBind}
               onChange={(e) => setNewVolumeBind(e.target.value)}
               placeholder="/data"
-              helperText="Path inside the container where this volume is mounted (e.g. /data, /var/lib/mysql)"
+              helperText="Path inside the container (e.g. /data, /var/lib/mysql)"
             />
             <TextField
               select
@@ -850,7 +1019,6 @@ export default function SettingsPanel({
               label="Access mode"
               value={newVolumeMode}
               onChange={(e) => setNewVolumeMode(e.target.value)}
-              helperText="Read-write or read-only inside the container"
             >
               <MenuItem value="rw">Read-write (rw)</MenuItem>
               <MenuItem value="ro">Read-only (ro)</MenuItem>
@@ -858,13 +1026,22 @@ export default function SettingsPanel({
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateVolumeOpen(false)} disabled={creatingVolume} sx={{ textTransform: "none" }}>
+          <Button
+            onClick={() => setCreateVolumeOpen(false)}
+            disabled={creatingVolume}
+            sx={{ textTransform: "none" }}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
             onClick={handleCreateVolume}
-            disabled={!newVolumeName.trim() || !String(newVolumeBind || "").trim() || creatingVolume}
+            disabled={
+              !newVolumeName.trim() ||
+              !String(newVolumeBind || "").trim() ||
+              creatingVolume ||
+              (remainingMb != null && Number(newVolumeSize) > remainingMb)
+            }
             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
           >
             {creatingVolume ? "Creating..." : "Create"}

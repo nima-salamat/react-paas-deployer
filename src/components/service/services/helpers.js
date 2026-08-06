@@ -120,13 +120,15 @@ export function resolveUsage(service, statusMap = {}) {
 }
 
 export function volumesAttachedToService(volumes, serviceId) {
+  if (!serviceId || !Array.isArray(volumes)) return [];
   const sid = String(serviceId);
-  return (volumes || [])
+  return volumes
     .filter((v) => {
-      const atts = v.service_attachments || {};
-      if (atts[sid]) return true;
-      const vs = v.service ?? v.service_id;
-      return vs != null && String(vs) === sid;
+      const owner = v.service?.id ?? v.service?.pk ?? v.service ?? null;
+      if (owner != null && String(owner) === sid) return true;
+      // Legacy fallback: service_attachments single key
+      const att = v.service_attachments || {};
+      return Object.keys(att).length === 1 && String(Object.keys(att)[0]) === sid;
     })
     .map((v) => String(v.id ?? v.pk));
 }
