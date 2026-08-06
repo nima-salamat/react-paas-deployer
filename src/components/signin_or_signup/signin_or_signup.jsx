@@ -1,11 +1,15 @@
+/**
+ * Sign-in / Sign-up / Recovery component driven by backend LoginSettings.
+ * Supports invite links via ?invite=<token> query parameter.
+ */
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Box, Paper, Typography, TextField, Button, ToggleButtonGroup, ToggleButton,
   Alert, Backdrop, CircularProgress, IconButton, InputAdornment, Stack,
-  useTheme, useMediaQuery, Tooltip, Snackbar, Divider,
+  useTheme, useMediaQuery, Tooltip, Snackbar, Divider, Chip,
 } from "@mui/material";
 import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
@@ -13,6 +17,7 @@ import EmailOutlined from "@mui/icons-material/EmailOutlined";
 import PhoneOutlined from "@mui/icons-material/PhoneOutlined";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import PersonSearch from "@mui/icons-material/PersonSearch";
+import LinkIcon from "@mui/icons-material/Link";
 
 const BASE_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api`;
 const MotionPaper = motion(Paper);
@@ -27,6 +32,7 @@ const DEFAULT_SETTINGS = {
   password_as_second_factor: true,
   allow_auto_signup: true,
   require_password_on_signup: true,
+  require_invite_for_signup: false,
   allow_username_recovery: true,
   recovery_via_email: true,
   recovery_via_phone: true,
@@ -35,16 +41,21 @@ const DEFAULT_SETTINGS = {
 export default function SigninOrSignup() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const theme = useTheme();
   const isSm = useMediaQuery(theme.breakpoints.down("sm"));
 
+  const inviteFromUrl = (searchParams.get("invite") || "").trim();
+
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [step, setStep] = useState("credentials");
-  // credentials | otp | password | set_password | recovery | recovery_otp | recovery_result
   const [method, setMethod] = useState("email");
   const [form, setForm] = useState({
     username: "", email: "", phone: "", code: "", password: "",
   });
+  const [inviteToken, setInviteToken] = useState(inviteFromUrl);
+  const [inviteInfo, setInviteInfo] = useState(null); // { valid, label, remaining_uses, ... }
+  const [inviteError, setInviteError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -60,6 +71,7 @@ export default function SigninOrSignup() {
     if (settings.allow_username && form.username.trim()) base.username = form.username.trim();
     if (method === "email" && form.email.trim()) base.email = form.email.trim();
     if (method === "phone" && form.phone.trim()) base.phone_number = form.phone.trim();
+    if (inviteToken) base.invite = inviteToken;
     return base;
   };
 
@@ -78,22 +90,40 @@ export default function SigninOrSignup() {
     else navigate("/", { replace: true });
   };
 
+  // Load settings
   useEffect(() => {
     (async () => {
       try {
         const res = await axios.get(`${BASE_URL}/settings/`);
         if (res.data?.settings) setSettings({ ...DEFAULT_SETTINGS, ...res.data.settings });
-      } catch {
-        // keep defaults
-      }
+      } catch { /* keep defaults */ }
     })();
   }, []);
+
+  // Validate invite token from URL
+  useEffect(() => {
+    if (!inviteFromUrl) return;
+    setInviteToken(inviteFromUrl);
+    (async () => {
+      try {
+        const res = await axios.get(`${BASE_URL}/invite/validate/`, {
+          params: { token: inviteFromUrl },
+        });
+        setInviteInfo(res.data);
+        setInviteError("");
+      } catch (err) {
+        setInviteInfo(null);
+        setInviteError(err.response?.data?.message || "Invalid or expired invite link");
+      }
+    })();
+  }, [inviteFromUrl]);
 
   useEffect(() => {
     if (settings.allow_email) setMethod("email");
     else if (settings.allow_phone) setMethod("phone");
   }, [settings.allow_email, settings.allow_phone]);
 
+  // Auto-redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("access");
     if (!token) return;
@@ -104,9 +134,12 @@ export default function SigninOrSignup() {
           timeout: 4000,
         });
         completeLogin(token, localStorage.getItem("refresh"));
-      } catch { /* stay on page */ }
+      } catch { /* stay */ }
     })();
   }, []);
+
+  const signupClosed = !settings.allow_auto_signup || settings.require_invite_for_signup;
+  const needsValidInvite = signupClosed && !inviteInfo?.valid;
 
   const handleCredentials = async (e) => {
     e.preventDefault();
@@ -116,6 +149,10 @@ export default function SigninOrSignup() {
     }
     if (method === "email" && !form.email.trim()) return showError("Email is required");
     if (method === "phone" && !form.phone.trim()) return showError("Phone is required");
+
+    if (needsValidInvite) {
+      return showError("A valid invite link is required to create a new account");
+    }
 
     setLoading(true);
     try {
@@ -273,9 +310,38 @@ export default function SigninOrSignup() {
         <Typography variant={isSm ? "h5" : "h4"} align="center" sx={{ fontWeight: 700, mb: 1 }}>
           {stepTitle[step] || "Welcome"}
         </Typography>
-        <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
           {stepSubtitle[step] || ""}
         </Typography>
+
+        {/* Invite status banner */}
+        {inviteToken && step === "credentials" && (
+          <Box sx={{ mb: 2 }}>
+            {inviteInfo?.valid ? (
+              <Alert severity="success" icon={<LinkIcon />} variant="outlined">
+                Valid invite{inviteInfo.label ? `: ${inviteInfo.label}` : ""}
+                {inviteInfo.remaining_uses != null && (
+                  <Chip
+                    size="small"
+                    label={`${inviteInfo.remaining_uses} use(s) left`}
+                    sx={{ ml: 1 }}
+                  />
+                )}
+              </Alert>
+            ) : inviteError ? (
+              <Alert severity="error" variant="outlined">{inviteError}</Alert>
+            ) : (
+              <Alert severity="info" variant="outlined">Checking invite…</Alert>
+            )}
+          </Box>
+        )}
+
+        {signupClosed && !inviteToken && step === "credentials" && (
+          <Alert severity="warning" sx={{ mb: 2 }} variant="outlined">
+            Public signup is closed. You need a valid invite link to create an account.
+            Existing users can still sign in.
+          </Alert>
+        )}
 
         {/* ===== CREDENTIALS ===== */}
         {step === "credentials" && (
@@ -309,7 +375,7 @@ export default function SigninOrSignup() {
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
 
-            <Button type="submit" fullWidth variant="contained" disabled={loading}
+            <Button type="submit" fullWidth variant="contained" disabled={loading || (needsValidInvite)}
               sx={{ mt: 3, py: 1.5, borderRadius: 3 }}>
               {settings.require_otp ? "Send Verification Code" : "Continue"}
             </Button>
