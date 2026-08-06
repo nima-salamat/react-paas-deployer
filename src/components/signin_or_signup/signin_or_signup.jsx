@@ -151,9 +151,9 @@ export default function SigninOrSignup() {
     if (method === "email" && !form.email.trim()) return showError("Email is required");
     if (method === "phone" && !form.phone.trim()) return showError("Phone is required");
 
-    if (needsValidInvite) {
-      return showError("A valid invite link is required to create a new account");
-    }
+    // Do NOT block Continue here.
+    // Existing users must always be able to log in without an invite.
+    // Only the backend rejects *new* signups when invite is required.
 
     setLoading(true);
     try {
@@ -360,9 +360,9 @@ export default function SigninOrSignup() {
         )}
 
         {signupClosed && !inviteToken && step === "credentials" && (
-          <Alert severity="warning" sx={{ mb: 2 }} variant="outlined">
-            Public signup is closed. You need a valid invite link to create an account.
-            Existing users can still sign in.
+          <Alert severity="info" sx={{ mb: 2 }} variant="outlined">
+            New accounts require an invite link. If you already have an account, just enter your
+            credentials below and continue — login works without an invite.
           </Alert>
         )}
 
@@ -398,7 +398,7 @@ export default function SigninOrSignup() {
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
 
-            <Button type="submit" fullWidth variant="contained" disabled={loading || (needsValidInvite)}
+            <Button type="submit" fullWidth variant="contained" disabled={loading}
               sx={{ mt: 3, py: 1.5, borderRadius: 3 }}>
               {settings.require_otp ? "Send Verification Code" : "Continue"}
             </Button>
