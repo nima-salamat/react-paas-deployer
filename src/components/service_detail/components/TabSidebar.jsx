@@ -126,9 +126,7 @@ export default function TabSidebar({
                 fontSize: 11,
               }}
             >
-              {service?.service_name
-                ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`
-                : "—"}
+              {service?.service_host || service?.service_name || "—"}
             </Typography>
             <Stack direction="row" spacing={0.75} sx={{ mt: 1.25 }} flexWrap="wrap" useFlexGap>
               <Chip

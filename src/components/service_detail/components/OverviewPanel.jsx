@@ -75,14 +75,8 @@ export default function OverviewPanel({
         title="Service details"
       >
         <InfoRow label="Name" value={service?.name} />
-        <InfoRow
-          label="Host"
-          value={
-            service?.service_name
-              ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`
-              : null
-          }
-        />
+        <InfoRow label="Service name" value={service?.service_name || null} />
+        <InfoRow label="Service host" value={service?.service_host || null} />
         <InfoRow label="Status" value={service?.status} />
         <InfoRow
           label="Running"

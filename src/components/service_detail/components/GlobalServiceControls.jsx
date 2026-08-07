@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   Paper,
   Typography,
@@ -9,6 +9,8 @@ import {
   LinearProgress,
   useTheme,
   Divider,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
@@ -18,6 +20,115 @@ import MemoryIcon from "@mui/icons-material/Memory";
 import StorageIcon from "@mui/icons-material/Storage";
 import HubIcon from "@mui/icons-material/Hub";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import CheckIcon from "@mui/icons-material/Check";
+
+function useCopy() {
+  const [copied, setCopied] = useState(null);
+  const copy = useCallback(async (text, key) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(String(text));
+      setCopied(key);
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  return { copied, copy };
+}
+
+function CopyBtn({ value, k, title, copied, onCopy }) {
+  if (!value) return null;
+  return (
+    <Tooltip title={copied === k ? "Copied!" : title}>
+      <IconButton
+        size="small"
+        onClick={() => onCopy(value, k)}
+        sx={{ p: 0.35 }}
+        aria-label={title}
+      >
+        {copied === k ? (
+          <CheckIcon sx={{ fontSize: 16, color: "success.main" }} />
+        ) : (
+          <ContentCopyIcon sx={{ fontSize: 16 }} />
+        )}
+      </IconButton>
+    </Tooltip>
+  );
+}
+
+/** service_name = docker label, service_host = label.DEPLOYMENT_DOMAIN */
+function ServiceIdentity({ service, onCopied }) {
+  const { copied, copy } = useCopy();
+  const handle = (v, k) => {
+    copy(v, k);
+    onCopied?.(k, v);
+  };
+
+  const serviceName = service?.service_name || null;
+  const serviceHost = service?.service_host || null;
+
+  if (!serviceName && !serviceHost) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        —
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack spacing={0.35}>
+      {serviceHost ? (
+        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontSize: 12.5,
+              wordBreak: "break-all",
+            }}
+          >
+            {serviceHost}
+          </Typography>
+          <CopyBtn
+            value={serviceHost}
+            k="host"
+            title="Copy host"
+            copied={copied}
+            onCopy={handle}
+          />
+        </Stack>
+      ) : null}
+      {serviceName ? (
+        <Stack direction="row" alignItems="center" spacing={0.5}>
+          <Typography variant="caption" color="text.secondary">
+            Service name:{" "}
+            <Box
+              component="span"
+              sx={{
+                fontFamily: "ui-monospace, monospace",
+                fontWeight: 700,
+                color: "text.primary",
+              }}
+            >
+              {serviceName}
+            </Box>
+          </Typography>
+          <CopyBtn
+            value={serviceName}
+            k="name"
+            title="Copy service name"
+            copied={copied}
+            onCopy={handle}
+          />
+        </Stack>
+      ) : null}
+    </Stack>
+  );
+}
 
 export default function GlobalServiceControls({
   service,
@@ -36,9 +147,16 @@ export default function GlobalServiceControls({
   networkName,
   rebuildLoading,
   actions,
+  onCopyFeedback,
 }) {
   const theme = useTheme();
-  const { startService, stopService, rebuildService, checkServiceRunning, openServiceInNewTab } = actions;
+  const {
+    startService,
+    stopService,
+    rebuildService,
+    checkServiceRunning,
+    openServiceInNewTab,
+  } = actions;
 
   const colorForPercent = (p) => {
     const pct = Number(p) || 0;
@@ -58,11 +176,14 @@ export default function GlobalServiceControls({
       : service?.status || "Unknown";
 
   const statusColor =
-    serviceRunning === true || ["running", "success"].includes(String(service?.status || ""))
+    serviceRunning === true ||
+    ["running", "success"].includes(String(service?.status || ""))
       ? "success"
       : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
       ? "warning"
       : "default";
+
+  const canOpen = Boolean(service?.service_host || service?.service_name) && !selectedIsDb;
 
   return (
     <Paper
@@ -79,7 +200,6 @@ export default function GlobalServiceControls({
             : "linear-gradient(145deg, #ffffff, #f8fafc)",
       }}
     >
-      {/* Header */}
       <Box
         sx={{
           display: "flex",
@@ -90,30 +210,19 @@ export default function GlobalServiceControls({
           mb: 2,
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography
             variant="h5"
             sx={{
               fontWeight: 800,
               lineHeight: 1.25,
               letterSpacing: "-0.02em",
-              mb: 0.25,
+              mb: 0.5,
             }}
           >
             {service?.name || "Service"}
           </Typography>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              fontSize: 12.5,
-            }}
-          >
-            {service?.service_name
-              ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`
-              : "—"}
-          </Typography>
+          <ServiceIdentity service={service} onCopied={onCopyFeedback} />
         </Box>
         <Chip
           label={statusLabel}
@@ -123,12 +232,7 @@ export default function GlobalServiceControls({
         />
       </Box>
 
-      {/* Action buttons */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1}
-        sx={{ mb: 2.5 }}
-      >
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 2.5 }}>
         <Button
           variant="contained"
           startIcon={<PlayArrowIcon />}
@@ -145,7 +249,9 @@ export default function GlobalServiceControls({
           color="warning"
           startIcon={<RefreshIcon />}
           onClick={rebuildService}
-          disabled={!service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId}
+          disabled={
+            !service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId
+          }
           fullWidth
           size="medium"
           sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
@@ -177,7 +283,7 @@ export default function GlobalServiceControls({
         <Button
           variant="outlined"
           onClick={openServiceInNewTab}
-          disabled={!service?.service_name || selectedIsDb}
+          disabled={!canOpen}
           startIcon={<LinkIcon />}
           fullWidth
           size="medium"
@@ -188,14 +294,7 @@ export default function GlobalServiceControls({
         </Button>
       </Stack>
 
-      {/* Meta chips */}
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ mb: 2.5 }}
-        flexWrap="wrap"
-        useFlexGap
-      >
+      <Stack direction="row" spacing={1} sx={{ mb: 2.5 }} flexWrap="wrap" useFlexGap>
         <Chip
           icon={<Inventory2Icon sx={{ fontSize: 16 }} />}
           label={`Deploys: ${deployCount}`}
@@ -238,11 +337,13 @@ export default function GlobalServiceControls({
 
       <Divider sx={{ mb: 2 }} />
 
-      {/* Resource meters */}
       <Stack spacing={1.5}>
         <Box>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Typography
+              variant="caption"
+              sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}
+            >
               <MemoryIcon sx={{ fontSize: 14 }} /> CPU
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
@@ -266,7 +367,10 @@ export default function GlobalServiceControls({
         </Box>
         <Box>
           <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}>
+            <Typography
+              variant="caption"
+              sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}
+            >
               <MemoryIcon sx={{ fontSize: 14 }} /> RAM
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
