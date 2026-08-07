@@ -1200,22 +1200,12 @@ export default function ServiceDetail() {
   };
 
   return (
-    <Box sx={{ p: { xs: 1, sm: 2 }, display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
-      <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
-        <TabSidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          service={service}
-          selectedDeploy={selectedDeploy}
-          deployCount={deployCount}
-          volumeCount={volumeCount}
-          networkName={networkName}
-          serviceRunning={serviceRunning}
-        />
-      </Box>
-
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <ServiceToolbar
+    <Box
+      sx={{
+        p: { xs: 1, sm: 2 },
+      }}
+    >
+      <ServiceToolbar
           refreshIntervalMs={refreshIntervalMs}
           setRefreshIntervalMs={setRefreshIntervalMs}
           intervalMenuAnchor={intervalMenuAnchor}
@@ -1224,145 +1214,161 @@ export default function ServiceDetail() {
           navigate={navigate}
         />
 
-        <GlobalServiceControls
-          service={service}
-          serviceRunning={serviceRunning}
-          serviceCpu={serviceCpu}
-          serviceRam={serviceRam}
-          serviceLoading={serviceLoading}
-          serviceBusy={serviceBusy}
-          serviceStatusLoadingManual={serviceStatusLoadingManual}
-          selectedDeploy={selectedDeploy}
-          selectedDeployId={selectedDeployId}
-          selectedIsDb={selectedIsDb}
-          selectedPlatform={selectedPlatform}
-          deployCount={deployCount}
-          volumeCount={volumeCount}
-          networkName={networkName}
-          rebuildLoading={rebuildLoading}
-          actions={{ startService, stopService, rebuildService, checkServiceRunning, openServiceInNewTab }}
-        />
+      <Box sx={{ p: { xs: 1, sm: 2 }, display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
+        <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
+          <TabSidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            service={service}
+            selectedDeploy={selectedDeploy}
+            deployCount={deployCount}
+            volumeCount={volumeCount}
+            networkName={networkName}
+            serviceRunning={serviceRunning}
+          />
+        </Box>
 
-        {activeTab === "overview" && (
-          <OverviewPanel
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <GlobalServiceControls
             service={service}
             serviceRunning={serviceRunning}
+            serviceCpu={serviceCpu}
+            serviceRam={serviceRam}
+            serviceLoading={serviceLoading}
+            serviceBusy={serviceBusy}
+            serviceStatusLoadingManual={serviceStatusLoadingManual}
             selectedDeploy={selectedDeploy}
-            planDetail={planDetail}
+            selectedDeployId={selectedDeployId}
+            selectedIsDb={selectedIsDb}
+            selectedPlatform={selectedPlatform}
+            deployCount={deployCount}
+            volumeCount={volumeCount}
             networkName={networkName}
-            networkDetail={networkDetail}
+            rebuildLoading={rebuildLoading}
+            actions={{ startService, stopService, rebuildService, checkServiceRunning, openServiceInNewTab }}
           />
-        )}
 
-        {activeTab === "create" && (
-          <CreateDeployPanel
-            formState={{ name, version, config, zipFile, createPlatform, createDbFields, submitting, zipInputRef }}
-            formActions={{ setName, setVersion, setConfig, setZipFile, setCreatePlatform, setCreateDbFields, handleCreate }}
-            editState={{ editingDeployId, editData, editDbFields, editOriginalName, editZipFile, editZipInputRef }}
-            editActions={{ setEditData, setEditDbFields, setEditZipFile, handleUpdateDeploy, handleCancelEdit }}
-            deployState={{ deploys, deploysLoading, pageInfo, selectedDeployId, actionState }}
-            deployActions={{ handleSelectDeploy, handleUnselectDeploy, handleEditClick, openConfirm, handlePrev, handleNext, handleDownloadZip }}
-            planPlatform={planPlatform}
-            service={service}
-            error={error}
-          />
-        )}
-
-        {activeTab === "logs" && (
-          <LogsPanel
-            serviceLogs={{ entries: serviceLogsEntries, loading: serviceLogsLoading, error: serviceLogsError, connected: serviceLogsConnected, paused: serviceLogsPaused, filter: serviceLogsFilter, level: serviceLogsLevel }}
-            serviceLogActions={{ setFilter: setServiceLogsFilter, setLevel: setServiceLogsLevel, onTogglePaused: () => setServiceLogsPaused((v) => !v), refresh: refreshServiceLogs, clear: clearServiceLogs, scrollRef: serviceLogScrollRef }}
-            deployLogs={{ entries: deployLogEntries, loading: deployLogLoading, loadingOlder: deployLogLoadingOlder, error: deployLogError, filter: deployLogFilter, level: deployLogLevel, deployId: deployLogDeployId, hasMoreOlder: deployLogHasMoreOlderRef.current }}
-            deployLogActions={{ setFilter: setDeployLogFilter, setLevel: setDeployLogLevel, setDeployId: (val) => { deployLogManualSelectRef.current = true; setDeployLogDeployId(String(val)); }, refresh: fetchDeployLogsInitial, clear: clearDeployLogs, loadOlder: loadOlderDeployLogs, scrollRef: deployLogScrollRef }}
-            deploys={deploys}
-            currentDeployForLogs={currentDeployForLogs}
-            id={id}
-            isDesktop={isDesktop}
-            handleDownloadEntries={handleDownloadEntries}
-            handleCopyEntries={handleCopyEntries}
-          />
-        )}
-
-        {activeTab === "settings" && (
-          <SettingsPanel
-            service={service}
-            planDetail={planDetail}
-            networkName={networkName}
-            networkDetail={networkDetail}
-            selectedNetworkId={selectedNetworkId}
-            setSelectedNetworkId={setSelectedNetworkId}
-            availableNetworks={availableNetworks}
-            networkActionLoading={networkActionLoading}
-            onAttachNetwork={handleAttachNetwork}
-            onDetachNetwork={handleDetachNetwork}
-            onCreateNetwork={handleCreateNetwork}
-            attachedVolumes={attachedVolumes}
-            availableVolumes={availableVolumes}
-            selectedVolumeId={selectedVolumeId}
-            setSelectedVolumeId={setSelectedVolumeId}
-            volumeActionLoading={volumeActionLoading}
-            onAttachVolume={handleAttachVolume}
-            onDetachVolume={handleDetachVolume}
-            onCreateVolume={handleCreateVolume}
-            availablePlans={availablePlans}
-            plansLoading={plansLoading}
-            selectedPlanId={selectedPlanId}
-            setSelectedPlanId={setSelectedPlanId}
-            planActionLoading={planActionLoading}
-            onApplyPlan={handleApplyPlan}
-            error={error}
-            successMessage={settingsSuccess}
-          />
-        )}
-      </Box>
-
-      <Snackbar
-        open={!!snackbar}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-      >
-        <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity || "info"} sx={{ width: '100%' }}>
-          {snackbar?.message}
-        </Alert>
-      </Snackbar>
-
-      <Dialog open={filesDialogOpen} onClose={() => setFilesDialogOpen(false)}>
-        <DialogTitle>Volume Files</DialogTitle>
-        <DialogContent>
-          {volumeActionLoading ? <CircularProgress size={24} /> : (
-            volumeFiles.length ? (
-              volumeFiles.map((f, i) => <Typography key={i}>{f}</Typography>)
-            ) : <Typography>No files.</Typography>
+          {activeTab === "overview" && (
+            <OverviewPanel
+              service={service}
+              serviceRunning={serviceRunning}
+              selectedDeploy={selectedDeploy}
+              planDetail={planDetail}
+              networkName={networkName}
+              networkDetail={networkDetail}
+            />
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setFilesDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
 
-      <Dialog open={confirmDialog.open} onClose={closeConfirm}>
-        <DialogTitle>{confirmDialog.title}</DialogTitle>
-        <DialogContent>
-          <Typography>{confirmDialog.message}</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeConfirm} disabled={confirmDialog.loading}>Cancel</Button>
-          <Button
-            color="error"
-            disabled={confirmDialog.loading}
-            onClick={async () => {
-              setConfirmDialog(p => ({ ...p, loading: true }));
-              if (confirmDialog.type === "delete") {
-                await handleDeleteDeploy(confirmDialog.deployId);
-              }
-              closeConfirm();
-            }}
-          >
-            {confirmDialog.loading ? "Confirming..." : "Confirm"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          {activeTab === "create" && (
+            <CreateDeployPanel
+              formState={{ name, version, config, zipFile, createPlatform, createDbFields, submitting, zipInputRef }}
+              formActions={{ setName, setVersion, setConfig, setZipFile, setCreatePlatform, setCreateDbFields, handleCreate }}
+              editState={{ editingDeployId, editData, editDbFields, editOriginalName, editZipFile, editZipInputRef }}
+              editActions={{ setEditData, setEditDbFields, setEditZipFile, handleUpdateDeploy, handleCancelEdit }}
+              deployState={{ deploys, deploysLoading, pageInfo, selectedDeployId, actionState }}
+              deployActions={{ handleSelectDeploy, handleUnselectDeploy, handleEditClick, openConfirm, handlePrev, handleNext, handleDownloadZip }}
+              planPlatform={planPlatform}
+              service={service}
+              error={error}
+            />
+          )}
+
+          {activeTab === "logs" && (
+            <LogsPanel
+              serviceLogs={{ entries: serviceLogsEntries, loading: serviceLogsLoading, error: serviceLogsError, connected: serviceLogsConnected, paused: serviceLogsPaused, filter: serviceLogsFilter, level: serviceLogsLevel }}
+              serviceLogActions={{ setFilter: setServiceLogsFilter, setLevel: setServiceLogsLevel, onTogglePaused: () => setServiceLogsPaused((v) => !v), refresh: refreshServiceLogs, clear: clearServiceLogs, scrollRef: serviceLogScrollRef }}
+              deployLogs={{ entries: deployLogEntries, loading: deployLogLoading, loadingOlder: deployLogLoadingOlder, error: deployLogError, filter: deployLogFilter, level: deployLogLevel, deployId: deployLogDeployId, hasMoreOlder: deployLogHasMoreOlderRef.current }}
+              deployLogActions={{ setFilter: setDeployLogFilter, setLevel: setDeployLogLevel, setDeployId: (val) => { deployLogManualSelectRef.current = true; setDeployLogDeployId(String(val)); }, refresh: fetchDeployLogsInitial, clear: clearDeployLogs, loadOlder: loadOlderDeployLogs, scrollRef: deployLogScrollRef }}
+              deploys={deploys}
+              currentDeployForLogs={currentDeployForLogs}
+              id={id}
+              isDesktop={isDesktop}
+              handleDownloadEntries={handleDownloadEntries}
+              handleCopyEntries={handleCopyEntries}
+            />
+          )}
+
+          {activeTab === "settings" && (
+            <SettingsPanel
+              service={service}
+              planDetail={planDetail}
+              networkName={networkName}
+              networkDetail={networkDetail}
+              selectedNetworkId={selectedNetworkId}
+              setSelectedNetworkId={setSelectedNetworkId}
+              availableNetworks={availableNetworks}
+              networkActionLoading={networkActionLoading}
+              onAttachNetwork={handleAttachNetwork}
+              onDetachNetwork={handleDetachNetwork}
+              onCreateNetwork={handleCreateNetwork}
+              attachedVolumes={attachedVolumes}
+              availableVolumes={availableVolumes}
+              selectedVolumeId={selectedVolumeId}
+              setSelectedVolumeId={setSelectedVolumeId}
+              volumeActionLoading={volumeActionLoading}
+              onAttachVolume={handleAttachVolume}
+              onDetachVolume={handleDetachVolume}
+              onCreateVolume={handleCreateVolume}
+              availablePlans={availablePlans}
+              plansLoading={plansLoading}
+              selectedPlanId={selectedPlanId}
+              setSelectedPlanId={setSelectedPlanId}
+              planActionLoading={planActionLoading}
+              onApplyPlan={handleApplyPlan}
+              error={error}
+              successMessage={settingsSuccess}
+            />
+          )}
+        </Box>
+
+        <Snackbar
+          open={!!snackbar}
+          autoHideDuration={6000}
+          onClose={() => setSnackbar(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        >
+          <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity || "info"} sx={{ width: '100%' }}>
+            {snackbar?.message}
+          </Alert>
+        </Snackbar>
+
+        <Dialog open={filesDialogOpen} onClose={() => setFilesDialogOpen(false)}>
+          <DialogTitle>Volume Files</DialogTitle>
+          <DialogContent>
+            {volumeActionLoading ? <CircularProgress size={24} /> : (
+              volumeFiles.length ? (
+                volumeFiles.map((f, i) => <Typography key={i}>{f}</Typography>)
+              ) : <Typography>No files.</Typography>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setFilesDialogOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={confirmDialog.open} onClose={closeConfirm}>
+          <DialogTitle>{confirmDialog.title}</DialogTitle>
+          <DialogContent>
+            <Typography>{confirmDialog.message}</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeConfirm} disabled={confirmDialog.loading}>Cancel</Button>
+            <Button
+              color="error"
+              disabled={confirmDialog.loading}
+              onClick={async () => {
+                setConfirmDialog(p => ({ ...p, loading: true }));
+                if (confirmDialog.type === "delete") {
+                  await handleDeleteDeploy(confirmDialog.deployId);
+                }
+                closeConfirm();
+              }}
+            >
+              {confirmDialog.loading ? "Confirming..." : "Confirm"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Box>
     </Box>
   );
 }
