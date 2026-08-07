@@ -1168,7 +1168,21 @@ export default function SettingsPanel({
 
         <Alert
           severity={canMutateVolumes ? "info" : "warning"}
-          sx={{ mb: 2, borderRadius: 2 }}
+          sx={{
+            mb: 2,
+            borderRadius: 2,
+            alignItems: { xs: "flex-start", sm: "center" },
+            "& .MuiAlert-message": {
+              width: "100%",
+              py: { xs: 0.25, sm: 0.5 },
+            },
+            "& .MuiAlert-action": {
+              display: { xs: "none", sm: "flex" },
+              alignItems: "center",
+              pt: 0,
+              pr: 1,
+            },
+          }}
           action={
             onPurgeRuntime ? (
               <Button
@@ -1178,15 +1192,38 @@ export default function SettingsPanel({
                 onClick={() => onPurgeRuntime?.()}
                 sx={{ textTransform: "none", fontWeight: 700, whiteSpace: "nowrap" }}
               >
-                {purgeRuntimeLoading ? "Removing…" : "Remove container & image"}
+                {purgeRuntimeLoading ? "Removing…" : "Remove runtime"}
               </Button>
             ) : null
           }
         >
-          {canMutateVolumes
-            ? "Volumes are immutable (name/size/path/mode). Attach, detach or delete only. If attach fails, remove container & image first."
-            : volumeMutateReason ||
-              "Stop the service and remove its container & image before attaching, detaching, or deleting volumes."}
+          <Stack spacing={1} sx={{ width: "100%" }}>
+            <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
+              {canMutateVolumes
+                ? "Volumes: name/size/path are fixed after Docker provision. You can attach, detach or delete."
+                : volumeMutateReason ||
+                  "Stop the service, then remove its container before changing volumes."}
+            </Typography>
+            {onPurgeRuntime ? (
+              <Button
+                color="inherit"
+                size="small"
+                variant="outlined"
+                disabled={purgeRuntimeLoading}
+                onClick={() => onPurgeRuntime?.()}
+                sx={{
+                  display: { xs: "inline-flex", sm: "none" },
+                  alignSelf: "stretch",
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderRadius: 1.5,
+                  borderColor: "currentColor",
+                }}
+              >
+                {purgeRuntimeLoading ? "Removing…" : "Remove container & image"}
+              </Button>
+            ) : null}
+          </Stack>
         </Alert>
 
         {/* Attached volumes */}

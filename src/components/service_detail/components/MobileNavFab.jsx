@@ -12,7 +12,10 @@ import {
   ListItemIcon,
   ListItemText,
   Badge,
+  Fab,
+  Tooltip,
   useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
@@ -31,8 +34,10 @@ const TABS = [
 ];
 
 /**
- * Fixed service-section FAB — bottom-left (opposite of app FloatingNav bottom-right).
- * Icon: Widgets (not hamburger) so it does not clash with the global menu.
+ * Service-section FAB — geometric mirror of app FloatingNav.
+ * FloatingNav defaults: position bottom-right, anchorOffset { bottom: 24, right: 24 }
+ * → this FAB: bottom-left with { bottom: 24, left: 24 }
+ * Same size (52 mobile / 56 desktop), borderRadius 3, shadow, zIndex 20.
  */
 export default function MobileNavFab({
   activeTab,
@@ -43,12 +48,19 @@ export default function MobileNavFab({
   volumeCount = 0,
   networkName,
   serviceRunning,
+  // keep in sync with FloatingNav anchorOffset
+  anchorOffset = { bottom: 24, left: 24 },
 }) {
   const theme = useTheme();
+  const isSm = useMediaQuery(theme.breakpoints.down("sm"));
   const [open, setOpen] = useState(false);
   const [sheetOffset, setSheetOffset] = useState(0);
   const sheetStartY = useRef(0);
   const sheetDragging = useRef(false);
+
+  const bottom = anchorOffset?.bottom ?? 24;
+  const left = anchorOffset?.left ?? 24;
+  const fabSize = isSm ? 52 : 56;
 
   const go = (value) => {
     setActiveTab(value);
@@ -87,47 +99,37 @@ export default function MobileNavFab({
 
   return (
     <>
+      {/* Fixed FAB — mirror of FloatingNav (right ↔ left) */}
       <Box
-        role="button"
-        aria-label="Open service sections"
-        onClick={() => setOpen(true)}
         sx={{
           position: "fixed",
-          left: 16,
-          bottom: 24,
-          zIndex: (t) => t.zIndex.speedDial,
-          width: 52,
-          height: 52,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: "50%",
-          bgcolor: "primary.main",
-          color: "primary.contrastText",
-          boxShadow:
-            theme.palette.mode === "dark"
-              ? "0 8px 28px rgba(0,0,0,0.5)"
-              : "0 8px 28px rgba(37,99,235,0.35)",
-          cursor: "pointer",
-          border: "2px solid",
-          borderColor:
-            theme.palette.mode === "dark"
-              ? "rgba(255,255,255,0.18)"
-              : "rgba(255,255,255,0.55)",
-          transition: "transform 0.15s ease, box-shadow 0.15s ease",
-          "&:active": { transform: "scale(0.94)" },
-          mb: "env(safe-area-inset-bottom, 0px)",
+          zIndex: 20, // same as FloatingNav
+          bottom,
+          left,
+          right: "auto",
+          pointerEvents: "none",
         }}
       >
-        <Badge
-          color="warning"
-          variant="dot"
-          invisible={!selectedDeploy}
-          overlap="circular"
-          anchorOrigin={{ vertical: "top", horizontal: "right" }}
-        >
-          <WidgetsOutlinedIcon sx={{ fontSize: 26 }} />
-        </Badge>
+        <Tooltip title={open ? "Close sections" : "Service sections"} placement="right">
+          <Fab
+            onClick={() => setOpen(true)}
+            size={isSm ? "medium" : "large"}
+            color="primary"
+            aria-label="Open service sections"
+            sx={{
+              pointerEvents: "auto",
+              boxShadow:
+                theme.palette.mode === "dark"
+                  ? "0 8px 28px rgba(0,0,0,0.5)"
+                  : "0 8px 28px rgba(37,99,235,0.35)",
+              borderRadius: 3,
+              width: fabSize,
+              height: fabSize,
+            }}
+          >
+            <WidgetsOutlinedIcon sx={{ fontSize: 22, color: "#fff" }} />
+          </Fab>
+        </Tooltip>
       </Box>
 
       <Drawer
@@ -135,90 +137,81 @@ export default function MobileNavFab({
         open={open}
         onClose={() => setOpen(false)}
         PaperProps={{
-          sx: {
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            maxHeight: "78vh",
-            pb: "env(safe-area-inset-bottom, 0px)",
-            transform: sheetOffset ? `translateY(${sheetOffset}px)` : undefined,
-            transition: sheetOffset ? "none" : undefined,
-          },
           onTouchStart: onSheetTouchStart,
           onTouchMove: onSheetTouchMove,
           onTouchEnd: onSheetTouchEnd,
+          sx: {
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            maxHeight: "78vh",
+            transform: sheetOffset ? `translateY(${sheetOffset}px)` : undefined,
+            transition: sheetDragging.current ? "none" : "transform 0.2s ease",
+            pb: "env(safe-area-inset-bottom, 0px)",
+          },
         }}
       >
-        <Box sx={{ display: "flex", justifyContent: "center", pt: 1.25, pb: 0.5 }}>
-          <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "divider" }} />
-        </Box>
-
-        <Box sx={{ px: 2, pb: 1, display: "flex", alignItems: "flex-start", gap: 1 }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.25 }}>
-              {service?.name || "Service"}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{
-                display: "block",
-                fontFamily: "ui-monospace, Menlo, Monaco, Consolas, monospace",
-                fontSize: 11,
-                wordBreak: "break-all",
-              }}
-            >
-              {service?.service_host || service?.service_name || "—"}
-            </Typography>
-            <Stack direction="row" spacing={0.75} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
-              <Chip
-                label={statusLabel}
-                size="small"
-                color={statusColor}
-                sx={{ height: 22, fontWeight: 700, fontSize: 11 }}
-              />
-              {selectedDeploy ? (
+        <Box sx={{ px: 2, pt: 1.25, pb: 0.5 }}>
+          <Box
+            sx={{
+              width: 40,
+              height: 4,
+              borderRadius: 99,
+              bgcolor: "divider",
+              mx: "auto",
+              mb: 1.25,
+            }}
+          />
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle1" fontWeight={800} noWrap>
+                {service?.name || "Service"}
+              </Typography>
+              <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
                 <Chip
-                  label={selectedDeploy.name || selectedDeploy.id}
                   size="small"
-                  variant="outlined"
-                  color="success"
-                  sx={{ height: 22, fontSize: 11, maxWidth: 140 }}
+                  label={statusLabel}
+                  color={statusColor}
+                  sx={{ height: 22, fontWeight: 700 }}
                 />
-              ) : null}
-            </Stack>
-          </Box>
-          <IconButton size="small" onClick={() => setOpen(false)} aria-label="Close menu">
-            <CloseIcon fontSize="small" />
-          </IconButton>
+                {networkName ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "inline-flex", alignItems: "center", gap: 0.35 }}
+                  >
+                    <HubIcon sx={{ fontSize: 13 }} /> {networkName}
+                  </Typography>
+                ) : null}
+                {volumeCount > 0 ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: "inline-flex", alignItems: "center", gap: 0.35 }}
+                  >
+                    <StorageIcon sx={{ fontSize: 13 }} /> {volumeCount} vol
+                  </Typography>
+                ) : null}
+                {deployCount > 0 ? (
+                  <Typography variant="caption" color="text.secondary">
+                    {deployCount} deploy{deployCount === 1 ? "" : "s"}
+                  </Typography>
+                ) : null}
+              </Stack>
+            </Box>
+            <IconButton size="small" onClick={() => setOpen(false)} aria-label="Close">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+          {selectedDeploy?.name ? (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }} noWrap>
+              Selected deploy: {selectedDeploy.name}
+            </Typography>
+          ) : null}
         </Box>
 
-        <Stack direction="row" spacing={1} sx={{ px: 2, pb: 1.5 }} flexWrap="wrap" useFlexGap>
-          <Chip
-            icon={<Inventory2Icon sx={{ fontSize: "14px !important" }} />}
-            label={`${deployCount} deploys`}
-            size="small"
-            variant="outlined"
-            sx={{ height: 24 }}
-          />
-          <Chip
-            icon={<StorageIcon sx={{ fontSize: "14px !important" }} />}
-            label={`${volumeCount} volumes`}
-            size="small"
-            variant="outlined"
-            sx={{ height: 24 }}
-          />
-          <Chip
-            icon={<HubIcon sx={{ fontSize: "14px !important" }} />}
-            label={networkName && networkName !== "—" ? networkName : "No network"}
-            size="small"
-            variant="outlined"
-            sx={{ height: 24, maxWidth: 160 }}
-          />
-        </Stack>
+        <Divider sx={{ my: 1 }} />
 
-        <Divider />
-
-        <List sx={{ py: 1 }}>
+        <List sx={{ px: 1, pb: 2 }}>
           {TABS.map((tab) => {
             const selected = activeTab === tab.value;
             return (
@@ -227,34 +220,24 @@ export default function MobileNavFab({
                 selected={selected}
                 onClick={() => go(tab.value)}
                 sx={{
-                  mx: 1,
                   borderRadius: 2,
                   mb: 0.5,
-                  "&.Mui-selected": {
-                    bgcolor:
-                      theme.palette.mode === "dark"
-                        ? "rgba(59,130,246,0.16)"
-                        : "rgba(59,130,246,0.1)",
-                  },
+                  py: 1.25,
                 }}
               >
-                <ListItemIcon
-                  sx={{ minWidth: 40, color: selected ? "primary.main" : "text.secondary" }}
-                >
-                  {tab.icon}
+                <ListItemIcon sx={{ minWidth: 40, color: selected ? "primary.main" : "text.secondary" }}>
+                  {tab.value === "create" ? (
+                    <Badge badgeContent={deployCount || 0} color="primary" max={99}>
+                      {tab.icon}
+                    </Badge>
+                  ) : (
+                    tab.icon
+                  )}
                 </ListItemIcon>
                 <ListItemText
                   primary={tab.label}
                   primaryTypographyProps={{ fontWeight: selected ? 800 : 600 }}
                 />
-                {selected ? (
-                  <Chip
-                    label="Now"
-                    size="small"
-                    color="primary"
-                    sx={{ height: 20, fontSize: 10, fontWeight: 700 }}
-                  />
-                ) : null}
               </ListItemButton>
             );
           })}
