@@ -290,11 +290,15 @@ export default function LogPanel({
           }
         }}
         sx={{
-          p: 1.25,
+          p: { xs: 1, sm: 1.25 },
           minHeight: { xs: 240, sm: 280 },
           maxHeight: { xs: 360, sm: 420, md: 480 },
           overflowY: "auto",
+          overflowX: "hidden",
           borderRadius: 2,
+          width: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
           bgcolor: (t) =>
             t.palette.mode === "dark"
               ? "rgba(0,0,0,0.2)"

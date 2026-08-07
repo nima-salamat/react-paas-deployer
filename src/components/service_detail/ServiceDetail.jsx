@@ -26,6 +26,8 @@ import CreateDeployPanel from "./components/CreateDeployPanel";
 import LogsPanel from "./components/LogsPanel";
 import ServiceToolbar from "./components/ServiceToolbar";
 import SettingsPanel from "./components/SettingsPanel";
+import MobileNavFab from "./components/MobileNavFab";
+import MobileServiceHeader from "./components/MobileServiceHeader";
 
 import {
   API_BASE,
@@ -135,6 +137,7 @@ export default function ServiceDetail() {
   const [deployLogFilter, setDeployLogFilter] = useState("");
   const [deployLogLevel, setDeployLogLevel] = useState("all");
   const [deployLogDeployId, setDeployLogDeployId] = useState("");
+  const [deployLogLiveConnected, setDeployLogLiveConnected] = useState(false);
 
   const mountedRef = useRef(false);
   const fetchIdRef = useRef(0);
@@ -160,6 +163,11 @@ export default function ServiceDetail() {
   const deployLogOldestCursorRef = useRef(null);
   const deployLogNewestCursorRef = useRef(null);
   const deployLogHasMoreOlderRef = useRef(false);
+  const deployWsRef = useRef(null);
+  const deployWsReconnectTimerRef = useRef(null);
+  const deployWsReconnectAttemptRef = useRef(0);
+  const deployWsShouldReconnectRef = useRef(true);
+  const deployLogDeployIdRef = useRef("");
 
   useEffect(() => {
     mountedRef.current = true;
@@ -171,6 +179,10 @@ export default function ServiceDetail() {
   useEffect(() => {
     serviceLogPausedRef.current = serviceLogsPaused;
   }, [serviceLogsPaused]);
+
+  useEffect(() => {
+    deployLogDeployIdRef.current = deployLogDeployId;
+  }, [deployLogDeployId]);
 
   const safeSetSnackbar = useCallback((severity, message) => {
     setSnackbar({ severity, message });
@@ -196,6 +208,153 @@ export default function ServiceDetail() {
 
     setServiceLogsConnected(false);
   }, []);
+
+  const stopDeployLogWs = useCallback(() => {
+    deployWsShouldReconnectRef.current = false;
+    deployWsReconnectAttemptRef.current = 0;
+    if (deployWsReconnectTimerRef.current) {
+      clearTimeout(deployWsReconnectTimerRef.current);
+      deployWsReconnectTimerRef.current = null;
+    }
+    if (deployWsRef.current) {
+      try {
+        deployWsRef.current.close();
+      } catch {
+        /* ignore */
+      }
+      deployWsRef.current = null;
+    }
+    setDeployLogLiveConnected(false);
+  }, []);
+
+  const appendDeployLiveEvent = useCallback((payload) => {
+    if (!payload || typeof payload !== "object") return;
+    const stage = payload.stage || "";
+    const message = payload.message || "";
+    const level = String(payload.level || "info").toLowerCase();
+    const progress = payload.progress;
+    const ts = payload.timestamp || new Date().toISOString();
+    const parts = [];
+    if (stage) parts.push(`[${stage}]`);
+    if (progress != null && progress !== "") parts.push(`(${progress}%)`);
+    if (message) parts.push(message);
+    const text = parts.join(" ").trim() || JSON.stringify(payload);
+    const key = `live-${payload.deploy_id || ""}-${stage}-${ts}-${text.slice(0, 48)}`;
+    const entry = {
+      key,
+      text,
+      level: level === "warn" ? "warning" : level,
+      timestamp: ts,
+      stage: stage || undefined,
+      progress: progress != null ? progress : undefined,
+      raw: payload,
+    };
+    setDeployLogEntries((prev) => {
+      if (prev.some((e) => e.key === key)) return prev;
+      const out = [...prev, entry];
+      if (out.length > SERVICE_LOG_MAX_LINES) {
+        return out.slice(out.length - SERVICE_LOG_MAX_LINES);
+      }
+      return out;
+    });
+  }, []);
+
+  const connectDeployLogStream = useCallback((deployId) => {
+    if (!deployId) return;
+    deployWsShouldReconnectRef.current = true;
+
+    if (deployWsRef.current) {
+      try {
+        deployWsRef.current.close();
+      } catch {
+        /* ignore */
+      }
+      deployWsRef.current = null;
+    }
+    if (deployWsReconnectTimerRef.current) {
+      clearTimeout(deployWsReconnectTimerRef.current);
+      deployWsReconnectTimerRef.current = null;
+    }
+
+    const token = localStorage.getItem("access");
+    if (!token) {
+      setDeployLogError((prev) => prev || "Authentication required for live deploy events.");
+      setDeployLogLiveConnected(false);
+      return;
+    }
+
+    let backendUrl;
+    try {
+      backendUrl = new URL(API_BASE);
+    } catch {
+      setDeployLogError("Invalid API base URL for WebSocket.");
+      return;
+    }
+    const protocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
+    const socketUrl = `${protocol}//${backendUrl.host}/ws/deployments/${deployId}/?token=${encodeURIComponent(token)}`;
+    const socket = new WebSocket(socketUrl);
+    deployWsRef.current = socket;
+
+    socket.onopen = () => {
+      if (!mountedRef.current) return;
+      if (deployLogDeployIdRef.current !== String(deployId)) {
+        try {
+          socket.close();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      deployWsReconnectAttemptRef.current = 0;
+      setDeployLogLiveConnected(true);
+      setDeployLogError(null);
+    };
+
+    socket.onmessage = (event) => {
+      if (!mountedRef.current) return;
+      if (deployLogDeployIdRef.current !== String(deployId)) return;
+      let payload;
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (payload?.type === "deployment.connected") {
+        setDeployLogLiveConnected(true);
+        return;
+      }
+      if (payload?.type === "deployment.event") {
+        appendDeployLiveEvent(payload.event || payload);
+        return;
+      }
+      // Some sinks may send the event object directly
+      if (payload?.stage || payload?.message) {
+        appendDeployLiveEvent(payload);
+      }
+    };
+
+    socket.onerror = () => {
+      if (!mountedRef.current) return;
+      setDeployLogLiveConnected(false);
+    };
+
+    socket.onclose = (evt) => {
+      if (!mountedRef.current) return;
+      setDeployLogLiveConnected(false);
+      if (!deployWsShouldReconnectRef.current || evt.wasClean) return;
+      if (deployLogDeployIdRef.current !== String(deployId)) return;
+
+      deployWsReconnectAttemptRef.current += 1;
+      const attempt = deployWsReconnectAttemptRef.current;
+      const delay = Math.min(15000, 1000 * 2 ** Math.max(0, attempt - 1));
+      deployWsReconnectTimerRef.current = setTimeout(() => {
+        if (!mountedRef.current || !deployWsShouldReconnectRef.current) return;
+        if (deployLogDeployIdRef.current !== String(deployId)) return;
+        connectDeployLogStream(deployId);
+      }, delay);
+    };
+  }, [appendDeployLiveEvent]);
+
 
 
 
@@ -577,20 +736,32 @@ export default function ServiceDetail() {
   }, [deployLogDeployId, deployLogLoadingOlder]);
 
   const pollNewDeployLogs = useCallback(async () => {
-    if (!deployLogDeployId || !deployLogNewestCursorRef.current || deployLogPollLockRef.current) return;
+    if (!deployLogDeployId || deployLogPollLockRef.current) return;
 
     deployLogPollLockRef.current = true;
     try {
+      const params = { limit: 100 };
+      if (deployLogNewestCursorRef.current) {
+        params.after = deployLogNewestCursorRef.current;
+      }
       const resp = await apiRequest({
-        method: "GET", url: `${DEPLOY_BASE}${deployLogDeployId}/logs/`,
-        params: { limit: 100, after: deployLogNewestCursorRef.current },
+        method: "GET",
+        url: `${DEPLOY_BASE}${deployLogDeployId}/logs/`,
+        params,
       });
       const fresh = normalizeTextEntries(resp.data?.logs);
       if (fresh.length) {
         setDeployLogEntries((prev) => mergeEntries(prev, fresh));
-        deployLogNewestCursorRef.current = resp.data?.next_after || resp.data?.latest_after || deployLogNewestCursorRef.current;
+        deployLogNewestCursorRef.current =
+          resp.data?.next_after ||
+          resp.data?.latest_after ||
+          deployLogNewestCursorRef.current;
+      } else if (!deployLogNewestCursorRef.current) {
+        deployLogNewestCursorRef.current =
+          resp.data?.latest_after || resp.data?.next_after || null;
       }
     } catch (err) {
+      /* silent poll failure */
     } finally {
       deployLogPollLockRef.current = false;
     }
@@ -669,6 +840,16 @@ export default function ServiceDetail() {
     fetchDeployLogsInitial(deployLogDeployId);
   }, [deployLogDeployId, activeTab, fetchDeployLogsInitial]);
 
+  // Live deploy events via DeploymentConsumer WebSocket
+  useEffect(() => {
+    if (activeTab !== "logs" || !deployLogDeployId) {
+      stopDeployLogWs();
+      return undefined;
+    }
+    connectDeployLogStream(deployLogDeployId);
+    return () => stopDeployLogWs();
+  }, [activeTab, deployLogDeployId, connectDeployLogStream, stopDeployLogWs]);
+
   useEffect(() => {
     if (activeTab !== "logs") {
       stopServiceLogConnection();
@@ -681,19 +862,35 @@ export default function ServiceDetail() {
   }, [activeTab, fetchServiceLogs, connectServiceLogStream, stopServiceLogConnection]);
 
   useEffect(() => {
-    if (activeTab !== "logs" || !deployLogDeployId || !deployLogNewestCursorRef.current) {
+    if (activeTab !== "logs" || !deployLogDeployId) {
       if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; }
       return;
     }
-    const active = ["queued", "deploying", "running", "stopping"].includes(String(service?.status));
-    if (!active) {
+    // Poll as fallback even without cursor; live WS is primary while connected
+    const active = ["queued", "deploying", "running", "stopping", "pending"].includes(
+      String(service?.status || "").toLowerCase()
+    );
+    const deployActive = ["pending", "running", "rolling_back"].includes(
+      String(
+        (deploys.find((d) => String(d.id ?? d.pk) === String(deployLogDeployId)) || {})
+          .status || ""
+      ).toLowerCase()
+    );
+    if (!active && !deployActive) {
       if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; }
       return;
     }
     if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; }
-    deployLogPollTimerRef.current = setInterval(() => { if (!document.hidden) pollNewDeployLogs(); }, DEPLOY_LOG_POLL_INTERVAL);
-    return () => { if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; } };
-  }, [activeTab, deployLogDeployId, service?.status, pollNewDeployLogs]);
+    deployLogPollTimerRef.current = setInterval(() => {
+      if (!document.hidden) pollNewDeployLogs();
+    }, DEPLOY_LOG_POLL_INTERVAL);
+    return () => {
+      if (deployLogPollTimerRef.current) {
+        clearInterval(deployLogPollTimerRef.current);
+        deployLogPollTimerRef.current = null;
+      }
+    };
+  }, [activeTab, deployLogDeployId, service?.status, deploys, pollNewDeployLogs]);
 
   useEffect(() => {
     if (!isDesktop) setActiveTab((current) => current || "overview");
@@ -1199,10 +1396,18 @@ export default function ServiceDetail() {
     window.open(`http://${host}`, "_blank", "noopener,noreferrer");
   };
 
+  const tabLabelMap = {
+    overview: "Overview",
+    create: "Deploys",
+    logs: "Logs",
+    settings: "Settings",
+  };
+
   return (
     <Box
       sx={{
-        p: { xs: 1, sm: 2 },
+        p: { xs: 1, sm: 1.5, md: 2 },
+        pb: { xs: 10, md: 2 },
       }}
     >
       <ServiceToolbar
@@ -1214,21 +1419,45 @@ export default function ServiceDetail() {
           navigate={navigate}
         />
 
-      <Box sx={{ p: { xs: 1, sm: 2 }, display: "flex", flexDirection: { xs: "column", md: "row" }, gap: 2 }}>
-        <Box sx={{ width: { xs: "100%", md: 240 }, flexShrink: 0 }}>
-          <TabSidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            service={service}
-            selectedDeploy={selectedDeploy}
-            deployCount={deployCount}
-            volumeCount={volumeCount}
-            networkName={networkName}
-            serviceRunning={serviceRunning}
-          />
-        </Box>
+      {/* Mobile: single sticky identity header (no duplicate stats elsewhere) */}
+      {!isDesktop ? (
+        <MobileServiceHeader
+          service={service}
+          serviceRunning={serviceRunning}
+          selectedDeploy={selectedDeploy}
+          selectedPlatform={selectedPlatform}
+          selectedIsDb={selectedIsDb}
+          deployCount={deployCount}
+          volumeCount={volumeCount}
+          networkName={networkName}
+          activeTabLabel={tabLabelMap[activeTab] || activeTab}
+        />
+      ) : null}
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          gap: { xs: 1.5, md: 2 },
+        }}
+      >
+        {/* Desktop only sidebar */}
+        {isDesktop ? (
+          <Box sx={{ width: 240, flexShrink: 0 }}>
+            <TabSidebar
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              service={service}
+              selectedDeploy={selectedDeploy}
+              deployCount={deployCount}
+              volumeCount={volumeCount}
+              networkName={networkName}
+              serviceRunning={serviceRunning}
+            />
+          </Box>
+        ) : null}
+
+        <Box sx={{ flex: 1, minWidth: 0, width: "100%" }}>
           <GlobalServiceControls
             service={service}
             serviceRunning={serviceRunning}
@@ -1245,6 +1474,7 @@ export default function ServiceDetail() {
             volumeCount={volumeCount}
             networkName={networkName}
             rebuildLoading={rebuildLoading}
+            compact={!isDesktop}
             actions={{ startService, stopService, rebuildService, checkServiceRunning, openServiceInNewTab }}
           />
 
@@ -1256,6 +1486,7 @@ export default function ServiceDetail() {
               planDetail={planDetail}
               networkName={networkName}
               networkDetail={networkDetail}
+              hideServiceIdentity={!isDesktop}
             />
           )}
 
@@ -1277,7 +1508,7 @@ export default function ServiceDetail() {
             <LogsPanel
               serviceLogs={{ entries: serviceLogsEntries, loading: serviceLogsLoading, error: serviceLogsError, connected: serviceLogsConnected, paused: serviceLogsPaused, filter: serviceLogsFilter, level: serviceLogsLevel }}
               serviceLogActions={{ setFilter: setServiceLogsFilter, setLevel: setServiceLogsLevel, onTogglePaused: () => setServiceLogsPaused((v) => !v), refresh: refreshServiceLogs, clear: clearServiceLogs, scrollRef: serviceLogScrollRef }}
-              deployLogs={{ entries: deployLogEntries, loading: deployLogLoading, loadingOlder: deployLogLoadingOlder, error: deployLogError, filter: deployLogFilter, level: deployLogLevel, deployId: deployLogDeployId, hasMoreOlder: deployLogHasMoreOlderRef.current }}
+              deployLogs={{ entries: deployLogEntries, loading: deployLogLoading, loadingOlder: deployLogLoadingOlder, error: deployLogError, filter: deployLogFilter, level: deployLogLevel, deployId: deployLogDeployId, hasMoreOlder: deployLogHasMoreOlderRef.current, connected: deployLogLiveConnected }}
               deployLogActions={{ setFilter: setDeployLogFilter, setLevel: setDeployLogLevel, setDeployId: (val) => { deployLogManualSelectRef.current = true; setDeployLogDeployId(String(val)); }, refresh: fetchDeployLogsInitial, clear: clearDeployLogs, loadOlder: loadOlderDeployLogs, scrollRef: deployLogScrollRef }}
               deploys={deploys}
               currentDeployForLogs={currentDeployForLogs}
@@ -1320,6 +1551,20 @@ export default function ServiceDetail() {
             />
           )}
         </Box>
+
+        {/* Mobile edge nav FAB + bottom sheet */}
+        {!isDesktop ? (
+          <MobileNavFab
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            service={service}
+            selectedDeploy={selectedDeploy}
+            deployCount={deployCount}
+            volumeCount={volumeCount}
+            networkName={networkName}
+            serviceRunning={serviceRunning}
+          />
+        ) : null}
 
         <Snackbar
           open={!!snackbar}

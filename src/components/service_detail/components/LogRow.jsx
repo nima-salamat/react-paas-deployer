@@ -1,5 +1,5 @@
 import React, { memo, useState, useMemo } from "react";
-import { Box, Typography, Chip, Button, IconButton, useTheme } from "@mui/material";
+import { Box, Typography, Chip, Button, IconButton, useTheme, useMediaQuery } from "@mui/material";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { inferLogLevel, formatLogTime } from "../utils";
@@ -7,6 +7,7 @@ import { LOG_COLLAPSE_CHARS, LOG_COLLAPSE_LINES } from "../constants";
 
 export default memo(function LogRow({ entry }) {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [expanded, setExpanded] = useState(false);
   const level = entry?.level || inferLogLevel(entry?.text);
   const timeLabel = formatLogTime(entry?.timestamp);
@@ -43,6 +44,11 @@ export default memo(function LogRow({ entry }) {
       ? "default"
       : "primary";
 
+  const mono = {
+    fontFamily:
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+  };
+
   return (
     <Box
       sx={{
@@ -50,53 +56,86 @@ export default memo(function LogRow({ entry }) {
         borderColor,
         bgcolor: bg,
         borderRadius: 1.5,
-        px: 1.25,
-        py: 0.85,
+        px: { xs: 1, sm: 1.25 },
+        py: { xs: 0.75, sm: 0.85 },
         display: "flex",
-        gap: 1.25,
-        alignItems: "flex-start",
+        flexDirection: isMobile ? "column" : "row",
+        gap: isMobile ? 0.5 : 1.25,
+        alignItems: isMobile ? "stretch" : "flex-start",
+        width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
-      {timeLabel ? (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            flexShrink: 0,
-            mt: 0.25,
-            minWidth: 58,
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-            fontSize: 11,
-          }}
-        >
-          {timeLabel}
-        </Typography>
-      ) : null}
-      <Chip
-        label={level.toUpperCase()}
-        size="small"
-        color={levelColor}
-        variant="outlined"
+      {/* Meta row: time + level — full width on mobile, side column on desktop */}
+      <Box
         sx={{
-          height: 20,
-          fontSize: 10,
-          fontWeight: 700,
-          mt: 0.15,
+          display: "flex",
+          alignItems: "center",
+          gap: 0.75,
           flexShrink: 0,
+          flexWrap: "wrap",
+          ...(isMobile
+            ? { width: "100%" }
+            : { flexDirection: "column", alignItems: "flex-start", minWidth: 72 }),
         }}
-      />
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      >
+        {timeLabel ? (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              ...mono,
+              fontSize: 11,
+              lineHeight: 1.2,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {timeLabel}
+          </Typography>
+        ) : null}
+        <Chip
+          label={level.toUpperCase()}
+          size="small"
+          color={levelColor}
+          variant="outlined"
+          sx={{
+            height: 20,
+            fontSize: 10,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        />
+        {entry?.stage ? (
+          <Chip
+            label={entry.stage}
+            size="small"
+            variant="outlined"
+            sx={{ height: 20, fontSize: 10, maxWidth: 140 }}
+          />
+        ) : null}
+        {entry?.progress != null && entry.progress !== "" ? (
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+            {entry.progress}%
+          </Typography>
+        ) : null}
+      </Box>
+
+      {/* Message — takes remaining width, wraps properly on mobile */}
+      <Box sx={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : "auto" }}>
         <Box
           component="pre"
           sx={{
             m: 0,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
-            fontSize: 12.5,
+            overflowWrap: "anywhere",
+            fontSize: { xs: 12, sm: 12.5 },
             lineHeight: 1.55,
-            fontFamily:
-              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+            ...mono,
+            width: "100%",
+            maxWidth: "100%",
             ...(isLong && !expanded
               ? {
                   display: "-webkit-box",

@@ -148,6 +148,7 @@ export default function GlobalServiceControls({
   rebuildLoading,
   actions,
   onCopyFeedback,
+  compact = false,
 }) {
   const theme = useTheme();
   const {
@@ -189,9 +190,9 @@ export default function GlobalServiceControls({
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 2, sm: 2.5 },
+        p: compact ? { xs: 1.5, sm: 2 } : { xs: 2, sm: 2.5 },
         borderRadius: 2.5,
-        mb: 2.5,
+        mb: compact ? 1.5 : 2.5,
         border: "1px solid",
         borderColor: "divider",
         backgroundImage: (t) =>
@@ -200,47 +201,60 @@ export default function GlobalServiceControls({
             : "linear-gradient(145deg, #ffffff, #f8fafc)",
       }}
     >
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 1.5,
-          flexWrap: "wrap",
-          mb: 2,
-        }}
-      >
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography
-            variant="h5"
-            sx={{
-              fontWeight: 800,
-              lineHeight: 1.25,
-              letterSpacing: "-0.02em",
-              mb: 0.5,
-            }}
-          >
-            {service?.name || "Service"}
-          </Typography>
-          <ServiceIdentity service={service} onCopied={onCopyFeedback} />
+      {!compact ? (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 1.5,
+            flexWrap: "wrap",
+            mb: 2,
+          }}
+        >
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 800,
+                lineHeight: 1.25,
+                letterSpacing: "-0.02em",
+                mb: 0.5,
+              }}
+            >
+              {service?.name || "Service"}
+            </Typography>
+            <ServiceIdentity service={service} onCopied={onCopyFeedback} />
+          </Box>
+          <Chip
+            label={statusLabel}
+            color={statusColor}
+            size="medium"
+            sx={{ fontWeight: 700, height: 28 }}
+          />
         </Box>
-        <Chip
-          label={statusLabel}
-          color={statusColor}
-          size="medium"
-          sx={{ fontWeight: 700, height: 28 }}
-        />
-      </Box>
+      ) : (
+        <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700, mb: 1.25 }}>
+          Controls
+        </Typography>
+      )}
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 2.5 }}>
+      <Stack
+        direction={{ xs: compact ? "row" : "column", sm: "row" }}
+        spacing={1}
+        sx={{ mb: compact ? 1.5 : 2.5 }}
+        flexWrap={compact ? "wrap" : "nowrap"}
+        useFlexGap
+      >
+
         <Button
           variant="contained"
           startIcon={<PlayArrowIcon />}
           onClick={() => startService()}
           disabled={!service || serviceLoading || serviceBusy || !selectedDeployId}
-          fullWidth
-          size="medium"
-          sx={{ borderRadius: 1.5, fontWeight: 700, textTransform: "none", py: 1 }}
+          fullWidth={!compact}
+          size={compact ? "small" : "medium"}
+          sx={{ borderRadius: 1.5, fontWeight: 700, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
         >
           Start
         </Button>
@@ -252,9 +266,9 @@ export default function GlobalServiceControls({
           disabled={
             !service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId
           }
-          fullWidth
-          size="medium"
-          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
+          fullWidth={!compact}
+          size={compact ? "small" : "medium"}
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
         >
           {rebuildLoading ? "Rebuilding..." : selectedIsDb ? "Rebuild DB" : "Rebuild"}
         </Button>
@@ -264,9 +278,9 @@ export default function GlobalServiceControls({
           startIcon={<StopIcon />}
           onClick={stopService}
           disabled={!service || serviceLoading || serviceBusy}
-          fullWidth
-          size="medium"
-          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
+          fullWidth={!compact}
+          size={compact ? "small" : "medium"}
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
         >
           Stop
         </Button>
@@ -274,9 +288,9 @@ export default function GlobalServiceControls({
           variant="outlined"
           onClick={() => checkServiceRunning(false)}
           disabled={!service || serviceStatusLoadingManual}
-          fullWidth
-          size="medium"
-          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
+          fullWidth={!compact}
+          size={compact ? "small" : "medium"}
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
         >
           {serviceStatusLoadingManual ? "Checking..." : "Check status"}
         </Button>
@@ -285,57 +299,62 @@ export default function GlobalServiceControls({
           onClick={openServiceInNewTab}
           disabled={!canOpen}
           startIcon={<LinkIcon />}
-          fullWidth
-          size="medium"
+          fullWidth={!compact}
+          size={compact ? "small" : "medium"}
           title={selectedIsDb ? "DB services are not opened in browser" : undefined}
-          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: 1 }}
+          sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
         >
           Open
         </Button>
       </Stack>
 
+      {!compact ? (
+        <>
       <Stack direction="row" spacing={1} sx={{ mb: 2.5 }} flexWrap="wrap" useFlexGap>
-        <Chip
-          icon={<Inventory2Icon sx={{ fontSize: 16 }} />}
-          label={`Deploys: ${deployCount}`}
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 1.5 }}
-        />
-        <Chip
-          icon={<StorageIcon sx={{ fontSize: 16 }} />}
-          label={`Volumes: ${volumeCount}`}
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 1.5 }}
-        />
-        <Chip
-          icon={<HubIcon sx={{ fontSize: 16 }} />}
-          label={`Network: ${networkName}`}
-          size="small"
-          variant="outlined"
-          sx={{ borderRadius: 1.5 }}
-        />
-        {selectedDeploy ? (
-          <Chip
-            label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`}
-            size="small"
-            color="success"
-            sx={{ borderRadius: 1.5, fontWeight: 600 }}
-          />
-        ) : null}
-        {selectedPlatform ? (
-          <Chip
-            label={`${selectedIsDb ? "DB" : "App"} · ${selectedPlatform}`}
-            size="small"
-            color={selectedIsDb ? "info" : "default"}
-            variant="outlined"
-            sx={{ borderRadius: 1.5 }}
-          />
-        ) : null}
-      </Stack>
+            <Chip
+              icon={<Inventory2Icon sx={{ fontSize: 16 }} />}
+              label={`Deploys: ${deployCount}`}
+              size="small"
+              variant="outlined"
+              sx={{ borderRadius: 1.5 }}
+            />
+            <Chip
+              icon={<StorageIcon sx={{ fontSize: 16 }} />}
+              label={`Volumes: ${volumeCount}`}
+              size="small"
+              variant="outlined"
+              sx={{ borderRadius: 1.5 }}
+            />
+            <Chip
+              icon={<HubIcon sx={{ fontSize: 16 }} />}
+              label={`Network: ${networkName}`}
+              size="small"
+              variant="outlined"
+              sx={{ borderRadius: 1.5 }}
+            />
+            {selectedDeploy ? (
+              <Chip
+                label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`}
+                size="small"
+                color="success"
+                sx={{ borderRadius: 1.5, fontWeight: 600 }}
+              />
+            ) : null}
+            {selectedPlatform ? (
+              <Chip
+                label={`${selectedIsDb ? "DB" : "App"} · ${selectedPlatform}`}
+                size="small"
+                color={selectedIsDb ? "info" : "default"}
+                variant="outlined"
+                sx={{ borderRadius: 1.5 }}
+              />
+            ) : null}
+          </Stack>
 
-      <Divider sx={{ mb: 2 }} />
+          <Divider sx={{ mb: 2 }} />
+        </>
+      ) : null}
+
 
       <Stack spacing={1.5}>
         <Box>

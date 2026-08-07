@@ -17,6 +17,7 @@ import {
   keyframes,
   IconButton,
   Tooltip,
+  useMediaQuery,
 } from "@mui/material";
 import RocketLaunchIcon from "@mui/icons-material/RocketLaunch";
 import AccountTreeIcon from "@mui/icons-material/AccountTree";
@@ -113,7 +114,12 @@ function OrbitDots({ color, count = 16, active = true }) {
 export default function Home() {
   const theme = useTheme();
   const navigate = useNavigate();
-  const [loggedIn, setLoggedIn] = useState(() => Boolean(window.localStorage.getItem("access")));
+  const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+  const isMdDown = useMediaQuery(theme.breakpoints.down("md"));
+
+  const [loggedIn, setLoggedIn] = useState(() =>
+    Boolean(window.localStorage.getItem("access"))
+  );
   const [orbitActive, setOrbitActive] = useState(() => {
     try {
       const saved = window.localStorage.getItem(ORBIT_STORAGE_KEY);
@@ -128,10 +134,8 @@ export default function Home() {
     const syncAuth = () => {
       setLoggedIn(Boolean(window.localStorage.getItem("access")));
     };
-
     window.addEventListener("auth-changed", syncAuth);
     window.addEventListener("storage", syncAuth);
-
     return () => {
       window.removeEventListener("auth-changed", syncAuth);
       window.removeEventListener("storage", syncAuth);
@@ -141,7 +145,9 @@ export default function Home() {
   useEffect(() => {
     try {
       window.localStorage.setItem(ORBIT_STORAGE_KEY, String(orbitActive));
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }, [orbitActive]);
 
   const toggleOrbit = () => setOrbitActive((v) => !v);
@@ -154,7 +160,6 @@ export default function Home() {
   const pageBg = isDark
     ? "linear-gradient(180deg, #050b16 0%, #0a1424 45%, #07101c 100%)"
     : "linear-gradient(180deg, #f5f9ff 0%, #eef5ff 50%, #f8fbff 100%)";
-
   const orbitColor = isDark ? "#ffffff" : "#0f172a";
 
   const fadeUp = {
@@ -171,6 +176,22 @@ export default function Home() {
       animation: `${iconSpin} 0.65s ease-in-out`,
     },
   };
+
+  /*
+   * Hero image contains centered wordmark:
+   *   PAAS
+   *   DEPLOYER
+   * On narrow screens, object-fit:cover + tight radial mask cropped the edges
+   * of those letters. We:
+   *  - keep a wider horizontal focal area on xs
+   *  - soften the mask so the wordmark stays inside the opaque region
+   *  - use a mobile-friendly aspect that does not over-crop width
+   */
+  const heroMask = isXs
+    ? "radial-gradient(ellipse 92% 78% at 50% 42%, #000 58%, transparent 88%)"
+    : isMdDown
+    ? "radial-gradient(ellipse 84% 74% at 50% 44%, #000 50%, transparent 82%)"
+    : "radial-gradient(ellipse 75% 70% at 50% 45%, #000 42%, transparent 78%)";
 
   return (
     <Box
@@ -252,8 +273,8 @@ export default function Home() {
               mb: { xs: 5, md: 6 },
               mx: "auto",
               width: "100%",
-              pt: { xs: 1, md: 3.5 },
-              pb: { xs: 1, md: 3.5 },
+              pt: { xs: 0.5, md: 3.5 },
+              pb: { xs: 0.5, md: 3.5 },
               px: { xs: 0, sm: 2, md: 3 },
               overflow: "visible",
             }}
@@ -306,10 +327,14 @@ export default function Home() {
                 zIndex: 2,
                 borderRadius: { xs: 2, sm: 3, md: 4 },
                 overflow: "hidden",
-                height: { xs: 420, sm: "auto" },
-                aspectRatio: { xs: "auto", sm: "1376 / 768" },
-                maxHeight: { xs: "none", sm: 360, md: 420 },
+                // Mobile: wider frame so PAAS / DEPLOYER wordmark is not side-cropped
                 width: "100%",
+                maxWidth: "100%",
+                // Prefer aspect based on source art (1376x768) but allow taller frame on xs
+                aspectRatio: { xs: "4 / 3", sm: "1376 / 768" },
+                maxHeight: { xs: "min(72vw, 340px)", sm: 360, md: 420 },
+                minHeight: { xs: 260, sm: 0 },
+                mx: "auto",
                 border: `1px solid ${subtleBorder}`,
                 boxShadow: isDark
                   ? "0 24px 64px rgba(0,0,0,0.45)"
@@ -320,17 +345,19 @@ export default function Home() {
               <Box
                 component="img"
                 src={heroImage}
-                alt="PaaS Deployer"
+                alt="PaaS Deployer — PAAS DEPLOYER"
                 sx={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
-                  objectPosition: "center",
                   display: "block",
-                  WebkitMaskImage:
-                    "radial-gradient(ellipse 75% 70% at 50% 45%, #000 42%, transparent 78%)",
-                  maskImage:
-                    "radial-gradient(ellipse 75% 70% at 50% 45%, #000 42%, transparent 78%)",
+                  // cover still fills the frame, but we anchor to the wordmark center
+                  objectFit: "cover",
+                  objectPosition: { xs: "center 42%", sm: "center center", md: "center center" },
+                  // Slight zoom-out on mobile so left/right of wordmark stay inside frame
+                  transform: { xs: "scale(1.02)", sm: "none" },
+                  transformOrigin: "center center",
+                  WebkitMaskImage: heroMask,
+                  maskImage: heroMask,
                 }}
               />
 
@@ -340,8 +367,14 @@ export default function Home() {
                   inset: 0,
                   pointerEvents: "none",
                   background: isDark
-                    ? "radial-gradient(ellipse 80% 75% at 50% 40%, transparent 35%, rgba(5,11,22,0.55) 100%)"
-                    : "radial-gradient(ellipse 80% 75% at 50% 40%, transparent 30%, rgba(37,99,235,0.28) 70%, rgba(30,64,175,0.42) 100%)",
+                    ? {
+                        xs: "radial-gradient(ellipse 95% 85% at 50% 40%, transparent 45%, rgba(5,11,22,0.45) 100%)",
+                        sm: "radial-gradient(ellipse 80% 75% at 50% 40%, transparent 35%, rgba(5,11,22,0.55) 100%)",
+                      }
+                    : {
+                        xs: "radial-gradient(ellipse 95% 85% at 50% 40%, transparent 40%, rgba(37,99,235,0.22) 75%, rgba(30,64,175,0.38) 100%)",
+                        sm: "radial-gradient(ellipse 80% 75% at 50% 40%, transparent 30%, rgba(37,99,235,0.28) 70%, rgba(30,64,175,0.42) 100%)",
+                      },
                 }}
               />
 
@@ -352,35 +385,42 @@ export default function Home() {
                   right: 0,
                   bottom: 0,
                   height: "auto",
-                  minHeight: { xs: "35%", sm: "25%" },
+                  minHeight: { xs: "32%", sm: "25%" },
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "flex-end",
-                  px: 2,
-                  pt: 6,
-                  pb: { xs: 2.5, md: 2 },
+                  px: { xs: 1.5, sm: 2 },
+                  pt: { xs: 4, sm: 6 },
+                  pb: { xs: 1.75, md: 2 },
                   textAlign: "center",
                   zIndex: 3,
                   background: isDark
-                    ? "linear-gradient(180deg, transparent 0%, rgba(5,11,22,0.6) 35%, rgba(5,11,22,0.95) 100%)"
-                    : "linear-gradient(180deg, transparent 0%, rgba(37,99,235,0.4) 35%, rgba(30,64,175,0.85) 100%)",
+                    ? "linear-gradient(180deg, transparent 0%, rgba(5,11,22,0.55) 40%, rgba(5,11,22,0.95) 100%)"
+                    : "linear-gradient(180deg, transparent 0%, rgba(37,99,235,0.35) 40%, rgba(30,64,175,0.85) 100%)",
                 }}
               >
                 <Typography
                   sx={{
                     color: "rgba(255,255,255,0.95)",
                     maxWidth: 520,
-                    fontSize: { xs: "0.8rem", sm: "0.95rem" },
+                    fontSize: { xs: "0.78rem", sm: "0.95rem" },
                     fontWeight: 500,
                     mb: 1.25,
                     textShadow: "0 2px 12px rgba(0,0,0,0.35)",
+                    px: 0.5,
                   }}
                 >
                   Deploy, scale and manage your services with a modern control panel
                 </Typography>
 
-                <Stack direction="row" spacing={1.25} flexWrap="wrap" justifyContent="center">
+                <Stack
+                  direction="row"
+                  spacing={1.25}
+                  flexWrap="wrap"
+                  useFlexGap
+                  justifyContent="center"
+                >
                   <Button
                     variant="contained"
                     onClick={() => navigate("/plans")}
@@ -513,7 +553,8 @@ export default function Home() {
                       Start with a Plan
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Plans define CPU, RAM, storage & pricing — choose or create a plan to get started.
+                      Plans define CPU, RAM, storage & pricing — choose or create a plan to get
+                      started.
                     </Typography>
                   </Box>
                 </Stack>
@@ -618,7 +659,11 @@ export default function Home() {
                       </Avatar>
                       <Box>
                         <Typography sx={{ fontWeight: 800, mb: 0.5 }}>{c.title}</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.55 }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ lineHeight: 1.55 }}
+                        >
                           {c.desc}
                         </Typography>
                       </Box>
@@ -646,10 +691,11 @@ export default function Home() {
                   Need help?
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
-                  Recommended flow: 1) choose or create a plan, 2) create a service using that plan, 3)
-                  deploy & monitor. Explore the open-source repositories for API and frontend details.
+                  Recommended flow: 1) choose or create a plan, 2) create a service using that plan,
+                  3) deploy & monitor. Explore the open-source repositories for API and frontend
+                  details.
                 </Typography>
-                <Stack direction="row" spacing={2} sx={{ mt: 1.5 }} flexWrap="wrap">
+                <Stack direction="row" spacing={2} sx={{ mt: 1.5 }} flexWrap="wrap" useFlexGap>
                   <Link
                     href={GITHUB_API}
                     target="_blank"
@@ -689,7 +735,7 @@ export default function Home() {
                 md={5}
                 sx={{ display: "flex", justifyContent: { xs: "flex-start", md: "flex-end" } }}
               >
-                <Stack direction="row" spacing={1.25} flexWrap="wrap">
+                <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
                   <Button
                     variant="outlined"
                     onClick={() => navigate("/plans")}

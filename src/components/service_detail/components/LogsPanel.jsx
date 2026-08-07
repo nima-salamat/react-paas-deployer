@@ -9,9 +9,12 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Chip,
 } from "@mui/material";
 import LogPanel from "./LogPanel";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import WifiIcon from "@mui/icons-material/Wifi";
+import WifiOffIcon from "@mui/icons-material/WifiOff";
 
 export default function LogsPanel({
   serviceLogs,
@@ -25,8 +28,10 @@ export default function LogsPanel({
   handleDownloadEntries,
   handleCopyEntries,
 }) {
+  const deployLive = Boolean(deployLogs?.connected);
+
   return (
-    <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
+    <Stack spacing={2.5} sx={{ maxWidth: 960, width: "100%" }}>
       <LogPanel
         title="Service logs"
         subtitle="Latest logs stay at the bottom. Scroll up for older lines."
@@ -57,10 +62,14 @@ export default function LogsPanel({
       <Paper
         elevation={0}
         sx={{
-          p: { xs: 1.75, sm: 2.25 },
+          p: { xs: 1.5, sm: 2.25 },
           borderRadius: 2.5,
           border: "1px solid",
           borderColor: "divider",
+          width: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          overflow: "hidden",
         }}
       >
         <Stack
@@ -70,12 +79,21 @@ export default function LogsPanel({
           alignItems={{ xs: "stretch", sm: "center" }}
           sx={{ mb: 1.75 }}
         >
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Deploy history
-            </Typography>
+          <Box sx={{ minWidth: 0 }}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                Deploy history
+              </Typography>
+              <Chip
+                icon={deployLive ? <WifiIcon /> : <WifiOffIcon />}
+                label={deployLive ? "Live events" : "Offline"}
+                color={deployLive ? "success" : "default"}
+                size="small"
+                sx={{ fontWeight: 600 }}
+              />
+            </Stack>
             <Typography variant="caption" color="text.secondary">
-              Latest at the bottom. Scroll up to load older logs.
+              Latest at the bottom. Live deployment events appear here while connected.
             </Typography>
           </Box>
 
@@ -139,13 +157,13 @@ export default function LogsPanel({
               ? `Deploy: ${currentDeployForLogs.name || currentDeployForLogs.id}`
               : "Deploy history"
           }
-          subtitle="Newest at the bottom. Scroll up for older records."
+          subtitle="Newest at the bottom. Live stages from the deploy worker appear automatically."
           entries={deployLogs.entries}
           loading={deployLogs.loading}
           loadingOlder={deployLogs.loadingOlder}
           error={deployLogs.error}
-          connected={false}
-          showConnectionChip={false}
+          connected={deployLive}
+          showConnectionChip
           filter={deployLogs.filter}
           level={deployLogs.level}
           onFilterChange={deployLogActions.setFilter}
@@ -166,7 +184,7 @@ export default function LogsPanel({
           onLoadOlder={deployLogActions.loadOlder}
           hasMoreOlder={deployLogs.hasMoreOlder}
           scrollRef={deployLogActions.scrollRef}
-          emptyText="No deploy history available."
+          emptyText="No deploy history available. Start a deploy to see live events."
         />
       </Paper>
     </Stack>

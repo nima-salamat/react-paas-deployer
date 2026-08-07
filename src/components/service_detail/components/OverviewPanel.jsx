@@ -67,9 +67,11 @@ export default function OverviewPanel({
   planDetail,
   networkName,
   networkDetail,
+  hideServiceIdentity = false,
 }) {
   return (
-    <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
+    <Stack spacing={2.5} sx={{ maxWidth: 960, width: "100%" }}>
+      {!hideServiceIdentity ? (
       <SectionCard
         icon={<DnsIcon color="primary" fontSize="small" />}
         title="Service details"
@@ -105,6 +107,29 @@ export default function OverviewPanel({
           <InfoRow label="Updated" value={formatDate(service.updated_at)} />
         ) : null}
       </SectionCard>
+      ) : (
+      <SectionCard
+        icon={<DnsIcon color="primary" fontSize="small" />}
+        title="Selected deploy"
+      >
+        <InfoRow
+          label="Deploy"
+          value={
+            selectedDeploy
+              ? `${selectedDeploy.name || selectedDeploy.id}${
+                  selectedDeploy.version ? ` (v${selectedDeploy.version})` : ""
+                }`
+              : "None"
+          }
+        />
+        {service?.created_at ? (
+          <InfoRow label="Created" value={formatDate(service.created_at)} />
+        ) : null}
+        {service?.updated_at ? (
+          <InfoRow label="Updated" value={formatDate(service.updated_at)} />
+        ) : null}
+      </SectionCard>
+      )}
 
       <SectionCard
         icon={<SpeedIcon color="primary" fontSize="small" />}
