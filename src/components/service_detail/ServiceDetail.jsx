@@ -1307,7 +1307,152 @@ export default function ServiceDetail() {
     }
   };
 
-  const handleApplyPlan = async (planId, applyImmediately = false) => {
+
+
+  const handlePurgeRuntime = useCallback(async () => {
+    if (!id) return;
+    setVolumeActionLoading(true);
+    setError(null);
+    try {
+      const resp = await apiRequest({
+        method: "POST",
+        url: `${SERVICE_ACTION_ROOT}purge_service_runtime/`,
+        data: { service_id: id },
+      });
+      const detail = resp?.data?.detail || "Container & image removed.";
+      safeSetSnackbar?.(resp?.data?.result === "success" ? "success" : "warning", detail);
+      await fetchService?.(true);
+      await checkServiceRunning?.(true);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        "Failed to remove container/image.";
+      setError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      throw err;
+    } finally {
+      if (mountedRef.current) setVolumeActionLoading(false);
+    }
+  }, [id, safeSetSnackbar, fetchService, checkServiceRunning]);
+
+  const handleUpdateVolume = useCallback(async (volume, fields) => {
+    const volId = volume?.id ?? volume?.pk;
+    if (!volId) return;
+    setVolumeActionLoading(true);
+    setError(null);
+    try {
+      await apiRequest({
+        method: "PATCH",
+        url: `${VOLUME_API_ROOT}${volId}/`,
+        data: fields,
+      });
+      safeSetSnackbar("success", "Volume updated.");
+      setSettingsSuccess?.("Volume updated.");
+      await fetchAttachedVolumes();
+      await fetchAvailableVolumes();
+      await fetchService?.(true);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        err?.response?.data?.errors ||
+        "Unable to update volume.";
+      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      throw err;
+    } finally {
+      if (mountedRef.current) setVolumeActionLoading(false);
+    }
+  }, [safeSetSnackbar, fetchAttachedVolumes, fetchAvailableVolumes, fetchService]);
+
+  const handleDeleteVolume = useCallback(async (volume) => {
+    const volId = volume?.id ?? volume?.pk;
+    if (!volId) return;
+    setVolumeActionLoading(true);
+    setError(null);
+    try {
+      await apiRequest({ method: "DELETE", url: `${VOLUME_API_ROOT}${volId}/` });
+      safeSetSnackbar("success", "Volume deleted.");
+      await fetchAttachedVolumes();
+      await fetchAvailableVolumes();
+      await fetchService(true);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        err?.response?.data?.errors ||
+        "Unable to delete volume.";
+      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      throw err;
+    } finally {
+      if (mountedRef.current) setVolumeActionLoading(false);
+    }
+  }, [safeSetSnackbar, fetchAttachedVolumes, fetchAvailableVolumes, fetchService]);
+
+  const handleViewVolumeFiles = useCallback(async (volume) => {
+    const volId = volume?.id ?? volume?.pk;
+    if (!volId) return [];
+    const resp = await apiRequest({
+      method: "GET",
+      url: `${VOLUME_API_ROOT}${volId}/files/`,
+    });
+    const files = resp?.data?.files;
+    if (Array.isArray(files)) return files;
+    if (Array.isArray(resp?.data)) return resp.data;
+    return [];
+  }, []);
+
+  const handleDownloadVolume = useCallback(async (volume) => {
+    const volId = volume?.id ?? volume?.pk;
+    if (!volId) return;
+    try {
+      const token = localStorage.getItem("access");
+      const url = `${VOLUME_API_ROOT}${volId}/download/`;
+      const resp = await axios.get(url, {
+        responseType: "blob",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      // If server returned JSON error as blob, surface it
+      const ct = String(resp.headers["content-type"] || "");
+      if (ct.includes("application/json")) {
+        const text = await resp.data.text?.() || "";
+        let detail = "Download failed.";
+        try {
+          detail = JSON.parse(text)?.detail || detail;
+        } catch { /* ignore */ }
+        safeSetSnackbar("error", detail);
+        return;
+      }
+      const disposition = resp.headers["content-disposition"] || "";
+      let filename = `${volume?.name || "volume"}.tar.gz`;
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      if (match?.[1]) filename = match[1];
+      const blobUrl = URL.createObjectURL(new Blob([resp.data], { type: "application/gzip" }));
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
+      safeSetSnackbar("success", "Volume download started.");
+    } catch (err) {
+      const status = err?.response?.status;
+      let msg = "Unable to download volume.";
+      if (err?.response?.data instanceof Blob) {
+        try {
+          const t = await err.response.data.text();
+          const j = JSON.parse(t);
+          msg = j.detail || j.error || msg;
+        } catch { /* ignore */ }
+      } else {
+        msg = err?.response?.data?.detail || err?.response?.data?.error || msg;
+      }
+      if (status === 404) msg = msg || "Docker volume not found. Rebuild the service first.";
+      safeSetSnackbar("error", typeof msg === "string" ? msg : "Download failed.");
+    }
+  }, [safeSetSnackbar]);
+
+    const handleApplyPlan = async (planId, applyImmediately = false) => {
     if (!planId || !id) return;
     setPlanActionLoading(true);
     setError(null);
@@ -1540,6 +1685,26 @@ export default function ServiceDetail() {
               onAttachVolume={handleAttachVolume}
               onDetachVolume={handleDetachVolume}
               onCreateVolume={handleCreateVolume}
+              onUpdateVolume={handleUpdateVolume}
+              onDeleteVolume={handleDeleteVolume}
+              onViewVolumeFiles={handleViewVolumeFiles}
+              onDownloadVolume={handleDownloadVolume}
+              canMutateVolumes={
+                !["running", "queued", "deploying", "stopping"].includes(
+                  String(service?.status || "").toLowerCase()
+                ) && !serviceRunning
+              }
+              volumeMutateReason={
+                serviceRunning || String(service?.status || "").toLowerCase() === "running"
+                  ? "Service is running. Stop it, then remove the container before changing volumes."
+                  : ["queued", "deploying", "stopping"].includes(
+                      String(service?.status || "").toLowerCase()
+                    )
+                  ? `Service is ${service.status}. Wait until it is stopped.`
+                  : "If attach/detach fails, remove the container first (image alone does not block volumes)."
+              }
+              onPurgeRuntime={handlePurgeRuntime}
+              purgeRuntimeLoading={volumeActionLoading}
               availablePlans={availablePlans}
               plansLoading={plansLoading}
               selectedPlanId={selectedPlanId}

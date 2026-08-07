@@ -19,16 +19,18 @@ function InfoRow({ label, value }) {
       <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, flexShrink: 0 }}>
         {label}
       </Typography>
-      <Typography
-        variant="body2"
+      <Box
+        component="div"
         sx={{
           fontWeight: 600,
           textAlign: "right",
           wordBreak: "break-word",
+          fontSize: "0.875rem",
+          lineHeight: 1.43,
         }}
       >
         {value ?? "—"}
-      </Typography>
+      </Box>
     </Box>
   );
 }

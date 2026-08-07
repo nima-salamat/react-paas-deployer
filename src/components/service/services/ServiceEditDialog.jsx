@@ -13,10 +13,13 @@ import {
   Grid,
   IconButton,
   LinearProgress,
+  MenuItem,
   Paper,
   Stack,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
@@ -26,6 +29,8 @@ import SpeedIcon from "@mui/icons-material/Speed";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
+import apiRequest from "../../customHooks/apiRequest";
+import { VOLUME_API_ROOT } from "./helpers";
 
 function SectionHead({ icon, title, subtitle }) {
   return (
@@ -38,9 +43,7 @@ function SectionHead({ icon, title, subtitle }) {
           display: "grid",
           placeItems: "center",
           bgcolor: (t) =>
-            t.palette.mode === "dark"
-              ? "rgba(59,130,246,0.15)"
-              : "rgba(59,130,246,0.1)",
+            t.palette.mode === "dark" ? "rgba(59,130,246,0.15)" : "rgba(59,130,246,0.1)",
           color: "primary.main",
         }}
       >
@@ -83,7 +86,7 @@ function StorageBar({ quotaMb, usedMb }) {
         sx={{ height: 8, borderRadius: 1 }}
       />
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-        Remaining {(Math.max(0, quota - used)).toLocaleString()} MB · Volumes are exclusive (not shareable)
+        Remaining {(Math.max(0, quota - used)).toLocaleString()} MB · Exclusive volumes only
       </Typography>
     </Paper>
   );
@@ -101,6 +104,12 @@ function EditBody({
   plansForPlatformErrors,
   volumes,
   volumesLoading,
+  onVolumesChanged,
+  canMutateVolumes = true,
+  volumeMutateReason = "",
+  onPurgeRuntime,
+  purgeRuntimeLoading = false,
+  onDeleteVolume,
 }) {
   const svc = draft.service;
   const platform =
@@ -113,11 +122,18 @@ function EditBody({
   const [newNetName, setNewNetName] = useState("");
   const [creatingNet, setCreatingNet] = useState(false);
   const [volumeError, setVolumeError] = useState(null);
+  const [volumeMsg, setVolumeMsg] = useState(null);
+  const [creatingVolume, setCreatingVolume] = useState(false);
+  const [newVol, setNewVol] = useState({
+    name: "",
+    size_mb: "1024",
+    default_bind: "/data",
+    default_mode: "rw",
+  });
   const loadedPlatformRef = useRef(null);
 
   const serviceId = String(svc.id ?? svc.pk ?? "");
 
-  // Quota from service.storage or plan.max_storage
   const quotaMb = useMemo(() => {
     if (svc.storage?.quota_mb != null) return Number(svc.storage.quota_mb);
     const gb =
@@ -129,9 +145,7 @@ function EditBody({
 
   const selectedVols = draft.selectedVolumeIds || [];
 
-  // Volumes that can appear:
-  // - already owned by this service
-  // - unused (service null / is_unused)
+  // Attachable = owned by this service OR unused
   const attachableVolumes = useMemo(() => {
     return (volumes || []).filter((v) => {
       const owner = v.service?.id ?? v.service?.pk ?? v.service ?? null;
@@ -192,18 +206,13 @@ function EditBody({
       if (cur.includes(id)) {
         return { ...d, selectedVolumeIds: cur.filter((x) => x !== id) };
       }
-      // Quota check
       if (quotaMb != null) {
         const other = cur.reduce((acc, id2) => {
-          const v = attachableVolumes.find(
-            (x) => String(x.id ?? x.pk) === id2
-          );
+          const v = attachableVolumes.find((x) => String(x.id ?? x.pk) === id2);
           return acc + (Number(v?.size_mb) || 0);
         }, 0);
         if (other + (Number(sizeMb) || 0) > quotaMb) {
-          setVolumeError(
-            `Cannot attach: would exceed plan storage (${quotaMb} MB).`
-          );
+          setVolumeError(`Cannot attach: would exceed plan storage (${quotaMb} MB).`);
           return d;
         }
       }
@@ -211,21 +220,85 @@ function EditBody({
     });
   };
 
+  const handleCreateVolume = async () => {
+    setVolumeError(null);
+    setVolumeMsg(null);
+    const n = newVol.name.trim();
+    const bind = newVol.default_bind.trim();
+    const size = Number(newVol.size_mb);
+    if (!n) {
+      setVolumeError("Volume name is required.");
+      return;
+    }
+    if (!bind.startsWith("/")) {
+      setVolumeError("Bind must be an absolute path, e.g. /data");
+      return;
+    }
+    if (!size || size < 1) {
+      setVolumeError("Valid size (MB) is required.");
+      return;
+    }
+    if (remainingMb != null && size > remainingMb) {
+      setVolumeError(`Not enough storage. Remaining: ${remainingMb} MB.`);
+      return;
+    }
+
+    setCreatingVolume(true);
+    try {
+      // Create already owned by this service (exclusive)
+      const res = await apiRequest({
+        method: "POST",
+        url: VOLUME_API_ROOT,
+        data: {
+          name: n,
+          size_mb: size,
+          default_bind: bind,
+          default_mode: newVol.default_mode || "rw",
+          service: serviceId,
+        },
+      });
+      const id = String(res.data?.id ?? res.data?.pk ?? "");
+      await onVolumesChanged?.();
+      if (id) {
+        setDraft((d) => ({
+          ...d,
+          selectedVolumeIds: d.selectedVolumeIds?.includes(id)
+            ? d.selectedVolumeIds
+            : [...(d.selectedVolumeIds || []), id],
+          // treat as already "initial" so Save won't re-PATCH attach
+          initialVolumeIds: [...(d.initialVolumeIds || []), id],
+        }));
+      }
+      setNewVol({ name: "", size_mb: "1024", default_bind: "/data", default_mode: "rw" });
+      setVolumeMsg("Volume created and attached to this service.");
+    } catch (err) {
+      const msg =
+        err?.response?.data?.errors?.size_mb ||
+        err?.response?.data?.errors ||
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        "Failed to create volume.";
+      setVolumeError(typeof msg === "object" ? JSON.stringify(msg) : String(msg));
+    } finally {
+      setCreatingVolume(false);
+    }
+  };
+
   return (
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", md: "1fr 260px" },
-        gap: 3,
+        gridTemplateColumns: { xs: "1fr", md: "1fr 240px" },
+        gap: { xs: 2.5, md: 3 },
       }}
     >
-      <Stack spacing={3}>
+      <Stack spacing={2.5}>
         {/* Network */}
         <Box>
           <SectionHead
             icon={<HubIcon fontSize="small" />}
             title="Network"
-            subtitle="Select a private network for this service"
+            subtitle="Private network for this service"
           />
           {networksFetchError && (
             <Alert
@@ -275,12 +348,8 @@ function EditBody({
                           : "transparent",
                     }}
                   >
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                    >
-                      <Box>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
+                      <Box sx={{ minWidth: 0 }}>
                         <Typography variant="body2" fontWeight={800}>
                           {n.name}
                         </Typography>
@@ -318,7 +387,7 @@ function EditBody({
               )}
             </Stack>
           )}
-          <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
             <TextField
               size="small"
               placeholder="New network name"
@@ -364,7 +433,7 @@ function EditBody({
           <SectionHead
             icon={<SpeedIcon fontSize="small" />}
             title={platform ? `Plan · ${platform}` : "Plan"}
-            subtitle="Current plan is marked. Click another to switch (Save to apply)."
+            subtitle="Switch plan on Save. Same platform only."
           />
           {plansLoading ? (
             <Box sx={{ py: 3, textAlign: "center" }}>
@@ -386,9 +455,7 @@ function EditBody({
             <Grid container spacing={1.5}>
               {availablePlans.length === 0 ? (
                 <Grid item xs={12}>
-                  <Typography color="text.secondary">
-                    No plans for this platform.
-                  </Typography>
+                  <Typography color="text.secondary">No plans for this platform.</Typography>
                 </Grid>
               ) : (
                 availablePlans.map((p) => {
@@ -399,9 +466,7 @@ function EditBody({
                     <Grid item xs={12} sm={6} key={pid}>
                       <Paper
                         elevation={0}
-                        onClick={() =>
-                          setDraft((d) => ({ ...d, selectedPlanId: pid }))
-                        }
+                        onClick={() => setDraft((d) => ({ ...d, selectedPlanId: pid }))}
                         sx={{
                           p: 1.75,
                           borderRadius: 2,
@@ -412,6 +477,7 @@ function EditBody({
                             : isSelected
                             ? "primary.main"
                             : "divider",
+                          height: "100%",
                           bgcolor: (t) =>
                             isCurrent
                               ? t.palette.mode === "dark"
@@ -424,11 +490,7 @@ function EditBody({
                               : "transparent",
                         }}
                       >
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="flex-start"
-                        >
+                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
                           <Typography fontWeight={800}>{p.name}</Typography>
                           {isCurrent ? (
                             <Chip
@@ -447,12 +509,7 @@ function EditBody({
                             />
                           ) : null}
                         </Stack>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          display="block"
-                          sx={{ mt: 0.75 }}
-                        >
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
                           {[
                             p.max_cpu != null && `${p.max_cpu} CPU`,
                             p.max_ram != null && `${p.max_ram} MB`,
@@ -480,35 +537,69 @@ function EditBody({
 
         <Divider />
 
-        {/* Volumes — exclusive + quota */}
+        {/* Volumes */}
         <Box>
           <SectionHead
             icon={<StorageIcon fontSize="small" />}
             title="Volumes"
-            subtitle="Exclusive to this service. Total size limited by plan storage. Applied on Save."
+            subtitle="Exclusive to this service. Create or attach unused ones. Applied on Save."
           />
+          {!canMutateVolumes && (
+            <Alert
+              severity="warning"
+              sx={{ mb: 1.5, borderRadius: 1.5 }}
+              action={
+                onPurgeRuntime ? (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    disabled={purgeRuntimeLoading}
+                    onClick={() => onPurgeRuntime?.()}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    {purgeRuntimeLoading ? "Removing…" : "Remove container & image"}
+                  </Button>
+                ) : null
+              }
+            >
+              {volumeMutateReason ||
+                "Stop service and remove container & image before changing volumes."}
+            </Alert>
+          )}
           <StorageBar quotaMb={quotaMb} usedMb={usedBySelection} />
           {volumeError && (
-            <Alert severity="error" sx={{ mb: 1.5, borderRadius: 1.5 }} onClose={() => setVolumeError(null)}>
+            <Alert
+              severity="error"
+              sx={{ mb: 1.5, borderRadius: 1.5 }}
+              onClose={() => setVolumeError(null)}
+            >
               {volumeError}
             </Alert>
           )}
+          {volumeMsg && (
+            <Alert
+              severity="success"
+              sx={{ mb: 1.5, borderRadius: 1.5 }}
+              onClose={() => setVolumeMsg(null)}
+            >
+              {volumeMsg}
+            </Alert>
+          )}
+
           {volumesLoading && attachableVolumes.length === 0 ? (
             <CircularProgress size={22} />
           ) : attachableVolumes.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No unused volumes available. Create volumes from Settings or the Volumes page, then attach them here.
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              No volumes yet. Create one below.
             </Typography>
           ) : (
-            <Stack spacing={1}>
+            <Stack spacing={1} sx={{ mb: 2 }}>
               {attachableVolumes.map((v) => {
                 const vid = String(v.id ?? v.pk);
                 const isAttached = selectedVols.includes(vid);
                 const size = Number(v.size_mb) || 0;
                 const wouldExceed =
-                  !isAttached &&
-                  quotaMb != null &&
-                  usedBySelection + size > quotaMb;
+                  !isAttached && quotaMb != null && usedBySelection + size > quotaMb;
                 return (
                   <Paper
                     key={vid}
@@ -536,14 +627,8 @@ function EditBody({
                       opacity: wouldExceed ? 0.65 : 1,
                     }}
                   >
-                    <Box sx={{ minWidth: 0 }}>
-                      <Stack
-                        direction="row"
-                        spacing={0.75}
-                        alignItems="center"
-                        flexWrap="wrap"
-                        useFlexGap
-                      >
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
                         <Typography variant="body2" fontWeight={800}>
                           {v.name}
                         </Typography>
@@ -563,11 +648,7 @@ function EditBody({
                           />
                         )}
                       </Stack>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        fontFamily="monospace"
-                      >
+                      <Typography variant="caption" color="text.secondary" fontFamily="monospace">
                         {v.default_bind || v.bind || "—"}
                         {v.size_mb != null ? ` · ${v.size_mb} MB` : ""}
                       </Typography>
@@ -578,11 +659,7 @@ function EditBody({
                         color="warning"
                         startIcon={<LinkOffIcon />}
                         onClick={() => toggleVolume(vid, size)}
-                        sx={{
-                          textTransform: "none",
-                          fontWeight: 700,
-                          borderRadius: 1.5,
-                        }}
+                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
                       >
                         Detach
                       </Button>
@@ -591,13 +668,9 @@ function EditBody({
                         size="small"
                         variant="contained"
                         startIcon={<LinkIcon />}
-                        disabled={wouldExceed}
+                        disabled={wouldExceed || !canMutateVolumes}
                         onClick={() => toggleVolume(vid, size)}
-                        sx={{
-                          textTransform: "none",
-                          fontWeight: 700,
-                          borderRadius: 1.5,
-                        }}
+                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
                       >
                         Attach
                       </Button>
@@ -607,25 +680,95 @@ function EditBody({
               })}
             </Stack>
           )}
+
+          {/* Create volume inline */}
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, borderRadius: 2, borderStyle: "dashed" }}
+          >
+            <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
+              Create volume
+            </Typography>
+            <Stack spacing={1}>
+              <TextField
+                size="small"
+                label="Name"
+                value={newVol.name}
+                onChange={(e) => setNewVol((p) => ({ ...p, name: e.target.value }))}
+                fullWidth
+              />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <TextField
+                  size="small"
+                  label="Bind path"
+                  value={newVol.default_bind}
+                  onChange={(e) => setNewVol((p) => ({ ...p, default_bind: e.target.value }))}
+                  fullWidth
+                  placeholder="/data"
+                />
+                <TextField
+                  size="small"
+                  label="Size MB"
+                  type="number"
+                  value={newVol.size_mb}
+                  onChange={(e) => setNewVol((p) => ({ ...p, size_mb: e.target.value }))}
+                  inputProps={{
+                    min: 1,
+                    max: remainingMb != null ? remainingMb : undefined,
+                  }}
+                  sx={{ width: { xs: "100%", sm: 120 } }}
+                />
+                <TextField
+                  select
+                  size="small"
+                  label="Mode"
+                  value={newVol.default_mode}
+                  onChange={(e) => setNewVol((p) => ({ ...p, default_mode: e.target.value }))}
+                  sx={{ width: { xs: "100%", sm: 100 } }}
+                >
+                  <MenuItem value="rw">rw</MenuItem>
+                  <MenuItem value="ro">ro</MenuItem>
+                </TextField>
+              </Stack>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={handleCreateVolume}
+                disabled={
+                  creatingVolume || (remainingMb != null && remainingMb <= 0) || !canMutateVolumes
+                }
+                sx={{
+                  borderRadius: 1.5,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  alignSelf: "flex-start",
+                }}
+              >
+                {creatingVolume ? "Creating…" : "Create & attach"}
+              </Button>
+            </Stack>
+          </Paper>
         </Box>
       </Stack>
 
-      <Box>
+      {/* Overview sidebar — below content on mobile */}
+      <Box sx={{ order: { xs: -1, md: 0 } }}>
         <Paper
           elevation={0}
           sx={{
-            p: 2.5,
+            p: 2,
             borderRadius: 2,
             border: "1px solid",
             borderColor: "divider",
-            position: "sticky",
+            position: { md: "sticky" },
             top: 8,
           }}
         >
           <Typography variant="subtitle1" fontWeight={800} gutterBottom>
             Overview
           </Typography>
-          <Stack spacing={1}>
+          <Stack spacing={0.75}>
             <Typography variant="body2">
               <strong>Name:</strong> {svc.name}
             </Typography>
@@ -643,9 +786,7 @@ function EditBody({
             </Typography>
             <Typography variant="body2">
               <strong>Volumes:</strong> {selectedVols.length}
-              {quotaMb != null
-                ? ` · ${usedBySelection}/${quotaMb} MB`
-                : ""}
+              {quotaMb != null ? ` · ${usedBySelection}/${quotaMb} MB` : ""}
             </Typography>
           </Stack>
         </Paper>
@@ -670,16 +811,26 @@ export default function ServiceEditDialog({
   plansForPlatformErrors,
   volumes,
   volumesLoading,
+  onVolumesChanged,
+  canMutateVolumes = true,
+  volumeMutateReason = "",
+  onPurgeRuntime,
+  purgeRuntimeLoading = false,
+  onDeleteVolume,
 }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
       fullWidth
       maxWidth="md"
+      fullScreen={isMobile}
       disableScrollLock
       keepMounted={false}
-      PaperProps={{ sx: { borderRadius: 2.5 } }}
+      PaperProps={{ sx: { borderRadius: isMobile ? 0 : 2.5 } }}
     >
       <DialogTitle
         sx={{
@@ -687,14 +838,22 @@ export default function ServiceEditDialog({
           justifyContent: "space-between",
           alignItems: "center",
           fontWeight: 800,
+          py: 1.5,
         }}
       >
-        Settings — {draft?.service?.name}
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="subtitle1" fontWeight={800} noWrap>
+            Settings
+          </Typography>
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {draft?.service?.name}
+          </Typography>
+        </Box>
         <IconButton onClick={onClose} size="small">
           <CloseIcon />
         </IconButton>
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ px: { xs: 1.5, sm: 3 } }}>
         {draft && (
           <EditBody
             draft={draft}
@@ -708,10 +867,16 @@ export default function ServiceEditDialog({
             plansForPlatformErrors={plansForPlatformErrors}
             volumes={volumes}
             volumesLoading={volumesLoading}
+            onVolumesChanged={onVolumesChanged}
+            canMutateVolumes={canMutateVolumes}
+            volumeMutateReason={volumeMutateReason}
+            onPurgeRuntime={onPurgeRuntime}
+            purgeRuntimeLoading={purgeRuntimeLoading}
+            onDeleteVolume={onDeleteVolume}
           />
         )}
       </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
+      <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, gap: 1 }}>
         <Button onClick={onClose} sx={{ textTransform: "none" }}>
           Cancel
         </Button>

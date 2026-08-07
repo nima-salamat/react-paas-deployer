@@ -15,7 +15,6 @@ import {
   Button,
   CircularProgress,
   Container,
-  Grid,
   Paper,
   Snackbar,
   Stack,
@@ -858,9 +857,31 @@ export default function ServicesListMui({
               ))}
             </Stack>
           ) : (
-            <Grid container spacing={2.5}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  lg: "repeat(3, minmax(0, 1fr))",
+                },
+                gap: { xs: 1.5, sm: 2, md: 2.5 },
+                width: "100%",
+                maxWidth: { xs: 420, sm: "100%" },
+                mx: "auto",
+                alignItems: "stretch",
+                justifyItems: "stretch",
+              }}
+            >
               {filteredServices.map((s) => (
-                <Grid item xs={12} sm={6} lg={4} key={getKey(s)}>
+                <Box
+                  key={getKey(s)}
+                  sx={{
+                    display: "flex",
+                    width: "100%",
+                    minWidth: 0,
+                  }}
+                >
                   <ServiceItem
                     s={s}
                     layout="card"
@@ -873,9 +894,9 @@ export default function ServicesListMui({
                     onDelete={deleteService}
                     onOpen={handleOpen}
                   />
-                </Grid>
+                </Box>
               ))}
-            </Grid>
+            </Box>
           )}
         </Box>
       )}
@@ -914,6 +935,7 @@ export default function ServicesListMui({
         plansForPlatformErrors={plansForPlatformErrors}
         volumes={volumes}
         volumesLoading={volumesLoading}
+        onVolumesChanged={() => fetchVolumes({ silent: false })}
       />
     </Container>
   );

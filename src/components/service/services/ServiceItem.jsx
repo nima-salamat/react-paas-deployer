@@ -22,14 +22,6 @@ import AppsIcon from "@mui/icons-material/Apps";
 import { resolveServiceKind, resolveUsage, getKey } from "./helpers";
 import UsageBar from "./UsageBar";
 
-const btnSx = {
-  borderRadius: 1.5,
-  textTransform: "none",
-  fontWeight: 600,
-  height: 34,
-  minWidth: 0,
-};
-
 function ServiceItem({
   s,
   layout = "card",
@@ -66,7 +58,6 @@ function ServiceItem({
   const isRunning = status === "running";
   const statusColor = isRunning ? "success" : isUpdating ? "warning" : "default";
 
-  // Prefer live status entry over nested object lookup (stable prop)
   const usage = resolveUsage(
     statusEntry
       ? { ...s, cpu_percent: statusEntry.cpu, memory_percent: statusEntry.ram }
@@ -95,59 +86,83 @@ function ServiceItem({
       }
       color={isDb ? "info" : "default"}
       variant={isDb ? "filled" : "outlined"}
-      sx={{ height: 24, fontWeight: 700, fontSize: 11 }}
+      sx={{ height: 22, fontWeight: 700, fontSize: 11 }}
     />
   );
 
-  const stats = (
-    <Box sx={{ mt: layout === "row" ? 0 : 1.5 }}>
-      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-        {cpu != null && (
-          <Chip
-            size="small"
-            icon={<ComputerIcon sx={{ fontSize: 14 }} />}
-            label={`${cpu} CPU`}
-            sx={{ height: 24 }}
-          />
-        )}
-        {ram != null && (
-          <Chip
-            size="small"
-            icon={<MemoryIcon sx={{ fontSize: 14 }} />}
-            label={`${ram} MB`}
-            sx={{ height: 24 }}
-          />
-        )}
-        {storage != null && (
-          <Chip
-            size="small"
-            icon={<StorageIcon sx={{ fontSize: 14 }} />}
-            label={`${storage} GB`}
-            sx={{ height: 24 }}
-          />
-        )}
-        {price != null && (
-          <Chip
-            size="small"
-            icon={<AttachMoneyIcon sx={{ fontSize: 14 }} />}
-            label={`${price}/hr`}
-            color="success"
-            variant="outlined"
-            sx={{ height: 24 }}
-          />
-        )}
-      </Stack>
-      {(usage.cpu != null || usage.ram != null) && (
-        <Stack direction="row" spacing={1.5} sx={{ mt: 1.25 }}>
-          <UsageBar label="CPU" value={usage.cpu} dense />
-          <UsageBar label="RAM" value={usage.ram} dense />
-        </Stack>
+  const metaChips = (
+    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+      {cpu != null && (
+        <Chip
+          size="small"
+          icon={<ComputerIcon sx={{ fontSize: 13 }} />}
+          label={`${cpu} CPU`}
+          sx={{ height: 22, fontSize: 11 }}
+        />
       )}
-    </Box>
+      {ram != null && (
+        <Chip
+          size="small"
+          icon={<MemoryIcon sx={{ fontSize: 13 }} />}
+          label={`${ram} MB`}
+          sx={{ height: 22, fontSize: 11 }}
+        />
+      )}
+      {storage != null && (
+        <Chip
+          size="small"
+          icon={<StorageIcon sx={{ fontSize: 13 }} />}
+          label={`${storage} GB`}
+          sx={{ height: 22, fontSize: 11 }}
+        />
+      )}
+      {price != null && (
+        <Chip
+          size="small"
+          icon={<AttachMoneyIcon sx={{ fontSize: 13 }} />}
+          label={`${price}/hr`}
+          color="success"
+          variant="outlined"
+          sx={{ height: 22, fontSize: 11 }}
+        />
+      )}
+    </Stack>
   );
 
+  const usageBars = (
+    <Stack
+      direction="row"
+      spacing={1.25}
+      sx={{
+        mt: 1.25,
+        minHeight: 28,
+        visibility: usage.cpu != null || usage.ram != null ? "visible" : "hidden",
+      }}
+    >
+      <UsageBar label="CPU" value={usage.cpu ?? 0} dense />
+      <UsageBar label="RAM" value={usage.ram ?? 0} dense />
+    </Stack>
+  );
+
+  const actionBtnSx = {
+    borderRadius: 1.5,
+    textTransform: "none",
+    fontWeight: 700,
+    minWidth: 0,
+    flex: "1 1 calc(50% - 4px)",
+    py: 0.85,
+    fontSize: { xs: 12.5, sm: 13 },
+  };
+
   const actions = !isReadOnly && (
-    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+    <Box
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 0.75,
+        width: "100%",
+      }}
+    >
       <Button
         size="small"
         variant="contained"
@@ -160,9 +175,21 @@ function ServiceItem({
           e.stopPropagation();
           onToggleStatus?.(s, s.status);
         }}
-        sx={{ ...btnSx, minWidth: 88 }}
+        sx={actionBtnSx}
       >
         {isUpdating ? "…" : isRunning ? "Stop" : "Start"}
+      </Button>
+      <Button
+        size="small"
+        variant="contained"
+        startIcon={<LaunchIcon fontSize="small" />}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen?.(s);
+        }}
+        sx={actionBtnSx}
+      >
+        Open
       </Button>
       <Button
         size="small"
@@ -172,7 +199,7 @@ function ServiceItem({
           e.stopPropagation();
           onEdit?.(s);
         }}
-        sx={{ ...btnSx, minWidth: 72 }}
+        sx={actionBtnSx}
       >
         Edit
       </Button>
@@ -185,76 +212,68 @@ function ServiceItem({
           e.stopPropagation();
           onDelete?.(s.id ?? s.pk);
         }}
-        sx={{ ...btnSx, minWidth: 80 }}
+        sx={actionBtnSx}
       >
         Delete
       </Button>
-      <Button
-        size="small"
-        variant="contained"
-        startIcon={<LaunchIcon fontSize="small" />}
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpen?.(s);
-        }}
-        sx={{ ...btnSx, minWidth: 76 }}
-      >
-        Open
-      </Button>
-    </Stack>
+    </Box>
   );
 
+  /* ─── Row layout ─── */
   if (layout === "row") {
     return (
       <Paper
         elevation={0}
         sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          p: 2,
+          p: { xs: 1.5, sm: 2 },
           mb: 1.25,
-          flexWrap: "wrap",
-          gap: 1.5,
           borderRadius: 2,
           border: "1px solid",
           borderColor: "divider",
         }}
       >
-        <Box sx={{ flex: 1, minWidth: 160 }}>
-          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Typography variant="subtitle1" fontWeight={800}>
-              {s.name || "(no name)"}
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={{ xs: 1.25, md: 2 }}
+          alignItems={{ xs: "stretch", md: "center" }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="subtitle1" fontWeight={800} sx={{ lineHeight: 1.25 }}>
+                {s.name || "(no name)"}
+              </Typography>
+              {kindChip}
+              <Chip
+                label={s.status ?? "unknown"}
+                color={statusColor}
+                size="small"
+                sx={{ fontWeight: 700, height: 22 }}
+              />
+            </Stack>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.35 }}
+            >
+              <HubIcon sx={{ fontSize: 14 }} /> {networkName}
             </Typography>
-            {kindChip}
-          </Stack>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-          >
-            <HubIcon sx={{ fontSize: 14 }} /> {networkName}
-          </Typography>
-        </Box>
-        <Box sx={{ flex: 2, minWidth: 200 }}>{stats}</Box>
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
-          <Chip
-            label={s.status ?? "unknown"}
-            color={statusColor}
-            size="small"
-            sx={{ fontWeight: 700, height: 24 }}
-          />
-          {actions}
-        </Box>
+            {metaChips}
+            {usageBars}
+          </Box>
+          <Box sx={{ width: { xs: "100%", md: 280 }, flexShrink: 0 }}>{actions}</Box>
+        </Stack>
       </Paper>
     );
   }
 
+  /* ─── Card layout ─── */
   return (
     <Paper
       elevation={0}
       sx={{
+        width: "100%",
         height: "100%",
+        minHeight: { xs: 220, sm: 240 },
         display: "flex",
         flexDirection: "column",
         borderRadius: 2.5,
@@ -263,79 +282,92 @@ function ServiceItem({
         overflow: "hidden",
         backgroundImage: (t) =>
           t.palette.mode === "dark"
-            ? "linear-gradient(145deg, rgba(30,41,59,0.5), rgba(15,23,42,0.7))"
+            ? "linear-gradient(145deg, rgba(30,41,59,0.55), rgba(15,23,42,0.75))"
             : "linear-gradient(145deg, #ffffff, #f8fafc)",
       }}
     >
-      <Box sx={{ p: 2, flexGrow: 1 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", gap: 1 }}>
-          <Box sx={{ minWidth: 0 }}>
-            <Stack
-              direction="row"
-              spacing={0.75}
-              alignItems="center"
-              flexWrap="wrap"
-              useFlexGap
-              sx={{ mb: 0.35 }}
+      <Box
+        sx={{
+          p: { xs: 1.5, sm: 2 },
+          flexGrow: 1,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: { xs: 140, sm: 150 },
+        }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+          <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: 0, flex: 1 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: 1.5,
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                bgcolor: (t) =>
+                  isDb
+                    ? t.palette.mode === "dark"
+                      ? "rgba(6,182,212,0.2)"
+                      : "rgba(6,182,212,0.12)"
+                    : t.palette.mode === "dark"
+                    ? "rgba(99,102,241,0.2)"
+                    : "rgba(99,102,241,0.1)",
+                color: isDb ? "info.main" : "primary.main",
+              }}
             >
-              <Box
+              {isDb ? (
+                <StorageOutlinedIcon sx={{ fontSize: 20 }} />
+              ) : (
+                <AppsIcon sx={{ fontSize: 20 }} />
+              )}
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                variant="subtitle1"
+                fontWeight={800}
                 sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 1.25,
-                  display: "grid",
-                  placeItems: "center",
-                  flexShrink: 0,
-                  bgcolor: (t) =>
-                    isDb
-                      ? t.palette.mode === "dark"
-                        ? "rgba(6,182,212,0.2)"
-                        : "rgba(6,182,212,0.12)"
-                      : t.palette.mode === "dark"
-                      ? "rgba(99,102,241,0.2)"
-                      : "rgba(99,102,241,0.1)",
-                  color: isDb ? "info.main" : "primary.main",
+                  lineHeight: 1.25,
+                  wordBreak: "break-word",
                 }}
               >
-                {isDb ? (
-                  <StorageOutlinedIcon sx={{ fontSize: 18 }} />
-                ) : (
-                  <AppsIcon sx={{ fontSize: 18 }} />
-                )}
-              </Box>
-              <Typography variant="subtitle1" fontWeight={800} noWrap>
                 {s.name || "(no name)"}
               </Typography>
-            </Stack>
-            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-              {kindChip}
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-              >
-                <HubIcon sx={{ fontSize: 14 }} /> {networkName}
-              </Typography>
-            </Stack>
-          </Box>
+              <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                {kindChip}
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "inline-flex", alignItems: "center", gap: 0.35 }}
+                >
+                  <HubIcon sx={{ fontSize: 13 }} /> {networkName}
+                </Typography>
+              </Stack>
+            </Box>
+          </Stack>
           <Chip
             label={s.status ?? "unknown"}
             color={statusColor}
             size="small"
-            sx={{ fontWeight: 700, height: 24, flexShrink: 0 }}
+            sx={{ fontWeight: 700, height: 22, flexShrink: 0 }}
           />
-        </Box>
-        {stats}
+        </Stack>
+
+        {metaChips}
+        {usageBars}
+        <Box sx={{ flexGrow: 1 }} />
       </Box>
+
       {!isReadOnly && (
         <Box
           sx={{
-            px: 2,
-            py: 1.5,
+            px: { xs: 1.25, sm: 1.5 },
+            py: 1.25,
+            mt: "auto",
             borderTop: "1px solid",
             borderColor: "divider",
             bgcolor: (t) =>
-              t.palette.mode === "dark" ? "rgba(0,0,0,0.15)" : "rgba(0,0,0,0.02)",
+              t.palette.mode === "dark" ? "rgba(0,0,0,0.18)" : "rgba(15,23,42,0.02)",
           }}
         >
           {actions}
@@ -369,7 +401,6 @@ export default memo(ServiceItem, (prev, next) => {
   if (prev.isReadOnly !== next.isReadOnly) return false;
   if (!shallowServiceEqual(prev.s, next.s)) return false;
   if (!statusEntryEqual(prev.statusEntry, next.statusEntry)) return false;
-  // plan/network caches: only care about THIS service's entries
   const planIsObj = next.s?.plan && typeof next.s.plan === "object";
   const netIsObj = next.s?.network && typeof next.s.network === "object";
   const planId = planIsObj ? next.s.plan.id ?? next.s.plan.pk : next.s?.plan;

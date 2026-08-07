@@ -442,7 +442,25 @@ export default function CreateServiceWizard({
       });
       clearTimeout(t);
       const ok = res?.status === 201 || res?.status === 200;
-      const serviceId = res?.data?.id ?? res?.data?.pk ?? res?.data?.service?.id;
+      let serviceId = res?.data?.id ?? res?.data?.pk ?? res?.data?.service?.id;
+
+      // Backend may only return { success } — resolve id by name
+      if (ok && !serviceId && name.trim()) {
+        try {
+          const listRes = await apiRequest({
+            method: "GET",
+            url: apiUrl,
+            params: { q_search: name.trim(), page_size: 20 },
+          });
+          const list = extractList(listRes.data);
+          const match =
+            list.find((s) => String(s.name || "").toLowerCase() === name.trim().toLowerCase()) ||
+            list[0];
+          serviceId = match?.id ?? match?.pk;
+        } catch {
+          /* ignore */
+        }
+      }
 
       let attachNote = "";
       if (ok && serviceId && selectedVolumeIds.length) {
