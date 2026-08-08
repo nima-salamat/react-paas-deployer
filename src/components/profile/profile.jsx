@@ -27,6 +27,7 @@ import {
   InputLabel,
   MenuItem,
   Paper,
+  Popover,
   Select,
   Slider,
   Stack,
@@ -36,6 +37,7 @@ import {
   alpha,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
@@ -49,12 +51,38 @@ import LockOpenIcon from "@mui/icons-material/LockOpen";
 import PersonIcon from "@mui/icons-material/Person";
 import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import StarIcon from "@mui/icons-material/Star";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import RotateRightIcon from "@mui/icons-material/RotateRight";
+import OpenWithIcon from "@mui/icons-material/OpenWith";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import ReactAvatarEditor from "react-avatar-editor";
 import { format, parseISO } from "date-fns";
 import apiRequest from "../customHooks/apiRequest";
 
+// --- DND-Kit Imports ---
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
+
+/** Size of the crop canvas inside the editor (px) */
+const EDITOR_SIZE = 360;
 
 const COLOR_CHOICES = [
   { value: 0, label: "Default" },
@@ -77,6 +105,12 @@ const THEME_CHOICES = [
   { value: "dark", label: "Dark" },
 ];
 
+const PRESET_EMOJIS = [
+  "😀", "😂", "😍", "😎", "🤩", "👑",
+  "💡", "🔥", "❤️", "⭐", "🚀", "🍕",
+  "🎉", "🏆", "💎", "✨", "🎵", "💬",
+];
+
 // ─── helpers ───────────────────────────────────────────────────────────────
 
 function hasAccessToken() {
@@ -87,7 +121,6 @@ function hasAccessToken() {
   }
 }
 
-/** Normalize profile image URL from any shape the API may return. */
 export function resolveProfileImageUrl(profile) {
   if (!profile) return null;
   const candidates = [
@@ -101,7 +134,6 @@ export function resolveProfileImageUrl(profile) {
   for (const c of candidates) {
     if (typeof c === "string" && c.trim()) {
       const url = c.trim();
-      // Relative media path → absolute against API host
       if (url.startsWith("/")) {
         const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
         return `${host}${url}`;
@@ -135,6 +167,23 @@ function friendlyErr(err, fallback = "Something went wrong.") {
   }
   if (data.detail) return String(data.detail);
   return fallback;
+}
+
+function revokeUrl(url) {
+  if (url && typeof url === "string" && url.startsWith("blob:")) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function isImageFile(file) {
+  if (!file) return false;
+  if (file.type && file.type.startsWith("image/")) return true;
+  // fallback for some OS that omit MIME
+  return /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(file.name || "");
 }
 
 // ─── Context ───────────────────────────────────────────────────────────────
@@ -174,7 +223,6 @@ export const ProfileProvider = ({ children }) => {
           : Array.isArray(raw?.profiles)
           ? raw.profiles
           : [];
-        // Normalize image_url for consumers (Navbar, etc.)
         const normalized = list.map((p) => ({
           ...p,
           id: getProfileId(p),
@@ -184,7 +232,6 @@ export const ProfileProvider = ({ children }) => {
         setProfiles(normalized);
         return normalized;
       } catch (err) {
-        // 401 → empty, no scary error for guests
         if (err?.response?.status === 401 || err?.response?.status === 403) {
           setProfiles([]);
           setProfileError("");
@@ -246,25 +293,188 @@ export const useProfiles = () => {
   return ctx;
 };
 
-// ─── Drag-drop helper for StrictMode ───────────────────────────────────────
+// ─── Sortable Photo — whole card is draggable; click still opens preview ───
 
-const StrictModeDroppable = ({ children, ...props }) => {
-  const [enabled, setEnabled] = useState(false);
+const SortablePhoto = ({ id, profile, index, handleDeleteProfile, onPreview }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  // Track whether a drag actually started so click doesn't fire after drag
+  const didDragRef = useRef(false);
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.55 : 1,
+  };
+
+  const src = resolveProfileImageUrl(profile);
+
   useEffect(() => {
-    const id = requestAnimationFrame(() => setEnabled(true));
-    return () => {
-      cancelAnimationFrame(id);
-      setEnabled(false);
-    };
-  }, []);
-  if (!enabled) return null;
-  return <Droppable {...props}>{children}</Droppable>;
+    if (isDragging) didDragRef.current = true;
+  }, [isDragging]);
+
+  const handlePreviewClick = (e) => {
+    e.stopPropagation();
+    if (didDragRef.current) {
+      didDragRef.current = false;
+      return;
+    }
+    if (src) onPreview(src);
+  };
+
+  // Merge with dnd-kit listeners — never replace onPointerDown or drag breaks
+  const mergedListeners = listeners
+    ? {
+        ...listeners,
+        onPointerDown: (e) => {
+          didDragRef.current = false;
+          listeners.onPointerDown?.(e);
+        },
+      }
+    : undefined;
+
+  return (
+    <Paper
+      ref={setNodeRef}
+      style={style}
+      elevation={isDragging ? 10 : 0}
+      {...attributes}
+      {...mergedListeners}
+      sx={{
+        p: 1.25,
+        borderRadius: 2.5,
+        border: "1px solid",
+        borderColor: isDragging
+          ? "primary.main"
+          : index === 0
+          ? "primary.main"
+          : "divider",
+        position: "relative",
+        width: 132,
+        cursor: isDragging ? "grabbing" : "grab",
+        touchAction: "none",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        transition: "box-shadow 0.15s, border-color 0.15s, opacity 0.15s",
+        "&:hover": {
+          boxShadow: isDragging ? undefined : 3,
+        },
+      }}
+    >
+      {/* Number Badge */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 6,
+          left: 6,
+          width: 24,
+          height: 24,
+          bgcolor: index === 0 ? "primary.main" : "grey.800",
+          color: "white",
+          borderRadius: "50%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12,
+          fontWeight: "bold",
+          boxShadow: 2,
+          zIndex: 3,
+          pointerEvents: "none",
+        }}
+      >
+        {index + 1}
+      </Box>
+
+      {/* Primary Tag */}
+      {index === 0 && (
+        <Chip
+          icon={<StarIcon sx={{ fontSize: 14 }} />}
+          label="Primary"
+          size="small"
+          color="primary"
+          sx={{
+            position: "absolute",
+            top: -10,
+            left: "50%",
+            transform: "translateX(-50%)",
+            height: 20,
+            fontSize: 10,
+            fontWeight: 800,
+            zIndex: 3,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* Delete — stop drag from starting on this control */}
+      <IconButton
+        color="error"
+        size="small"
+        sx={{
+          position: "absolute",
+          top: 4,
+          right: 4,
+          bgcolor: alpha("#000", 0.4),
+          color: "#fff",
+          "&:hover": { bgcolor: "error.main" },
+          zIndex: 3,
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDeleteProfile(getProfileId(profile));
+        }}
+      >
+        <DeleteIcon fontSize="small" />
+      </IconButton>
+
+      {/* Photo — click opens preview; drag reorders */}
+      <Box
+        onClick={handlePreviewClick}
+        sx={{
+          cursor: isDragging ? "grabbing" : "grab",
+          borderRadius: 2,
+          overflow: "hidden",
+          mt: 1.5,
+          position: "relative",
+          "&:hover": { opacity: 0.92 },
+        }}
+      >
+        <Avatar
+          src={src || undefined}
+          alt={`Photo ${index + 1}`}
+          sx={{
+            width: 108,
+            height: 108,
+            mx: "auto",
+            borderRadius: 2,
+            pointerEvents: "none",
+          }}
+          variant="rounded"
+          draggable={false}
+        />
+      </Box>
+    </Paper>
+  );
 };
 
 // ─── Profile page ──────────────────────────────────────────────────────────
 
 const Profile = () => {
   const theme = useTheme();
+  // Desktop only for OS file drag-and-drop (not tablet / phone)
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
+  const prefersFinePointer = useMediaQuery("(pointer: fine)", { noSsr: true });
+  const enableFileDrop = isDesktop && prefersFinePointer;
+
   const {
     profiles,
     setProfiles,
@@ -297,6 +507,8 @@ const Profile = () => {
   const [editMode, setEditMode] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [deletePasswordDialogOpen, setDeletePasswordDialogOpen] = useState(false);
+  const [previewImageSrc, setPreviewImageSrc] = useState(null);
+
   const [passwordData, setPasswordData] = useState({
     password: "",
     confirm_password: "",
@@ -308,15 +520,63 @@ const Profile = () => {
     confirm_password: "",
   });
 
+  // ── Image pipeline ─────────────────────────────────────────────────────
+  // original* = source chosen by user (never mutated by Apply)
+  // newImageFile / previewUrl = final composite ready for upload / thumbnail
+  const [originalFile, setOriginalFile] = useState(null);
+  const [originalPreviewUrl, setOriginalPreviewUrl] = useState(null);
   const [newImageFile, setNewImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [hasAppliedEdit, setHasAppliedEdit] = useState(false);
+
   const [editorOpen, setEditorOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [position, setPosition] = useState({ x: 0.5, y: 0.5 });
   const [circularCrop, setCircularCrop] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Desktop drop-zone highlight
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  // --- EMOJI & ICON EDITOR STATE ---
+  const [emojis, setEmojis] = useState([]);
+  const [selectedEmojiId, setSelectedEmojiId] = useState(null);
+  const [draggingEmojiId, setDraggingEmojiId] = useState(null);
+  const [emojiAnchorEl, setEmojiAnchorEl] = useState(null);
+  const editorContainerRef = useRef(null);
+
+  // Snapshot of editor settings so reopening restores exact state (without baking image)
+  const editorSnapshotRef = useRef({
+    zoom: 1,
+    rotation: 0,
+    position: { x: 0.5, y: 0.5 },
+    circularCrop: true,
+    emojis: [],
+  });
+
+  // --- DND-Kit Sensors ---
+  // Pointer: small distance so click ≠ drag (preview still works)
+  // Touch: short delay so scroll/tap work on mobile; reorder still possible
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 180,
+        tolerance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchUserData();
@@ -334,6 +594,21 @@ const Profile = () => {
     const t = setTimeout(() => setError(""), 4500);
     return () => clearTimeout(t);
   }, [error]);
+
+  // Keep latest blob URLs for unmount cleanup
+  const originalPreviewUrlRef = useRef(originalPreviewUrl);
+  const previewUrlRef = useRef(previewUrl);
+  originalPreviewUrlRef.current = originalPreviewUrl;
+  previewUrlRef.current = previewUrl;
+
+  useEffect(() => {
+    return () => {
+      revokeUrl(originalPreviewUrlRef.current);
+      if (previewUrlRef.current !== originalPreviewUrlRef.current) {
+        revokeUrl(previewUrlRef.current);
+      }
+    };
+  }, []);
 
   const fetchUserData = async () => {
     setLoadingUser(true);
@@ -392,17 +667,43 @@ const Profile = () => {
     }
   };
 
-  // Auto-assign next order — user never picks it
   const nextOrder = useMemo(() => {
     if (!profiles.length) return 0;
     return Math.max(...profiles.map((p) => Number(p.order) || 0)) + 1;
   }, [profiles]);
 
+  const clearPendingImage = () => {
+    if (previewUrl && previewUrl !== originalPreviewUrl) {
+      revokeUrl(previewUrl);
+    }
+    revokeUrl(originalPreviewUrl);
+    setOriginalFile(null);
+    setOriginalPreviewUrl(null);
+    setNewImageFile(null);
+    setPreviewUrl(null);
+    setHasAppliedEdit(false);
+    setZoom(1);
+    setRotation(0);
+    setPosition({ x: 0.5, y: 0.5 });
+    setCircularCrop(true);
+    setEmojis([]);
+    setSelectedEmojiId(null);
+    editorSnapshotRef.current = {
+      zoom: 1,
+      rotation: 0,
+      position: { x: 0.5, y: 0.5 },
+      circularCrop: true,
+      emojis: [],
+    };
+  };
+
   const handleAddProfile = async () => {
-    if (!newImageFile) return;
+    const fileToUpload = newImageFile || originalFile;
+    if (!fileToUpload) return;
+
     setUploadingImage(true);
     const formData = new FormData();
-    formData.append("image", newImageFile, "profile.jpg");
+    formData.append("image", fileToUpload, "profile.jpg");
     formData.append("order", String(nextOrder));
     try {
       await apiRequest({
@@ -411,8 +712,7 @@ const Profile = () => {
         data: formData,
       });
       setSuccess("Profile photo added");
-      setNewImageFile(null);
-      setPreviewUrl(null);
+      clearPendingImage();
       await fetchProfiles();
       try {
         window.dispatchEvent(new Event("auth-changed"));
@@ -446,15 +746,22 @@ const Profile = () => {
     }
   };
 
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
-    const items = Array.from(profiles);
-    const [moved] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, moved);
-    const updated = items.map((p, index) => ({ ...p, order: index }));
-    setProfiles(updated);
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
 
-    const orderDict = updated.reduce((acc, p) => {
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = profiles.findIndex((p) => String(getProfileId(p)) === active.id);
+    const newIndex = profiles.findIndex((p) => String(getProfileId(p)) === over.id);
+
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const updatedProfiles = arrayMove(profiles, oldIndex, newIndex);
+    const reorderedProfiles = updatedProfiles.map((p, index) => ({ ...p, order: index }));
+
+    setProfiles(reorderedProfiles);
+
+    const orderDict = reorderedProfiles.reduce((acc, p) => {
       const id = getProfileId(p);
       if (id != null) acc[String(id)] = p.order;
       return acc;
@@ -480,7 +787,6 @@ const Profile = () => {
     })();
   };
 
-  // Password API paths match users/urls.py
   const fetchPasswordStatus = async () => {
     setPasswordStatusLoading(true);
     try {
@@ -490,7 +796,6 @@ const Profile = () => {
       });
       setHasPassword(Boolean(response.data?.has_password));
     } catch (err) {
-      // fallback: older path
       try {
         const response = await apiRequest({
           url: `${API_BASE}password-status/`,
@@ -605,37 +910,206 @@ const Profile = () => {
     }
   };
 
+  /** Load a File into the editor pipeline and open Adjust & Decorate */
+  const loadImageFile = (file) => {
+    if (!file || !isImageFile(file)) {
+      setError("Please choose a valid image file.");
+      return;
+    }
+
+    if (previewUrl && previewUrl !== originalPreviewUrl) {
+      revokeUrl(previewUrl);
+    }
+    revokeUrl(originalPreviewUrl);
+
+    const url = URL.createObjectURL(file);
+    setOriginalFile(file);
+    setOriginalPreviewUrl(url);
+    setNewImageFile(null);
+    setPreviewUrl(url);
+    setHasAppliedEdit(false);
+
+    setZoom(1);
+    setRotation(0);
+    setPosition({ x: 0.5, y: 0.5 });
+    setCircularCrop(true);
+    setEmojis([]);
+    setSelectedEmojiId(null);
+    editorSnapshotRef.current = {
+      zoom: 1,
+      rotation: 0,
+      position: { x: 0.5, y: 0.5 },
+      circularCrop: true,
+      emojis: [],
+    };
+
+    setEditorOpen(true);
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setNewImageFile(file);
-    setPreviewUrl(URL.createObjectURL(file));
-    setZoom(1);
-    setRotation(0);
-    setCircularCrop(true);
+    loadImageFile(file);
+  };
+
+  // ── Desktop file drag & drop ────────────────────────────────────────────
+  const handleDropZoneDragEnter = (e) => {
+    if (!enableFileDrop) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.types?.includes("Files")) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDropZoneDragLeave = (e) => {
+    if (!enableFileDrop) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDropZoneDragOver = (e) => {
+    if (!enableFileDrop) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const handleDropZoneDrop = (e) => {
+    if (!enableFileDrop) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragOver(false);
+
+    const files = e.dataTransfer?.files;
+    if (!files?.length) return;
+    const file = files[0];
+    loadImageFile(file);
+  };
+
+  const openEditor = () => {
+    if (!originalPreviewUrl) return;
+    const snap = editorSnapshotRef.current;
+    setZoom(snap.zoom);
+    setRotation(snap.rotation);
+    setPosition(snap.position || { x: 0.5, y: 0.5 });
+    setCircularCrop(snap.circularCrop);
+    setEmojis(snap.emojis || []);
+    setSelectedEmojiId(null);
     setEditorOpen(true);
   };
 
-  const handleApplyEdit = () => {
-    if (!editorRef.current) {
-      setEditorOpen(false);
-      return;
-    }
-    editorRef.current.getImageScaledToCanvas().toBlob(
-      (blob) => {
-        if (blob) {
-          setNewImageFile(blob);
-          setPreviewUrl(URL.createObjectURL(blob));
-        }
-        setEditorOpen(false);
-      },
-      "image/jpeg",
-      0.92
+  // --- EMOJI EDITOR LOGIC ---
+  const handleAddEmoji = (emojiChar) => {
+    const newEmoji = {
+      id: Date.now().toString(),
+      char: emojiChar,
+      x: EDITOR_SIZE / 2,
+      y: EDITOR_SIZE / 2,
+      size: 48,
+    };
+    setEmojis((prev) => [...prev, newEmoji]);
+    setSelectedEmojiId(newEmoji.id);
+    setEmojiAnchorEl(null);
+  };
+
+  const handleEmojiPointerDown = (e, id) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDraggingEmojiId(id);
+    setSelectedEmojiId(id);
+  };
+
+  const handleEditorPointerMove = (e) => {
+    if (!draggingEmojiId || !editorContainerRef.current) return;
+    const rect = editorContainerRef.current.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    let x = clientX - rect.left;
+    let y = clientY - rect.top;
+
+    x = Math.max(0, Math.min(EDITOR_SIZE, x));
+    y = Math.max(0, Math.min(EDITOR_SIZE, y));
+
+    setEmojis((prev) =>
+      prev.map((em) => (em.id === draggingEmojiId ? { ...em, x, y } : em))
     );
   };
 
-  const primaryUrl =
-    profiles[0] ? resolveProfileImageUrl(profiles[0]) : null;
+  const handleEditorPointerUp = () => {
+    setDraggingEmojiId(null);
+  };
+
+  const buildFinalBlob = () =>
+    new Promise((resolve) => {
+      if (!editorRef.current) {
+        resolve(null);
+        return;
+      }
+
+      const canvas = editorRef.current.getImageScaledToCanvas();
+      const ctx = canvas.getContext("2d");
+
+      const scaleX = canvas.width / EDITOR_SIZE;
+      const scaleY = canvas.height / EDITOR_SIZE;
+
+      emojis.forEach((emp) => {
+        ctx.font = `${emp.size * scaleX}px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(emp.char, emp.x * scaleX, emp.y * scaleY);
+      });
+
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
+    });
+
+  const handleApplyEdit = async () => {
+    const blob = await buildFinalBlob();
+    if (blob) {
+      if (previewUrl && previewUrl !== originalPreviewUrl) {
+        revokeUrl(previewUrl);
+      }
+      const url = URL.createObjectURL(blob);
+      setNewImageFile(blob);
+      setPreviewUrl(url);
+      setHasAppliedEdit(true);
+    }
+
+    editorSnapshotRef.current = {
+      zoom,
+      rotation,
+      position: { ...position },
+      circularCrop,
+      emojis: emojis.map((e) => ({ ...e })),
+    };
+
+    setEditorOpen(false);
+  };
+
+  const handleCancelEditor = () => {
+    const snap = editorSnapshotRef.current;
+    setZoom(snap.zoom);
+    setRotation(snap.rotation);
+    setPosition(snap.position || { x: 0.5, y: 0.5 });
+    setCircularCrop(snap.circularCrop);
+    setEmojis(snap.emojis || []);
+    setSelectedEmojiId(null);
+    setEditorOpen(false);
+  };
+
+  const primaryUrl = profiles[0] ? resolveProfileImageUrl(profiles[0]) : null;
 
   if (loadingUser && loadingProfiles) {
     return (
@@ -656,10 +1130,12 @@ const Profile = () => {
         : "linear-gradient(145deg, #ffffff, #f8fafc)",
   };
 
+  const canUpload = Boolean(newImageFile || originalFile);
+
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
-        {/* Hero */}
+        {/* Hero Section */}
         <Paper elevation={0} sx={{ ...sectionPaper, mb: 3 }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -717,6 +1193,7 @@ const Profile = () => {
           </Stack>
         </Paper>
 
+        {/* System Alerts */}
         {(error || profileError || success) && (
           <Stack spacing={1} sx={{ mb: 2 }}>
             {error && (
@@ -737,7 +1214,7 @@ const Profile = () => {
           </Stack>
         )}
 
-        {/* User info */}
+        {/* User Info Form */}
         <Paper elevation={0} sx={{ ...sectionPaper, mb: 3 }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
             <PersonIcon color="primary" />
@@ -862,7 +1339,7 @@ const Profile = () => {
           </Stack>
         </Paper>
 
-        {/* Photos */}
+        {/* Photos List */}
         <Paper elevation={0} sx={{ ...sectionPaper, mb: 3 }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
             <PhotoLibraryIcon color="primary" />
@@ -871,108 +1348,89 @@ const Profile = () => {
             </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Drag to reorder. The first photo is shown in the navbar.
+            Tap a photo to preview. Drag the photo itself to reorder.
+            {enableFileDrop ? " On desktop you can also drop an image below." : ""}
           </Typography>
 
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <StrictModeDroppable droppableId="profiles" direction="horizontal">
-              {(provided) => (
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  sx={{
-                    flexWrap: "wrap",
-                    gap: 2,
-                    minHeight: 120,
-                    alignItems: "flex-start",
-                  }}
-                >
-                  {profiles.map((profile, index) => {
-                    const id = String(getProfileId(profile));
-                    const src = resolveProfileImageUrl(profile);
-                    return (
-                      <Draggable key={id} draggableId={id} index={index}>
-                        {(drag) => (
-                          <Paper
-                            ref={drag.innerRef}
-                            {...drag.draggableProps}
-                            {...drag.dragHandleProps}
-                            elevation={0}
-                            sx={{
-                              p: 1.25,
-                              borderRadius: 2.5,
-                              border: "1px solid",
-                              borderColor: index === 0 ? "primary.main" : "divider",
-                              position: "relative",
-                              cursor: "grab",
-                              width: 132,
-                            }}
-                          >
-                            {index === 0 && (
-                              <Chip
-                                icon={<StarIcon sx={{ fontSize: 14 }} />}
-                                label="Primary"
-                                size="small"
-                                color="primary"
-                                sx={{
-                                  position: "absolute",
-                                  top: 6,
-                                  left: 6,
-                                  height: 22,
-                                  fontSize: 10,
-                                  fontWeight: 800,
-                                  zIndex: 1,
-                                }}
-                              />
-                            )}
-                            <Avatar
-                              src={src || undefined}
-                              alt={`Photo ${index + 1}`}
-                              sx={{
-                                width: 108,
-                                height: 108,
-                                mx: "auto",
-                                borderRadius: 2,
-                              }}
-                              variant="rounded"
-                            />
-                            <IconButton
-                              color="error"
-                              size="small"
-                              sx={{
-                                position: "absolute",
-                                top: 4,
-                                right: 4,
-                                bgcolor: alpha("#000", 0.35),
-                                color: "#fff",
-                                "&:hover": { bgcolor: "error.main" },
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteProfile(getProfileId(profile));
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Paper>
-                        )}
-                      </Draggable>
-                    );
-                  })}
-                  {provided.placeholder}
-                  {!profiles.length && (
-                    <Typography color="text.secondary" sx={{ py: 2 }}>
-                      No photos yet — add one below.
-                    </Typography>
-                  )}
-                </Stack>
-              )}
-            </StrictModeDroppable>
-          </DragDropContext>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={profiles.map((p) => String(getProfileId(p)))}
+              strategy={rectSortingStrategy}
+            >
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{
+                  flexWrap: "wrap",
+                  gap: 2,
+                  minHeight: 120,
+                  alignItems: "flex-start",
+                }}
+              >
+                {profiles.map((profile, index) => {
+                  const id = String(getProfileId(profile));
+                  return (
+                    <SortablePhoto
+                      key={id}
+                      id={id}
+                      profile={profile}
+                      index={index}
+                      handleDeleteProfile={handleDeleteProfile}
+                      onPreview={(src) => setPreviewImageSrc(src)}
+                    />
+                  );
+                })}
+                {!profiles.length && (
+                  <Typography color="text.secondary" sx={{ py: 2 }}>
+                    No photos yet — add one below.
+                  </Typography>
+                )}
+              </Stack>
+            </SortableContext>
+          </DndContext>
 
           <Divider sx={{ my: 2.5 }} />
+
+          {/* Desktop-only drop zone */}
+          {enableFileDrop && (
+            <Box
+              onDragEnter={handleDropZoneDragEnter}
+              onDragLeave={handleDropZoneDragLeave}
+              onDragOver={handleDropZoneDragOver}
+              onDrop={handleDropZoneDrop}
+              sx={{
+                mb: 2,
+                p: 3,
+                borderRadius: 3,
+                border: "2px dashed",
+                borderColor: isDragOver ? "primary.main" : "divider",
+                bgcolor: isDragOver
+                  ? alpha(theme.palette.primary.main, 0.08)
+                  : alpha(theme.palette.action.hover, 0.04),
+                textAlign: "center",
+                transition: "border-color 0.15s, background-color 0.15s",
+                cursor: "copy",
+              }}
+            >
+              <CloudUploadIcon
+                sx={{
+                  fontSize: 40,
+                  color: isDragOver ? "primary.main" : "text.secondary",
+                  mb: 1,
+                }}
+              />
+              <Typography variant="body1" fontWeight={700} sx={{ mb: 0.5 }}>
+                {isDragOver ? "Drop image to edit" : "Drag & drop a photo here"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Opens Adjust & Decorate automatically · JPG, PNG, WebP…
+              </Typography>
+            </Box>
+          )}
 
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -982,7 +1440,13 @@ const Profile = () => {
             {previewUrl && (
               <Avatar
                 src={previewUrl}
-                sx={{ width: 56, height: 56, borderRadius: 2 }}
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 2,
+                  border: hasAppliedEdit ? "2px solid" : "1px dashed",
+                  borderColor: hasAppliedEdit ? "primary.main" : "divider",
+                }}
                 variant="rounded"
               />
             )}
@@ -1001,31 +1465,43 @@ const Profile = () => {
                 onChange={handleImageChange}
               />
             </Button>
-            {previewUrl && (
+            {originalPreviewUrl && (
               <Button
                 variant="outlined"
                 startIcon={<EditIcon />}
-                onClick={() => setEditorOpen(true)}
+                onClick={openEditor}
                 sx={{ textTransform: "none", borderRadius: 2 }}
               >
-                Adjust
+                Adjust & Decorate
               </Button>
             )}
             <Button
               variant="contained"
               onClick={handleAddProfile}
-              disabled={!newImageFile || uploadingImage}
+              disabled={!canUpload || uploadingImage}
               sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
             >
               {uploadingImage ? "Uploading…" : "Upload photo"}
             </Button>
+            {(originalFile || newImageFile) && (
+              <Button
+                variant="text"
+                color="inherit"
+                onClick={clearPendingImage}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Clear
+              </Button>
+            )}
           </Stack>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-            Order is assigned automatically. Drag cards to change which one is primary.
+            {hasAppliedEdit
+              ? "Edits are ready — they will be applied when you upload."
+              : "Order is assigned automatically. The #1 photo is set as primary."}
           </Typography>
         </Paper>
 
-        {/* Password */}
+        {/* Security Section */}
         <Paper elevation={0} sx={{ ...sectionPaper }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
             <LockIcon color="primary" />
@@ -1072,55 +1548,289 @@ const Profile = () => {
           </Stack>
         </Paper>
 
-        {/* Image editor */}
+        {/* Photo Preview Dialog */}
+        <Dialog
+          open={Boolean(previewImageSrc)}
+          onClose={() => setPreviewImageSrc(null)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3, maxHeight: "92vh" } }}
+        >
+          <DialogTitle
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontWeight: 800,
+            }}
+          >
+            Photo Preview
+            <IconButton onClick={() => setPreviewImageSrc(null)} size="small">
+              &times;
+            </IconButton>
+          </DialogTitle>
+          <DialogContent
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              p: { xs: 1.5, sm: 3 },
+              bgcolor: (t) =>
+                t.palette.mode === "dark" ? "grey.900" : "grey.100",
+            }}
+          >
+            {previewImageSrc && (
+              <Box
+                component="img"
+                src={previewImageSrc}
+                alt="Preview"
+                sx={{
+                  maxWidth: "100%",
+                  maxHeight: "78vh",
+                  borderRadius: 2,
+                  objectFit: "contain",
+                  boxShadow: 4,
+                }}
+              />
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setPreviewImageSrc(null)} sx={{ textTransform: "none" }}>
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Image Editor & Emoji Decoration Dialog */}
         <Dialog
           open={editorOpen}
-          onClose={() => setEditorOpen(false)}
-          maxWidth="sm"
+          onClose={handleCancelEditor}
+          maxWidth="md"
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <DialogTitle sx={{ fontWeight: 800 }}>Adjust photo</DialogTitle>
-          <DialogContent>
-            <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
-              {previewUrl && (
+          <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
+            Adjust & Decorate Photo
+          </DialogTitle>
+          <DialogContent
+            onPointerMove={handleEditorPointerMove}
+            onPointerUp={handleEditorPointerUp}
+            onPointerLeave={handleEditorPointerUp}
+            sx={{ pt: 1 }}
+          >
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mb: 2, display: "flex", alignItems: "center", gap: 0.75 }}
+            >
+              <OpenWithIcon fontSize="small" />
+              Drag the photo to reposition · use sliders for zoom & rotation
+            </Typography>
+
+            <Box
+              ref={editorContainerRef}
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                mb: 2.5,
+                position: "relative",
+                width: EDITOR_SIZE,
+                height: EDITOR_SIZE,
+                maxWidth: "100%",
+                mx: "auto",
+                overflow: "hidden",
+                borderRadius: circularCrop ? "50%" : 3,
+                boxShadow: 4,
+                border: "2px solid",
+                borderColor: "divider",
+                bgcolor: "grey.900",
+                cursor: "grab",
+                touchAction: "none",
+                "&:active": { cursor: "grabbing" },
+              }}
+            >
+              {originalPreviewUrl && (
                 <ReactAvatarEditor
                   ref={editorRef}
-                  image={previewUrl}
-                  width={250}
-                  height={250}
-                  border={40}
-                  borderRadius={circularCrop ? 125 : 0}
-                  color={[255, 255, 255, 0.6]}
+                  image={originalPreviewUrl}
+                  width={EDITOR_SIZE}
+                  height={EDITOR_SIZE}
+                  border={0}
+                  borderRadius={circularCrop ? EDITOR_SIZE / 2 : 0}
+                  color={[0, 0, 0, 0.55]}
                   scale={zoom}
                   rotate={rotation}
+                  position={position}
+                  onPositionChange={setPosition}
+                  style={{ width: "100%", height: "100%" }}
                 />
               )}
+
+              {emojis.map((em) => (
+                <Box
+                  key={em.id}
+                  onPointerDown={(e) => handleEmojiPointerDown(e, em.id)}
+                  sx={{
+                    position: "absolute",
+                    left: em.x,
+                    top: em.y,
+                    transform: "translate(-50%, -50%)",
+                    fontSize: `${em.size}px`,
+                    cursor: "grab",
+                    userSelect: "none",
+                    lineHeight: 1,
+                    touchAction: "none",
+                    border: selectedEmojiId === em.id ? "2px dashed #1976d2" : "none",
+                    padding: "2px",
+                    borderRadius: "4px",
+                    bgcolor:
+                      selectedEmojiId === em.id
+                        ? alpha("#1976d2", 0.15)
+                        : "transparent",
+                    zIndex: 2,
+                    "&:active": { cursor: "grabbing" },
+                  }}
+                >
+                  {em.char}
+                </Box>
+              ))}
             </Box>
-            <Typography variant="body2" gutterBottom>
-              Zoom
-            </Typography>
-            <Slider value={zoom} onChange={(_, v) => setZoom(v)} min={1} max={3} step={0.01} />
-            <Typography variant="body2" gutterBottom>
-              Rotation
-            </Typography>
-            <Slider
-              value={rotation}
-              onChange={(_, v) => setRotation(v)}
-              min={-180}
-              max={180}
-              step={1}
-            />
-            <Stack direction="row" alignItems="center" sx={{ mt: 1 }}>
-              <Switch
-                checked={circularCrop}
-                onChange={(e) => setCircularCrop(e.target.checked)}
-              />
-              <Typography variant="body2">Circular crop</Typography>
+
+            <Stack
+              direction="row"
+              spacing={1}
+              justifyContent="center"
+              sx={{ mb: 2 }}
+              flexWrap="wrap"
+              useFlexGap
+            >
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<InsertEmoticonIcon />}
+                onClick={(e) => setEmojiAnchorEl(e.currentTarget)}
+                sx={{ textTransform: "none", borderRadius: 2 }}
+              >
+                Add Emoji / Icon
+              </Button>
+              <Popover
+                open={Boolean(emojiAnchorEl)}
+                anchorEl={emojiAnchorEl}
+                onClose={() => setEmojiAnchorEl(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+                transformOrigin={{ vertical: "top", horizontal: "center" }}
+              >
+                <Box
+                  sx={{
+                    p: 1.25,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(6, 1fr)",
+                    gap: 0.5,
+                  }}
+                >
+                  {PRESET_EMOJIS.map((em) => (
+                    <IconButton key={em} onClick={() => handleAddEmoji(em)} size="small">
+                      {em}
+                    </IconButton>
+                  ))}
+                </Box>
+              </Popover>
+            </Stack>
+
+            {selectedEmojiId && (
+              <Paper
+                sx={{ p: 1.5, mb: 2, bgcolor: alpha(theme.palette.primary.main, 0.06) }}
+                variant="outlined"
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  sx={{ mb: 1 }}
+                >
+                  <Typography variant="body2" fontWeight="bold">
+                    Emoji size
+                  </Typography>
+                  <IconButton
+                    color="error"
+                    size="small"
+                    onClick={() => {
+                      setEmojis((prev) => prev.filter((em) => em.id !== selectedEmojiId));
+                      setSelectedEmojiId(null);
+                    }}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+                <Slider
+                  value={emojis.find((e) => e.id === selectedEmojiId)?.size || 48}
+                  onChange={(_, val) =>
+                    setEmojis((prev) =>
+                      prev.map((em) =>
+                        em.id === selectedEmojiId ? { ...em, size: val } : em
+                      )
+                    )
+                  }
+                  min={16}
+                  max={140}
+                  size="small"
+                />
+              </Paper>
+            )}
+
+            <Stack spacing={1.5}>
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                  <ZoomInIcon fontSize="small" color="action" />
+                  <Typography variant="body2" fontWeight={600}>
+                    Zoom
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                    {zoom.toFixed(2)}×
+                  </Typography>
+                </Stack>
+                <Slider
+                  value={zoom}
+                  onChange={(_, v) => setZoom(v)}
+                  min={1}
+                  max={4}
+                  step={0.01}
+                  size="small"
+                />
+              </Box>
+
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                  <RotateRightIcon fontSize="small" color="action" />
+                  <Typography variant="body2" fontWeight={600}>
+                    Rotation
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                    {rotation}°
+                  </Typography>
+                </Stack>
+                <Slider
+                  value={rotation}
+                  onChange={(_, v) => setRotation(v)}
+                  min={-180}
+                  max={180}
+                  step={1}
+                  size="small"
+                />
+              </Box>
+
+              <Stack direction="row" alignItems="center">
+                <Switch
+                  checked={circularCrop}
+                  onChange={(e) => setCircularCrop(e.target.checked)}
+                  size="small"
+                />
+                <Typography variant="body2">Circular crop</Typography>
+              </Stack>
             </Stack>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setEditorOpen(false)} sx={{ textTransform: "none" }}>
+          <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+            <Button onClick={handleCancelEditor} sx={{ textTransform: "none" }}>
               Cancel
             </Button>
             <Button
@@ -1133,7 +1843,7 @@ const Profile = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Set / change password */}
+        {/* Set / Change Password Dialog */}
         <Dialog
           open={passwordDialogOpen}
           onClose={() => setPasswordDialogOpen(false)}
@@ -1238,7 +1948,7 @@ const Profile = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Remove password */}
+        {/* Remove Password Dialog */}
         <Dialog
           open={deletePasswordDialogOpen}
           onClose={() => setDeletePasswordDialogOpen(false)}
