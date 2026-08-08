@@ -22,6 +22,7 @@ import HubIcon from "@mui/icons-material/Hub";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 function useCopy() {
   const [copied, setCopied] = useState(null);
@@ -146,6 +147,7 @@ export default function GlobalServiceControls({
   volumeCount,
   networkName,
   rebuildLoading,
+  forceCancelLoading = false,
   actions,
   onCopyFeedback,
   compact = false,
@@ -155,6 +157,7 @@ export default function GlobalServiceControls({
     startService,
     stopService,
     rebuildService,
+    forceCancelDeploy,
     checkServiceRunning,
     openServiceInNewTab,
   } = actions;
@@ -272,6 +275,21 @@ export default function GlobalServiceControls({
         >
           {rebuildLoading ? "Rebuilding..." : selectedIsDb ? "Rebuild DB" : "Rebuild"}
         </Button>
+        {serviceBusy || forceCancelLoading ? (
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<CancelIcon />}
+            onClick={() => forceCancelDeploy?.()}
+            disabled={!service || forceCancelLoading || !forceCancelDeploy}
+            fullWidth={!compact}
+            size={compact ? "small" : "medium"}
+            title="Stop deploy immediately and remove intermediate containers/images"
+            sx={{ borderRadius: 1.5, fontWeight: 700, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
+          >
+            {forceCancelLoading ? "Cancelling..." : "Force cancel"}
+          </Button>
+        ) : null}
         <Button
           variant="outlined"
           color="error"

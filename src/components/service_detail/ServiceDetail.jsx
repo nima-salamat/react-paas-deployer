@@ -105,6 +105,7 @@ export default function ServiceDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [actionState, setActionState] = useState({});
   const [rebuildLoading, setRebuildLoading] = useState(false);
+  const [forceCancelLoading, setForceCancelLoading] = useState(false);
   const [dbConfigSaving, setDbConfigSaving] = useState(false);
   const [dbConfigFields, setDbConfigFields] = useState({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
 
@@ -1182,6 +1183,43 @@ export default function ServiceDetail() {
     }
   };
 
+
+  const forceCancelDeploy = async () => {
+    if (!id) return;
+    setError(null); setSnackbar(null); setForceCancelLoading(true);
+    try {
+      const resp = await apiRequest({
+        method: "POST",
+        url: `${SERVICE_ACTION_ROOT}force_cancel_deploy/`,
+        data: { service_id: id },
+      });
+      const detail =
+        resp?.data?.detail ||
+        "Deployment cancelled and runtime cleaned up.";
+      safeSetSnackbar(
+        resp?.data?.result === "success" ? "success" : "warning",
+        detail
+      );
+      await fetchService();
+      await fetchDeploys(pageInfo.page);
+      setTimeout(() => { if (mountedRef.current) checkServiceRunning(true); }, 1000);
+      setTimeout(() => {
+        if (mountedRef.current) {
+          fetchService(true);
+          checkServiceRunning(true);
+        }
+      }, 3000);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        (err.response ? JSON.stringify(err.response.data) : "Force cancel failed.");
+      setError(typeof msg === "string" ? msg : "Force cancel failed.");
+    } finally {
+      if (mountedRef.current) setForceCancelLoading(false);
+    }
+  };
+
   const stopService = async () => {
     if (!id) return;
     setError(null); setSnackbar(null);
@@ -1620,7 +1658,8 @@ export default function ServiceDetail() {
             networkName={networkName}
             rebuildLoading={rebuildLoading}
             compact={!isDesktop}
-            actions={{ startService, stopService, rebuildService, checkServiceRunning, openServiceInNewTab }}
+            actions={{ startService, stopService, rebuildService, forceCancelDeploy, checkServiceRunning, openServiceInNewTab }}
+            forceCancelLoading={forceCancelLoading}
           />
 
           {activeTab === "overview" && (

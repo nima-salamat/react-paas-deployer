@@ -52,6 +52,7 @@ export default function ServiceToolbar({
       sx={{
         display: "flex",
         alignItems: "center",
+        justifyContent: "space-between",
         gap: 1,
         flexWrap: "wrap",
         px: 1.5,
@@ -64,6 +65,7 @@ export default function ServiceToolbar({
           t.palette.mode === "dark" ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
       }}
     >
+      {/* Left: back */}
       <Tooltip title="Back to services list">
         <Button
           size="small"
@@ -77,64 +79,57 @@ export default function ServiceToolbar({
         </Button>
       </Tooltip>
 
-      <Box
-        sx={{
-          width: 1,
-          height: 20,
-          bgcolor: "divider",
-          mx: 0.5,
-          display: { xs: "none", sm: "block" },
-        }}
-      />
+      {/* Right: refresh + interval */}
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: "auto" }}>
+        <Tooltip title="Refresh now">
+          <span>
+            <IconButton
+              size="small"
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label="Refresh"
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1.5,
+              }}
+            >
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
 
-      <Tooltip title="Refresh now">
-        <span>
-          <IconButton
+        <Tooltip title={`Auto-refresh: ${currentLabel}`}>
+          <Button
             size="small"
-            onClick={onRefresh}
-            disabled={refreshing}
-            aria-label="Refresh"
+            startIcon={
+              isOff ? <TimerOffIcon fontSize="small" /> : <TimerIcon fontSize="small" />
+            }
+            onClick={handleOpenMenu}
+            variant="outlined"
+            color={isOff ? "inherit" : "primary"}
             sx={{
-              border: "1px solid",
-              borderColor: "divider",
+              textTransform: "none",
+              fontWeight: 600,
               borderRadius: 1.5,
+              minWidth: 72,
             }}
+            aria-controls={open ? "refresh-interval-menu" : undefined}
+            aria-haspopup="true"
+            aria-expanded={open ? "true" : undefined}
           >
-            <RefreshIcon fontSize="small" />
-          </IconButton>
-        </span>
-      </Tooltip>
-
-      <Tooltip title={`Auto-refresh: ${currentLabel}`}>
-        <Button
-          size="small"
-          startIcon={
-            isOff ? <TimerOffIcon fontSize="small" /> : <TimerIcon fontSize="small" />
-          }
-          onClick={handleOpenMenu}
-          variant="outlined"
-          color={isOff ? "inherit" : "primary"}
-          sx={{
-            textTransform: "none",
-            fontWeight: 600,
-            borderRadius: 1.5,
-            minWidth: 72,
-          }}
-          aria-controls={open ? "refresh-interval-menu" : undefined}
-          aria-haspopup="true"
-          aria-expanded={open ? "true" : undefined}
-        >
-          {currentLabel}
-        </Button>
-      </Tooltip>
+            {currentLabel}
+          </Button>
+        </Tooltip>
+      </Box>
 
       <Menu
         id="refresh-interval-menu"
         anchorEl={intervalMenuAnchor}
         open={open}
         onClose={handleCloseMenu}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
         PaperProps={{ sx: { minWidth: 200, borderRadius: 2, mt: 0.5 } }}
       >
         <MenuItem disabled dense>

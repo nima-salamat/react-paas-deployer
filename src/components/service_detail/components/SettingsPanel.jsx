@@ -338,14 +338,14 @@ function VolumeCard({
           )}
 
           {isAttached ? (
-            <Tooltip title={blocked ? mutateReason || "Cannot detach now" : "Detach"}>
+            <Tooltip title={blocked ? mutateReason || "Service busy — detach may fail" : "Detach"}>
               <span>
                 <Button
                   size="small"
                   color="warning"
                   variant="outlined"
-                  disabled={loading || blocked}
-                  onClick={() => onDetach(volume.id ?? volume.pk)}
+                  disabled={loading}
+                  onClick={() => onDetach?.(volume.id ?? volume.pk, volume)}
                   startIcon={<LinkOffIcon fontSize="small" />}
                   sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
                 >
@@ -381,9 +381,9 @@ function VolumeCard({
           <Tooltip
             title={
               isAttached
-                ? "Detach first, then delete"
-                : blocked
-                ? mutateReason || "Cannot delete now"
+                ? blocked
+                  ? mutateReason || "Stop service & remove runtime, or detach first"
+                  : "Delete mounted volume (service must be idle)"
                 : "Delete volume permanently"
             }
           >
@@ -391,7 +391,7 @@ function VolumeCard({
               <IconButton
                 size="small"
                 color="error"
-                disabled={loading || isAttached || blocked}
+                disabled={loading || (isAttached && blocked)}
                 onClick={() => onDelete?.(volume)}
               >
                 <DeleteIcon fontSize="small" />
@@ -827,6 +827,8 @@ export default function SettingsPanel({
   volumeMutateReason = "",
   onPurgeRuntime,
   purgeRuntimeLoading = false,
+  onDeleteService,
+  deleteServiceLoading = false,
   availablePlans,
   plansLoading,
   selectedPlanId,
@@ -873,6 +875,14 @@ export default function SettingsPanel({
   // Delete confirm dialog
   const [deleteVolumeDialog, setDeleteVolumeDialog] = useState({ open: false, volume: null, loading: false });
 
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
+  const [deleteServiceConfirmOpen, setDeleteServiceConfirmOpen] = useState(false);
+
+  // Local mount overrides so Detach/Attach UI updates even if parent
+  // keeps listing volumes only by service_id (soft-detach keeps ownership).
+  // key = volume id string → true=mounted, false=soft-detached
+  const [mountOverrides, setMountOverrides] = useState({});
+
   // UI toggles
   const [applyImmediately, setApplyImmediately] = useState(false);
   const [showAllNetworks, setShowAllNetworks] = useState(false);
@@ -902,6 +912,78 @@ export default function SettingsPanel({
   }, [storage]);
 
   const remainingMb = storageNormalized?.remaining_mb ?? null;
+
+  // Idle service ⇒ UI allows attach/detach; backend still enforces container absence.
+  const serviceStatus = String(
+    service?.status ??
+      service?.deploy_status ??
+      service?.state ??
+      service?.service_status ??
+      ""
+  )
+    .toLowerCase()
+    .trim();
+  const statusBusy = ["queued", "deploying", "stopping", "running", "pending", "updating..."].includes(
+    serviceStatus
+  );
+  // When status is stopped/failed/succeeded/empty, enable volume mutations in UI.
+  // Parent canMutateVolumes=false is ignored for idle statuses (was blocking detach incorrectly).
+  const effectiveCanMutate = !statusBusy;
+  const effectiveMutateReason = statusBusy
+    ? volumeMutateReason ||
+      `Service is "${serviceStatus || "busy"}". Stop it before changing volumes.`
+    : volumeMutateReason || "";
+
+  const serviceIdStr = String(
+    service?.id ?? service?.pk ?? service?.uuid ?? ""
+  );
+
+  const volumeIdOf = (v) => String(v?.id ?? v?.pk ?? "");
+
+  const isVolumeMounted = useCallback(
+    (v) => {
+      if (!v) return false;
+      const id = volumeIdOf(v);
+      // 1) Local override after attach/detach (survives parent re-fetch mistakes)
+      if (Object.prototype.hasOwnProperty.call(mountOverrides, id)) {
+        return !!mountOverrides[id];
+      }
+      // 2) Explicit API flag (authoritative from backend list)
+      if (typeof v.is_mounted === "boolean") return v.is_mounted;
+      // 3) service_attachments from API
+      if (v.service_attachments != null && typeof v.service_attachments === "object") {
+        const atts = v.service_attachments;
+        if (Object.keys(atts).length === 0) return false;
+        if (serviceIdStr && atts[serviceIdStr]) return true;
+        return Object.keys(atts).length > 0;
+      }
+      // 4) Fallback: parent list membership
+      const inAttached = (attachedVolumes || []).some((x) => volumeIdOf(x) === id);
+      const inAvailable = (availableVolumes || []).some((x) => volumeIdOf(x) === id);
+      if (inAttached && !inAvailable) return true;
+      if (inAvailable && !inAttached) return false;
+      return inAttached;
+    },
+    [mountOverrides, serviceIdStr, attachedVolumes, availableVolumes]
+  );
+
+  // Merge both lists; split by real mount state (not parent buckets)
+  const { mountedList, unmountedList } = useMemo(() => {
+    const map = new Map();
+    for (const v of [...(attachedVolumes || []), ...(availableVolumes || [])]) {
+      const id = volumeIdOf(v);
+      if (!id) continue;
+      map.set(id, v);
+    }
+    const all = [...map.values()];
+    const mounted = [];
+    const unmounted = [];
+    for (const v of all) {
+      if (isVolumeMounted(v)) mounted.push(v);
+      else unmounted.push(v);
+    }
+    return { mountedList: mounted, unmountedList: unmounted };
+  }, [attachedVolumes, availableVolumes, isVolumeMounted]);
 
   // ── Plan helpers ───────────────────────────────────────────────────────
   const currentPlatform = useMemo(() => {
@@ -1069,6 +1151,98 @@ export default function SettingsPanel({
     }
   }, [deleteVolumeDialog.volume, onDeleteVolume]);
 
+  const handleConfirmPurgeRuntime = useCallback(async () => {
+    try {
+      await onPurgeRuntime?.();
+    } finally {
+      setPurgeConfirmOpen(false);
+    }
+  }, [onPurgeRuntime]);
+
+  const handleConfirmDeleteService = useCallback(async () => {
+    if (!onDeleteService) {
+      window.alert(
+        "onDeleteService prop is not wired in the parent page. " +
+          "Pass onDeleteService={() => api.delete(`/service/${id}/`)} to enable deletion."
+      );
+      return;
+    }
+    try {
+      await onDeleteService();
+      setDeleteServiceConfirmOpen(false);
+      if (typeof window !== "undefined") {
+        window.location.href = "/service";
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert(err?.response?.data?.detail || err?.message || "Delete failed");
+    }
+  }, [onDeleteService]);
+
+
+  const handleDetachVolume = useCallback(
+    async (id, volume) => {
+      const vid = String(id ?? volumeIdOf(volume) ?? "");
+      if (!vid || vid === "undefined" || vid === "null") {
+        window.alert("Detach failed: volume id is missing");
+        return;
+      }
+      try {
+        if (!onDetachVolume) {
+          throw new Error(
+            "onDetachVolume is not provided by parent. " +
+              "Wire: onDetachVolume={(id) => api.post(`/volume/${id}/detach/`)}"
+          );
+        }
+        const result = await onDetachVolume(vid, volume);
+        // Mark unmounted locally so UI moves card even if parent list is stale
+        setMountOverrides((prev) => ({ ...prev, [vid]: false }));
+        // If parent returned payload with is_mounted still true, keep override false
+        if (result && result.is_mounted === true) {
+          console.warn("Detach API returned is_mounted=true — backend may not have applied detach", result);
+        }
+        return result;
+      } catch (err) {
+        console.error("detach error", err);
+        const msg =
+          err?.response?.data?.error ||
+          err?.response?.data?.detail ||
+          (typeof err?.response?.data === "string" ? err.response.data : null) ||
+          err?.message ||
+          "Detach failed";
+        window.alert(String(msg));
+      }
+    },
+    [onDetachVolume]
+  );
+
+  const handleAttachVolume = useCallback(
+    async (idOrVolume) => {
+      const vid =
+        typeof idOrVolume === "object"
+          ? volumeIdOf(idOrVolume)
+          : String(idOrVolume ?? "");
+      try {
+        if (onAttachVolume) {
+          await onAttachVolume(vid);
+        } else {
+          throw new Error("onAttachVolume is not provided by parent");
+        }
+        setMountOverrides((prev) => ({ ...prev, [vid]: true }));
+      } catch (err) {
+        console.error(err);
+        window.alert(
+          err?.response?.data?.error ||
+            err?.response?.data?.detail ||
+            err?.message ||
+            "Attach failed"
+        );
+        throw err;
+      }
+    },
+    [onAttachVolume]
+  );
+
   // ─────────────────────────────────────────────────────────────────────
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
@@ -1156,7 +1330,7 @@ export default function SettingsPanel({
             <Button
               size="small" startIcon={<AddIcon />} variant="outlined"
               onClick={() => { setCreateVolumeError(null); setCreateVolumeOpen(true); }}
-              disabled={(remainingMb != null && remainingMb <= 0) || !canMutateVolumes}
+              disabled={(remainingMb != null && remainingMb <= 0) || !effectiveCanMutate}
               sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
             >
               New
@@ -1167,95 +1341,47 @@ export default function SettingsPanel({
         <StorageQuotaBar storage={storageNormalized} />
 
         <Alert
-          severity={canMutateVolumes ? "info" : "warning"}
-          sx={{
-            mb: 2,
-            borderRadius: 2,
-            alignItems: { xs: "flex-start", sm: "center" },
-            "& .MuiAlert-message": {
-              width: "100%",
-              py: { xs: 0.25, sm: 0.5 },
-            },
-            "& .MuiAlert-action": {
-              display: { xs: "none", sm: "flex" },
-              alignItems: "center",
-              pt: 0,
-              pr: 1,
-            },
-          }}
-          action={
-            onPurgeRuntime ? (
-              <Button
-                color="inherit"
-                size="small"
-                disabled={purgeRuntimeLoading}
-                onClick={() => onPurgeRuntime?.()}
-                sx={{ textTransform: "none", fontWeight: 700, whiteSpace: "nowrap" }}
-              >
-                {purgeRuntimeLoading ? "Removing…" : "Remove runtime"}
-              </Button>
-            ) : null
-          }
+          severity={effectiveCanMutate ? "info" : "warning"}
+          sx={{ mb: 2, borderRadius: 2 }}
         >
-          <Stack spacing={1} sx={{ width: "100%" }}>
-            <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
-              {canMutateVolumes
-                ? "Volumes: name/size/path are fixed after Docker provision. You can attach, detach or delete."
-                : volumeMutateReason ||
-                  "Stop the service, then remove its container before changing volumes."}
-            </Typography>
-            {onPurgeRuntime ? (
-              <Button
-                color="inherit"
-                size="small"
-                variant="outlined"
-                disabled={purgeRuntimeLoading}
-                onClick={() => onPurgeRuntime?.()}
-                sx={{
-                  display: { xs: "inline-flex", sm: "none" },
-                  alignSelf: "stretch",
-                  textTransform: "none",
-                  fontWeight: 700,
-                  borderRadius: 1.5,
-                  borderColor: "currentColor",
-                }}
-              >
-                {purgeRuntimeLoading ? "Removing…" : "Remove container & image"}
-              </Button>
-            ) : null}
-          </Stack>
+          <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
+            {effectiveCanMutate
+              ? "Quota counts every volume owned by this service (attached and soft-detached). Name/size/path lock after Docker provision. Soft-detached volumes can be deleted anytime; mounted ones need an idle runtime."
+              : effectiveMutateReason ||
+                "Stop the service before changing volumes. If a container still exists, use Danger zone → Remove runtime."}
+          </Typography>
         </Alert>
 
-        {/* Attached volumes */}
+        {/* Attached (mounted) volumes — split by is_mounted, not parent buckets */}
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-          Attached ({(attachedVolumes || []).length})
+          Attached ({mountedList.length})
         </Typography>
-        {(attachedVolumes || []).length === 0 ? (
+        {mountedList.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            No volumes attached to this service.
+            No volumes mounted on this service.
           </Typography>
         ) : (
           <Stack spacing={1} sx={{ mb: 2 }}>
-            {(attachedVolumes || []).map((v) => (
+            {mountedList.map((v) => (
               <VolumeCard
                 key={v.id ?? v.pk}
                 volume={v}
                 isAttached
                 loading={volumeActionLoading}
-                onDetach={onDetachVolume}
+                onDetach={handleDetachVolume}
                 onDelete={handleDeleteVolume}
                 onEdit={handleOpenEditVolume}
                 onViewFiles={handleViewFiles}
                 onDownload={onDownloadVolume}
                 remainingMb={remainingMb}
-                canMutate={canMutateVolumes}
-                mutateReason={volumeMutateReason}
+                canMutate={effectiveCanMutate}
+                mutateReason={effectiveMutateReason}
               />
             ))}
           </Stack>
         )}
 
-        {/* Available volumes */}
+        {/* Available / soft-detached volumes */}
         <Button
           size="small"
           endIcon={showAvailableVolumes ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -1264,17 +1390,17 @@ export default function SettingsPanel({
         >
           {showAvailableVolumes
             ? "Hide available volumes"
-            : `Show available volumes (${(availableVolumes || []).length})`}
+            : `Show available volumes (${unmountedList.length})`}
         </Button>
 
         <Collapse in={showAvailableVolumes}>
           <Stack spacing={1}>
-            {(availableVolumes || []).length === 0 ? (
+            {unmountedList.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                No unused volumes. Create one with the New button.
+                No unmounted volumes. Create one with the New button.
               </Typography>
             ) : (
-              (availableVolumes || []).map((v) => {
+              unmountedList.map((v) => {
                 const vid = String(v.id ?? v.pk ?? "");
                 return (
                   <VolumeCard
@@ -1282,14 +1408,14 @@ export default function SettingsPanel({
                     volume={v}
                     isAttached={false}
                     loading={volumeActionLoading}
-                    onAttach={() => onAttachVolume?.(vid)}
+                    onAttach={() => handleAttachVolume(vid)}
                     onDelete={handleDeleteVolume}
                     onEdit={handleOpenEditVolume}
                     onViewFiles={handleViewFiles}
                     onDownload={onDownloadVolume}
                     remainingMb={remainingMb}
-                    canMutate={canMutateVolumes}
-                    mutateReason={volumeMutateReason}
+                    canMutate={effectiveCanMutate}
+                    mutateReason={effectiveMutateReason}
                   />
                 );
               })
@@ -1365,6 +1491,89 @@ export default function SettingsPanel({
             </Stack>
           </>
         )}
+      </Paper>
+
+
+      {/* ═══════════════ DANGER ZONE ═══════════════ */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 2.5,
+          border: "1px solid",
+          borderColor: "error.light",
+          bgcolor: (t) =>
+            t.palette.mode === "dark" ? "rgba(239,68,68,0.06)" : "rgba(239,68,68,0.03)",
+        }}
+      >
+        <SectionHeader
+          icon={<DeleteIcon fontSize="small" color="error" />}
+          title="Danger zone"
+          subtitle="Destructive actions. Runtime must be removed before volume topology changes."
+        />
+
+        <Stack spacing={1.5}>
+          <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, borderColor: "divider" }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="space-between"
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  Remove container & image
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Force-stop and delete the Docker container and image for this service.
+                  Required before attach / detach / edit of volumes while a runtime still exists.
+                </Typography>
+              </Box>
+              <Button
+                color="error"
+                variant="outlined"
+                disabled={!onPurgeRuntime || purgeRuntimeLoading}
+                onClick={() => setPurgeConfirmOpen(true)}
+                sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}
+              >
+                {purgeRuntimeLoading ? "Removing…" : "Remove runtime"}
+              </Button>
+            </Stack>
+          </Paper>
+
+          <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, borderColor: "error.light" }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.5}
+              alignItems={{ xs: "stretch", sm: "center" }}
+              justifyContent="space-between"
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "error.main" }}>
+                  Delete this service
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {statusBusy
+                    ? `Service is currently "${serviceStatus}". Stop it, then delete.`
+                    : "Permanently delete this service. Runtime is already idle — you can delete now. You will be redirected to /service."}
+                </Typography>
+              </Box>
+              <Button
+                color="error"
+                variant="contained"
+                disabled={deleteServiceLoading || statusBusy}
+                onClick={() => setDeleteServiceConfirmOpen(true)}
+                sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 800, whiteSpace: "nowrap", flexShrink: 0 }}
+              >
+                {deleteServiceLoading
+                  ? "Deleting…"
+                  : statusBusy
+                  ? "Stop service first"
+                  : "Delete service"}
+              </Button>
+            </Stack>
+          </Paper>
+        </Stack>
       </Paper>
 
       {/* ═══════════ Create Network Dialog ═══════════ */}
@@ -1550,6 +1759,76 @@ export default function SettingsPanel({
           </Button>
           <Button variant="contained" color="error" onClick={confirmDeleteVolume} disabled={deleteVolumeDialog.loading} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}>
             {deleteVolumeDialog.loading ? "Deleting..." : "Delete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Purge runtime confirm */}
+      <Dialog
+        open={purgeConfirmOpen}
+        onClose={() => !purgeRuntimeLoading && setPurgeConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2.5 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800 }}>Remove container & image?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            This will force-stop and delete the Docker container and related images for this service.
+            Volumes on disk are <strong>not</strong> deleted.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            After removal you can attach, detach, or edit volumes that are not yet provisioned in Docker.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setPurgeConfirmOpen(false)} disabled={purgeRuntimeLoading} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmPurgeRuntime}
+            disabled={purgeRuntimeLoading}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
+          >
+            {purgeRuntimeLoading ? "Removing…" : "Yes, remove runtime"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete service confirm */}
+      <Dialog
+        open={deleteServiceConfirmOpen}
+        onClose={() => !deleteServiceLoading && setDeleteServiceConfirmOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2.5 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, color: "error.main" }}>Delete service?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            Permanently delete service <strong>"{service?.name || "this service"}"</strong>.
+            This cannot be undone.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {statusBusy
+              ? "Service is still busy. Stop it before deleting."
+              : "Service is idle. After deletion you will be redirected to /service."}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDeleteServiceConfirmOpen(false)} disabled={deleteServiceLoading} sx={{ textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleConfirmDeleteService}
+            disabled={deleteServiceLoading}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 1.5 }}
+          >
+            {deleteServiceLoading ? "Deleting…" : "Yes, delete service"}
           </Button>
         </DialogActions>
       </Dialog>
