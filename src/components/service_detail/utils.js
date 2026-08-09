@@ -538,19 +538,37 @@ export function buildConnectionHints(platform, cfg = {}, serviceHost = "localhos
  *     "entry_point": "..." | null
  *   }
  */
+/** Platforms that support Celery / gunicorn-style worker_count / server_type. */
+const PYTHON_WORKER_PLATFORMS = new Set([
+  "django",
+  "flask",
+  "python",
+  "fastapi",
+]);
+
 export function buildDjangoConfigSuggestion(inspection) {
   if (!inspection || typeof inspection !== "object") return "";
-  const cfg = {
-    platform: inspection.platform || inspection.suggested_config?.platform || "django",
-  };
-  // server_type: include only if detected (null means "auto-detect at deploy time")
-  const st = inspection.server_type || inspection.suggested_config?.server_type;
-  if (st) cfg.server_type = st;
-  // celery flags
-  cfg.celery = Boolean(inspection.suggested_config?.celery);
-  cfg.celery_beat = Boolean(inspection.suggested_config?.celery_beat);
-  cfg.worker_count = Number(inspection.suggested_config?.worker_count) || 1;
-  // entry_point: include only if detected (gives the user an escape hatch)
+  const platform = String(
+    inspection.platform || inspection.suggested_config?.platform || "django"
+  )
+    .toLowerCase()
+    .trim();
+  const cfg = { platform };
+  const isPythonFamily = PYTHON_WORKER_PLATFORMS.has(platform);
+
+  // server_type / celery / worker_count only for Django/Flask/Python/FastAPI
+  if (isPythonFamily) {
+    const st = inspection.server_type || inspection.suggested_config?.server_type;
+    if (st) cfg.server_type = st;
+    cfg.celery = Boolean(inspection.suggested_config?.celery);
+    cfg.celery_beat = Boolean(inspection.suggested_config?.celery_beat);
+    cfg.worker_count =
+      Number(inspection.suggested_config?.worker_count) ||
+      Number(inspection.worker_count) ||
+      1;
+  }
+
+  // entry_point: include only if detected
   const ep = inspection.entrypoint || inspection.suggested_config?.entry_point;
   if (ep) cfg.entry_point = ep;
   return JSON.stringify(cfg, null, 2);

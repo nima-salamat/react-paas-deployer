@@ -1169,7 +1169,7 @@ export default function ServiceDetail() {
     }
   };
 
-  const rebuildService = async () => {
+  const rebuildService = async ({ forceReinit = false } = {}) => {
     if (!id) return;
     setError(null); setSnackbar(null); setRebuildLoading(true);
     const deployId = selectedDeployId || selectedDeploy?.id || selectedDeploy?.pk;
@@ -1177,9 +1177,34 @@ export default function ServiceDetail() {
     try {
       if (deployId) {
         try {
-          const resp = await apiRequest({ method: "POST", url: `${DEPLOY_BASE}${deployId}/rebuild/` });
+          // ---------------------------------------------------------------
+          // Build the rebuild URL. For DB platforms, append ?force_reinit=true
+          // when the operator armed the "Force re-initialize" checkbox in
+          // GlobalServiceControls. The backend (deploy/apis.py rebuild
+          // endpoint) parses this query param leniently (1/true/yes/on) and
+          // forwards it as a kwarg to run_db_deploy, which in turn passes it
+          // to DBDeployer().deploy(force_reinit=True). When True, the
+          // deployer wipes every named Docker volume bound to the container
+          // BEFORE starting it, so the database reinitialises from scratch.
+          //
+          // Host-bind paths (starting with "/") are NEVER wiped — only named
+          // Docker volumes managed by the platform. (Enforced in db_deployer.py.)
+          // ---------------------------------------------------------------
+          const rebuildUrl = forceReinit && selectedIsDb
+            ? `${DEPLOY_BASE}${deployId}/rebuild/?force_reinit=true`
+            : `${DEPLOY_BASE}${deployId}/rebuild/`;
+
+          const resp = await apiRequest({ method: "POST", url: rebuildUrl });
           if (resp.status === 202 || resp.data?.result === "success") {
-            safeSetSnackbar("success", resp.data?.detail || (selectedIsDb ? "DB rebuild queued (volumes preserved)." : "App rebuild queued (image rebuilt from zip)."));
+            let defaultMsg;
+            if (forceReinit && selectedIsDb) {
+              defaultMsg = "DB rebuild queued (force_reinit=true — volumes will be wiped, ALL DATA LOST).";
+            } else if (selectedIsDb) {
+              defaultMsg = "DB rebuild queued (volumes preserved).";
+            } else {
+              defaultMsg = "App rebuild queued (image rebuilt from zip).";
+            }
+            safeSetSnackbar("success", resp.data?.detail || defaultMsg);
             await fetchService();
             setTimeout(() => { if (mountedRef.current) checkServiceRunning(true); }, 1500);
             setTimeout(() => { if (mountedRef.current) { fetchService(true); checkServiceRunning(true); } }, 4000);
@@ -1187,6 +1212,10 @@ export default function ServiceDetail() {
           }
         } catch (rebuildErr) { }
       }
+      // Fallback: start_service does NOT support force_reinit (it's a
+      // deploy-level option, not a service-level one), so we ignore
+      // forceReinit here on purpose. The operator should select a deploy
+      // first if they want force_reinit semantics.
       await startService({ forceRebuild: true });
     } catch (err) {
       setError(err.response?.data?.detail || (err.response ? JSON.stringify(err.response.data) : "Error rebuilding service"));
@@ -1722,6 +1751,8 @@ export default function ServiceDetail() {
               deployState={{ deploys, deploysLoading, pageInfo, selectedDeployId, actionState }}
               deployActions={{ handleSelectDeploy, handleUnselectDeploy, handleEditClick, openConfirm, handlePrev, handleNext, handleDownloadZip }}
               planPlatform={planPlatform}
+              planCpu={planDetail?.max_cpu ?? service?.plan?.max_cpu}
+              planRam={planDetail?.max_ram ?? service?.plan?.max_ram}
               service={service}
               error={error}
             />

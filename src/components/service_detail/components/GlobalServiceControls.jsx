@@ -11,6 +11,9 @@ import {
   Divider,
   IconButton,
   Tooltip,
+  FormControlLabel,
+  Checkbox,
+  Alert,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
@@ -23,6 +26,7 @@ import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
 function useCopy() {
   const [copied, setCopied] = useState(null);
@@ -162,6 +166,33 @@ export default function GlobalServiceControls({
     openServiceInNewTab,
   } = actions;
 
+  // ---------------------------------------------------------------------
+  // Force re-init toggle (DB platforms only).
+  //
+  // When checked, the next click on "Rebuild DB" will send
+  // ?force_reinit=true to the rebuild endpoint. The backend then wipes
+  // every named Docker volume bound to this DB BEFORE starting the
+  // container, so the database reinitialises from scratch.
+  //
+  // Use case: a previous deploy failed mid-init and left corrupt data in
+  // the volume (typical symptom: container starts, mysqld silently dies
+  // 2 seconds after "InnoDB initialization has started", Docker
+  // restart_policy kicks in every ~60s — restart loop). A normal rebuild
+  // preserves the volume and keeps failing; force re-init wipes it.
+  //
+  // Host-bind paths (starting with "/") are NEVER wiped — only named
+  // Docker volumes managed by the platform. (Enforced in db_deployer.py.)
+  // ---------------------------------------------------------------------
+  const [forceReinit, setForceReinit] = useState(false);
+
+  const handleRebuildClick = () => {
+    if (typeof rebuildService !== "function") return;
+    rebuildService({ forceReinit });
+    // Reset the toggle right after triggering so the operator doesn't
+    // accidentally wipe the volume again on the next rebuild.
+    setForceReinit(false);
+  };
+
   const colorForPercent = (p) => {
     const pct = Number(p) || 0;
     if (pct >= 90) return theme.palette.error.main;
@@ -263,9 +294,9 @@ export default function GlobalServiceControls({
         </Button>
         <Button
           variant="outlined"
-          color="warning"
+          color={forceReinit ? "error" : "warning"}
           startIcon={<RefreshIcon />}
-          onClick={rebuildService}
+          onClick={handleRebuildClick}
           disabled={
             !service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId
           }
@@ -273,7 +304,11 @@ export default function GlobalServiceControls({
           size={compact ? "small" : "medium"}
           sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
         >
-          {rebuildLoading ? "Rebuilding..." : selectedIsDb ? "Rebuild DB" : "Rebuild"}
+          {rebuildLoading
+            ? "Rebuilding..."
+            : selectedIsDb
+              ? (forceReinit ? "Rebuild DB (wipe volume)" : "Rebuild DB")
+              : "Rebuild"}
         </Button>
         {serviceBusy || forceCancelLoading ? (
           <Button
@@ -325,6 +360,73 @@ export default function GlobalServiceControls({
           Open
         </Button>
       </Stack>
+
+      {/* ----------------------------------------------------------------- */}
+      {/* Force re-init toggle — DB platforms only.                          */}
+      {/* Shows a warning Alert explaining the destructive action, with a    */}
+      {/* Checkbox the operator must tick before clicking "Rebuild DB".      */}
+      {/* ----------------------------------------------------------------- */}
+      {selectedIsDb && selectedDeployId ? (
+        <Alert
+          severity={forceReinit ? "error" : "warning"}
+          icon={<WarningAmberIcon fontSize="small" />}
+          sx={{
+            mb: compact ? 1.5 : 2,
+            borderRadius: 1.5,
+            alignItems: "center",
+            // Subtle pulsing border when armed to draw the eye.
+            ...(forceReinit
+              ? {
+                  border: "1px solid",
+                  borderColor: "error.main",
+                  boxShadow: (t) =>
+                    t.palette.mode === "dark"
+                      ? "0 0 0 1px rgba(244,67,54,0.35)"
+                      : "0 0 0 1px rgba(244,67,54,0.25)",
+                }
+              : {}),
+          }}
+          action={
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={forceReinit}
+                  onChange={(e) => setForceReinit(e.target.checked)}
+                  size="small"
+                  color="error"
+                  disabled={rebuildLoading || serviceBusy}
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+                  Force re-initialize
+                </Typography>
+              }
+              sx={{ mr: 0, ml: 1 }}
+            />
+          }
+        >
+          <Typography variant="caption" component="div" sx={{ lineHeight: 1.45 }}>
+            {forceReinit ? (
+              <>
+                <strong>Danger zone.</strong> The next "Rebuild DB" click will{" "}
+                <strong>wipe the data volume(s)</strong> and reinitialize the
+                database from scratch. <strong>All data will be lost.</strong>{" "}
+                Use this only when a previous deploy failed mid-init and left
+                corrupt data (typical symptom: container restart loop with
+                mysqld silently dying right after "InnoDB initialization has
+                started").
+              </>
+            ) : (
+              <>
+                Tick this to wipe the data volume on the next rebuild. Useful
+                when the DB is stuck in a restart loop after a failed init.
+                Normal rebuilds preserve data.
+              </>
+            )}
+          </Typography>
+        </Alert>
+      ) : null}
 
       {!compact ? (
         <>

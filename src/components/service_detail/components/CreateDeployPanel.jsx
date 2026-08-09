@@ -33,6 +33,8 @@ export default function CreateDeployPanel({
   deployState,
   deployActions,
   planPlatform,
+  planCpu,
+  planRam,
   service,
   error,
 }) {
@@ -130,6 +132,9 @@ export default function CreateDeployPanel({
     try {
       const fd = new FormData();
       fd.append("file", file);
+      // Plan resources → backend suggests worker_count from CPU/RAM.
+      if (planCpu != null && planCpu !== "") fd.append("max_cpu", String(planCpu));
+      if (planRam != null && planRam !== "") fd.append("max_ram", String(planRam));
       const access = localStorage.getItem("access");
       const headers = access ? { Authorization: `Bearer ${access}` } : {};
       const resp = await axios.post(`${DEPLOY_BASE}inspect_zip/`, fd, { headers });
@@ -143,7 +148,7 @@ export default function CreateDeployPanel({
     } finally {
       setInspecting(false);
     }
-  }, [zipFile]);
+  }, [zipFile, planCpu, planRam]);
 
   const handleApplySuggestedConfig = useCallback(() => {
     if (!inspectResult) return;

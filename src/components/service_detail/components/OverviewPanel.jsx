@@ -73,7 +73,7 @@ function SectionCard({ icon, title, children }) {
 // ---------------------------------------------------------------------------
 // Credential row — masked by default, eye toggle to reveal, copy button.
 // ---------------------------------------------------------------------------
-function CredentialRow({ label, value, mono = false, sensitive = false }) {
+function CredentialRow({ label, value, mono = false, sensitive = false, tooltip = "" }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -147,11 +147,17 @@ function CredentialRow({ label, value, mono = false, sensitive = false }) {
 // ---------------------------------------------------------------------------
 // Connection-string block — monospace, copy button, collapsible hints.
 // ---------------------------------------------------------------------------
-function ConnectionStringBlock({ platform, cfg, serviceHost }) {
+function ConnectionStringBlock({ platform, cfg, serviceName }) {
   const [copied, setCopied] = useState(false);
   const [showHints, setShowHints] = useState(false);
-  const uri = buildConnectionString(platform, cfg, serviceHost);
-  const hints = buildConnectionHints(platform, cfg, serviceHost);
+  // For a database deployed as a Docker container, the host clients should
+  // use to connect is the *service name* (Docker's internal DNS), not the
+  // Docker daemon's external host. Other containers on the same network
+  // resolve the DB by service_name; service_host only works for connections
+  // from outside Docker AND only when the port is published.
+  const connectHost = serviceName || "localhost";
+  const uri = buildConnectionString(platform, cfg, connectHost);
+  const hints = buildConnectionHints(platform, cfg, connectHost);
 
   if (!uri) return null;
 
@@ -235,7 +241,7 @@ function ConnectionStringBlock({ platform, cfg, serviceHost }) {
 // Database credentials card — fetches real credentials via the reveal
 // endpoint (because DeploySerializer masks them in the regular API).
 // ---------------------------------------------------------------------------
-function DatabaseCredentialsCard({ selectedDeploy, serviceHost }) {
+function DatabaseCredentialsCard({ selectedDeploy, serviceName, serviceHost }) {
   const [creds, setCreds] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -301,7 +307,10 @@ function DatabaseCredentialsCard({ selectedDeploy, serviceHost }) {
       {!loading && !error && creds && (
         <>
           <CredentialRow label="Platform" value={platform} />
-          <CredentialRow label="Host" value={serviceHost || "—"} mono />
+          <CredentialRow label="Service name" value={serviceName || "—"} mono />
+          {serviceHost && (
+            <CredentialRow label="Service host (external)" value={serviceHost} mono />
+          )}
           <CredentialRow label="Port" value={creds.port ?? "default"} mono />
           <CredentialRow label="Database" value={creds.database} mono />
           <CredentialRow label="Username" value={creds.username} mono />
@@ -320,7 +329,7 @@ function DatabaseCredentialsCard({ selectedDeploy, serviceHost }) {
               ))}
             </>
           )}
-          <ConnectionStringBlock platform={platform} cfg={creds} serviceHost={serviceHost} />
+          <ConnectionStringBlock platform={platform} cfg={creds} serviceName={serviceName} />
         </>
       )}
     </SectionCard>
@@ -404,6 +413,7 @@ export default function OverviewPanel({
       {selectedDeploy && (
         <DatabaseCredentialsCard
           selectedDeploy={selectedDeploy}
+          serviceName={service?.service_name || null}
           serviceHost={serviceHost}
         />
       )}
