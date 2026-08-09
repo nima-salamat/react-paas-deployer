@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import {
   Paper,
   Typography,
@@ -9,11 +9,21 @@ import {
   TextField,
   Alert,
   Divider,
+  CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import DeployCard from "./DeployCard";
-import { isDbPlatform } from "../utils";
+import {
+  isDbPlatform,
+  generateDbCredentials,
+  buildDjangoConfigSuggestion,
+} from "../utils";
+import { DEPLOY_BASE } from "../constants";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
+import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
+import SearchIcon from "@mui/icons-material/Search";
+import axios from "axios";
 
 export default function CreateDeployPanel({
   formState,
@@ -78,6 +88,68 @@ export default function CreateDeployPanel({
   const isDb = editingDeployId
     ? isDbPlatform(editData.platform || planPlatform || createPlatform)
     : isDbPlatform(effectivePlatform);
+
+  // --- Fill automatically (DB credentials) ---
+  // Generates a random, DB-safe set of credentials client-side (no API
+  // round-trip — secrets never leave the browser) and fills them into
+  // whichever field-set is active (create or edit).
+  const [filling, setFilling] = useState(false);
+  const handleFillAutomatically = useCallback(() => {
+    const platform = editingDeployId
+      ? (editData.platform || planPlatform || createPlatform || "")
+      : effectivePlatform;
+    const creds = generateDbCredentials(platform);
+    setFilling(true);
+    // Tiny delay so the spinner is visible (otherwise it flickers too fast).
+    setTimeout(() => {
+      if (editingDeployId) {
+        setEditDbFields((f) => ({ ...f, ...creds }));
+      } else {
+        setCreateDbFields((f) => ({ ...f, ...creds }));
+      }
+      setFilling(false);
+    }, 150);
+  }, [editingDeployId, editData.platform, planPlatform, createPlatform, effectivePlatform, setEditDbFields, setCreateDbFields]);
+
+  // --- Inspect & suggest config (Django JSON config helper) ---
+  // Uploads the selected zip to /deploy/inspect_zip/ which reuses the
+  // existing platform_bridge.enrich_config_from_project() to auto-detect
+  // platform, server_type (WSGI/ASGI), entry_point, etc.  The returned
+  // suggested_config is formatted as JSON and pasted into the config
+  // textarea.  Only available for new deploys (not edit mode).
+  const [inspecting, setInspecting] = useState(false);
+  const [inspectResult, setInspectResult] = useState(null);
+  const [inspectError, setInspectError] = useState(null);
+
+  const handleInspectZip = useCallback(async () => {
+    const file = zipFile;
+    if (!file) return;
+    setInspecting(true);
+    setInspectError(null);
+    setInspectResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const access = localStorage.getItem("access");
+      const headers = access ? { Authorization: `Bearer ${access}` } : {};
+      const resp = await axios.post(`${DEPLOY_BASE}inspect_zip/`, fd, { headers });
+      if (resp.data?.result === "success") {
+        setInspectResult(resp.data);
+      } else {
+        setInspectError(resp.data?.detail || "Inspection failed.");
+      }
+    } catch (e) {
+      setInspectError(e?.response?.data?.detail || e?.message || "Inspection failed.");
+    } finally {
+      setInspecting(false);
+    }
+  }, [zipFile]);
+
+  const handleApplySuggestedConfig = useCallback(() => {
+    if (!inspectResult) return;
+    const jsonStr = buildDjangoConfigSuggestion(inspectResult);
+    if (jsonStr) setConfig(jsonStr);
+  }, [inspectResult, setConfig]);
 
   const deploysGrid = (
     <Box
@@ -263,6 +335,25 @@ export default function CreateDeployPanel({
                 DB credentials (stored in deploy config). After changing a
                 running DB, call Rebuild to apply — volumes/data are preserved.
               </Typography>
+
+              {/* Fill automatically — generates a random, DB-safe username +
+                  password + database name.  Saves the user from having to
+                  invent secure credentials manually. */}
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
+                <Tooltip title="Generate a random username, password, and database name. You can still edit them after.">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={filling ? <CircularProgress size={14} /> : <AutoFixHighIcon fontSize="small" />}
+                    onClick={handleFillAutomatically}
+                    disabled={filling}
+                    sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+                  >
+                    Fill automatically
+                  </Button>
+                </Tooltip>
+              </Box>
+
               <Box
                 sx={{
                   display: "grid",
@@ -271,28 +362,37 @@ export default function CreateDeployPanel({
                 }}
               >
                 {["username", "password", "root_password", "database", "port"].map(
-                  (field) => (
-                    <TextField
-                      key={field}
-                      fullWidth
-                      size="small"
-                      type="text"
-                      label={field.replace(/_/g, " ")}
-                      value={
-                        editingDeployId
-                          ? editDbFields[field] || ""
-                          : createDbFields[field] || ""
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (editingDeployId) {
-                          setEditDbFields((f) => ({ ...f, [field]: val }));
-                        } else {
-                          setCreateDbFields((f) => ({ ...f, [field]: val }));
+                  (field) => {
+                    const isPasswordField = field === "password" || field === "root_password";
+                    const editing = Boolean(editingDeployId);
+                    return (
+                      <TextField
+                        key={field}
+                        fullWidth
+                        size="small"
+                        type={isPasswordField ? "password" : "text"}
+                        label={field.replace(/_/g, " ")}
+                        placeholder={
+                          (isPasswordField && editing)
+                            ? "Leave empty to keep current"
+                            : ""
                         }
-                      }}
-                    />
-                  )
+                        value={
+                          editing
+                            ? editDbFields[field] || ""
+                            : createDbFields[field] || ""
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (editing) {
+                            setEditDbFields((f) => ({ ...f, [field]: val }));
+                          } else {
+                            setCreateDbFields((f) => ({ ...f, [field]: val }));
+                          }
+                        }}
+                      />
+                    );
+                  }
                 )}
               </Box>
               <TextField
@@ -363,9 +463,12 @@ export default function CreateDeployPanel({
                         hidden
                         accept=".zip"
                         ref={zipInputRef}
-                        onChange={(e) =>
-                          setZipFile(e.target.files?.[0] || null)
-                        }
+                        onChange={(e) => {
+                          setZipFile(e.target.files?.[0] || null);
+                          // Reset previous inspection result when a new file is picked.
+                          setInspectResult(null);
+                          setInspectError(null);
+                        }}
                       />
                     </Button>
                     <Typography variant="body2" color="text.secondary">
@@ -373,6 +476,26 @@ export default function CreateDeployPanel({
                         ? `${zipFile.name} (${Math.round(zipFile.size / 1024)} KB)`
                         : "Required for app deploys"}
                     </Typography>
+                    {/* Inspect & suggest config — uploads the zip to the
+                        backend, which reuses platform_bridge to auto-detect
+                        Django/Flask/Node/etc. and suggests a config JSON.
+                        Only available for new deploys (not edit mode) and
+                        only when a zip is selected. */}
+                    {zipFile && (
+                      <Tooltip title="Inspect the uploaded zip and auto-fill the config JSON based on detected framework (Django/Flask/Node/etc.).">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="secondary"
+                          startIcon={inspecting ? <CircularProgress size={14} /> : <SearchIcon fontSize="small" />}
+                          onClick={handleInspectZip}
+                          disabled={inspecting}
+                          sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+                        >
+                          {inspecting ? "Inspecting…" : "Inspect & suggest config"}
+                        </Button>
+                      </Tooltip>
+                    )}
                   </>
                 ) : (
                   <>
@@ -401,6 +524,55 @@ export default function CreateDeployPanel({
                   </>
                 )}
               </Box>
+
+              {/* Inspect result banner — shows detected platform/framework
+                  and offers to apply the suggested config JSON. */}
+              {inspectError && (
+                <Alert severity="warning" sx={{ mb: 1.5 }} onClose={() => setInspectError(null)}>
+                  {inspectError}
+                </Alert>
+              )}
+              {inspectResult && (
+                <Alert
+                  severity="success"
+                  sx={{ mb: 1.5 }}
+                  onClose={() => setInspectResult(null)}
+                  action={
+                    <Button
+                      size="small"
+                      color="inherit"
+                      variant="outlined"
+                      onClick={handleApplySuggestedConfig}
+                      sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
+                    >
+                      Apply suggested config
+                    </Button>
+                  }
+                >
+                  <Box component="div" sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, alignItems: "center" }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Detected:
+                    </Typography>
+                    {inspectResult.platform && (
+                      <Chip label={inspectResult.platform} size="small" color="primary" />
+                    )}
+                    {inspectResult.framework && (
+                      <Chip label={inspectResult.framework} size="small" variant="outlined" />
+                    )}
+                    {inspectResult.server_type && (
+                      <Chip label={inspectResult.server_type.toUpperCase()} size="small" variant="outlined" />
+                    )}
+                    {inspectResult.django_settings_module && (
+                      <Chip label={inspectResult.django_settings_module} size="small" variant="outlined" />
+                    )}
+                  </Box>
+                  {inspectResult.markers && inspectResult.markers.length > 0 && (
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                      Markers: {inspectResult.markers.join(", ")}
+                    </Typography>
+                  )}
+                </Alert>
+              )}
             </>
           )}
 

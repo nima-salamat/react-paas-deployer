@@ -56,3 +56,46 @@ export const MUTABLE_DB_CONFIG_KEYS = [
 
 export const LOG_COLLAPSE_CHARS = 180;
 export const LOG_COLLAPSE_LINES = 3;
+
+// ---------------------------------------------------------------------------
+// DB credential generation + connection strings
+// ---------------------------------------------------------------------------
+
+// Default port per DB platform — used by buildConnectionString() when the
+// deploy config doesn't specify a port, and by the create-deploy form when
+// pre-filling the port field after "Fill automatically".
+export const DB_DEFAULT_PORTS = {
+  mysql:      3306,
+  mariadb:    3306,
+  postgresql: 5432,
+  postgres:   5432,
+  mongodb:    27017,
+  mongo:      27017,
+  redis:      6379,
+  oracle:     1521,
+};
+
+// Safe alphabet for DB passwords — excludes characters that break:
+//   * URL encoding in connection strings (`@`, `:`, `/`, `#`, `?`)
+//   * Shell quoting (`'`, `"`, `` ` ``, `\`, `$`)
+//   * SQL string literals (`'`, `"`)
+//   * JSON string escaping (`"`, `\`)
+//   * Whitespace (breaks copy-paste and config files)
+// Includes a healthy mix of upper/lower/digits/symbols so the password
+// satisfies typical DB password policy requirements.
+export const PASSWORD_ALPHABET_SAFE =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+  "abcdefghijklmnopqrstuvwxyz" +
+  "0123456789" +
+  "!@#%^&*()-_=+";
+
+// Sentinel value sent to the backend for password fields when the user
+// wants to KEEP the existing password (i.e. didn't type a new one).
+// The backend's update_db_config + update endpoints treat this the same
+// as null / empty string — they skip the field instead of overwriting.
+export const SENTINEL_KEEP_EXISTING = "__unchanged__";
+
+// Username / database name alphabet — DB identifiers are case-sensitive
+// on most platforms and lowercase-only on some, so stick to lowercase
+// letters + digits to be universally safe.
+export const DB_IDENTIFIER_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";

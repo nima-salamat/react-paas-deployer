@@ -1,4 +1,11 @@
-import { DB_PLATFORMS, MUTABLE_DB_CONFIG_KEYS } from "./constants";
+import {
+  DB_PLATFORMS,
+  MUTABLE_DB_CONFIG_KEYS,
+  DB_DEFAULT_PORTS,
+  PASSWORD_ALPHABET_SAFE,
+  DB_IDENTIFIER_ALPHABET,
+  SENTINEL_KEEP_EXISTING,
+} from "./constants";
 
 export function parseDeployConfig(raw) {
   if (raw == null || raw === "") return {};
@@ -304,3 +311,254 @@ export function scrollToBottom(el) {
   if (!el) return;
   el.scrollTop = el.scrollHeight;
 }
+
+// ---------------------------------------------------------------------------
+// Random credential generation (client-side, no API round-trip)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pick a cryptographically-random index in [0, max) using the Web Crypto
+ * API.  Falls back to Math.random() if crypto is unavailable (old browser).
+ * Uses rejection sampling to avoid modulo bias.
+ */
+function _secureRandomInt(max) {
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    // Rejection sampling — eliminate modulo bias for small alphabets.
+    const maxUint32 = 0xFFFFFFFF;
+    const limit = maxUint32 - (maxUint32 % max);
+    const arr = new Uint32Array(1);
+    let x;
+    do {
+      crypto.getRandomValues(arr);
+      x = arr[0];
+    } while (x >= limit);
+    return x % max;
+  }
+  // Fallback — not crypto-secure, but better than nothing.
+  return Math.floor(Math.random() * max);
+}
+
+/**
+ * Generate a random password of the given length from PASSWORD_ALPHABET_SAFE.
+ * Uses the Web Crypto API for cryptographic randomness so the password is
+ * safe to use for production databases.
+ */
+export function generatePassword(length = 24) {
+  const alphabet = PASSWORD_ALPHABET_SAFE;
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += alphabet.charAt(_secureRandomInt(alphabet.length));
+  }
+  return out;
+}
+
+/**
+ * Generate a random DB-safe identifier (lowercase + digits) of the given
+ * length.  Used for username suffixes and database name suffixes.
+ */
+export function generateDbIdentifier(length = 6) {
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += DB_IDENTIFIER_ALPHABET.charAt(_secureRandomInt(DB_IDENTIFIER_ALPHABET.length));
+  }
+  return out;
+}
+
+/**
+ * Generate a complete set of DB credentials for the given platform.
+ * Returns { username, password, root_password?, database, port }.
+ *
+ * The generated values follow these rules:
+ *   * username: `<platform>_user_<6 random lowercase+digits>` (≤32 chars)
+ *   * password: 24 chars from PASSWORD_ALPHABET_SAFE
+ *   * root_password: same as password (only for mysql/mariadb)
+ *   * database: `<platform>_db_<8 random lowercase+digits>` (≤64 chars)
+ *   * port: null (use platform default — backend picks the standard port)
+ *
+ * This is the client-side generator.  The backend has a matching
+ * generator at POST /deploy/generate_db_credentials/ for API-only clients.
+ */
+export function generateDbCredentials(platform) {
+  const p = String(platform || "").toLowerCase().trim();
+  const creds = {
+    username: `${p}_user_${generateDbIdentifier(6)}`,
+    password: generatePassword(24),
+    database: `${p}_db_${generateDbIdentifier(8)}`,
+    port: "",
+  };
+  if (p === "mysql" || p === "mariadb") {
+    creds.root_password = generatePassword(24);
+  }
+  return creds;
+}
+
+// ---------------------------------------------------------------------------
+// Connection string builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a connection-string URI for the given DB platform + config.
+ *
+ * Returns a string like:
+ *   mysql:      mysql://user:password@host:3306/database
+ *   postgresql: postgresql://user:password@host:5432/database
+ *   mongodb:    mongodb://user:password@host:27017/database?authSource=admin
+ *   redis:      redis://:password@host:6379   (or redis://user:password@... with ACL)
+ *   oracle:     oracle+cx_oracle://user:password@host:1521/?service_name=database
+ *
+ * Returns "" if the platform is unknown or required fields are missing.
+ *
+ * @param platform  DB platform key (mysql, postgresql, mongodb, redis, oracle)
+ * @param cfg       Deploy config dict (must contain at least username + password
+ *                  for most platforms; redis can have just password)
+ * @param serviceHost  The hostname clients should connect from outside the
+ *                  Docker network — typically `service.service_host` from
+ *                  the services API.  Falls back to "localhost" if absent.
+ */
+export function buildConnectionString(platform, cfg = {}, serviceHost = "localhost") {
+  const p = String(platform || "").toLowerCase().trim();
+  const host = String(serviceHost || "localhost").trim() || "localhost";
+  const port = Number(cfg?.port) || DB_DEFAULT_PORTS[p] || "";
+  const user = encodeURIComponent(String(cfg?.username || ""));
+  const pass = encodeURIComponent(String(cfg?.password || ""));
+  const db = encodeURIComponent(String(cfg?.database || ""));
+
+  const authPart = user || pass
+    ? `${user}:${pass}@`
+    : (pass && p === "redis" ? `:${pass}@` : "");
+
+  const portPart = port ? `:${port}` : "";
+
+  switch (p) {
+    case "mysql":
+    case "mariadb":
+      return `mysql://${authPart}${host}${portPart}/${db}`;
+    case "postgresql":
+    case "postgres":
+      return `postgresql://${authPart}${host}${portPart}/${db}`;
+    case "mongodb":
+    case "mongo": {
+      const qs = db ? `?authSource=admin` : "";
+      return `mongodb://${authPart}${host}${portPart}/${db}${qs}`;
+    }
+    case "redis": {
+      // Redis ACL users (Redis 6+) can have a username; older Redis only has password.
+      if (user && pass) return `redis://${user}:${pass}@${host}${portPart}`;
+      if (pass) return `redis://:${pass}@${host}${portPart}`;
+      return `redis://${host}${portPart}`;
+    }
+    case "oracle": {
+      // SQLAlchemy / cx_oracle style.
+      const svc = db ? `/?service_name=${db}` : "";
+      return `oracle+cx_oracle://${authPart}${host}${portPart}${svc}`;
+    }
+    default:
+      return "";
+  }
+}
+
+/**
+ * Build a human-readable "how to connect" hint for the given platform.
+ * Returned as an array of strings, each a line of instructions.
+ */
+export function buildConnectionHints(platform, cfg = {}, serviceHost = "localhost") {
+  const p = String(platform || "").toLowerCase().trim();
+  const host = String(serviceHost || "localhost").trim() || "localhost";
+  const port = Number(cfg?.port) || DB_DEFAULT_PORTS[p] || "";
+  const user = cfg?.username || "";
+  const pass = cfg?.password || "";
+  const db = cfg?.database || "";
+
+  switch (p) {
+    case "mysql":
+    case "mariadb":
+      return [
+        `Connect with the MySQL CLI:`,
+        `mysql -h ${host} -P ${port} -u ${user} -p${pass} ${db}`,
+        ``,
+        `Or from Python (PyMySQL / mysql-connector):`,
+        `import pymysql; conn = pymysql.connect(host="${host}", port=${port}, user="${user}", password="${pass}", database="${db}")`,
+      ];
+    case "postgresql":
+    case "postgres":
+      return [
+        `Connect with psql:`,
+        `PGPASSWORD=${pass} psql -h ${host} -p ${port} -U ${user} -d ${db}`,
+        ``,
+        `Or from Python (psycopg2):`,
+        `import psycopg2; conn = psycopg2.connect(host="${host}", port=${port}, user="${user}", password="${pass}", dbname="${db}")`,
+      ];
+    case "mongodb":
+    case "mongo":
+      return [
+        `Connect with mongosh:`,
+        `mongosh "mongodb://${user}:${pass}@${host}:${port}/${db}?authSource=admin"`,
+        ``,
+        `Or from Python (pymongo):`,
+        `from pymongo import MongoClient; client = MongoClient("mongodb://${user}:${pass}@${host}:${port}/${db}?authSource=admin")`,
+      ];
+    case "redis":
+      return [
+        `Connect with redis-cli:`,
+        `redis-cli -h ${host} -p ${port} -a ${pass}`,
+        ``,
+        `Or from Python (redis-py):`,
+        `import redis; r = redis.Redis(host="${host}", port=${port}, password="${pass}")`,
+      ];
+    case "oracle":
+      return [
+        `Connect with sqlplus:`,
+        `sqlplus ${user}/${pass}@${host}:${port}/${db}`,
+        ``,
+        `Or from Python (cx_Oracle):`,
+        `import cx_Oracle; conn = cx_Oracle.connect("${user}", "${pass}", "${host}:${port}/${db}")`,
+      ];
+    default:
+      return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Django config suggestion helper (maps inspect_zip API response -> config JSON)
+// ---------------------------------------------------------------------------
+
+/**
+ * Map the response of POST /deploy/inspect_zip/ to a config JSON object
+ * suitable for pasting into the Create Deploy form's config textarea.
+ *
+ * Returns a JSON string (pretty-printed, 2-space indent).
+ *
+ * The shape matches what the backend's _parse_deploy_config expects:
+ *   {
+ *     "platform": "django",
+ *     "server_type": "wsgi" | "asgi" | null,
+ *     "celery": false,
+ *     "celery_beat": false,
+ *     "worker_count": 1,
+ *     "entry_point": "..." | null
+ *   }
+ */
+export function buildDjangoConfigSuggestion(inspection) {
+  if (!inspection || typeof inspection !== "object") return "";
+  const cfg = {
+    platform: inspection.platform || inspection.suggested_config?.platform || "django",
+  };
+  // server_type: include only if detected (null means "auto-detect at deploy time")
+  const st = inspection.server_type || inspection.suggested_config?.server_type;
+  if (st) cfg.server_type = st;
+  // celery flags
+  cfg.celery = Boolean(inspection.suggested_config?.celery);
+  cfg.celery_beat = Boolean(inspection.suggested_config?.celery_beat);
+  cfg.worker_count = Number(inspection.suggested_config?.worker_count) || 1;
+  // entry_point: include only if detected (gives the user an escape hatch)
+  const ep = inspection.entrypoint || inspection.suggested_config?.entry_point;
+  if (ep) cfg.entry_point = ep;
+  return JSON.stringify(cfg, null, 2);
+}
+
+/**
+ * Sentinel value to send for password fields the user wants to KEEP.
+ * The backend's update_db_config + update endpoints treat this the same
+ * as null / empty string — they skip the field instead of overwriting.
+ */
+export { SENTINEL_KEEP_EXISTING };

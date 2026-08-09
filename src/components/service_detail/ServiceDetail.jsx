@@ -928,6 +928,12 @@ export default function ServiceDetail() {
     const cfg = parseDeployConfig(deploy.config);
     setEditingDeployId(deploy.id);
     setEditData({ name: deploy.name || "", version: deploy.version || "", config: typeof deploy.config === "string" ? deploy.config : deploy.config ? JSON.stringify(deploy.config, null, 2) : "", platform });
+    // Pre-fill DB fields from the deploy config.  NOTE: for DB platforms,
+    // the regular API masks password/root_password/username via
+    // MaskedDBConfigField, so cfg won't have them.  We do a follow-up
+    // fetch via /deploy/<id>/reveal_db_credentials/ below to get the
+    // real values so the user sees them in the edit form and doesn't
+    // accidentally overwrite them with "" by saving without typing.
     setEditDbFields({
       root_password: cfg.root_password != null ? String(cfg.root_password) : "",
       password: cfg.password != null ? String(cfg.password) : "",
@@ -941,6 +947,39 @@ export default function ServiceDetail() {
     setError(null);
     setActiveTab("create");
     document.querySelector(".create-deploy-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    // For DB-platform deploys, fetch the real (unmasked) credentials so
+    // the edit form shows them and the user doesn't lose them by saving
+    // with empty password fields.  This is owner-only; non-owners get
+    // a 403 and we just leave the masked (empty) values in place.
+    if (isDbPlatform(platform)) {
+      const deployId = deploy.id || deploy.pk;
+      (async () => {
+        try {
+          const access = localStorage.getItem("access");
+          const headers = access ? { Authorization: `Bearer ${access}` } : {};
+          const resp = await fetch(`${DEPLOY_BASE}${deployId}/reveal_db_credentials/`, { headers });
+          if (!resp.ok) return; // silently fail — form still works, just empty
+          const data = await resp.json();
+          if (data.result === "success" && data.config) {
+            const c = data.config;
+            setEditDbFields((prev) => ({
+              ...prev,
+              root_password: c.root_password != null ? String(c.root_password) : prev.root_password,
+              password:      c.password      != null ? String(c.password)      : prev.password,
+              username:      c.username      != null ? String(c.username)      : prev.username,
+              database:      c.database      != null ? String(c.database)      : prev.database,
+              port:          c.port          != null ? String(c.port)          : prev.port,
+              env:           c.env           != null
+                              ? (typeof c.env === "string" ? c.env : JSON.stringify(c.env, null, 2))
+                              : prev.env,
+            }));
+          }
+        } catch {
+          // Network error — leave the pre-filled (masked) values in place.
+        }
+      })();
+    }
   }, []);
 
   const handleCancelEdit = useCallback(() => {
