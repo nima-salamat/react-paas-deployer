@@ -309,7 +309,22 @@ export default function AdminDashboard() {
       const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
       setDetail(unwrapData(res));
       try {
-        await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
+        const rr = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
+        const rd = rr.data?.data || rr.data || {};
+        const ids = new Set((rd.message_ids || []).map(String));
+        if (ids.size) {
+          setDetail((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              messages: (prev.messages || []).map((m) =>
+                ids.has(String(m.id))
+                  ? { ...m, seen_at: rd.last_read_at || new Date().toISOString(), is_seen: true }
+                  : m
+              ),
+            };
+          });
+        }
       } catch { /* */ }
     } catch {
       setDetail(null);
@@ -897,9 +912,11 @@ export default function AdminDashboard() {
                       <Typography variant="caption" fontWeight={600}>
                         {m.author?.username}{m.is_staff_reply ? " (Staff)" : ""}
                       </Typography>
-                      <Typography variant="caption" color={m.seen_at || m.is_seen ? "primary.main" : "text.disabled"}>
-                        {m.seen_at || m.is_seen ? "Seen" : "Sent"}
-                      </Typography>
+                      {m.is_staff_reply ? (
+                        <Typography variant="caption" color={m.seen_at || m.is_seen ? "primary.main" : "text.disabled"}>
+                          {m.seen_at || m.is_seen ? "Seen" : "Sent"}
+                        </Typography>
+                      ) : null}
                     </Stack>
                     <Box sx={{ fontSize: 13, "& p": { m: 0 } }} dangerouslySetInnerHTML={{ __html: m.body }} />
                   </Paper>

@@ -17,7 +17,8 @@ const STATUS_COLOR = {
   resolved: "success", closed: "default",
 };
 
-function SeenTicks({ seen }) {
+function SeenTicks({ seen, mine }) {
+  if (!mine) return null;
   if (seen) {
     return (
       <Tooltip title="Seen">
@@ -35,7 +36,7 @@ function SeenTicks({ seen }) {
 export default function TicketDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { subscribe, send, connected } = useTicketNotify();
+  const { subscribe, send, connected, userId } = useTicketNotify();
   const [ticket, setTicket] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,38 +44,102 @@ export default function TicketDetail() {
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState([]);
   const bottomRef = useRef(null);
+  const ticketRef = useRef(null);
+  ticketRef.current = ticket;
+
+  const markRead = useCallback(async () => {
+    try {
+      const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
+      const data = res.data?.data || res.data || {};
+      const ids = data.message_ids || [];
+      if (ids.length && ticketRef.current) {
+        const idSet = new Set(ids.map(String));
+        setTicket((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: (prev.messages || []).map((m) =>
+              idSet.has(String(m.id)) ? { ...m, seen_at: data.last_read_at || new Date().toISOString(), is_seen: true } : m
+            ),
+          };
+        });
+      }
+    } catch { /* */ }
+  }, [id]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
       setTicket(unwrapData(res));
-      try {
-        await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
-      } catch { /* */ }
+      // mark after paint data
+      setTimeout(() => { markRead(); }, 50);
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load ticket");
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [id]);
+  }, [id, markRead]);
 
   useEffect(() => { load(); }, [load]);
 
-  // Subscribe to this ticket on the global notify socket
+  // Live events for this ticket
   useEffect(() => {
     send({ type: "subscribe_ticket", ticket_id: Number(id) });
     const unsub = subscribe((ev) => {
       if (String(ev.ticket_id) !== String(id)) return;
-      if (ev.type === "ticket.message" || ev.type === "ticket.updated" || ev.type === "ticket.seen") {
+      if (ev.type === "ticket.message" || ev.type === "ticket.updated") {
         load(true);
+      } else if (ev.type === "ticket.seen") {
+        // Other party read our messages
+        const ids = (ev.message_ids || []).map(String);
+        if (!ids.length) {
+          // fallback: mark all my messages as seen
+          setTicket((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              messages: (prev.messages || []).map((m) => {
+                const mine = userId != null && m.author?.id != null && String(m.author.id) === String(userId);
+                return mine ? { ...m, seen_at: m.seen_at || new Date().toISOString(), is_seen: true } : m;
+              }),
+            };
+          });
+          return;
+        }
+        const idSet = new Set(ids);
+        setTicket((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: (prev.messages || []).map((m) =>
+              idSet.has(String(m.id)) ? { ...m, seen_at: new Date().toISOString(), is_seen: true } : m
+            ),
+          };
+        });
       }
     });
     return () => {
       send({ type: "unsubscribe_ticket", ticket_id: Number(id) });
       unsub();
     };
-  }, [id, send, subscribe, load]);
+  }, [id, send, subscribe, load, userId]);
+
+  // Re-mark read when tab becomes visible
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible") markRead();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [markRead]);
+
+  // Polling fallback when WS offline
+  useEffect(() => {
+    if (connected) return undefined;
+    const t = setInterval(() => load(true), 12000);
+    return () => clearInterval(t);
+  }, [connected, load]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -147,44 +212,47 @@ export default function TicketDetail() {
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
       <Stack spacing={1.5} mb={3}>
-        {(ticket.messages || []).map((m) => (
-          <Paper
-            key={m.id}
-            elevation={0}
-            variant="outlined"
-            sx={{
-              p: 2,
-              bgcolor: m.is_staff_reply ? "action.hover" : "background.paper",
-              borderColor: m.is_staff_reply ? "primary.light" : "divider",
-            }}
-          >
-            <Stack direction="row" gap={1.5} alignItems="flex-start">
-              <Avatar sx={{ width: 36, height: 36 }}>
-                {(m.author?.username || "?")[0]?.toUpperCase()}
-              </Avatar>
-              <Box flex={1}>
-                <Stack direction="row" justifyContent="space-between" flexWrap="wrap" alignItems="center">
-                  <Typography fontWeight={600}>
-                    {m.author?.username || "User"}
-                    {m.is_staff_reply ? " (Staff)" : ""}
-                  </Typography>
-                  <Stack direction="row" alignItems="center">
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(m.created_at).toLocaleString()}
+        {(ticket.messages || []).map((m) => {
+          const mine = userId != null && m.author?.id != null && String(m.author.id) === String(userId);
+          return (
+            <Paper
+              key={m.id}
+              elevation={0}
+              variant="outlined"
+              sx={{
+                p: 2,
+                bgcolor: m.is_staff_reply ? "action.hover" : "background.paper",
+                borderColor: m.is_staff_reply ? "primary.light" : "divider",
+              }}
+            >
+              <Stack direction="row" gap={1.5} alignItems="flex-start">
+                <Avatar sx={{ width: 36, height: 36 }}>
+                  {(m.author?.username || "?")[0]?.toUpperCase()}
+                </Avatar>
+                <Box flex={1}>
+                  <Stack direction="row" justifyContent="space-between" flexWrap="wrap" alignItems="center">
+                    <Typography fontWeight={600}>
+                      {m.author?.username || "User"}
+                      {m.is_staff_reply ? " (Staff)" : ""}
                     </Typography>
-                    <SeenTicks seen={Boolean(m.seen_at || m.is_seen)} />
+                    <Stack direction="row" alignItems="center">
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(m.created_at).toLocaleString()}
+                      </Typography>
+                      <SeenTicks seen={Boolean(m.seen_at || m.is_seen)} mine={mine} />
+                    </Stack>
                   </Stack>
-                </Stack>
-                <Box sx={{ mt: 1, "& p": { m: 0 } }} dangerouslySetInnerHTML={{ __html: m.body }} />
-                {(m.attachments || []).map((a) => (
-                  <Button key={a.id} size="small" href={a.download_url} target="_blank" rel="noopener">
-                    {a.original_filename}
-                  </Button>
-                ))}
-              </Box>
-            </Stack>
-          </Paper>
-        ))}
+                  <Box sx={{ mt: 1, "& p": { m: 0 } }} dangerouslySetInnerHTML={{ __html: m.body }} />
+                  {(m.attachments || []).map((a) => (
+                    <Button key={a.id} size="small" href={a.download_url} target="_blank" rel="noopener">
+                      {a.original_filename}
+                    </Button>
+                  ))}
+                </Box>
+              </Stack>
+            </Paper>
+          );
+        })}
         <div ref={bottomRef} />
       </Stack>
 
@@ -205,9 +273,6 @@ export default function TicketDetail() {
               {sending ? "Sending…" : "Send"}
             </Button>
           </Stack>
-          {files.length > 0 && (
-            <Typography variant="caption" color="text.secondary">{files.length} file(s) selected</Typography>
-          )}
         </Paper>
       )}
     </Box>
