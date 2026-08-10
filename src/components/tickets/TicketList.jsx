@@ -7,6 +7,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, unwrapList } from "./api";
+import { useTicketNotify } from "./TicketNotifyContext";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -15,6 +16,9 @@ const STATUS_COLOR = {
 const PRIORITY_COLOR = { low: "default", normal: "info", high: "warning", urgent: "error" };
 
 export default function TicketList() {
+  const { subscribe, connected } = useTicketNotify();
+  const [tick, setTick] = useState(0);
+
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,15 +50,28 @@ export default function TicketList() {
     }
   }, [page, search, status, priority]);
 
+  
+  useEffect(() => {
+    return subscribe((ev) => {
+      if (ev.type === "ticket.message" || ev.type === "ticket.updated" || ev.type === "ticket.created") {
+        // soft reload list
+        setTick((n) => n + 1);
+      }
+    });
+  }, [subscribe]);
+
   useEffect(() => {
     const t = setTimeout(load, search ? 300 : 0);
     return () => clearTimeout(t);
-  }, [load]);
+  }, [load, tick]);
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1200, mx: "auto" }}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems="center" mb={3} gap={2}>
-        <Typography variant="h5" fontWeight={700}>Support Tickets</Typography>
+        <Stack direction="row" alignItems="center" gap={1}>
+          <Typography variant="h5" fontWeight={700}>Support Tickets</Typography>
+          <Chip size="small" label={connected ? "Live" : "Offline"} color={connected ? "success" : "default"} variant="outlined" />
+        </Stack>
         <Button variant="contained" onClick={() => navigate("/tickets/new")}>New Ticket</Button>
       </Stack>
       <Paper sx={{ p: 2, mb: 2 }}>

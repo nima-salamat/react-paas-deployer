@@ -200,10 +200,14 @@ export default function AdminDashboard() {
     setInvLoading(true);
     try {
       const res = await apiRequest({ method: "GET", url: `${AUTH}/invite/list/` });
-      const d = res.data?.data || res.data?.results || res.data;
-      setInvites(Array.isArray(d) ? d : d?.results || []);
-    } catch {
+      const body = res.data || {};
+      // ok() merges: { success, message, invites: [...] }
+      const list = body.invites || body.data?.invites || body.results || body.data || [];
+      setInvites(Array.isArray(list) ? list : []);
+    } catch (e) {
+      console.error("invite list", e);
       setInvites([]);
+      setToast(e?.response?.data?.message || "Failed to load invites");
     } finally {
       setInvLoading(false);
     }
@@ -304,6 +308,9 @@ export default function AdminDashboard() {
     try {
       const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
       setDetail(unwrapData(res));
+      try {
+        await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
+      } catch { /* */ }
     } catch {
       setDetail(null);
     } finally {
@@ -407,9 +414,9 @@ export default function AdminDashboard() {
     }
   };
 
-  const deactivateInvite = async (id) => {
+  const deactivateInvite = async (token) => {
     try {
-      await apiRequest({ method: "POST", url: `${AUTH}/invite/deactivate/`, data: { id } });
+      await apiRequest({ method: "POST", url: `${AUTH}/invite/deactivate/`, data: { token } });
       setToast("Invite deactivated");
       loadInvites();
     } catch (e) {
@@ -785,7 +792,7 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell align="right">
                           {inv.is_active && (
-                            <Button size="small" color="warning" onClick={() => deactivateInvite(inv.id)}>Deactivate</Button>
+                            <Button size="small" color="warning" onClick={() => deactivateInvite(inv.token)}>Deactivate</Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -856,7 +863,7 @@ export default function AdminDashboard() {
 
       {/* Ticket drawer */}
       <Drawer anchor="right" open={Boolean(selectedId)} onClose={() => { setSelectedId(null); setDetail(null); }}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 480 } } }}>
+        PaperProps={{ sx: { width: { xs: "100%", sm: "min(720px, 92vw)" }, maxWidth: 900 } }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Typography fontWeight={700}>{detail?.public_id || "Ticket"}</Typography>
           <Stack direction="row">
@@ -886,9 +893,14 @@ export default function AdminDashboard() {
               <Stack spacing={1} mb={2} sx={{ maxHeight: 300, overflow: "auto" }}>
                 {(detail.messages || []).map((m) => (
                   <Paper key={m.id} variant="outlined" sx={{ p: 1.2, bgcolor: m.is_staff_reply ? "action.hover" : "background.paper" }}>
-                    <Typography variant="caption" fontWeight={600}>
-                      {m.author?.username}{m.is_staff_reply ? " (Staff)" : ""}
-                    </Typography>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography variant="caption" fontWeight={600}>
+                        {m.author?.username}{m.is_staff_reply ? " (Staff)" : ""}
+                      </Typography>
+                      <Typography variant="caption" color={m.seen_at || m.is_seen ? "primary.main" : "text.disabled"}>
+                        {m.seen_at || m.is_seen ? "Seen" : "Sent"}
+                      </Typography>
+                    </Stack>
                     <Box sx={{ fontSize: 13, "& p": { m: 0 } }} dangerouslySetInnerHTML={{ __html: m.body }} />
                   </Paper>
                 ))}

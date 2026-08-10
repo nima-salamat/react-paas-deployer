@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { TicketNotifyBell } from "../tickets/TicketNotifyContext.jsx";
 import {
   Link as RouterLink,
   matchPath,
@@ -562,6 +563,8 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {!checkingAuth && loggedIn ? (
+              <>
+              <TicketNotifyBell />
               <IconButton
                 onClick={() => navigate("/profile")}
                 aria-label="Open profile"
@@ -584,6 +587,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
                   }}
                 />
               </IconButton>
+              </>
             ) : !checkingAuth ? (
               <>
                 {/* Mobile View: Icon Only */}

@@ -20,6 +20,7 @@ import TicketDetail from "./components/tickets/TicketDetail.jsx";
 import StaffConsole from "./components/staff/StaffConsole.jsx";
 import EmailManagement from "./components/emails/EmailManagement.jsx";
 import AdminDashboard from "./components/admin/AdminDashboard.jsx";
+import { TicketNotifyProvider } from "./components/tickets/TicketNotifyContext.jsx";
 
 const THEME_STORAGE_KEY = "paas-theme-mode";
 const allowedThemeModes = new Set(["light", "dark", "system"]);
@@ -164,6 +165,7 @@ function App() {
   return (
     <ThemeProvider theme={appTheme}>
       <CssBaseline enableColorScheme />
+      <TicketNotifyProvider>
       <Router>
         <Routes>
           <Route path="/" element={<Layout themeMode={themeMode} setThemeMode={setThemeMode} />}>
@@ -186,6 +188,7 @@ function App() {
           </Route>
         </Routes>
       </Router>
+      </TicketNotifyProvider>
     </ThemeProvider>
   );
 }
