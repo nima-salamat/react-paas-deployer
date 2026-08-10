@@ -14,6 +14,12 @@ import Profile from "./components/profile/profile.jsx";
 import Volumes from "./components/volumes/Volumes.jsx";
 import Networks from "./components/networks/Networks.jsx";
 import FloatingNav from "./components/layout/FloatingNav";
+import TicketList from "./components/tickets/TicketList.jsx";
+import CreateTicket from "./components/tickets/CreateTicket.jsx";
+import TicketDetail from "./components/tickets/TicketDetail.jsx";
+import StaffConsole from "./components/staff/StaffConsole.jsx";
+import EmailManagement from "./components/emails/EmailManagement.jsx";
+import AdminDashboard from "./components/admin/AdminDashboard.jsx";
 
 const THEME_STORAGE_KEY = "paas-theme-mode";
 const allowedThemeModes = new Set(["light", "dark", "system"]);
@@ -169,6 +175,13 @@ function App() {
             <Route path="signin_or_signup" element={<SigninOrSignup />} />
             <Route path="aboutUs" element={<AboutUs />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="tickets" element={<TicketList />} />
+            <Route path="tickets/new" element={<CreateTicket />} />
+            <Route path="tickets/:id" element={<TicketDetail />} />
+            <Route path="staff" element={<StaffConsole />} />
+            <Route path="staff/tickets" element={<StaffConsole />} />
+            <Route path="admin" element={<AdminDashboard />} />
+            <Route path="admin/emails" element={<EmailManagement />} />
             <Route path="service/:id" element={<ServiceDetail />} />
           </Route>
         </Routes>

@@ -41,6 +41,8 @@ import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
 import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
+import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
@@ -52,11 +54,13 @@ import { useProfiles, resolveProfileImageUrl } from "../profile/profile.jsx";
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_ICON = "/icon.svg";
 
-const allNavItems = [
+const baseNavItems = [
   { path: "/", label: "Home", icon: HomeOutlinedIcon, guest: true },
   { path: "/services", label: "Services", icon: MiscellaneousServicesOutlinedIcon, guest: false },
   { path: "/volumes", label: "Volumes", icon: Inventory2OutlinedIcon, guest: false },
   { path: "/networks", label: "Networks", icon: LanOutlinedIcon, guest: false },
+  { path: "/tickets", label: "Tickets", icon: ConfirmationNumberOutlinedIcon, guest: false },
+  { path: "/admin", label: "Admin", icon: AdminPanelSettingsOutlinedIcon, guest: false, staffOnly: true },
   { path: "/plans", label: "Plans", icon: PaidOutlinedIcon, guest: true },
   { path: "/aboutUs", label: "About us", icon: InfoOutlinedIcon, guest: true },
   { path: "/profile", label: "Profile", icon: PersonOutlineOutlinedIcon, guest: false },
@@ -75,6 +79,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [userImage, setUserImage] = useState(null);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
@@ -108,6 +113,12 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     if (path === "/") return location.pathname === "/";
     if (path === "/services") {
       return location.pathname === "/services" || location.pathname.startsWith("/service/");
+    }
+    if (path === "/tickets") {
+      return location.pathname === "/tickets" || location.pathname.startsWith("/tickets/");
+    }
+    if (path === "/admin") {
+      return location.pathname === "/admin" || location.pathname.startsWith("/admin/");
     }
     return Boolean(matchPath({ path, end: true }, location.pathname));
   };
@@ -198,6 +209,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     if (!accessToken) {
       if (mountedRef.current) {
         setLoggedIn(false);
+      setIsStaff(false);
         setUserImage(null);
         setCheckingAuth(false);
         profilesLoadedRef.current = false;
@@ -209,6 +221,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     if (location.pathname === "/signin_or_signup") {
       if (mountedRef.current) {
         setLoggedIn(false);
+      setIsStaff(false);
         setCheckingAuth(false);
       }
       return false;
@@ -226,6 +239,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
 
       if (!validateRes.ok) {
         setLoggedIn(false);
+        setIsStaff(false);
         setUserImage(null);
         profilesLoadedRef.current = false;
         currentProfileIdRef.current = null;
@@ -233,12 +247,25 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
       }
 
       setLoggedIn(true);
+      try {
+        const body = await validateRes.json();
+        const u = body.user || body;
+        setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
+      } catch {
+        // fallback: fetch user profile flags
+        try {
+          await refreshStaffFlag();
+        } catch {
+          setIsStaff(false);
+        }
+      }
       await loadProfilesIfNeeded({ force });
       return true;
     } catch (error) {
       if (mountedRef.current) {
         console.error("Auth check failed:", error);
         setLoggedIn(false);
+      setIsStaff(false);
         setUserImage(null);
         profilesLoadedRef.current = false;
         currentProfileIdRef.current = null;
@@ -330,6 +357,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     profileRequestRef.current = null;
 
     setLoggedIn(false);
+      setIsStaff(false);
     setUserImage(null);
     setCheckingAuth(false);
     setLogoutDialogOpen(false);
@@ -364,6 +392,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
       if (!validateRes.ok) {
         window.localStorage.setItem("auth_mode", "signin_or_signup");
         setLoggedIn(false);
+      setIsStaff(false);
         setUserImage(null);
         profilesLoadedRef.current = false;
         currentProfileIdRef.current = null;
@@ -379,6 +408,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
       console.error("Auth validation failed on sign-in click:", error);
       window.localStorage.setItem("auth_mode", "signin_or_signup");
       setLoggedIn(false);
+      setIsStaff(false);
       setUserImage(null);
       profilesLoadedRef.current = false;
       currentProfileIdRef.current = null;
@@ -396,7 +426,44 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
 
   const drawerWidth = { xs: "88vw", sm: 360, md: 396 };
   const avatarSrc = userImage || DEFAULT_ICON;
-  const visibleNavItems = allNavItems.filter((item) => loggedIn || item.guest);
+  
+  async function refreshStaffFlag() {
+    try {
+      const accessToken = window.localStorage.getItem("access");
+      if (!accessToken) {
+        setIsStaff(false);
+        return;
+      }
+      let res = await fetch(`${API_BASE}/api/users/user/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) {
+        res = await fetch(`${API_BASE}/users/user/`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      }
+      if (!res.ok) {
+        setIsStaff(false);
+        return;
+      }
+      const data = await res.json();
+      const u = data.user || data;
+      setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
+    } catch {
+      setIsStaff(false);
+    }
+  };
+
+  useEffect(() => {
+    if (loggedIn) refreshStaffFlag();
+    else setIsStaff(false);
+  }, [loggedIn]);
+
+  const visibleNavItems = baseNavItems.filter((item) => {
+    if (!loggedIn && !item.guest) return false;
+    if (item.staffOnly && !isStaff) return false;
+    return loggedIn || item.guest;
+  });
 
   return (
     <>

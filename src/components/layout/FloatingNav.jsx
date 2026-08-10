@@ -18,6 +18,8 @@ import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
+import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 
 import { motion } from "framer-motion";
 
@@ -182,6 +184,8 @@ export default function FloatingNav({
     { to: "/services", label: "Services", icon: <StorageIcon /> },
     { to: "/volumes", label: "Volumes", icon: <Inventory2OutlinedIcon /> },
     { to: "/networks", label: "Networks", icon: <LanOutlinedIcon /> },
+    { to: "/tickets", label: "Tickets", icon: <ConfirmationNumberOutlinedIcon /> },
+    { to: "/admin", label: "Admin", icon: <AdminPanelSettingsOutlinedIcon /> },
     { to: "/plans", label: "Plans", icon: <PriceChangeIcon /> },
     { to: "/profile", label: "Profile", icon: <AccountCircleIcon /> },
     {
