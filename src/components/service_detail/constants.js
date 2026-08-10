@@ -87,7 +87,7 @@ export const PASSWORD_ALPHABET_SAFE =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
   "abcdefghijklmnopqrstuvwxyz" +
   "0123456789" +
-  "!@#%^&*()-_=+";
+  "!.*_+-=";
 
 // Sentinel value sent to the backend for password fields when the user
 // wants to KEEP the existing password (i.e. didn't type a new one).
