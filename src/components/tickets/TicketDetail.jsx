@@ -137,7 +137,7 @@ export default function TicketDetail() {
   // Polling fallback when WS offline
   useEffect(() => {
     if (connected) return undefined;
-    const t = setInterval(() => load(true), 12000);
+    const t = setInterval(() => load(true), 5000);
     return () => clearInterval(t);
   }, [connected, load]);
 
