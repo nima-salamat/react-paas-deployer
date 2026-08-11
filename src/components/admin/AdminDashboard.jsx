@@ -21,6 +21,7 @@ import { TICKETS_API, EMAILS_API, unwrapData } from "../tickets/api";
 import EmailManagement from "../emails/EmailManagement.jsx";
 import MessageBubble from "../tickets/MessageBubble.jsx";
 import SimpleHtmlEditor, { htmlToPlain } from "../tickets/SimpleHtmlEditor.jsx";
+import PendingFilesBar from "../tickets/PendingFilesBar.jsx";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -87,6 +88,7 @@ export default function AdminDashboard() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [reply, setReply] = useState("");
+  const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
 
   // users
@@ -328,6 +330,7 @@ export default function AdminDashboard() {
     if (!silent) {
       setDetailLoading(true);
       setReply("");
+      setFiles([]);
     }
     try {
       const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
@@ -368,13 +371,15 @@ export default function AdminDashboard() {
   };
 
   const sendReply = async () => {
-    if (!htmlToPlain(reply)) return;
+    if (!htmlToPlain(reply) && !files.length) return;
     setSending(true);
     try {
       const form = new FormData();
-      form.append("body", reply);
+      form.append("body", htmlToPlain(reply) ? reply : "<p></p>");
+      files.forEach((f) => form.append("attachments", f));
       await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
       setReply("");
+      setFiles([]);
       await openDetail(selectedId, { silent: true });
       loadTickets({ silent: true });
     } finally {
@@ -997,9 +1002,33 @@ export default function AdminDashboard() {
               {detail.status !== "closed" && (
                 <Box>
                   <SimpleHtmlEditor value={reply} onChange={setReply} minHeight={110} disabled={sending} />
-                  <Button sx={{ mt: 1 }} fullWidth variant="contained" disabled={sending || !htmlToPlain(reply)} onClick={sendReply}>
-                    {sending ? "Sending…" : "Send reply"}
-                  </Button>
+                  <PendingFilesBar
+                    files={files}
+                    onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    onClear={() => setFiles([])}
+                  />
+                  <Stack direction="row" gap={1} alignItems="center" mt={1}>
+                    <Button component="label" size="small" variant="outlined">
+                      Attach
+                      <input
+                        hidden
+                        type="file"
+                        multiple
+                        accept="image/*,audio/*,video/*,.pdf,.zip,.txt,.doc,.docx"
+                        onChange={(e) => {
+                          const picked = Array.from(e.target.files || []);
+                          setFiles((prev) => [...prev, ...picked].slice(0, 5));
+                          e.target.value = "";
+                        }}
+                      />
+                    </Button>
+                    <Typography variant="caption" color="text.secondary" flex={1}>
+                      {files.length ? `${files.length} selected` : ""}
+                    </Typography>
+                    <Button variant="contained" disabled={sending || (!htmlToPlain(reply) && !files.length)} onClick={sendReply}>
+                      {sending ? "Sending…" : "Send reply"}
+                    </Button>
+                  </Stack>
                 </Box>
               )}
             </Box>

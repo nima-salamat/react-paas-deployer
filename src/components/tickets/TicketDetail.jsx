@@ -10,6 +10,7 @@ import { TICKETS_API, unwrapData } from "./api";
 import { useTicketNotify } from "./TicketNotifyContext";
 import MessageBubble from "./MessageBubble";
 import SimpleHtmlEditor, { htmlToPlain } from "./SimpleHtmlEditor";
+import PendingFilesBar from "./PendingFilesBar";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -129,11 +130,11 @@ export default function TicketDetail() {
   }, [ticket?.messages?.length]);
 
   const sendReply = async () => {
-    if (!htmlToPlain(reply)) return;
+    if (!htmlToPlain(reply) && !files.length) return;
     setSending(true);
     try {
       const form = new FormData();
-      form.append("body", reply);
+      form.append("body", htmlToPlain(reply) ? reply : "<p></p>");
       files.forEach((f) => form.append("attachments", f));
       await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/messages/`, data: form });
       setReply("");
@@ -208,15 +209,30 @@ export default function TicketDetail() {
       ) : (
         <Box>
           <SimpleHtmlEditor value={reply} onChange={setReply} minHeight={100} disabled={sending} />
+          <PendingFilesBar
+            files={files}
+            onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+            onClear={() => setFiles([])}
+          />
           <Stack direction="row" justifyContent="space-between" alignItems="center" mt={1} gap={1}>
             <Button component="label" size="small" variant="outlined">
               Attach
-              <input hidden type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
+              <input
+                hidden
+                type="file"
+                multiple
+                accept="image/*,audio/*,video/*,.pdf,.zip,.txt,.doc,.docx,.xls,.xlsx"
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files || []);
+                  setFiles((prev) => [...prev, ...picked].slice(0, 5));
+                  e.target.value = "";
+                }}
+              />
             </Button>
-            <Typography variant="caption" color="text.secondary">
-              {files.length ? `${files.length} file(s)` : ""}
+            <Typography variant="caption" color="text.secondary" flex={1}>
+              {files.length ? `${files.length} selected` : "Images, audio, video, docs"}
             </Typography>
-            <Button variant="contained" disabled={sending || !htmlToPlain(reply)} onClick={sendReply}>
+            <Button variant="contained" disabled={sending || (!htmlToPlain(reply) && !files.length)} onClick={sendReply}>
               {sending ? "Sending…" : "Send"}
             </Button>
           </Stack>
