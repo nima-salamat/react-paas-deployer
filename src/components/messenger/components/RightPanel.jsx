@@ -11,6 +11,7 @@ import BlockIcon from "@mui/icons-material/Block";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import LinkIcon from "@mui/icons-material/Link";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import VideocamIcon from "@mui/icons-material/Videocam";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
@@ -62,7 +63,7 @@ export default function RightPanel({
   myJoinRequests, convJoinRequests,
   canGoBack, onBack, onClose,
   onOpenMyProfile, onOpenContacts, onOpenBlocks, onOpenMyRequests, onOpenConvJoinRequests,
-  onOpenCreateGroup, onOpenJoin, onNavigateHome,
+  onOpenCreateGroup, onOpenJoin, onNavigateHome, onOpenMediaSettings,
   onStartDm, onRemoveContact, onUnblock,
   onPatchGroup, onCreateInvite, onRevokeInvite,
   onOpenAddMembers, onAddContact, onBlockUser, onMessage, onOpenPhoto, onViewProfile,
@@ -140,6 +141,13 @@ export default function RightPanel({
           <ListItemButton onClick={onOpenJoin}>
             <ListItemIcon><LinkIcon /></ListItemIcon>
             <ListItemText primary="Join with invite" />
+          </ListItemButton>
+          <ListItemButton onClick={onOpenMediaSettings}>
+            <ListItemIcon><VideocamIcon /></ListItemIcon>
+            <ListItemText
+              primary="Media settings"
+              secondary="Choose camera & microphone"
+            />
           </ListItemButton>
           <Divider sx={{ my: 1 }} />
           <ListItemButton onClick={onNavigateHome}>

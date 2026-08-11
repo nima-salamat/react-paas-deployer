@@ -45,7 +45,7 @@ const EMOJI_CATEGORIES = {
 export default function MessageComposer({
   text, setText, files, setFiles,
   replyTo, editingMsg, onCancelReplyOrEdit,
-  onSend, onPickImage, inputRef, onKeyDown,
+  onSend, onPickImage, onPickVideo, inputRef, onKeyDown,
 }) {
   const fileRef = useRef(null);
   const emojiBtnRef = useRef(null);
@@ -81,10 +81,13 @@ export default function MessageComposer({
     const picked = Array.from(e.target.files || []);
     e.target.value = "";
     if (!picked.length) return;
-    // Images go through crop dialog; non-image files are added directly.
+    // Images go through crop dialog; videos go through video edit dialog
+    // (if onPickVideo is provided); other files are added directly.
     picked.forEach((f) => {
       if (f.type?.startsWith("image/")) {
         onPickImage(f);
+      } else if (f.type?.startsWith("video/") && onPickVideo) {
+        onPickVideo(f);
       } else {
         setFiles((prev) => [...prev, f]);
       }
@@ -93,12 +96,39 @@ export default function MessageComposer({
 
   /* -------------------- voice / video recording -------------------- */
 
+  // Read saved device IDs from MediaSettingsDialog (camera + mic pickers).
+  // We resolve the saved selection at recording time so the user can change
+  // devices in settings without having to reload the page.
+  const getSavedDevices = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("messenger.mediaDevices") || "{}");
+      return {
+        cameraId: saved.cameraId || "",
+        micId: saved.micId || "",
+      };
+    } catch {
+      return { cameraId: "", micId: "" };
+    }
+  };
+
   const startRecording = async (mode) => {
     setRecordError("");
     try {
-      const constraints = mode === "video"
-        ? { video: { width: { ideal: 320 }, height: { ideal: 320 } }, audio: true }
-        : { audio: true };
+      const { cameraId, micId } = getSavedDevices();
+      // Build constraints using saved device IDs (if any).
+      // Use `exact` so the browser picks the user-selected device; fall back
+      // to a generic constraint if no selection was made.
+      const audioConstraint = micId
+        ? { deviceId: { exact: micId } }
+        : true;
+      const videoConstraint = mode === "video"
+        ? {
+            width: { ideal: 320 },
+            height: { ideal: 320 },
+            ...(cameraId ? { deviceId: { exact: cameraId } } : {}),
+          }
+        : false;
+      const constraints = { video: videoConstraint, audio: audioConstraint };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
 

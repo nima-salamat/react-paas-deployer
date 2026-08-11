@@ -51,6 +51,7 @@ import LockOpenIcon from "@mui/icons-material/LockOpen";
 import PersonIcon from "@mui/icons-material/Person";
 import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import StarIcon from "@mui/icons-material/Star";
+import BrokenImageIcon from "@mui/icons-material/BrokenImage";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
@@ -470,10 +471,15 @@ const SortablePhoto = ({ id, profile, index, handleDeleteProfile, onPreview }) =
             mx: "auto",
             borderRadius: 2,
             pointerEvents: "none",
+            bgcolor: "action.hover",
           }}
           variant="rounded"
           draggable={false}
-        />
+        >
+          {/* Fallback shown when src is missing or fails to load (404).
+              The user might have a stale URL cached from a deleted photo. */}
+          <BrokenImageIcon sx={{ fontSize: 36, color: "text.disabled" }} />
+        </Avatar>
       </Box>
     </Paper>
   );

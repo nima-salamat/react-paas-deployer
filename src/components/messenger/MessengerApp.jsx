@@ -65,6 +65,8 @@ import ConfirmDialog from "./components/ConfirmDialog";
 import ContextMenu from "./components/ContextMenu";
 import AudioPlayerBar from "./components/AudioPlayerBar";
 import MediaGalleryDialog from "./components/MediaGalleryDialog";
+import MediaSettingsDialog from "./components/MediaSettingsDialog";
+import VideoEditDialog from "./components/VideoEditDialog";
 
 export default function MessengerApp() {
   const theme = useTheme();
@@ -120,6 +122,12 @@ export default function MessengerApp() {
 
   // Image crop
   const [cropFile, setCropFile] = useState(null);
+
+  // Media settings dialog (camera / microphone picker for voice & video msgs)
+  const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
+
+  // Video edit dialog (trim + crop before sending)
+  const [videoEditFile, setVideoEditFile] = useState(null);
 
   // "Join this public group?" confirmation dialog — shown when the user clicks
   // a non-member public group row in the search results (Telegram shows a
@@ -643,7 +651,9 @@ export default function MessengerApp() {
       if (preview) { setPreview(null); return; }
       if (galleryState) { setGalleryState(null); return; }
       if (readersMessage) { setReadersMessage(null); return; }
+      if (videoEditFile) { setVideoEditFile(null); return; }
       if (cropFile) { setCropFile(null); return; }
+      if (mediaSettingsOpen) { setMediaSettingsOpen(false); return; }
       if (ctx) { setCtx(null); return; }
       if (reactAnchor) { setReactAnchor(null); return; }
       if (editingMsg) { setEditingMsg(null); setText(""); return; }
@@ -653,7 +663,7 @@ export default function MessengerApp() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [preview, galleryState, readersMessage, cropFile, ctx, reactAnchor, editingMsg, replyTo, panelHistory, activeId, closeChat, popPanel]);
+  }, [preview, galleryState, readersMessage, videoEditFile, cropFile, mediaSettingsOpen, ctx, reactAnchor, editingMsg, replyTo, panelHistory, activeId, closeChat, popPanel]);
 
   /* search users */
   useEffect(() => {
@@ -1600,6 +1610,7 @@ export default function MessengerApp() {
               onCancelReplyOrEdit={() => { setReplyTo(null); setEditingMsg(null); setText(""); }}
               onSend={sendOrEdit}
               onPickImage={(f) => setCropFile(f)}
+              onPickVideo={(f) => setVideoEditFile(f)}
               inputRef={inputRef}
               onKeyDown={onComposerKeyDown}
             />
@@ -1705,6 +1716,7 @@ export default function MessengerApp() {
             onOpenCreateGroup={() => setCreateGroupOpen(true)}
             onOpenJoin={() => setJoinOpen(true)}
             onNavigateHome={() => navigate("/")}
+            onOpenMediaSettings={() => setMediaSettingsOpen(true)}
             onStartDm={startDm}
             onRemoveContact={removeContact}
             onUnblock={unblockUser}
@@ -1785,6 +1797,18 @@ export default function MessengerApp() {
           const cropped = new File([blob], filename, { type: "image/jpeg" });
           setFiles((prev) => [...prev, cropped]);
           setCropFile(null);
+        }}
+      />
+
+      {/* Video edit dialog (trim + crop before sending) */}
+      <VideoEditDialog
+        open={Boolean(videoEditFile)}
+        file={videoEditFile}
+        onClose={() => setVideoEditFile(null)}
+        onConfirm={(blob, filename) => {
+          const edited = new File([blob], filename, { type: "video/webm" });
+          setFiles((prev) => [...prev, edited]);
+          setVideoEditFile(null);
         }}
       />
 
@@ -2024,6 +2048,12 @@ export default function MessengerApp() {
         confirmColor="warning"
         onConfirm={leaveChat}
         onClose={() => setConfirmLeave(null)}
+      />
+
+      {/* Media settings — camera/microphone picker for voice & video messages */}
+      <MediaSettingsDialog
+        open={mediaSettingsOpen}
+        onClose={() => setMediaSettingsOpen(false)}
       />
 
       {/* Toasts */}

@@ -17,6 +17,7 @@ import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import ClearIcon from "@mui/icons-material/Clear";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import TuneIcon from "@mui/icons-material/Tune";
 
 /**
  * Professional image editor dialog — replaces the old simple crop dialog.
@@ -53,11 +54,18 @@ export default function ImageCropDialog({
   const containerRef = useRef(null);
   const imgRef = useRef(null);            // HTMLImageElement
   const [imgSrc, setImgSrc] = useState(null);
-  const [mode, setMode] = useState("crop");        // "crop" | "draw"
+  const [mode, setMode] = useState("crop");        // "crop" | "draw" | "adjust"
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);     // degrees
   const [aspect, setAspect] = useState(circular ? 1 : null); // null = free
   const [sending, setSending] = useState(false);
+  // Image adjustment filters (CSS-style). Applied at export time too.
+  const [brightness, setBrightness] = useState(100);  // % (100 = no change)
+  const [contrast, setContrast] = useState(100);      // %
+  const [saturate, setSaturate] = useState(100);      // %
+  const [blur, setBlur] = useState(0);                // px
+  const [grayscale, setGrayscale] = useState(0);      // %
+  const [sepia, setSepia] = useState(0);              // %
   // Crop rect in display coords: {x, y, w, h}
   const [crop, setCrop] = useState({ x: 60, y: 60, w: 300, h: 300 });
   const cropDragRef = useRef(null);  // {mode, startX, startY, origCrop}
@@ -105,10 +113,29 @@ export default function ImageCropDialog({
       setTool("solid");
       setColor(PEN_COLORS[0]);
       setThickness(6);
+      setBrightness(100);
+      setContrast(100);
+      setSaturate(100);
+      setBlur(0);
+      setGrayscale(0);
+      setSepia(0);
     }
   }, [open, circular]);
 
-  // Render the image canvas (zoom + rotation)
+  // Build the CSS filter string from the current filter state.
+  // Applied both to the live preview canvas (via ctx.filter) and at export time.
+  const filterString = useCallback(() => {
+    const parts = [];
+    if (brightness !== 100) parts.push(`brightness(${brightness}%)`);
+    if (contrast !== 100) parts.push(`contrast(${contrast}%)`);
+    if (saturate !== 100) parts.push(`saturate(${saturate}%)`);
+    if (blur > 0) parts.push(`blur(${blur}px)`);
+    if (grayscale > 0) parts.push(`grayscale(${grayscale}%)`);
+    if (sepia > 0) parts.push(`sepia(${sepia}%)`);
+    return parts.length ? parts.join(" ") : "none";
+  }, [brightness, contrast, saturate, blur, grayscale, sepia]);
+
+  // Render the image canvas (zoom + rotation + filters)
   const renderImage = useCallback(() => {
     const c = imgCanvasRef.current;
     if (!c || !imgRef.current) return;
@@ -118,6 +145,8 @@ export default function ImageCropDialog({
     // Fill dark background
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(0, 0, EDITOR_W, EDITOR_H);
+    // Apply CSS-style filter for live preview (brightness/contrast/saturate/blur/grayscale/sepia)
+    ctx.filter = filterString();
     // Translate to center, rotate, scale, draw image centered
     ctx.translate(EDITOR_W / 2, EDITOR_H / 2);
     ctx.rotate((rotation * Math.PI) / 180);
@@ -128,8 +157,9 @@ export default function ImageCropDialog({
     const dw = img.width * scale;
     const dh = img.height * scale;
     ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+    ctx.filter = "none";
     ctx.restore();
-  }, [zoom, rotation]);
+  }, [zoom, rotation, filterString]);
 
   // Render drawings on top
   const renderDrawings = useCallback(() => {
@@ -316,6 +346,9 @@ export default function ImageCropDialog({
       octx.fillStyle = "#1a1a1a";
       octx.fillRect(0, 0, off.width, off.height);
       octx.save();
+      // Apply the same CSS filter at export time (so the saved image matches
+      // what the user sees in the live preview).
+      octx.filter = filterString();
       octx.translate(off.width / 2, off.height / 2);
       octx.rotate((rotation * Math.PI) / 180);
       octx.scale(zoom, zoom);
@@ -324,6 +357,7 @@ export default function ImageCropDialog({
       // At natural resolution, we need to draw at scale 1 (the image's own size),
       // but the zoom + rotation still apply. So draw at the natural size:
       octx.drawImage(img, -img.width / 2, -img.height / 2, img.width, img.height);
+      octx.filter = "none";
       octx.restore();
       // Step 2: composite drawings (scale from display coords → natural coords)
       const scaleX = img.width / EDITOR_W;
@@ -431,6 +465,7 @@ export default function ImageCropDialog({
           >
             <ToggleButton value="crop"><CropIcon sx={{ fontSize: 18, mr: 0.5 }} />Crop</ToggleButton>
             <ToggleButton value="draw"><BrushIcon sx={{ fontSize: 18, mr: 0.5 }} />Draw</ToggleButton>
+            <ToggleButton value="adjust"><TuneIcon sx={{ fontSize: 18, mr: 0.5 }} />Adjust</ToggleButton>
           </ToggleButtonGroup>
           <Divider orientation="vertical" flexItem />
           <Tooltip title="Rotate left 90°">
@@ -511,6 +546,97 @@ export default function ImageCropDialog({
             <Tooltip title="Undo"><span><IconButton size="small" onClick={undo} disabled={!strokes.length}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
             <Tooltip title="Redo"><span><IconButton size="small" onClick={redo} disabled={!redoStack.length}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
             <Tooltip title="Clear all drawings"><span><IconButton size="small" onClick={clearDrawings} disabled={!strokes.length}><ClearIcon fontSize="small" /></IconButton></span></Tooltip>
+          </Stack>
+        )}
+
+        {/* Adjust toolbar (only in adjust mode) — filters / color grading */}
+        {mode === "adjust" && (
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ p: 1.5, borderBottom: "1px solid", borderColor: "divider", flexWrap: "wrap", gap: 1.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
+              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Brightness</Typography>
+              <Slider
+                size="small" min={0} max={200} step={1}
+                value={brightness} onChange={(_, v) => setBrightness(v)}
+              />
+              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{brightness}%</Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
+              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Contrast</Typography>
+              <Slider
+                size="small" min={0} max={200} step={1}
+                value={contrast} onChange={(_, v) => setContrast(v)}
+              />
+              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{contrast}%</Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
+              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Saturation</Typography>
+              <Slider
+                size="small" min={0} max={200} step={1}
+                value={saturate} onChange={(_, v) => setSaturate(v)}
+              />
+              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{saturate}%</Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
+              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Blur</Typography>
+              <Slider
+                size="small" min={0} max={10} step={0.1}
+                value={blur} onChange={(_, v) => setBlur(v)}
+              />
+              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{blur.toFixed(1)}px</Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
+              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Grayscale</Typography>
+              <Slider
+                size="small" min={0} max={100} step={1}
+                value={grayscale} onChange={(_, v) => setGrayscale(v)}
+              />
+              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{grayscale}%</Typography>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
+              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Sepia</Typography>
+              <Slider
+                size="small" min={0} max={100} step={1}
+                value={sepia} onChange={(_, v) => setSepia(v)}
+              />
+              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{sepia}%</Typography>
+            </Box>
+            <Divider orientation="vertical" flexItem />
+            {/* Quick presets */}
+            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="caption" sx={{ mr: 0.5 }}>Presets:</Typography>
+              <ToggleButtonGroup size="small" exclusive>
+                <ToggleButton
+                  value="none"
+                  onClick={() => { setBrightness(100); setContrast(100); setSaturate(100); setBlur(0); setGrayscale(0); setSepia(0); }}
+                  sx={{ py: 0.25, fontSize: 11 }}
+                >Original</ToggleButton>
+                <ToggleButton
+                  value="vivid"
+                  onClick={() => { setBrightness(105); setContrast(115); setSaturate(140); setBlur(0); setGrayscale(0); setSepia(0); }}
+                  sx={{ py: 0.25, fontSize: 11 }}
+                >Vivid</ToggleButton>
+                <ToggleButton
+                  value="bw"
+                  onClick={() => { setBrightness(105); setContrast(115); setSaturate(100); setBlur(0); setGrayscale(100); setSepia(0); }}
+                  sx={{ py: 0.25, fontSize: 11 }}
+                >B&W</ToggleButton>
+                <ToggleButton
+                  value="vintage"
+                  onClick={() => { setBrightness(105); setContrast(95); setSaturate(85); setBlur(0); setGrayscale(0); setSepia(45); }}
+                  sx={{ py: 0.25, fontSize: 11 }}
+                >Vintage</ToggleButton>
+                <ToggleButton
+                  value="warm"
+                  onClick={() => { setBrightness(105); setContrast(105); setSaturate(115); setBlur(0); setGrayscale(0); setSepia(20); }}
+                  sx={{ py: 0.25, fontSize: 11 }}
+                >Warm</ToggleButton>
+                <ToggleButton
+                  value="cool"
+                  onClick={() => { setBrightness(95); setContrast(110); setSaturate(90); setBlur(0); setGrayscale(0); setSepia(0); }}
+                  sx={{ py: 0.25, fontSize: 11 }}
+                >Cool</ToggleButton>
+              </ToggleButtonGroup>
+            </Stack>
           </Stack>
         )}
 

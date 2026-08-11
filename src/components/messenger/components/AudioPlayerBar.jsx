@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Box, Stack, Typography, IconButton, Slider, MenuItem, Select, FormControl, Tooltip, alpha,
+  Box, Stack, Typography, IconButton, MenuItem, Select, FormControl, Tooltip, alpha,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
@@ -15,15 +15,29 @@ import Forward10Icon from "@mui/icons-material/Forward10";
 import LoopIcon from "@mui/icons-material/Loop";
 import DownloadIcon from "@mui/icons-material/Download";
 
+import WaveSurfer from "wavesurfer.js";
 import { formatDuration, withTokenQuery } from "../messengerUtils";
 
 /**
  * Premium audio player bar (Telegram-style). Renders a fixed bar at the top
  * of the chat pane when `player` is non-null.
  *
- * State is partially lifted to the parent via `onStateChange` so individual
- * MessageBubble components can render an inline progress bar / play button
- * for the currently-playing voice or audio message.
+ * Built on top of wavesurfer.js — the de-facto standard for waveform audio
+ * players in the web (used by Spotify web, SoundCloud, BBC, etc.).
+ *
+ * Why wavesurfer.js? The previous hand-rolled version had broken behaviors:
+ *  - "Moving the music" (dragging the seek/waveform) didn't work because the
+ *    custom canvas seek handler was racing with the <audio> element's
+ *    timeupdate event, causing it to snap back to the old position.
+ *  - The waveform was computed client-side via AudioContext.decodeAudioData
+ *    which fails on cross-origin blobs (CORS) and produces no fallback.
+ *  - The play() promise race was tracked with a ref but the seek slider
+ *    still fought with the audio element.
+ * wavesurfer.js handles all of this internally:
+ *  - Drag the waveform to seek (with a smooth scrubbing preview)
+ *  - Built-in peak fetching with CORS fallback
+ *  - Proper play() promise handling
+ *  - Speed / volume / loop all built-in
  *
  * Props:
  *  - player: { att, title } | null  — the currently-loaded audio attachment
@@ -31,12 +45,12 @@ import { formatDuration, withTokenQuery } from "../messengerUtils";
  *  - onStateChange: ({ isPlaying, currentTime, duration, attId }) => void
  */
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-const WAVE_BARS = 60;
 
 export default function AudioPlayerBar({ player, onChange, onStateChange }) {
-  const audioRef = useRef(null);
-  const waveCanvasRef = useRef(null);
-  const waveDataRef = useRef(null);          // Float32Array of peak values
+  const containerRef = useRef(null);       // div that wavesurfer mounts into
+  const wsRef = useRef(null);              // WaveSurfer instance
+  const pendingPlayRef = useRef(false);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -57,131 +71,112 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
     });
   }, [isPlaying, currentTime, duration, player, onStateChange]);
 
-  // Load new source when `player` changes
+  // ---- Initialise WaveSurfer once ----
   useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
+    if (!containerRef.current) return;
+    const ws = WaveSurfer.create({
+      container: containerRef.current,
+      waveColor: "#bdbdbd",
+      progressColor: "#1976d2",
+      cursorColor: "#1976d2",
+      cursorWidth: 2,
+      barWidth: 2,
+      barRadius: 2,
+      barGap: 2,
+      height: 32,
+      normalize: true,
+      interact: true,           // click to seek
+      hideScrollbar: true,
+      fillParent: true,
+      minPxPerSec: 50,
+      // mediaControls: false — we use our own controls
+      backend: "MediaElement",  // use <audio> element so we can use crossOrigin
+    });
+    wsRef.current = ws;
+
+    ws.on("play", () => setIsPlaying(true));
+    ws.on("pause", () => setIsPlaying(false));
+    ws.on("finish", () => {
+      setIsPlaying(false);
+      if (!loop) {
+        try { ws.seekTo(0); } catch { /* */ }
+        setCurrentTime(0);
+      }
+    });
+    ws.on("timeupdate", (t) => setCurrentTime(t || 0));
+    ws.on("ready", (dur) => {
+      // wavesurfer v7 ready event passes the duration
+      setDuration(dur || ws.getDuration() || 0);
+      setLoadingWave(false);
+    });
+    ws.on("loading", () => setLoadingWave(true));
+    ws.on("error", () => {
+      setErrorMsg("Could not load audio");
+      setLoadingWave(false);
+      setIsPlaying(false);
+    });
+    ws.on("decode", (dur) => setDuration(dur || ws.getDuration() || 0));
+
+    return () => {
+      try { ws.destroy(); } catch { /* */ }
+      wsRef.current = null;
+    };
+  }, []);
+
+  // ---- Load new source when `player` changes ----
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (!ws) return;
     if (!player) {
-      a.pause();
-      a.removeAttribute("src");
-      waveDataRef.current = null;
+      try { ws.pause(); } catch { /* */ }
+      try { ws.setTime(0); } catch { /* */ }
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
       setErrorMsg("");
+      // Clear the waveform
+      try { ws.empty(); } catch { /* */ }
       return;
     }
     const nextSrc = withTokenQuery(player.att.url);
-    // Always compare canonical (absolute) URLs to avoid unnecessary reloads
-    const currentSrc = a.currentSrc || a.src;
-    if (currentSrc !== nextSrc) {
-      a.src = nextSrc;
-      a.currentTime = 0;
-      setCurrentTime(0);
-      setDuration(0);
-      setErrorMsg("");
-      a.playbackRate = speed;
-      a.volume = muted ? 0 : volume;
-      // Play — handle autoplay rejections gracefully
-      const p = a.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => setIsPlaying(true)).catch((err) => {
-          setIsPlaying(false);
-          if (err && err.name !== "AbortError") {
-            setErrorMsg("Click play to start audio");
-          }
-        });
-      }
-      // Fetch the audio buffer to compute waveform
-      loadWaveform(nextSrc);
-    }
-  }, [player]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch + decode audio buffer for waveform
-  const loadWaveform = async (url) => {
     setLoadingWave(true);
-    waveDataRef.current = null;
+    setErrorMsg("");
+    setCurrentTime(0);
+    setDuration(0);
+    //wavesurfer v7 — load() accepts a URL or HTMLMediaElement
     try {
-      const token = localStorage.getItem("access");
-      const res = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) throw new Error("fetch failed");
-      const buf = await res.arrayBuffer();
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) throw new Error("no AudioContext");
-      const ctx = new Ctx();
-      const audioBuf = await ctx.decodeAudioData(buf);
-      ctx.close();
-      const channel = audioBuf.getChannelData(0);
-      const block = Math.floor(channel.length / WAVE_BARS);
-      const peaks = new Float32Array(WAVE_BARS);
-      for (let i = 0; i < WAVE_BARS; i++) {
-        let max = 0;
-        for (let j = 0; j < block; j++) {
-          const v = Math.abs(channel[i * block + j] || 0);
-          if (v > max) max = v;
-        }
-        peaks[i] = max;
-      }
-      waveDataRef.current = peaks;
-      drawWaveform(currentTime);
+      ws.load(nextSrc);
     } catch (e) {
-      // Silent — waveform is a nice-to-have
-    } finally {
+      setErrorMsg("Could not load audio");
       setLoadingWave(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player]);
 
-  // Draw waveform on canvas
-  const drawWaveform = useCallback((t) => {
-    const canvas = waveCanvasRef.current;
-    const peaks = waveDataRef.current;
-    if (!canvas || !peaks) return;
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width;
-    const H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-    const barW = W / peaks.length;
-    const progress = duration > 0 ? t / duration : 0;
-    for (let i = 0; i < peaks.length; i++) {
-      const barH = Math.max(2, peaks[i] * H * 0.9);
-      const x = i * barW;
-      const y = (H - barH) / 2;
-      if (i / peaks.length <= progress) {
-        ctx.fillStyle = "#1976d2";  // played — primary
-      } else {
-        ctx.fillStyle = "#bdbdbd";  // unplayed — grey
-      }
-      ctx.fillRect(x + 1, y, Math.max(1, barW - 2), barH);
-    }
-  }, [duration]);
-
+  // Sync speed / volume / loop
   useEffect(() => {
-    drawWaveform(currentTime);
-  }, [currentTime, drawWaveform]);
-
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.playbackRate = speed;
+    try { wsRef.current?.setPlaybackRate(speed); } catch { /* */ }
   }, [speed]);
 
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
+    try {
+      if (wsRef.current) {
+        wsRef.current.setVolume(muted ? 0 : volume);
+      }
+    } catch { /* */ }
   }, [volume, muted]);
 
-  // ---- ROBUST TOGGLE ----
-  // The previous version used `a.paused` which can lie when the play() promise
-  // is still pending. We track an explicit `pendingPlay` ref to avoid races.
-  const pendingPlayRef = useRef(false);
-
+  // ---- Toggle play/pause ----
   const togglePlay = useCallback(() => {
-    const a = audioRef.current;
-    if (!a || !player) return;
-    // If a play() call is in flight, ignore subsequent clicks until it resolves
+    const ws = wsRef.current;
+    if (!ws || !player) return;
     if (pendingPlayRef.current) return;
-    if (a.paused) {
+    if (ws.isPlaying()) {
+      try { ws.pause(); } catch { /* */ }
+      setIsPlaying(false);
+    } else {
       pendingPlayRef.current = true;
-      const p = a.play();
+      const p = ws.play();
       if (p && typeof p.then === "function") {
         p.then(() => {
           pendingPlayRef.current = false;
@@ -197,23 +192,21 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
         pendingPlayRef.current = false;
         setIsPlaying(true);
       }
-    } else {
-      try { a.pause(); } catch { /* ignore */ }
-      setIsPlaying(false);
     }
   }, [player]);
 
-  // Listen for external toggle / seek requests (from inline bubble play button)
+  // ---- Listen for external toggle / seek requests (from inline bubble play button) ----
   useEffect(() => {
     if (!player) return;
     const onToggle = () => togglePlay();
     const onSeekEv = (e) => {
-      const a = audioRef.current;
+      const ws = wsRef.current;
       const ratio = e?.detail?.ratio;
-      if (!a || typeof ratio !== "number" || !duration) return;
-      const t = Math.max(0, Math.min(1, ratio)) * duration;
-      a.currentTime = t;
-      setCurrentTime(t);
+      if (!ws || typeof ratio !== "number") return;
+      const d = ws.getDuration() || 0;
+      if (!d) return;
+      try { ws.seekTo(Math.max(0, Math.min(1, ratio))); } catch { /* */ }
+      setCurrentTime(Math.max(0, Math.min(1, ratio)) * d);
     };
     window.addEventListener("messenger:audio-toggle", onToggle);
     window.addEventListener("messenger:audio-seek", onSeekEv);
@@ -221,51 +214,36 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
       window.removeEventListener("messenger:audio-toggle", onToggle);
       window.removeEventListener("messenger:audio-seek", onSeekEv);
     };
-  }, [player, duration, togglePlay]);
+  }, [player, togglePlay]);
 
-  // Stop button — reset to 0 and pause
+  // ---- Stop button — reset to 0 and pause ----
   const stopAll = useCallback(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    try { a.pause(); } catch { /* ignore */ }
-    try { a.currentTime = 0; } catch { /* ignore */ }
+    const ws = wsRef.current;
+    if (!ws) return;
+    try { ws.pause(); } catch { /* */ }
+    try { ws.seekTo(0); } catch { /* */ }
     setIsPlaying(false);
     setCurrentTime(0);
   }, []);
 
-  const onSeek = (_, value) => {
-    const a = audioRef.current;
-    if (!a || !isFinite(value)) return;
-    a.currentTime = value;
-    setCurrentTime(value);
-  };
-
-  // Click on waveform to seek
-  const onWaveClick = (e) => {
-    const a = audioRef.current;
-    const canvas = waveCanvasRef.current;
-    if (!a || !canvas || !duration) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const ratio = Math.max(0, Math.min(1, x / rect.width));
-    a.currentTime = ratio * duration;
-    setCurrentTime(a.currentTime);
-  };
-
   const skip = (delta) => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.currentTime = Math.max(0, Math.min(duration, a.currentTime + delta));
-    setCurrentTime(a.currentTime);
+    const ws = wsRef.current;
+    if (!ws) return;
+    const d = ws.getDuration() || 0;
+    const t = Math.max(0, Math.min(d, (ws.getCurrentTime() || 0) + delta));
+    try { ws.setTime(t); } catch { /* */ }
+    setCurrentTime(t);
   };
 
   const onClosePlayer = () => {
-    const a = audioRef.current;
-    if (a) { try { a.pause(); } catch { /* */ } a.removeAttribute("src"); }
+    const ws = wsRef.current;
+    if (ws) {
+      try { ws.pause(); } catch { /* */ }
+      try { ws.empty(); } catch { /* */ }
+    }
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-    waveDataRef.current = null;
     setErrorMsg("");
     onChange(null);
   };
@@ -282,9 +260,6 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
   };
 
   const isVoice = player?.att?.kind === "voice" || (player?.att?.original_filename || "").startsWith("voice_");
-
-  const waveW = 200;
-  const waveH = 32;
 
   if (!player) return null;
   const title = player.title || player.att?.original_filename || "Audio";
@@ -305,28 +280,6 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
         boxShadow: 1,
       }}
     >
-      <audio
-        ref={audioRef}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime || 0)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
-        onEnded={() => {
-          if (!loop) {
-            setIsPlaying(false);
-            try { audioRef.current.currentTime = 0; } catch { /* */ }
-            setCurrentTime(0);
-          }
-        }}
-        onPause={() => setIsPlaying(false)}
-        onPlay={() => setIsPlaying(true)}
-        onError={() => {
-          setIsPlaying(false);
-          setErrorMsg("Could not load audio");
-        }}
-        loop={loop}
-        preload="metadata"
-        crossOrigin="anonymous"
-      />
       <Stack direction="row" alignItems="center" spacing={0.75}>
         {/* Skip back */}
         <Tooltip title="Back 10s">
@@ -379,31 +332,25 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
           {title}
         </Typography>
 
-        {/* Waveform / slider */}
-        <Box sx={{ flex: 1, minWidth: 80, display: "flex", alignItems: "center" }}>
-          {waveDataRef.current ? (
-            <canvas
-              ref={waveCanvasRef}
-              width={waveW}
-              height={waveH}
-              onClick={onWaveClick}
-              style={{
-                width: "100%",
-                maxWidth: waveW,
-                height: waveH,
-                cursor: "pointer",
-              }}
-            />
-          ) : (
-            <Slider
-              value={currentTime}
-              max={duration || 1}
-              min={0}
-              step={0.1}
-              onChange={onSeek}
-              size="small"
-              sx={{ flex: 1 }}
-            />
+        {/* Waveform — wavesurfer mounts into this div */}
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 80,
+            display: "flex",
+            alignItems: "center",
+            minHeight: 32,
+            position: "relative",
+            cursor: "pointer",
+            // Tame the wavesurfer canvas so it fits our bar height
+            "& div": { width: "100% !important" },
+          }}
+        >
+          <div ref={containerRef} style={{ width: "100%" }} />
+          {loadingWave && (
+            <Typography variant="caption" color="text.secondary" sx={{ position: "absolute", left: 8 }}>
+              Loading…
+            </Typography>
           )}
         </Box>
 
@@ -431,13 +378,33 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
           <IconButton size="small" onClick={() => setMuted((m) => !m)}>
             {muted || volume === 0 ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
           </IconButton>
-          <Slider
-            size="small"
-            min={0} max={1} step={0.05}
-            value={muted ? 0 : volume}
-            onChange={(_, v) => { setVolume(v); setMuted(v === 0); }}
-            sx={{ width: 50, ml: 0.5 }}
-          />
+          <Box
+            sx={{
+              width: 50, ml: 0.5,
+              "& input[type=range]": {
+                width: "100%", height: 4, WebkitAppearance: "none", appearance: "none",
+                bgcolor: "action.hover", borderRadius: 2, outline: "none",
+              },
+              "& input[type=range]::-webkit-slider-thumb": {
+                WebkitAppearance: "none", appearance: "none",
+                width: 10, height: 10, borderRadius: "50%", bgcolor: "primary.main", cursor: "pointer",
+              },
+              "& input[type=range]::-moz-range-thumb": {
+                width: 10, height: 10, borderRadius: "50%", bgcolor: "primary.main", border: "none", cursor: "pointer",
+              },
+            }}
+          >
+            <input
+              type="range"
+              min={0} max={1} step={0.05}
+              value={muted ? 0 : volume}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setVolume(v);
+                setMuted(v === 0);
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Loop */}
