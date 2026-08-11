@@ -34,6 +34,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import MenuIcon from "@mui/icons-material/Menu";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import BlockIcon from "@mui/icons-material/Block";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -468,6 +469,17 @@ export default function MessengerApp() {
         if (profileDataRef.current?.id && String(profileDataRef.current.id) === String(data.user_id)) {
           refreshProfileData(profileDataRef.current.id);
         }
+      }
+      // Group settings changed (title/description/history_visibility/channel mode/etc.)
+      // — reload conversation detail + messages so the new history filter applies.
+      if (data.type === "group.settings_changed") {
+        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
+          loadConversationDetail(data.conversation_id);
+          // Force a full reload of messages (not silent) so the new history
+          // visibility filter takes effect immediately.
+          loadMessages(data.conversation_id, { silent: false });
+        }
+        loadConversations({ silent: true });
       }
       // Join request events (Telegram-style — public groups requiring approval)
       if ([
@@ -1263,13 +1275,32 @@ export default function MessengerApp() {
             <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }}
               onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
               <Typography fontWeight={600} noWrap fontSize={15}>{convTitle(activeConv, meId)}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                {activeConv?.type === "group"
-                  ? `${(activeConv?.participants || []).length} members`
-                  : peer?.id && onlineUsers.has(Number(peer.id))
-                    ? "online"
-                    : peer?.username ? `@${peer.username}` : "tap for info"}
-              </Typography>
+              <Stack direction="row" spacing={0.5} alignItems="center"
+                onClick={(e) => { if (peer?.username) e.stopPropagation(); }}
+              >
+                <Typography variant="caption" color="text.secondary">
+                  {activeConv?.type === "group"
+                    ? `${(activeConv?.participants || []).length} members`
+                    : peer?.id && onlineUsers.has(Number(peer.id))
+                      ? "online"
+                      : peer?.username ? `@${peer.username}` : "tap for info"}
+                </Typography>
+                {peer?.username && (
+                  <Tooltip title="Copy username">
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard?.writeText(peer.username);
+                        flash("Username copied");
+                      }}
+                      sx={{ p: 0.2 }}
+                    >
+                      <ContentCopyIcon sx={{ fontSize: 12 }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
             </Box>
             <IconButton onClick={() => pushPanel("info")}>
               <InfoOutlinedIcon />

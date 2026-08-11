@@ -21,6 +21,7 @@ import {
   attachmentKind, formatTime, formatDuration, withTokenQuery, REACTIONS,
   parseMentions, isVoiceAttachment, isVideoMessageAttachment,
 } from "../messengerUtils";
+import VideoPlayer from "./VideoPlayer";
 
 /**
  * Single message bubble with attachments, reactions, read-receipt ticks,
@@ -237,20 +238,17 @@ export default function MessageBubble({
                   }}
                 />
               ) : videoMsg ? (
-                /* Circular video message (Telegram-style) */
-                <Box
-                  component="video"
-                  src={url}
-                  controls
-                  sx={{
-                    width: 220, height: 220, borderRadius: "50%",
-                    objectFit: "cover", display: "block",
-                    border: `3px solid ${mine ? "rgba(255,255,255,0.3)" : alpha(theme.palette.primary.main, 0.3)}`,
-                  }}
-                />
+                /* Circular video message (Telegram-style) — uses premium VideoPlayer */
+                <Box sx={{
+                  width: 220, height: 220, borderRadius: "50%",
+                  border: `3px solid ${mine ? "rgba(255,255,255,0.3)" : alpha(theme.palette.primary.main, 0.3)}`,
+                  overflow: "hidden",
+                  display: "inline-block",
+                }}>
+                  <VideoPlayer src={url} filename={a.original_filename} circular />
+                </Box>
               ) : k === "video" ? (
-                <Box component="video" src={url} controls
-                  sx={{ maxWidth: "100%", borderRadius: 1.5, maxHeight: 320, display: "block" }} />
+                <VideoPlayer src={url} filename={a.original_filename} maxWidth={360} maxHeight={360} />
               ) : voice ? (
                 /* Voice message — custom UI delegates playback to the top audio bar */
                 <Box

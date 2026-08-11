@@ -450,6 +450,40 @@ export default function RightPanel({
 
       {activeConv?.type === "group" && (
         <Box sx={{ px: 2, pb: 2 }}>
+          {/* Description — visible to ALL members.
+              Admins see an editable TextField; non-admins see read-only text. */}
+          {activeConv.description && !isAdmin && (
+            <Paper variant="outlined" sx={{ p: 1.25, mb: 1.5, bgcolor: "action.hover" }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5, fontWeight: 600 }}>
+                Description
+              </Typography>
+              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                {activeConv.description}
+              </Typography>
+            </Paper>
+          )}
+          {/* Channel-mode indicator for non-admins (read-only) */}
+          {!isAdmin && Boolean(activeConv.only_admins_send) && (
+            <Paper variant="outlined" sx={{ p: 1, mb: 1.5, bgcolor: alpha("#2196f3", 0.08), borderColor: alpha("#2196f3", 0.3) }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <ShieldIcon sx={{ fontSize: 16, color: "#2196f3" }} />
+                <Typography variant="caption" sx={{ color: "#2196f3", fontWeight: 600 }}>
+                  Channel mode — only admins can send messages
+                </Typography>
+              </Stack>
+            </Paper>
+          )}
+          {/* Approval-required indicator for non-admins */}
+          {!isAdmin && Boolean(activeConv.requires_approval) && (
+            <Paper variant="outlined" sx={{ p: 1, mb: 1.5, bgcolor: alpha("#9c27b0", 0.08), borderColor: alpha("#9c27b0", 0.3) }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <HowToRegIcon sx={{ fontSize: 16, color: "#9c27b0" }} />
+                <Typography variant="caption" sx={{ color: "#9c27b0", fontWeight: 600 }}>
+                  This group requires admin approval to join
+                </Typography>
+              </Stack>
+            </Paper>
+          )}
           {isAdmin && (
             <>
               <TextField fullWidth size="small" label="Group title" defaultValue={activeConv.title || ""}
