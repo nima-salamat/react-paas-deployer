@@ -61,7 +61,7 @@ export default function Sidebar({
   searchQ, setSearchQ, searchResults, searching,
   onViewUserProfile, startDm, addContact,
   listTab, setListTab, publicGroups, searchPublicGroups,
-  onJoinPublicGroup,
+  onJoinPublicGroup, onConfirmJoinPublicGroup,
   onTogglePin, onMarkRead, onCleanupChat, onLeaveChat, onDeleteChat, onBlockPeer,
   onOpenCreateGroup, onOpenJoin, onOpenSettings, onNavigateHome,
   onOpenMyRequests,
@@ -228,7 +228,17 @@ export default function Sidebar({
               return (
                 <ListItemButton
                   key={g.id}
-                  onClick={() => isMember && openChat(g)}
+                  onClick={() => {
+                    if (isMember) {
+                      openChat(g);
+                    } else if (!pending && onConfirmJoinPublicGroup) {
+                      // Not a member and no pending request → open the
+                      // "Join this group?" confirmation dialog.
+                      onConfirmJoinPublicGroup(g);
+                    }
+                    // If pending, do nothing — the user can cancel from the
+                    // "My join requests" panel.
+                  }}
                   sx={{ py: 1, opacity: isMember ? 1 : 0.9 }}
                 >
                   <ListItemAvatar>

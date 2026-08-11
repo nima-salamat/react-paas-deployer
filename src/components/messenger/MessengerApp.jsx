@@ -27,7 +27,7 @@ import {
   Box, Typography, IconButton, CircularProgress, Menu, MenuItem, ListItemIcon,
   Stack, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
-  ListItemText, Divider, Fade, Chip, Popover, useMediaQuery,
+  ListItemText, Divider, Fade, Chip, Popover, Tooltip, useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -48,7 +48,7 @@ import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import CloseIcon from "@mui/icons-material/Close";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
-import apiRequest from "../customHooks/apiRequest.jsx";
+import apiRequest, { refreshAccessToken } from "../customHooks/apiRequest.jsx";
 import { MSG_API, WS_URL, unwrapData, unwrapList, authHeaders } from "./api";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
@@ -120,6 +120,11 @@ export default function MessengerApp() {
 
   // Image crop
   const [cropFile, setCropFile] = useState(null);
+
+  // "Join this public group?" confirmation dialog — shown when the user clicks
+  // a non-member public group row in the search results (Telegram shows a
+  // preview + Join button instead of silently doing nothing).
+  const [joinConfirm, setJoinConfirm] = useState(null); // { group }
 
   // Read receipts
   const [readersMessage, setReadersMessage] = useState(null);
@@ -200,6 +205,21 @@ export default function MessengerApp() {
   const searchTimer = useRef(null);
   const activeIdRef = useRef(null);
   const bootstrapped = useRef(false);
+
+  // "Not authenticated" popup — shown when the messenger is opened without
+  // a valid access token (or when the token expired and refresh failed).
+  // The popup prompts the user to go to the sign-in / sign-up page instead
+  // of leaving them looking at a blank black screen.
+  const [showAuthPopup, setShowAuthPopup] = useState(false);
+  useEffect(() => {
+    if (!meId) setShowAuthPopup(true);
+  }, [meId]);
+  // Listen for explicit auth-failed events (e.g. apiRequest redirect)
+  useEffect(() => {
+    const onAuthFailed = () => setShowAuthPopup(true);
+    window.addEventListener("messenger:auth-failed", onAuthFailed);
+    return () => window.removeEventListener("messenger:auth-failed", onAuthFailed);
+  }, []);
   // Mirror state into refs so the WebSocket handler (which is bound once on mount)
   // can read the latest values without re-binding every render.
   const panelHistoryRef = useRef([]);
@@ -424,26 +444,33 @@ export default function MessengerApp() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* WebSocket */
+  /* WebSocket — with token refresh on expired-token disconnect.
+   *
+   * The backend closes the socket with code 4401 when the JWT is invalid/expired.
+   * When that happens we attempt to refresh the access token and reconnect once.
+   * If refresh fails, the user is redirected to /signin_or_signup by
+   * refreshAccessToken().
+   *
+   * We also proactively refresh the token shortly before it expires so that
+   * the WS connection doesn't drop in the first place.
+   */
   useEffect(() => {
-    const token = localStorage.getItem("access");
-    if (!token) return undefined;
-    const ws = new WebSocket(`${WS_URL}?token=${token}`);
-    wsRef.current = ws;
-    ws.onmessage = (ev) => {
+    let cancelled = false;
+    let pingTimer = null;
+    let reconnectTimer = null;
+    let refreshing = false;
+
+    const buildUrl = (tok) => `${WS_URL}?token=${encodeURIComponent(tok)}`;
+
+    const handleOnMessage = (ev) => {
       let data;
       try { data = JSON.parse(ev.data); } catch { return; }
       if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
-        // IMPORTANT: the backend only sends the event to participants of the
-        // conversation — so non-members never receive this. The reload here
-        // is safe and only refreshes this user's own chat list (no spinner
-        // because we pass silent:true).
         if (String(data.conversation_id) === String(activeIdRef.current)) {
           loadMessages(activeIdRef.current, { silent: true });
         }
         loadConversations({ silent: true });
       }
-      // Presence updates — toggle user's online status
       if (data.type === "presence.update" && data.user_id != null) {
         setOnlineUsers((prev) => {
           const next = new Set(prev);
@@ -451,15 +478,13 @@ export default function MessengerApp() {
           else next.delete(Number(data.user_id));
           return next;
         });
-        // Reload conversations so the chat list updates the online dot — silent
         loadConversations({ silent: true });
       }
-      // Member changes — reload conversation detail + messages
       if ([
         "member.left", "member.removed", "member.role_changed",
         "ownership.transferred", "conversation.deleted", "member.joined",
+        "messages.cleared",
       ].includes(data.type)) {
-        // If the current user was removed from the group, redirect them out
         if (
           (data.type === "member.removed" || data.type === "conversation.deleted")
           && String(data.user_id) === String(meId)
@@ -471,7 +496,6 @@ export default function MessengerApp() {
           loadConversations({ silent: false });
           return;
         }
-        // If user left (themselves) — they were the leaver; close chat
         if (
           data.type === "member.left"
           && String(data.user_id) === String(meId)
@@ -483,53 +507,40 @@ export default function MessengerApp() {
         }
         if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
           loadConversationDetail(data.conversation_id);
-          loadMessages(data.conversation_id, { silent: true });
-          // If admin is viewing this group's join requests panel, refresh those too
+          loadMessages(data.conversation_id, { silent: data.type !== "messages.cleared" });
           if (panelHistoryRef.current.includes("join-requests")) {
             loadConvJoinRequests(data.conversation_id);
           }
         }
         loadConversations({ silent: true });
       }
-      // Profile update — another user's avatar/bio/username changed.
-      // Reload everything so the new avatar propagates to chat list, chat header,
-      // member list, etc.
       if (data.type === "profile.update") {
         loadConversations({ silent: true });
         if (activeIdRef.current) {
           loadConversationDetail(activeIdRef.current);
           loadMessages(activeIdRef.current, { silent: true });
         }
-        // If the profile panel is showing this user, refresh it too
         if (profileDataRef.current?.id && String(profileDataRef.current.id) === String(data.user_id)) {
           refreshProfileData(profileDataRef.current.id);
         }
       }
-      // Group settings changed (title/description/history_visibility/channel mode/etc.)
-      // — reload conversation detail + messages so the new history filter applies.
       if (data.type === "group.settings_changed") {
         if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
           loadConversationDetail(data.conversation_id);
-          // Force a full reload of messages (not silent) so the new history
-          // visibility filter takes effect immediately.
           loadMessages(data.conversation_id, { silent: false });
         }
         loadConversations({ silent: true });
       }
-      // Join request events (Telegram-style — public groups requiring approval)
       if ([
         "join_request.new", "join_request.approved",
         "join_request.rejected", "join_request.cancelled",
       ].includes(data.type)) {
-        // If admin is viewing this group's join requests panel, refresh
         if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
           loadConvJoinRequests(data.conversation_id);
         }
-        // Refresh the user's own outgoing requests list
         if (panelHistoryRef.current.includes("my-requests")) {
           loadMyJoinRequests();
         }
-        // If approved — open the chat
         if (data.type === "join_request.approved" && String(data.user_id) === String(meId)) {
           flash("Your join request was approved!");
           loadConversations({ silent: false }).then((list) => {
@@ -543,12 +554,85 @@ export default function MessengerApp() {
         }
       }
     };
-    const ping = setInterval(() => {
-      try { ws.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
-    }, 25000);
+
+    const connect = async () => {
+      let token = localStorage.getItem("access");
+      if (!token) {
+        // Not logged in — abort. The auth-changed listener will reconnect
+        // after the user logs in.
+        return;
+      }
+      // Proactively refresh the token if it's about to expire.
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        const exp = Number(payload.exp || 0) * 1000;
+        if (exp && exp - Date.now() < 10000) {
+          if (!refreshing) {
+            refreshing = true;
+            try { token = await refreshAccessToken(); }
+            catch { refreshing = false; return; }
+            finally { refreshing = false; }
+          }
+        }
+      } catch { /* not a JWT — fall through */ }
+
+      if (cancelled) return;
+      const ws = new WebSocket(buildUrl(token));
+      wsRef.current = ws;
+      ws.onmessage = handleOnMessage;
+      ws.onclose = (ev) => {
+        clearInterval(pingTimer);
+        if (cancelled) return;
+        // 4401 = our backend's "auth failed" close code (see consumers.py).
+        // Try to refresh the token and reconnect once.
+        if (ev.code === 4401) {
+          if (!refreshing) {
+            refreshing = true;
+            refreshAccessToken()
+              .then(() => {
+                refreshing = false;
+                if (!cancelled) reconnectTimer = setTimeout(connect, 300);
+              })
+              .catch(() => {
+                refreshing = false;
+                // refreshAccessToken already redirected to /signin_or_signup
+              });
+          }
+          return;
+        }
+        // Other close codes — try to reconnect with exponential backoff.
+        // The token might still be valid (network blip, server restart, etc.).
+        if (!localStorage.getItem("access")) return;
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+      ws.onerror = () => {
+        try { ws.close(); } catch { /* */ }
+      };
+      pingTimer = setInterval(() => {
+        try { ws.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
+      }, 25000);
+    };
+
+    connect();
+
+    // Listen for auth changes (login / logout / token refresh) so we reconnect
+    // immediately after the user logs in.
+    const onAuth = () => {
+      clearTimeout(reconnectTimer);
+      clearInterval(pingTimer);
+      try { wsRef.current?.close(); } catch { /* */ }
+      reconnectTimer = setTimeout(connect, 200);
+    };
+    window.addEventListener("auth-changed", onAuth);
+    window.addEventListener("storage", onAuth);
+
     return () => {
-      clearInterval(ping);
-      try { ws.close(); } catch { /* */ }
+      cancelled = true;
+      clearInterval(pingTimer);
+      clearTimeout(reconnectTimer);
+      window.removeEventListener("auth-changed", onAuth);
+      window.removeEventListener("storage", onAuth);
+      try { wsRef.current?.close(); } catch { /* */ }
     };
   }, [loadConversations, loadMessages]);
 
@@ -952,6 +1036,18 @@ export default function MessengerApp() {
     } catch (e) {
       setError(e?.response?.data?.message || "Join failed");
     }
+  };
+
+  // Open the "Join this group?" confirmation dialog when the user clicks a
+  // non-member public group row in the search results.
+  const confirmJoinPublicGroup = (group) => {
+    if (!group?.id) return;
+    setJoinConfirm({ group });
+  };
+  const onConfirmJoin = async () => {
+    const g = joinConfirm?.group;
+    setJoinConfirm(null);
+    if (g) await joinPublicGroup(g);
   };
 
   // Cancel (delete) the current user's own pending join request.
@@ -1526,6 +1622,7 @@ export default function MessengerApp() {
       listTab={listTab} setListTab={setListTab}
       publicGroups={publicGroups} searchPublicGroups={searchPublicGroups}
       onJoinPublicGroup={joinPublicGroup}
+      onConfirmJoinPublicGroup={confirmJoinPublicGroup}
       onTogglePin={togglePin}
       onMarkRead={markChatRead}
       onCleanupChat={(conv) => setConfirmCleanup({ conv })}
@@ -1792,6 +1889,57 @@ export default function MessengerApp() {
         </DialogActions>
       </Dialog>
 
+      {/* "Join this public group?" confirmation dialog — shown when the user
+          clicks a non-member public group row in the search results. */}
+      <Dialog
+        open={Boolean(joinConfirm)}
+        onClose={() => setJoinConfirm(null)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {joinConfirm?.group?.avatar_url ? (
+            <Avatar src={withTokenQuery(joinConfirm.group.avatar_url)} sx={{ width: 40, height: 40 }} />
+          ) : (
+            <Avatar sx={{ width: 40, height: 40 }}>{joinConfirm?.group?.title?.[0]?.toUpperCase()}</Avatar>
+          )}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography fontWeight={700} noWrap>{joinConfirm?.group?.title || "Group"}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {(joinConfirm?.group?.participants?.length || 0)} members
+              {joinConfirm?.group?.requires_approval ? " · approval required" : ""}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {joinConfirm?.group?.description ? (
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+              {joinConfirm.group.description}
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No description provided.
+            </Typography>
+          )}
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+            {joinConfirm?.group?.requires_approval
+              ? "An admin will need to approve your request before you can join."
+              : "You will be added as a member immediately."}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
+          <Button onClick={() => setJoinConfirm(null)} color="inherit">Cancel</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={onConfirmJoin}
+          >
+            {joinConfirm?.group?.requires_approval ? "Send request" : "Join group"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Add members dialog */}
       <Dialog open={addMemberOpen} onClose={() => setAddMemberOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Add members from contacts</DialogTitle>
@@ -1891,7 +2039,7 @@ export default function MessengerApp() {
             sx={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1400 }} />
         </Fade>
       )}
-      {!hashReady && (
+      {!hashReady && !showAuthPopup && (
         <Box sx={{
           position: "fixed", inset: 0, bgcolor: "background.default",
           zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center",
@@ -1899,6 +2047,39 @@ export default function MessengerApp() {
           <CircularProgress />
         </Box>
       )}
+
+      {/* "Not authenticated" popup — prompts the user to sign in / sign up
+          instead of leaving them looking at a blank black screen. */}
+      <Dialog
+        open={showAuthPopup}
+        onClose={() => setShowAuthPopup(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <LockOutlinedIcon color="primary" />
+          Sign in required
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary">
+            You need to be signed in to use the messenger. Please sign in or
+            create an account to continue.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button onClick={() => setShowAuthPopup(false)} color="inherit">
+            Dismiss
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => navigate("/signin_or_signup")}
+          >
+            Go to sign in
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

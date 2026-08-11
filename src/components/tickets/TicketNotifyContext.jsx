@@ -10,6 +10,7 @@ import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOu
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
 import { API_HOST } from "./api";
+import { refreshAccessToken } from "../customHooks/apiRequest.jsx";
 
 const Ctx = createContext(null);
 const MUTE_KEY = "tickets_notify_muted";
@@ -132,9 +133,48 @@ export function TicketNotifyProvider({ children }) {
     let closed = false;
     let timer;
     let pingTimer;
+    // Guard: while we're waiting for a token refresh + retry, don't fire off
+    // additional reconnect attempts (prevents a thundering herd of WS connects
+    // each using the same expired token).
+    let refreshing = false;
 
-    const connect = () => {
-      const token = localStorage.getItem("access");
+    const connect = async () => {
+      let token = localStorage.getItem("access");
+      // If there's no token at all, the user simply isn't logged in — don't
+      // try to connect (and don't schedule a retry). The auth-changed event
+      // will trigger a reconnect when the user logs in.
+      if (!token) {
+        setConnected(false);
+        return;
+      }
+
+      // Check token expiry BEFORE opening the socket. If the token is already
+      // expired (or about to be), refresh it first so the WS connect succeeds.
+      // Access JWTs are short-lived (5 minutes by default); if we skip this
+      // check we end up reconnecting with the same expired token every 500ms,
+      // which is exactly what produced the ExpiredTokenError flood in the logs.
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+        const exp = Number(payload.exp || 0) * 1000;
+        // If token expires in < 10s, refresh proactively.
+        if (exp && exp - Date.now() < 10000) {
+          if (!refreshing) {
+            refreshing = true;
+            try {
+              token = await refreshAccessToken();
+            } catch {
+              // refreshAccessToken already redirected to /signin_or_signup
+              setConnected(false);
+              return;
+            } finally {
+              refreshing = false;
+            }
+          }
+        }
+      } catch {
+        // Token wasn't a JWT — fall through and let the server reject it.
+      }
+
       const uid = token ? decodeJwtUserId(token) : null;
       setUserId(uid);
       userIdRef.current = uid;
@@ -173,6 +213,24 @@ export function TicketNotifyProvider({ children }) {
         clearInterval(pingTimer);
         console.warn("[tickets-ws] closed", ev.code, ev.reason || "");
         if (closed) return;
+        // 4401 = our backend's "auth failed" close code (see consumers.py).
+        // Treat it as "token expired" — try to refresh, then reconnect.
+        // If refresh fails, refreshAccessToken() will redirect to login.
+        if (ev.code === 4401) {
+          if (!refreshing) {
+            refreshing = true;
+            refreshAccessToken()
+              .then(() => {
+                refreshing = false;
+                timer = setTimeout(connect, 300);
+              })
+              .catch(() => {
+                refreshing = false;
+                // refresh already redirected to login — stop retrying
+              });
+          }
+          return;
+        }
         if (!localStorage.getItem("access")) return;
         const attempt = Math.min(reconnectRef.current + 1, 8);
         reconnectRef.current = attempt;
