@@ -3,11 +3,17 @@ import React, {
 } from "react";
 import {
   Badge, IconButton, Menu, MenuItem, ListItemText, Typography, Snackbar, Alert, Box,
+  Divider, ListItemIcon, Switch, Tooltip,
 } from "@mui/material";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
+import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ClearAllIcon from "@mui/icons-material/ClearAll";
 import { API_HOST } from "./api";
 
 const Ctx = createContext(null);
+const MUTE_KEY = "tickets_notify_muted";
+const ITEMS_KEY = "tickets_notify_items_v1";
 
 function decodeJwtUserId(token) {
   try {
@@ -25,7 +31,6 @@ function buildNotifyWsUrl() {
   const token = localStorage.getItem("access");
   if (!token) return null;
   try {
-    // Same base as REST API (matches ServiceDetail deploy WS pattern)
     const backendUrl = new URL(API_HOST.startsWith("http") ? API_HOST : `https://${API_HOST}`);
     const protocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
     return `${protocol}//${backendUrl.host}/ws/tickets/notify/?token=${encodeURIComponent(token)}`;
@@ -35,11 +40,43 @@ function buildNotifyWsUrl() {
   }
 }
 
+function loadMuted() {
+  try {
+    return localStorage.getItem(MUTE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function persistMuted(value) {
+  try {
+    localStorage.setItem(MUTE_KEY, value ? "1" : "0");
+  } catch { /* */ }
+}
+
+function loadStoredItems() {
+  try {
+    const raw = sessionStorage.getItem(ITEMS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, 40) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistItems(items) {
+  try {
+    sessionStorage.setItem(ITEMS_KEY, JSON.stringify(items.slice(0, 40)));
+  } catch { /* */ }
+}
+
 export function TicketNotifyProvider({ children }) {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => loadStoredItems());
   const [unread, setUnread] = useState(0);
   const [connected, setConnected] = useState(false);
   const [toast, setToast] = useState(null);
+  const [muted, setMutedState] = useState(() => loadMuted());
   const [userId, setUserId] = useState(() => {
     const t = localStorage.getItem("access");
     return t ? decodeJwtUserId(t) : null;
@@ -48,7 +85,16 @@ export function TicketNotifyProvider({ children }) {
   const listenersRef = useRef(new Set());
   const reconnectRef = useRef(0);
   const userIdRef = useRef(userId);
+  const mutedRef = useRef(muted);
   userIdRef.current = userId;
+  mutedRef.current = muted;
+
+  const setMuted = useCallback((value) => {
+    const next = Boolean(value);
+    setMutedState(next);
+    mutedRef.current = next;
+    persistMuted(next);
+  }, []);
 
   const emit = useCallback((event) => {
     listenersRef.current.forEach((fn) => {
@@ -66,6 +112,20 @@ export function TicketNotifyProvider({ children }) {
     if (ws && ws.readyState === WebSocket.OPEN) {
       try { ws.send(JSON.stringify(payload)); } catch { /* */ }
     }
+  }, []);
+
+  const removeItem = useCallback((id) => {
+    setItems((prev) => {
+      const next = prev.filter((it) => it.id !== id);
+      persistItems(next);
+      return next;
+    });
+  }, []);
+
+  const clearAll = useCallback(() => {
+    setItems([]);
+    setUnread(0);
+    persistItems([]);
   }, []);
 
   useEffect(() => {
@@ -131,8 +191,12 @@ export function TicketNotifyProvider({ children }) {
           console.info("[tickets-ws] hello", data);
           return;
         }
+        // Never treat presence / pong / subscribe as "seen"
         if (data.type === "pong" || data.type === "subscribed") return;
 
+        // Always fan-out raw events to page subscribers (TicketDetail, lists, …)
+        // Seen is handled ONLY by explicit POST /read/ from TicketDetail when the
+        // user is actually viewing that ticket — not by being online / connected.
         emit(data);
 
         const me = userIdRef.current;
@@ -144,19 +208,28 @@ export function TicketNotifyProvider({ children }) {
 
         if (isSelf) return;
 
+        // ticket.seen must never create a notification or toast
+        if (data.type === "ticket.seen") return;
+
         if (data.type === "ticket.message" || data.type === "ticket.created") {
+          // Respect mute: still deliver to page subscribers via emit() above,
+          // but do not show toast / badge / list items when muted.
+          if (mutedRef.current) return;
+
           const title = data.type === "ticket.created" ? "New ticket" : "New reply";
           const body = data.preview || data.subject || data.public_id || "";
-          setItems((prev) => [
-            {
-              id: `${Date.now()}-${data.message_id || data.ticket_id}`,
-              title,
-              body,
-              data,
-              at: new Date().toISOString(),
-            },
-            ...prev,
-          ].slice(0, 40));
+          const item = {
+            id: `${Date.now()}-${data.message_id || data.ticket_id}-${Math.random().toString(36).slice(2, 7)}`,
+            title,
+            body,
+            data,
+            at: new Date().toISOString(),
+          };
+          setItems((prev) => {
+            const next = [item, ...prev].slice(0, 40);
+            persistItems(next);
+            return next;
+          });
           setUnread((n) => n + 1);
           setToast({ severity: "info", message: `${title}: ${body}` });
         }
@@ -191,11 +264,15 @@ export function TicketNotifyProvider({ children }) {
       items,
       unread,
       userId,
+      muted,
+      setMuted,
       clearUnread: () => setUnread(0),
+      removeItem,
+      clearAll,
       subscribe,
       send,
     }),
-    [connected, items, unread, userId, subscribe, send],
+    [connected, items, unread, userId, muted, setMuted, removeItem, clearAll, subscribe, send],
   );
 
   return (
@@ -223,43 +300,107 @@ export function useTicketNotify() {
     items: [],
     unread: 0,
     userId: null,
+    muted: false,
+    setMuted: () => {},
     clearUnread: () => {},
+    removeItem: () => {},
+    clearAll: () => {},
     subscribe: () => () => {},
     send: () => {},
   };
 }
 
 export function TicketNotifyBell() {
-  const { items, unread, clearUnread, connected } = useTicketNotify();
+  const {
+    items, unread, clearUnread, connected, muted, setMuted, removeItem, clearAll,
+  } = useTicketNotify();
   const [anchor, setAnchor] = useState(null);
+
+  const openMenu = (e) => {
+    setAnchor(e.currentTarget);
+    clearUnread();
+  };
+
   return (
     <>
-      <IconButton color="inherit" onClick={(e) => { setAnchor(e.currentTarget); clearUnread(); }}>
-        <Badge badgeContent={unread} color="error" max={99} variant={connected ? "standard" : "dot"}>
-          <NotificationsOutlinedIcon color={connected ? "inherit" : "disabled"} />
-        </Badge>
-      </IconButton>
+      <Tooltip title={muted ? "Notifications muted" : "Notifications"}>
+        <IconButton color="inherit" onClick={openMenu} aria-label="notifications">
+          <Badge
+            badgeContent={muted ? 0 : unread}
+            color="error"
+            max={99}
+            variant={connected ? "standard" : "dot"}
+          >
+            {muted ? (
+              <NotificationsOffOutlinedIcon color="disabled" />
+            ) : (
+              <NotificationsOutlinedIcon color={connected ? "inherit" : "disabled"} />
+            )}
+          </Badge>
+        </IconButton>
+      </Tooltip>
       <Menu
         anchorEl={anchor}
         open={Boolean(anchor)}
         onClose={() => setAnchor(null)}
-        PaperProps={{ sx: { width: 340, maxHeight: 420 } }}
+        PaperProps={{ sx: { width: 360, maxHeight: 460 } }}
       >
-        <MenuItem disabled>
+        <MenuItem dense disableRipple sx={{ cursor: "default", opacity: 1 }}>
           <ListItemText
             primary="Notifications"
-            secondary={connected ? "Realtime on" : "Realtime offline — check ASGI/Redis"}
+            secondary={
+              muted
+                ? "Muted — you will not get toasts or badge"
+                : connected
+                  ? "Realtime on"
+                  : "Realtime offline — check ASGI/Redis"
+            }
           />
         </MenuItem>
+        <MenuItem
+          onClick={(e) => {
+            e.stopPropagation();
+            setMuted(!muted);
+          }}
+        >
+          <ListItemIcon>
+            {muted ? <NotificationsOutlinedIcon fontSize="small" /> : <NotificationsOffOutlinedIcon fontSize="small" />}
+          </ListItemIcon>
+          <ListItemText primary={muted ? "Turn notifications on" : "Turn notifications off"} />
+          <Switch
+            edge="end"
+            size="small"
+            checked={!muted}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setMuted(!e.target.checked)}
+          />
+        </MenuItem>
+        {items.length > 0 && (
+          <MenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              clearAll();
+            }}
+          >
+            <ListItemIcon>
+              <ClearAllIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText primary="Clear all" />
+          </MenuItem>
+        )}
+        <Divider />
         {items.length === 0 ? (
           <MenuItem disabled><ListItemText primary="No notifications yet" /></MenuItem>
         ) : (
           items.slice(0, 15).map((it) => (
             <MenuItem
               key={it.id}
-              onClick={() => setAnchor(null)}
-              component="a"
-              href={it.data?.ticket_id ? `/tickets/${it.data.ticket_id}` : "/tickets"}
+              sx={{ alignItems: "flex-start", py: 1 }}
+              onClick={() => {
+                setAnchor(null);
+                const href = it.data?.ticket_id ? `/tickets/${it.data.ticket_id}` : "/tickets";
+                window.location.href = href;
+              }}
             >
               <ListItemText
                 primary={it.title}
@@ -271,7 +412,20 @@ export function TicketNotifyBell() {
                     </Typography>
                   </Box>
                 )}
+                sx={{ pr: 1 }}
               />
+              <IconButton
+                size="small"
+                edge="end"
+                aria-label="delete notification"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  removeItem(it.id);
+                }}
+              >
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
             </MenuItem>
           ))
         )}

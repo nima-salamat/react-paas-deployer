@@ -48,6 +48,11 @@ export default function TicketDetail() {
   ticketRef.current = ticket;
 
   const markRead = useCallback(async () => {
+    // Online / WS connected is NOT enough. Only mark seen when the user is
+    // actually looking at this ticket (detail mounted + tab visible).
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      return;
+    }
     try {
       const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
       const data = res.data?.data || res.data || {};
@@ -67,13 +72,16 @@ export default function TicketDetail() {
     } catch { /* */ }
   }, [id]);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, { mark = true } = {}) => {
     if (!silent) setLoading(true);
     try {
       const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
       setTicket(unwrapData(res));
-      // mark after paint data
-      setTimeout(() => { markRead(); }, 50);
+      // Only mark as read when the tab is visible; being online alone must not
+      // send a seen signal.
+      if (mark && typeof document !== "undefined" && document.visibilityState === "visible") {
+        setTimeout(() => { markRead(); }, 80);
+      }
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load ticket");
     } finally {
@@ -125,7 +133,8 @@ export default function TicketDetail() {
     };
   }, [id, send, subscribe, load, userId]);
 
-  // Re-mark read when tab becomes visible
+  // Re-mark read only when this ticket detail becomes visible again.
+  // Presence on WS (online) must never imply seen.
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === "visible") markRead();
