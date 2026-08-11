@@ -19,6 +19,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, EMAILS_API, unwrapData } from "../tickets/api";
 import EmailManagement from "../emails/EmailManagement.jsx";
+import MessageBubble from "../tickets/MessageBubble.jsx";
+import SimpleHtmlEditor, { htmlToPlain } from "../tickets/SimpleHtmlEditor.jsx";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -148,8 +150,9 @@ export default function AdminDashboard() {
   }, []);
   loadStatsRef.current = loadStats;
 
-  const loadTickets = useCallback(async () => {
-    setTLoading(true);
+  const loadTickets = useCallback(async (opts = {}) => {
+    const silent = Boolean(opts && opts.silent);
+    if (!silent) setTLoading(true);
     try {
       const params = { page };
       if (search) params.search = search;
@@ -288,17 +291,17 @@ export default function AdminDashboard() {
         if (data.type === "ticket.created") {
           setToast(`New ticket ${data.public_id}: ${data.subject}`);
           loadStatsRef.current?.();
-          loadTicketsRef.current?.();
+          loadTicketsRef.current?.({ silent: true });
         } else if (data.type === "ticket.message") {
           setToast(`New reply on ${data.public_id || data.ticket_id}`);
           const sid = selectedIdRef.current;
           if (sid != null && String(sid) === String(data.ticket_id)) {
             openDetailRef.current?.(sid);
           }
-          loadTicketsRef.current?.();
+          loadTicketsRef.current?.({ silent: true });
         } else if (data.type === "ticket.updated" || data.type === "ticket.seen") {
           loadStatsRef.current?.();
-          loadTicketsRef.current?.();
+          loadTicketsRef.current?.({ silent: true });
           const sid = selectedIdRef.current;
           if (data.type === "ticket.seen" && sid != null && String(sid) === String(data.ticket_id)) {
             openDetailRef.current?.(sid);
@@ -315,38 +318,44 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meLoading]);
 
-  const openDetail = async (id) => {
+  const openDetail = async (id, opts = {}) => {
+    const silent = Boolean(opts.silent);
     setSelectedId(id);
-    setDetailLoading(true);
-    setReply("");
+    selectedIdRef.current = id;
+    if (!silent) {
+      setDetailLoading(true);
+      setReply("");
+    }
     try {
       const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
       setDetail(unwrapData(res));
-      try {
-        const rr = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
-        const rd = rr.data?.data || rr.data || {};
-        const ids = new Set((rd.message_ids || []).map(String));
-        if (ids.size) {
-          setDetail((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              messages: (prev.messages || []).map((m) =>
-                ids.has(String(m.id))
-                  ? { ...m, seen_at: rd.last_read_at || new Date().toISOString(), is_seen: true }
-                  : m
-              ),
-            };
-          });
-        }
-      } catch { /* */ }
+      if (typeof document === "undefined" || document.visibilityState !== "hidden") {
+        try {
+          const rr = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
+          const rd = rr.data?.data || rr.data || {};
+          const ids = new Set((rd.message_ids || []).map(String));
+          if (ids.size) {
+            setDetail((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                messages: (prev.messages || []).map((m) =>
+                  ids.has(String(m.id))
+                    ? { ...m, seen_at: rd.last_read_at || new Date().toISOString(), is_seen: true }
+                    : m
+                ),
+              };
+            });
+          }
+        } catch { /* */ }
+      }
     } catch {
-      setDetail(null);
+      if (!silent) setDetail(null);
     } finally {
       setDetailLoading(false);
     }
   };
-  openDetailRef.current = openDetail;
+  openDetailRef.current = (id) => openDetail(id, { silent: true });
 
   const changeStatus = async (v) => {
     await apiRequest({ method: "POST", url: `${TICKETS_API}/staff/${selectedId}/status/`, data: { status: v } });
@@ -356,15 +365,15 @@ export default function AdminDashboard() {
   };
 
   const sendReply = async () => {
-    if (!reply.trim()) return;
+    if (!htmlToPlain(reply)) return;
     setSending(true);
     try {
       const form = new FormData();
-      form.append("body", reply.includes("<") ? reply : `<p>${reply.replace(/\n/g, "<br>")}</p>`);
+      form.append("body", reply);
       await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
       setReply("");
-      openDetail(selectedId);
-      loadTickets();
+      await openDetail(selectedId, { silent: true });
+      loadTickets({ silent: true });
     } finally {
       setSending(false);
     }
@@ -893,6 +902,7 @@ export default function AdminDashboard() {
 
       {/* Ticket drawer */}
       <Drawer anchor="right" open={Boolean(selectedId)} onClose={() => { setSelectedId(null); setDetail(null); }}
+        PaperProps={{ sx: { width: { xs: "100%", sm: "min(560px, 100vw)" }, maxWidth: 640 } }}
         PaperProps={{ sx: { width: { xs: "100%", sm: "min(720px, 92vw)" }, maxWidth: 900 } }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Typography fontWeight={700}>{detail?.public_id || "Ticket"}</Typography>
@@ -905,8 +915,8 @@ export default function AdminDashboard() {
         </Toolbar>
         <Divider />
         <Box sx={{ p: 2, overflow: "auto" }}>
-          {detailLoading && <CircularProgress />}
-          {detail && !detailLoading && (
+          {detailLoading && !detail && <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>}
+          {detail && (
             <>
               <Typography variant="h6">{detail.subject}</Typography>
               <Typography variant="body2" color="text.secondary" mb={1}>
@@ -920,31 +930,25 @@ export default function AdminDashboard() {
                   ))}
                 </Select>
               </FormControl>
-              <Stack spacing={1} mb={2} sx={{ maxHeight: 300, overflow: "auto" }}>
+              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: 1.5, mt: 1 }}>
+              <Box sx={{
+                flex: 1, minHeight: 320, maxHeight: "calc(100vh - 260px)", overflow: "auto",
+                display: "flex", flexDirection: "column", gap: 1.25, p: 1,
+                bgcolor: "background.default", borderRadius: 1, border: 1, borderColor: "divider",
+              }}>
                 {(detail.messages || []).map((m) => (
-                  <Paper key={m.id} variant="outlined" sx={{ p: 1.2, bgcolor: m.is_staff_reply ? "action.hover" : "background.paper" }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="caption" fontWeight={600}>
-                        {m.author?.username}{m.is_staff_reply ? " (Staff)" : ""}
-                      </Typography>
-                      {m.is_staff_reply ? (
-                        <Typography variant="caption" color={m.seen_at || m.is_seen ? "primary.main" : "text.disabled"}>
-                          {m.seen_at || m.is_seen ? "Seen" : "Sent"}
-                        </Typography>
-                      ) : null}
-                    </Stack>
-                    <Box sx={{ fontSize: 13, "& p": { m: 0 } }} dangerouslySetInnerHTML={{ __html: m.body }} />
-                  </Paper>
+                  <MessageBubble key={m.id} message={m} mine={Boolean(m.is_staff_reply)} showHtmlToggle />
                 ))}
-              </Stack>
+              </Box>
               {detail.status !== "closed" && (
-                <>
-                  <TextField fullWidth multiline minRows={3} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Reply…" />
-                  <Button sx={{ mt: 1 }} variant="contained" disabled={sending || !reply.trim()} onClick={sendReply}>
+                <Box>
+                  <SimpleHtmlEditor value={reply} onChange={setReply} minHeight={110} disabled={sending} />
+                  <Button sx={{ mt: 1 }} fullWidth variant="contained" disabled={sending || !htmlToPlain(reply)} onClick={sendReply}>
                     {sending ? "Sending…" : "Send reply"}
                   </Button>
-                </>
+                </Box>
               )}
+            </Box>
             </>
           )}
         </Box>
