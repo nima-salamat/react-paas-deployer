@@ -18,8 +18,8 @@ import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
-import ConfirmationNumberOutlinedIcon,
-  ChatBubbleOutline as ChatBubbleOutlineIcon from "@mui/icons-material/ConfirmationNumberOutlined";
+import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 
 import { motion } from "framer-motion";
