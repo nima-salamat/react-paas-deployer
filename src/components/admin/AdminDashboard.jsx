@@ -67,6 +67,10 @@ export default function AdminDashboard() {
   const [liveConnected, setLiveConnected] = useState(false);
   const [liveEvents, setLiveEvents] = useState([]);
   const wsRef = useRef(null);
+  const selectedIdRef = useRef(null);
+  const loadTicketsRef = useRef(() => {});
+  const openDetailRef = useRef(async () => {});
+  const loadStatsRef = useRef(() => {});
   const reconnectRef = useRef(0);
   const [tickets, setTickets] = useState([]);
   const [page, setPage] = useState(1);
@@ -77,6 +81,7 @@ export default function AdminDashboard() {
   const [assignedFilter, setAssignedFilter] = useState("");
   const [tLoading, setTLoading] = useState(false);
   const [selectedId, setSelectedId] = useState(null);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [reply, setReply] = useState("");
@@ -141,6 +146,7 @@ export default function AdminDashboard() {
       setStats(unwrapData(res));
     } catch { /* */ }
   }, []);
+  loadStatsRef.current = loadStats;
 
   const loadTickets = useCallback(async () => {
     setTLoading(true);
@@ -161,6 +167,7 @@ export default function AdminDashboard() {
       setTLoading(false);
     }
   }, [page, search, status, priority, assignedFilter]);
+  loadTicketsRef.current = loadTickets;
 
   const loadUsers = useCallback(async () => {
     setUserLoading(true);
@@ -280,15 +287,22 @@ export default function AdminDashboard() {
         setLiveEvents((prev) => [data, ...prev].slice(0, 30));
         if (data.type === "ticket.created") {
           setToast(`New ticket ${data.public_id}: ${data.subject}`);
-          loadStats();
-          loadTickets();
+          loadStatsRef.current?.();
+          loadTicketsRef.current?.();
         } else if (data.type === "ticket.message") {
-          setToast(`New reply on ${data.public_id}`);
-          if (selectedId && String(selectedId) === String(data.ticket_id)) openDetail(selectedId);
-          loadTickets();
-        } else if (data.type === "ticket.updated") {
-          loadStats();
-          loadTickets();
+          setToast(`New reply on ${data.public_id || data.ticket_id}`);
+          const sid = selectedIdRef.current;
+          if (sid != null && String(sid) === String(data.ticket_id)) {
+            openDetailRef.current?.(sid);
+          }
+          loadTicketsRef.current?.();
+        } else if (data.type === "ticket.updated" || data.type === "ticket.seen") {
+          loadStatsRef.current?.();
+          loadTicketsRef.current?.();
+          const sid = selectedIdRef.current;
+          if (data.type === "ticket.seen" && sid != null && String(sid) === String(data.ticket_id)) {
+            openDetailRef.current?.(sid);
+          }
         }
       };
     };
@@ -332,6 +346,7 @@ export default function AdminDashboard() {
       setDetailLoading(false);
     }
   };
+  openDetailRef.current = openDetail;
 
   const changeStatus = async (v) => {
     await apiRequest({ method: "POST", url: `${TICKETS_API}/staff/${selectedId}/status/`, data: { status: v } });

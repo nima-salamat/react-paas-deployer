@@ -48,9 +48,8 @@ export default function TicketDetail() {
   ticketRef.current = ticket;
 
   const markRead = useCallback(async () => {
-    // Online / WS connected is NOT enough. Only mark seen when the user is
-    // actually looking at this ticket (detail mounted + tab visible).
-    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+    // Only when this detail page is mounted. Skip if tab is hidden (user not looking).
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       return;
     }
     try {

@@ -8,6 +8,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, unwrapData, unwrapList } from "./api";
+import { useTicketNotify } from "./TicketNotifyContext";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -16,6 +17,9 @@ const STATUS_COLOR = {
 const PRIORITY_COLOR = { low: "default", normal: "info", high: "warning", urgent: "error" };
 
 export default function StaffTickets() {
+  const { subscribe, connected } = useTicketNotify();
+  const selectedIdRef = React.useRef(null);
+  const openDetailRef = React.useRef(async () => {});
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -28,6 +32,7 @@ export default function StaffTickets() {
   const [departments, setDepartments] = useState([]);
 
   const [selectedId, setSelectedId] = useState(null);
+  React.useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [reply, setReply] = useState("");
@@ -44,7 +49,7 @@ export default function StaffTickets() {
       if (status) params.status = status;
       if (priority) params.priority = priority;
       if (department) params.department = department;
-      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/staff/", params });
+      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/staff/`, params });
       const data = res.data;
       const results = data.results || data.data || data;
       setTickets(Array.isArray(results) ? results : []);
@@ -60,7 +65,7 @@ export default function StaffTickets() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/departments/", params: { all: "1" } });
+        const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/departments/`, params: { all: "1" } });
         const data = res.data?.data || res.data || [];
         setDepartments(Array.isArray(data) ? data : []);
       } catch { /* ignore */ }
@@ -72,22 +77,63 @@ export default function StaffTickets() {
     return () => clearTimeout(t);
   }, [loadList]);
 
+  // Live updates (new messages / ticket changes) — uses refs to avoid stale closures
+  useEffect(() => {
+    return subscribe((ev) => {
+      if (!ev || !ev.type) return;
+      if (ev.type === "ticket.message" || ev.type === "ticket.created" || ev.type === "ticket.updated") {
+        loadList();
+        const sid = selectedIdRef.current;
+        if (sid != null && String(sid) === String(ev.ticket_id)) {
+          openDetailRef.current?.(sid);
+        }
+      } else if (ev.type === "ticket.seen") {
+        const sid = selectedIdRef.current;
+        if (sid != null && String(sid) === String(ev.ticket_id)) {
+          openDetailRef.current?.(sid);
+        }
+      }
+    });
+  }, [subscribe, loadList]);
+
+
   const openDetail = async (id) => {
     setSelectedId(id);
+    selectedIdRef.current = id;
     setDetail(null);
     setDetailLoading(true);
     setActionError("");
     setReply("");
     setFiles([]);
     try {
-      const res = await apiRequest({ method: "GET", url: `/api/tickets/${id}/` });
+      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
       setDetail(res.data?.data || res.data);
+      // Mark other party's messages as seen (enables seen ticks for the user)
+      try {
+        const rr = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
+        const rd = rr.data?.data || rr.data || {};
+        const ids = new Set((rd.message_ids || []).map(String));
+        if (ids.size) {
+          setDetail((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              messages: (prev.messages || []).map((m) =>
+                ids.has(String(m.id))
+                  ? { ...m, seen_at: rd.last_read_at || new Date().toISOString(), is_seen: true }
+                  : m
+              ),
+            };
+          });
+        }
+      } catch { /* ignore mark-read errors */ }
     } catch (e) {
       setActionError(e?.response?.data?.message || "Failed to load ticket");
     } finally {
       setDetailLoading(false);
     }
   };
+  openDetailRef.current = openDetail;
 
   const changeStatus = async (newStatus) => {
     if (!selectedId) return;
