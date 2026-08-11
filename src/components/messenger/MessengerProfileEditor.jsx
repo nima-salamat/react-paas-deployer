@@ -39,10 +39,28 @@ function resolveUrl(profile) {
   ].filter(Boolean);
   let url = candidates[0] || null;
   if (!url) return null;
-  if (url.startsWith("http")) return url;
+  if (url.startsWith("http")) {
+    // Already absolute — but still need ?token= for /media/images/ paths.
+    if (url.includes("/media/images/")) {
+      const token = localStorage.getItem("access");
+      if (token) {
+        const sep = url.includes("?") ? "&" : "?";
+        url = `${url}${sep}token=${encodeURIComponent(token)}`;
+      }
+    }
+    return url;
+  }
   const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
-  if (url.startsWith("/")) return `${host}${url}`;
-  return `${host}/${url}`;
+  url = url.startsWith("/") ? `${host}${url}` : `${host}/${url}`;
+  // Profile photos are JWT-protected — append ?token= for <img> tags.
+  if (url.includes("/media/images/")) {
+    const token = localStorage.getItem("access");
+    if (token) {
+      const sep = url.includes("?") ? "&" : "?";
+      url = `${url}${sep}token=${encodeURIComponent(token)}`;
+    }
+  }
+  return url;
 }
 
 export default function MessengerProfileEditor({ onClose }) {

@@ -1960,7 +1960,7 @@ export default function MessengerApp() {
                   }}
                 >
                   <ListItemAvatar>
-                    <Avatar src={u.avatar || undefined}>{u.username?.[0]}</Avatar>
+                    <Avatar src={withTokenQuery(u.avatar) || undefined}>{u.username?.[0]}</Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={u.username}

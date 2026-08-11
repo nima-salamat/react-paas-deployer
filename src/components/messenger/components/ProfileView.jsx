@@ -231,7 +231,7 @@ export default function ProfileView({
               <Box
                 key={ph.id || i}
                 component="img"
-                src={ph.url}
+                src={withTokenQuery(ph.url)}
                 alt=""
                 onClick={() => openGallery(i)}
                 sx={{
@@ -292,7 +292,7 @@ export default function ProfileView({
         )}
         <DialogContent sx={{ p: 0, display: "flex", justifyContent: "center", alignItems: "center", minHeight: 320 }}>
           {currentPhoto && (
-            <Box component="img" src={currentPhoto.url} alt=""
+            <Box component="img" src={withTokenQuery(currentPhoto.url)} alt=""
               sx={{ maxWidth: "100%", maxHeight: "80vh", display: "block", userSelect: "none" }}
             />
           )}

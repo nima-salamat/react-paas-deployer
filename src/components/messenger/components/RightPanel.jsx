@@ -26,7 +26,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
 import SendIcon from "@mui/icons-material/Send";
 import {
-  convAvatar, convTitle, peerUser, myRole,
+  convAvatar, convTitle, peerUser, myRole, withTokenQuery,
 } from "../messengerUtils";
 import ProfileView from "./ProfileView";
 import ContextMenu from "./ContextMenu";
@@ -71,9 +71,14 @@ export default function RightPanel({
   onUploadGroupAvatar, onClearGroupAvatar,
   onCancelJoinRequest, onActOnJoinRequest,
 }) {
+  // All hooks MUST be declared before any conditional `return` — otherwise
+  // the hook count varies between renders of different `kind` panels and
+  // React throws "Invalid hook call" (#300) when the user switches panels.
   const [memberCtx, setMemberCtx] = useState(null); // { x, y, user, role }
   const [memberMenuAnchor, setMemberMenuAnchor] = useState(null); // for ⋮ button
   const [memberMenuTarget, setMemberMenuTarget] = useState(null);
+  const groupAvatarRef = useRef(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const headerTitle = (() => {
     switch (kind) {
@@ -155,7 +160,7 @@ export default function RightPanel({
           {(myJoinRequests || []).map((r) => (
             <ListItemButton key={r.id}>
               <ListItemAvatar>
-                <Avatar src={r.user?.avatar || undefined}>
+                <Avatar src={withTokenQuery(r.user?.avatar) || undefined}>
                   {r.user?.username?.[0]?.toUpperCase() || r.conversation_title?.[0]?.toUpperCase()}
                 </Avatar>
               </ListItemAvatar>
@@ -212,7 +217,7 @@ export default function RightPanel({
               <ListItemButton key={r.id}>
                 <ListItemAvatar>
                   <Box sx={{ position: "relative" }}>
-                    <Avatar src={r.user?.avatar || undefined}>{r.user?.username?.[0]?.toUpperCase()}</Avatar>
+                    <Avatar src={withTokenQuery(r.user?.avatar) || undefined}>{r.user?.username?.[0]?.toUpperCase()}</Avatar>
                     {r.user?.id && onlineUsers?.has(Number(r.user.id)) && <OnlineDot size={10} />}
                   </Box>
                 </ListItemAvatar>
@@ -260,7 +265,7 @@ export default function RightPanel({
             <ListItemButton key={c.id} onClick={() => c.contact && onStartDm(c.contact)}>
               <ListItemAvatar>
                 <Box sx={{ position: "relative" }}>
-                  <Avatar src={c.contact?.avatar || undefined}>{c.contact?.username?.[0]}</Avatar>
+                  <Avatar src={withTokenQuery(c.contact?.avatar) || undefined}>{c.contact?.username?.[0]}</Avatar>
                   {c.contact?.id && onlineUsers?.has(Number(c.contact.id)) && <OnlineDot />}
                 </Box>
               </ListItemAvatar>
@@ -285,7 +290,7 @@ export default function RightPanel({
         <List dense sx={{ overflow: "auto", flex: 1 }}>
           {blocks.map((u) => (
             <ListItemButton key={u.id}>
-              <ListItemAvatar><Avatar src={u.avatar || undefined}>{u.username?.[0]}</Avatar></ListItemAvatar>
+              <ListItemAvatar><Avatar src={withTokenQuery(u.avatar) || undefined}>{u.username?.[0]}</Avatar></ListItemAvatar>
               <ListItemText primary={u.username} />
               <Button size="small" onClick={() => onUnblock(u.id)}>Unblock</Button>
             </ListItemButton>
@@ -320,8 +325,6 @@ export default function RightPanel({
   const parts = activeConv?.participants || [];
   const isOwner = role === "owner";
   const isAdmin = role === "owner" || role === "admin";
-  const groupAvatarRef = useRef(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const openMemberContext = (e, user, mRole) => {
     e.preventDefault();
@@ -604,7 +607,7 @@ export default function RightPanel({
                 >
                   <ListItemAvatar>
                     <Box sx={{ position: "relative" }}>
-                      <Avatar src={p.user?.avatar || undefined} sx={{ width: 36, height: 36 }}>{p.user?.username?.[0]}</Avatar>
+                      <Avatar src={withTokenQuery(p.user?.avatar) || undefined} sx={{ width: 36, height: 36 }}>{p.user?.username?.[0]}</Avatar>
                       {p.user?.id && onlineUsers?.has(Number(p.user.id)) && <OnlineDot size={10} />}
                     </Box>
                   </ListItemAvatar>

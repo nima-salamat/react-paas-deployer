@@ -23,7 +23,7 @@ import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import {
-  convAvatar, convTitle, formatTime, formatUnread,
+  convAvatar, convTitle, formatTime, formatUnread, withTokenQuery,
 } from "../messengerUtils";
 import ContextMenu from "./ContextMenu";
 import OnlineDot from "./OnlineDot";
@@ -164,7 +164,7 @@ export default function Sidebar({
               sx={{ py: 1 }}
             >
               <ListItemAvatar>
-                <Avatar src={u.avatar || undefined}>{u.username?.[0]?.toUpperCase()}</Avatar>
+                <Avatar src={withTokenQuery(u.avatar) || undefined}>{u.username?.[0]?.toUpperCase()}</Avatar>
               </ListItemAvatar>
               <ListItemText
                 primary={u.username}
@@ -242,7 +242,7 @@ export default function Sidebar({
                   sx={{ py: 1, opacity: isMember ? 1 : 0.9 }}
                 >
                   <ListItemAvatar>
-                    <Avatar src={g.avatar_url || g.avatar || undefined}><PublicIcon /></Avatar>
+                    <Avatar src={withTokenQuery(g.avatar_url || g.avatar) || undefined}><PublicIcon /></Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={

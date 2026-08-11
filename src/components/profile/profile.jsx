@@ -133,10 +133,23 @@ export function resolveProfileImageUrl(profile) {
   ];
   for (const c of candidates) {
     if (typeof c === "string" && c.trim()) {
-      const url = c.trim();
+      let url = c.trim();
+      // Resolve relative URLs against the API host so <img src=...> works.
+      // The backend returns relative URLs like "/media/images/xxx.jpg" so the
+      // browser would otherwise try to load them from the frontend origin.
       if (url.startsWith("/")) {
         const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
-        return `${host}${url}`;
+        url = `${host}${url}`;
+      }
+      // Profile photos are served by Django's ProtectedMediaView which
+      // requires a JWT (served via ?token=... since <img> can't send headers).
+      // Append the token for any /media/images/ URL we're about to render.
+      if (url.includes("/media/images/")) {
+        const token = localStorage.getItem("access");
+        if (token) {
+          const sep = url.includes("?") ? "&" : "?";
+          url = `${url}${sep}token=${encodeURIComponent(token)}`;
+        }
       }
       return url;
     }

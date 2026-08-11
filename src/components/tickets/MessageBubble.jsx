@@ -522,7 +522,7 @@ export default function MessageBubble({
     >
       {!mine && showAvatar ? (
         <Avatar
-          src={m.author?.avatar || undefined}
+          src={mediaSrc(m.author?.avatar) || undefined}
           alt={name}
           sx={{
             width: 32,

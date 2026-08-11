@@ -160,25 +160,45 @@ export function isVideoMessageAttachment(a) {
  *  Backend AttachmentDownloadAPIView + ProtectedMediaView accept ?token= as
  *  alternative auth.
  *
- *  SAFETY: only append to same-origin or relative URLs — never leak the JWT
- *  to a third-party host. */
+ *  SAFETY: only append to the API host (same-origin OR VITE_API_BASE) — never
+ *  leak the JWT to a third-party host. The backend typically returns relative
+ *  URLs like "/media/images/xxx.jpg" so we resolve them against VITE_API_BASE
+ *  before comparing. */
 export function withTokenQuery(url) {
   if (!url) return url;
-  // Don't add token to data: URLs or external URLs
+  // Don't touch data: URLs
   if (url.startsWith("data:")) return url;
-  if (/^https?:\/\//i.test(url)) {
-    // Absolute URL — only add token if same-origin
-    try {
-      const u = new URL(url, window.location.origin);
-      if (u.origin !== window.location.origin) return url;
-    } catch {
-      return url;
-    }
-  }
+
   const token = localStorage.getItem("access");
   if (!token) return url;
-  const sep = url.indexOf("?") === -1 ? "?" : "&";
-  return `${url}${sep}token=${encodeURIComponent(token)}`;
+
+  // Compute the API host once (e.g. https://api.echonode.website)
+  const apiHost = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
+
+  // Normalize the input URL to an absolute form for the origin check
+  let abs = url;
+  if (url.startsWith("/")) {
+    // Relative URL — resolve against the API host
+    abs = `${apiHost}${url}`;
+  } else if (!/^https?:\/\//i.test(url)) {
+    // No protocol — prepend API host
+    abs = `${apiHost}/${url}`;
+  }
+
+  // Parse and verify origin is the API host (don't leak JWT to third parties)
+  try {
+    const u = new URL(abs);
+    // Allow same-origin (frontend hosting media) OR the API host
+    if (u.origin !== window.location.origin && u.origin !== new URL(apiHost).origin) {
+      return url;
+    }
+  } catch {
+    return url;
+  }
+
+  // Append the token (preserve any existing query string)
+  const sep = abs.indexOf("?") === -1 ? "?" : "&";
+  return `${abs}${sep}token=${encodeURIComponent(token)}`;
 }
 
 /** Format unread count: 0..999 as number, >999 as "999+". */

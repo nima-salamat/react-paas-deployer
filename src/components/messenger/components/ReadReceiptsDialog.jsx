@@ -11,7 +11,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import apiRequest from "../../customHooks/apiRequest.jsx";
 import { MSG_API, unwrapData } from "../api";
-import { formatTime } from "../messengerUtils";
+import { formatTime, withTokenQuery } from "../messengerUtils";
 
 /**
  * "Seen by" dialog — shows who has / hasn't read a specific message.
@@ -100,7 +100,7 @@ export default function ReadReceiptsDialog({ message, onClose }) {
             {readList.map((r, i) => (
               <ListItem key={`${r.user?.id ?? i}`}>
                 <ListItemAvatar>
-                  <Avatar src={r.user?.avatar || undefined} sx={{ width: 36, height: 36 }}>
+                  <Avatar src={withTokenQuery(r.user?.avatar) || undefined} sx={{ width: 36, height: 36 }}>
                     {r.user?.username?.[0]?.toUpperCase()}
                   </Avatar>
                 </ListItemAvatar>
@@ -121,7 +121,7 @@ export default function ReadReceiptsDialog({ message, onClose }) {
             {unreadList.map((r, i) => (
               <ListItem key={`${r.user?.id ?? i}`}>
                 <ListItemAvatar>
-                  <Avatar src={r.user?.avatar || undefined} sx={{ width: 36, height: 36 }}>
+                  <Avatar src={withTokenQuery(r.user?.avatar) || undefined} sx={{ width: 36, height: 36 }}>
                     {r.user?.username?.[0]?.toUpperCase()}
                   </Avatar>
                 </ListItemAvatar>
