@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Avatar, Box, Button, CircularProgress, IconButton, Stack, Tooltip, Typography,
 } from "@mui/material";
@@ -42,29 +42,52 @@ function isImage(ct, name = "") {
 }
 function isAudio(ct, name = "") {
   if (ct && String(ct).startsWith("audio/")) return true;
-  return /\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(name || "");
+  return /\.(mp3|wav|ogg|m4a|aac|flac|opus|webm)$/i.test(name || "");
 }
 function isVideo(ct, name = "") {
   if (ct && String(ct).startsWith("video/")) return true;
   return /\.(mp4|webm|mov|mkv)$/i.test(name || "");
 }
 
-/**
- * Download protected attachment with Bearer token → object URL.
- * Plain <img src="/api/..."> fails because JWT is not sent by the browser.
- */
-function useAuthObjectUrl(url) {
+/** Build absolute API URL for relative download paths */
+function resolveMediaUrl(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url) || url.startsWith("blob:")) return url;
+  try {
+    const host = import.meta.env?.VITE_API_BASE
+      ? `https://${String(import.meta.env.VITE_API_BASE).replace(/^https?:\/\//, "").replace(/\/+$/, "")}`
+      : window.location.origin;
+    if (url.startsWith("/")) return `${host}${url}`;
+    return `${host}/${url}`;
+  } catch {
+    return url;
+  }
+}
+
+async function authFetchBlob(url) {
+  const absolute = resolveMediaUrl(url);
+  const token = localStorage.getItem("access");
+  const res = await fetch(absolute, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.blob();
+}
+
+function useAuthObjectUrl(url, enabled) {
   const [objectUrl, setObjectUrl] = useState(null);
-  const [loading, setLoading] = useState(Boolean(url));
+  const [loading, setLoading] = useState(Boolean(enabled && url));
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!url) {
+    if (!enabled || !url) {
       setObjectUrl(null);
       setLoading(false);
+      setError(false);
       return undefined;
     }
-    let revoked = false;
+    let dead = false;
     let created = null;
     const ctrl = new AbortController();
 
@@ -72,15 +95,16 @@ function useAuthObjectUrl(url) {
       setLoading(true);
       setError(false);
       try {
+        const absolute = resolveMediaUrl(url);
         const token = localStorage.getItem("access");
-        const res = await fetch(url, {
+        const res = await fetch(absolute, {
           signal: ctrl.signal,
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           credentials: "include",
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const blob = await res.blob();
-        if (revoked) return;
+        if (dead) return;
         created = URL.createObjectURL(blob);
         setObjectUrl(created);
       } catch (e) {
@@ -94,11 +118,11 @@ function useAuthObjectUrl(url) {
     })();
 
     return () => {
-      revoked = true;
+      dead = true;
       ctrl.abort();
       if (created) URL.revokeObjectURL(created);
     };
-  }, [url]);
+  }, [url, enabled]);
 
   return { objectUrl, loading, error };
 }
@@ -109,15 +133,26 @@ function AttachmentBlock({ a, mine }) {
   const url = a.download_url || a.url;
   const sizeLabel = formatSize(a.size);
   const kind = isImage(ct, name) ? "image" : isAudio(ct, name) ? "audio" : isVideo(ct, name) ? "video" : "file";
-  const { objectUrl, loading, error } = useAuthObjectUrl(kind !== "file" ? url : null);
+  const { objectUrl, loading, error } = useAuthObjectUrl(url, kind !== "file");
+
+  const captionSx = { display: "block", mt: 0.5, opacity: 0.85, wordBreak: "break-all" };
 
   if (kind === "image") {
     return (
-      <Box sx={{ mt: 0.75, maxWidth: 280 }}>
+      <Box sx={{ mt: 0.75, maxWidth: 300 }}>
         {loading && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1 }}>
-            <CircularProgress size={18} sx={{ color: mine ? "inherit" : undefined }} />
-            <Typography variant="caption" sx={{ opacity: 0.85 }}>Loading image…</Typography>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 1,
+              minHeight: 120,
+              borderRadius: 1.5,
+              bgcolor: mine ? "rgba(0,0,0,0.12)" : "action.hover",
+            }}
+          >
+            <CircularProgress size={22} sx={{ color: mine ? "#fff" : undefined }} />
           </Box>
         )}
         {!loading && objectUrl && (
@@ -126,18 +161,23 @@ function AttachmentBlock({ a, mine }) {
             href={objectUrl}
             target="_blank"
             rel="noopener"
-            sx={{ display: "block", borderRadius: 1.5, overflow: "hidden", lineHeight: 0 }}
+            sx={{
+              display: "block",
+              borderRadius: 1.5,
+              overflow: "hidden",
+              lineHeight: 0,
+              bgcolor: mine ? "rgba(0,0,0,0.12)" : "action.hover",
+            }}
           >
-            <Box
-              component="img"
+            <img
               src={objectUrl}
               alt={name}
-              sx={{
+              style={{
                 width: "100%",
-                maxHeight: 280,
+                maxHeight: 320,
                 objectFit: "contain",
                 display: "block",
-                bgcolor: mine ? "rgba(0,0,0,0.12)" : "action.hover",
+                verticalAlign: "middle",
               }}
             />
           </Box>
@@ -145,34 +185,27 @@ function AttachmentBlock({ a, mine }) {
         {!loading && (error || !objectUrl) && (
           <Button
             size="small"
-            href={url}
-            target="_blank"
-            rel="noopener"
-            startIcon={<ImageIcon />}
             variant="outlined"
+            startIcon={<ImageIcon />}
             sx={{
+              textTransform: "none",
               color: mine ? "primary.contrastText" : "text.primary",
               borderColor: mine ? "rgba(255,255,255,0.45)" : "divider",
-              textTransform: "none",
             }}
-            onClick={async (e) => {
-              // Try authenticated open as blob if possible
-              e.preventDefault();
+            onClick={async () => {
               try {
-                const token = localStorage.getItem("access");
-                const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                const blob = await res.blob();
+                const blob = await authFetchBlob(url);
                 const u = URL.createObjectURL(blob);
                 window.open(u, "_blank");
               } catch {
-                window.open(url, "_blank");
+                window.open(resolveMediaUrl(url), "_blank");
               }
             }}
           >
-            {name}
+            Open image
           </Button>
         )}
-        <Typography variant="caption" sx={{ display: "block", mt: 0.35, opacity: 0.85 }}>
+        <Typography variant="caption" sx={captionSx}>
           <ImageIcon sx={{ fontSize: 12, mr: 0.4, verticalAlign: "middle" }} />
           {name}{sizeLabel ? ` · ${sizeLabel}` : ""}
         </Typography>
@@ -182,16 +215,35 @@ function AttachmentBlock({ a, mine }) {
 
   if (kind === "audio") {
     return (
-      <Box sx={{ mt: 0.75, minWidth: 200, maxWidth: 300 }}>
-        <Stack direction="row" alignItems="center" gap={0.5} mb={0.4}>
-          <AudioFileIcon sx={{ fontSize: 16, opacity: 0.9 }} />
-          <Typography variant="caption" sx={{ opacity: 0.95 }} noWrap title={name}>
-            {name}{sizeLabel ? ` · ${sizeLabel}` : ""}
-          </Typography>
+      <Box
+        sx={{
+          mt: 0.75,
+          minWidth: 220,
+          maxWidth: 320,
+          p: 1,
+          borderRadius: 1.5,
+          bgcolor: mine ? "rgba(0,0,0,0.12)" : "action.hover",
+        }}
+      >
+        <Stack direction="row" alignItems="center" gap={0.75} mb={0.75}>
+          <AudioFileIcon sx={{ fontSize: 20 }} />
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="caption" fontWeight={700} noWrap display="block" title={name}>
+              {name}
+            </Typography>
+            {sizeLabel && (
+              <Typography variant="caption" sx={{ opacity: 0.8 }}>{sizeLabel}</Typography>
+            )}
+          </Box>
         </Stack>
-        {loading && <CircularProgress size={18} />}
+        {loading && <CircularProgress size={18} sx={{ color: mine ? "#fff" : undefined }} />}
         {!loading && objectUrl && (
-          <Box component="audio" controls preload="metadata" src={objectUrl} sx={{ width: "100%", height: 36 }} />
+          <audio
+            controls
+            preload="metadata"
+            src={objectUrl}
+            style={{ width: "100%", height: 36, outline: "none" }}
+          />
         )}
         {!loading && error && (
           <Typography variant="caption" color="error">Could not load audio</Typography>
@@ -202,18 +254,17 @@ function AttachmentBlock({ a, mine }) {
 
   if (kind === "video") {
     return (
-      <Box sx={{ mt: 0.75, maxWidth: 300 }}>
+      <Box sx={{ mt: 0.75, maxWidth: 320 }}>
         {loading && <CircularProgress size={18} />}
         {!loading && objectUrl && (
-          <Box
-            component="video"
+          <video
             controls
             preload="metadata"
             src={objectUrl}
-            sx={{ width: "100%", maxHeight: 220, borderRadius: 1.5, bgcolor: "#000" }}
+            style={{ width: "100%", maxHeight: 240, borderRadius: 12, background: "#000" }}
           />
         )}
-        <Typography variant="caption" sx={{ display: "block", mt: 0.35, opacity: 0.85 }}>
+        <Typography variant="caption" sx={captionSx}>
           <VideocamIcon sx={{ fontSize: 12, mr: 0.4, verticalAlign: "middle" }} />
           {name}{sizeLabel ? ` · ${sizeLabel}` : ""}
         </Typography>
@@ -221,7 +272,6 @@ function AttachmentBlock({ a, mine }) {
     );
   }
 
-  // Generic file — open via authenticated fetch when possible
   return (
     <Button
       size="small"
@@ -238,10 +288,7 @@ function AttachmentBlock({ a, mine }) {
       }}
       onClick={async () => {
         try {
-          const token = localStorage.getItem("access");
-          const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-          if (!res.ok) throw new Error("fail");
-          const blob = await res.blob();
+          const blob = await authFetchBlob(url);
           const u = URL.createObjectURL(blob);
           const aEl = document.createElement("a");
           aEl.href = u;
@@ -249,7 +296,7 @@ function AttachmentBlock({ a, mine }) {
           aEl.click();
           setTimeout(() => URL.revokeObjectURL(u), 30_000);
         } catch {
-          window.open(url, "_blank");
+          window.open(resolveMediaUrl(url), "_blank");
         }
       }}
     >
