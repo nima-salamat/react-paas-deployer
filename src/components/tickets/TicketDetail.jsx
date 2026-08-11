@@ -193,7 +193,7 @@ export default function TicketDetail() {
           display: "flex",
           flexDirection: "column",
           gap: 1.25,
-          bgcolor: "background.default",
+          bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
         }}
       >
         {(ticket.messages || []).map((m) => {

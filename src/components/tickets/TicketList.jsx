@@ -65,7 +65,7 @@ export default function TicketList() {
       const data = res.data;
       const results = data.results || data.data || (Array.isArray(data) ? data : []);
       setTickets(Array.isArray(results) ? results : []);
-      setCount(data.count || results.length || 0);
+      setCount(typeof data.count === 'number' ? data.count : (results.length || 0));
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load tickets");
       if (firstLoad.current) setTickets([]);
@@ -206,13 +206,15 @@ export default function TicketList() {
               })}
             </TableBody>
           </Table>
-          {count > 15 && (
+          {Math.ceil((count || 0) / 15) > 1 && (
             <Box display="flex" justifyContent="center" py={1.5}>
               <Pagination
                 page={page}
-                count={Math.max(1, Math.ceil(count / 15))}
+                count={Math.max(1, Math.ceil((count || 0) / 15))}
                 onChange={(_, p) => setPage(p)}
                 color="primary"
+                showFirstButton
+                showLastButton
               />
             </Box>
           )}

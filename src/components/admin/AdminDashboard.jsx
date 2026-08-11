@@ -98,6 +98,9 @@ export default function AdminDashboard() {
   const [userActive, setUserActive] = useState("");
   const [userLoading, setUserLoading] = useState(false);
   const [editUser, setEditUser] = useState(null);
+  const [deptCatalog, setDeptCatalog] = useState([]); // [{id,name}]
+  const [userMemberships, setUserMemberships] = useState([]); // [{department_id, is_manager}]
+  const [membershipLoading, setMembershipLoading] = useState(false);
   const [permCatalog, setPermCatalog] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", email: "", password: "", is_staff: false });
@@ -163,7 +166,7 @@ export default function AdminDashboard() {
       const data = res.data;
       const results = data.results || data.data || [];
       setTickets(Array.isArray(results) ? results : []);
-      setCount(data.count || results.length || 0);
+      setCount(typeof data.count === 'number' ? data.count : (Array.isArray(results) ? results.length : 0));
     } catch {
       setTickets([]);
     } finally {
@@ -183,7 +186,7 @@ export default function AdminDashboard() {
       const data = res.data;
       // DRF pagination at top level
       setUsers(data.results || data.data?.results || []);
-      setUserCount(data.count || data.data?.count || 0);
+      setUserCount(typeof data.count === 'number' ? data.count : (Array.isArray(results) ? results.length : 0));
     } catch (e) {
       setUsers([]);
       setToast(e?.response?.data?.message || "Cannot load users (need users.view)");
@@ -393,6 +396,44 @@ export default function AdminDashboard() {
     }
   };
 
+  const loadUserMemberships = async (userId) => {
+    setMembershipLoading(true);
+    try {
+      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/admin/users/${userId}/memberships/` });
+      const data = res.data?.data || res.data || {};
+      setDeptCatalog(Array.isArray(data.departments) ? data.departments : []);
+      setUserMemberships(
+        (data.memberships || []).map((m) => ({
+          department_id: m.department_id,
+          is_manager: Boolean(m.is_manager),
+        }))
+      );
+    } catch {
+      setDeptCatalog([]);
+      setUserMemberships([]);
+    } finally {
+      setMembershipLoading(false);
+    }
+  };
+
+  const toggleDeptMembership = (deptId, checked) => {
+    setUserMemberships((prev) => {
+      if (checked) {
+        if (prev.some((m) => String(m.department_id) === String(deptId))) return prev;
+        return [...prev, { department_id: deptId, is_manager: false }];
+      }
+      return prev.filter((m) => String(m.department_id) !== String(deptId));
+    });
+  };
+
+  const toggleDeptManager = (deptId, isManager) => {
+    setUserMemberships((prev) =>
+      prev.map((m) =>
+        String(m.department_id) === String(deptId) ? { ...m, is_manager: isManager } : m
+      )
+    );
+  };
+
   const saveUser = async () => {
     if (!editUser) return;
     try {
@@ -407,6 +448,15 @@ export default function AdminDashboard() {
           rules: editUser.rules || [],
         },
       });
+      try {
+        await apiRequest({
+          method: "PUT",
+          url: `${TICKETS_API}/admin/users/${editUser.id}/memberships/`,
+          data: { memberships: userMemberships },
+        });
+      } catch (me) {
+        console.warn("memberships", me);
+      }
       setToast("User updated");
       setEditUser(null);
       loadUsers();
@@ -691,9 +741,9 @@ export default function AdminDashboard() {
                     ))}
                   </TableBody>
                 </Table>
-                {count > 15 && (
+                {Math.ceil((count || 0) / 15) > 1 && (
                   <Box display="flex" justifyContent="center" p={2}>
-                    <Pagination page={page} count={Math.ceil(count / 15)} onChange={(_, v) => setPage(v)} />
+                    <Pagination page={page} count={Math.max(1, Math.ceil((count || 0) / 15))} onChange={(_, v) => setPage(v)} showFirstButton showLastButton color="primary" />
                   </Box>
                 )}
               </Paper>
@@ -775,7 +825,7 @@ export default function AdminDashboard() {
                           </Stack>
                         </TableCell>
                         <TableCell align="right">
-                          <Button size="small" onClick={() => setEditUser({ ...u, rules: u.rules || [] })}>Edit</Button>
+                          <Button size="small" onClick={() => { const _u = { ...u, rules: u.rules || [] }; setEditUser(_u); loadUserMemberships(_u.id); }}>Edit</Button>
                           <IconButton size="small" color="error" onClick={() => deactivateUser(u.id)}>
                             <DeleteOutlineIcon fontSize="small" />
                           </IconButton>
@@ -786,7 +836,9 @@ export default function AdminDashboard() {
                 </Table>
                 {userCount > 20 && (
                   <Box display="flex" justifyContent="center" p={2}>
-                    <Pagination page={userPage} count={Math.ceil(userCount / 20)} onChange={(_, v) => setUserPage(v)} />
+                    {Math.ceil((userCount || 0) / 20) > 1 && (
+                      <Pagination page={userPage} count={Math.max(1, Math.ceil((userCount || 0) / 20))} onChange={(_, v) => setUserPage(v)} showFirstButton showLastButton color="primary" />
+                    )}
                   </Box>
                 )}
               </Paper>
@@ -893,6 +945,54 @@ export default function AdminDashboard() {
                   </Box>
                 )}
               </Paper>
+
+                <Paper variant="outlined" sx={{ p: 1.5, mt: 2 }}>
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                    Department memberships
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                    A user can belong to multiple departments. Managers can reassign tickets in that department.
+                  </Typography>
+                  {membershipLoading ? (
+                    <CircularProgress size={22} />
+                  ) : (
+                    <Stack gap={0.5}>
+                      {(deptCatalog || []).map((d) => {
+                        const mem = (userMemberships || []).find((m) => String(m.department_id) === String(d.id));
+                        const checked = Boolean(mem);
+                        return (
+                          <Stack key={d.id} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.25 }}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={checked}
+                                  onChange={(e) => toggleDeptMembership(d.id, e.target.checked)}
+                                />
+                              }
+                              label={<Typography variant="body2">{d.name}</Typography>}
+                            />
+                            <FormControlLabel
+                              disabled={!checked}
+                              control={
+                                <Switch
+                                  size="small"
+                                  checked={Boolean(mem?.is_manager)}
+                                  onChange={(e) => toggleDeptManager(d.id, e.target.checked)}
+                                />
+                              }
+                              label={<Typography variant="caption">Manager</Typography>}
+                            />
+                          </Stack>
+                        );
+                      })}
+                      {!deptCatalog?.length && (
+                        <Typography variant="caption" color="text.secondary">No departments defined.</Typography>
+                      )}
+                    </Stack>
+                  )}
+                </Paper>
+
             )}
           </>
         )}
@@ -934,7 +1034,8 @@ export default function AdminDashboard() {
               <Box sx={{
                 flex: 1, minHeight: 320, maxHeight: "calc(100vh - 260px)", overflow: "auto",
                 display: "flex", flexDirection: "column", gap: 1.25, p: 1,
-                bgcolor: "background.default", borderRadius: 1, border: 1, borderColor: "divider",
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
+                  borderRadius: 2, border: "none",
               }}>
                 {(detail.messages || []).map((m) => (
                   <MessageBubble key={m.id} message={m} mine={Boolean(m.is_staff_reply)} showHtmlToggle />

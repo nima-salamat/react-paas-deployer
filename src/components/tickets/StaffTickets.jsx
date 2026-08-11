@@ -61,7 +61,7 @@ export default function StaffTickets() {
       const data = res.data;
       const results = data.results || data.data || data;
       setTickets(Array.isArray(results) ? results : []);
-      setCount(data.count || (Array.isArray(results) ? results.length : 0));
+      setCount(typeof data.count === 'number' ? data.count : (Array.isArray(results) ? results.length : 0));
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load tickets (staff only)");
       if (firstLoadRef.current) setTickets([]);
@@ -254,9 +254,9 @@ export default function StaffTickets() {
               ))}
             </TableBody>
           </Table>
-          {count > 15 && (
+          {Math.ceil((count || 0) / 15) > 1 && (
             <Box display="flex" justifyContent="center" py={1.5}>
-              <Pagination page={page} count={Math.max(1, Math.ceil(count / 15))} onChange={(_, p) => setPage(p)} color="primary" />
+              <Pagination page={page} count={Math.max(1, Math.ceil((count || 0) / 15))} onChange={(_, p) => setPage(p)} color="primary" showFirstButton showLastButton />
             </Box>
           )}
         </Paper>
@@ -300,7 +300,8 @@ export default function StaffTickets() {
               <Box sx={{
                 flex: 1, minHeight: 280, maxHeight: "calc(100vh - 320px)", overflow: "auto",
                 display: "flex", flexDirection: "column", gap: 1.1, p: 1, mb: 1.5,
-                bgcolor: "background.default", borderRadius: 1, border: 1, borderColor: "divider",
+                bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
+                borderRadius: 2, border: "none",
               }}>
                 {(detail.messages || []).map((m) => (
                   <MessageBubble key={m.id} message={m} mine={Boolean(m.is_staff_reply)} showHtmlToggle />
