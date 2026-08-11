@@ -150,6 +150,14 @@ export default function MessageComposer({
       mr.onstop = () => {
         const recordedType = mr.mimeType || mimeType;
         const blob = new Blob(chunksRef.current, { type: recordedType });
+        if (!blob.size) {
+          setRecordError("Recording was empty. Please try again.");
+          stopAllTracks();
+          if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+          setRecording("idle");
+          setRecordSeconds(0);
+          return;
+        }
         const ts = Date.now();
         const filename = mode === "video"
           ? `video_message_${ts}.webm`

@@ -13,6 +13,13 @@ import CheckIcon from "@mui/icons-material/Check";
 import ReplayIcon from "@mui/icons-material/Replay";
 import CropFreeIcon from "@mui/icons-material/CropFree";
 
+const QUALITY_PRESETS = {
+  original: { label: "Original", maxHeight: null, bitrate: 2_500_000 },
+  p480: { label: "480p", maxHeight: 480, bitrate: 1_200_000 },
+  p720: { label: "720p", maxHeight: 720, bitrate: 2_500_000 },
+  p1080: { label: "1080p", maxHeight: 1080, bitrate: 5_000_000 },
+};
+
 /**
  * Lightweight video trim/crop dialog.
  *
@@ -54,6 +61,7 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
   const [cropMode, setCropMode] = useState("none"); // "none" | "square" | "4:3" | "16:9"
+  const [quality, setQuality] = useState("p720");
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
@@ -131,6 +139,19 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
     // Determine output canvas size based on crop mode
     let outW = v.videoWidth || 640;
     let outH = v.videoHeight || 480;
+    const applyQuality = () => {
+      const preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.p720;
+      if (!preset.maxHeight || c.height <= preset.maxHeight) return;
+      const srcCanvas = document.createElement("canvas");
+      srcCanvas.width = c.width;
+      srcCanvas.height = c.height;
+      srcCanvas.getContext("2d").drawImage(c, 0, 0);
+      const ratio = preset.maxHeight / srcCanvas.height;
+      c.width = Math.max(1, Math.round(srcCanvas.width * ratio));
+      c.height = Math.max(1, Math.round(srcCanvas.height * ratio));
+      ctx.drawImage(srcCanvas, 0, 0, c.width, c.height);
+    };
+
     if (cropMode === "square") {
       const s = Math.min(outW, outH);
       // Center crop
@@ -139,6 +160,7 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
       c.width = s;
       c.height = s;
       ctx.drawImage(v, sx, sy, s, s, 0, 0, s, s);
+      applyQuality();
     } else if (cropMode === "4:3") {
       // Compute 4:3 region centered on the source
       const targetRatio = 4 / 3;
@@ -158,6 +180,7 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
       c.width = sw;
       c.height = sh;
       ctx.drawImage(v, sx, sy, sw, sh, 0, 0, sw, sh);
+      applyQuality();
     } else if (cropMode === "16:9") {
       const targetRatio = 16 / 9;
       const srcRatio = outW / outH;
@@ -176,12 +199,14 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
       c.width = sw;
       c.height = sh;
       ctx.drawImage(v, sx, sy, sw, sh, 0, 0, sw, sh);
+      applyQuality();
     } else {
       c.width = outW;
       c.height = outH;
       ctx.drawImage(v, 0, 0, outW, outH);
+      applyQuality();
     }
-  }, [cropMode]);
+  }, [cropMode, quality]);
 
   // ---- Render canvas continuously while playing ----
   useEffect(() => {
@@ -237,7 +262,8 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
         throw new Error("Browser does not support WebM recording");
       }
 
-      const mr = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: 2_500_000 });
+      const preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS.p720;
+      const mr = new MediaRecorder(canvasStream, { mimeType, videoBitsPerSecond: preset.bitrate });
       chunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
       const done = new Promise((resolve) => { mr.onstop = resolve; });
@@ -285,7 +311,7 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
       setProcessing(false);
       setProgress(0);
     }
-  }, [drawFrame, file, onConfirm, trimEnd, trimStart]);
+  }, [drawFrame, file, onConfirm, quality, trimEnd, trimStart]);
 
   const formatTime = (t) => {
     if (!isFinite(t)) return "0:00";
@@ -428,6 +454,25 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
             </ToggleButtonGroup>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
               Output will be re-encoded as WebM. Audio is preserved.
+            </Typography>
+          </Box>
+
+          <Box>
+            <Typography variant="subtitle2" sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}>
+              <VideocamIcon fontSize="small" /> Quality
+            </Typography>
+            <ToggleButtonGroup
+              value={quality}
+              exclusive
+              onChange={(_, v) => v && setQuality(v)}
+              size="small"
+            >
+              {Object.entries(QUALITY_PRESETS).map(([value, preset]) => (
+                <ToggleButton key={value} value={value}>{preset.label}</ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+              Higher quality keeps more detail but uploads a larger file.
             </Typography>
           </Box>
 

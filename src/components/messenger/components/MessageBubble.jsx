@@ -378,19 +378,22 @@ export default function MessageBubble({
               ) : k === "video" ? (
                 <VideoPlayer src={url} filename={a.original_filename} contentType={a.content_type} maxWidth={360} maxHeight={360} />
               ) : voice ? (
-                /* Voice message — inline waveform + play button (also opens global player) */
-                <InlineAudioPlayer
-                  att={a}
-                  mine={mine}
-                  active={isActiveAudio}
-                  isPlaying={audioIsPlaying}
-                  currentTime={audioCurrentTime}
-                  duration={audioDuration}
-                  onPlay={onPlayAudio}
-                  onToggle={onToggleAudio}
-                  onSeek={onSeekAudio}
-                  variant="voice"
-                />
+                <Stack spacing={0.5}>
+                  <InlineAudioPlayer
+                    att={a}
+                    mine={mine}
+                    active={isActiveAudio}
+                    isPlaying={audioIsPlaying}
+                    currentTime={audioCurrentTime}
+                    duration={audioDuration}
+                    onPlay={onPlayAudio}
+                    onToggle={onToggleAudio}
+                    onSeek={onSeekAudio}
+                    variant="voice"
+                  />
+                  <Box component="audio" src={url} controls preload="metadata"
+                    sx={{ width: "100%", maxWidth: 300, height: 34, display: "block" }} />
+                </Stack>
               ) : k === "audio" ? (
                 /* Regular audio file — inline player (music-style) */
                 <Stack direction="column" spacing={0.5} sx={{ mt: 0.25 }}>
@@ -412,6 +415,8 @@ export default function MessageBubble({
                     onSeek={onSeekAudio}
                     variant="audio"
                   />
+                  <Box component="audio" src={url} controls preload="metadata"
+                    sx={{ width: "100%", maxWidth: 300, height: 34, display: "block" }} />
                 </Stack>
               ) : (
                 <Chip

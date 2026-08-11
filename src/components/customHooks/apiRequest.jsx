@@ -121,7 +121,7 @@ function refreshAccessToken() {
   return refreshPromise;
 }
 
-const apiRequest = async ({ method = "GET", url, data = {}, params = {} }) => {
+const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploadProgress }) => {
   const accessToken = localStorage.getItem("access");
 
   try {
@@ -131,6 +131,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {} }) => {
       data,
       params,
       headers: buildHeaders(accessToken, data),
+      onUploadProgress,
     });
     return response;
   } catch (error) {
@@ -153,6 +154,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {} }) => {
           data,
           params,
           headers: buildHeaders(newAccess, data),
+          onUploadProgress,
         });
         return retryResponse;
       } catch (refreshErr) {

@@ -27,7 +27,7 @@ import {
   Box, Typography, IconButton, CircularProgress, Menu, MenuItem, ListItemIcon,
   Stack, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
-  ListItemText, Divider, Fade, Chip, Popover, Tooltip, useMediaQuery,
+  ListItemText, Divider, Fade, Chip, Popover, Tooltip, useMediaQuery, LinearProgress,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -96,6 +96,7 @@ export default function MessengerApp() {
   // Composer state
   const [text, setText] = useState("");
   const [files, setFiles] = useState([]);
+  const [pendingUploads, setPendingUploads] = useState([]);
   const [replyTo, setReplyTo] = useState(null);
   const [editingMsg, setEditingMsg] = useState(null);
 
@@ -738,26 +739,67 @@ export default function MessengerApp() {
       return;
     }
     if (!body && !files.length) return;
+    const filesToSend = [...files];
+    const emptyFile = filesToSend.find((f) => !f || Number(f.size || 0) <= 0);
+    if (emptyFile) {
+      setError(`${emptyFile?.name || "File"} is empty and was not sent`);
+      return;
+    }
     const form = new FormData();
     form.append("body", body);
     if (replyTo) form.append("reply_to", replyTo.id);
-    files.forEach((f) => form.append("files", f));
+    filesToSend.forEach((f) => form.append("files", f));
+    const pendingId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    if (filesToSend.length) {
+      const totalBytes = filesToSend.reduce((sum, f) => sum + Number(f.size || 0), 0);
+      setPendingUploads((prev) => [...prev, {
+        id: pendingId,
+        conversationId: activeId,
+        body,
+        files: filesToSend.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+        loaded: 0,
+        total: totalBytes,
+        progress: 0,
+        status: "uploading",
+      }]);
+    }
     setText(""); setFiles([]);
     const rep = replyTo; setReplyTo(null);
     try {
       const res = await apiRequest({
         method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`,
         data: form,
+        onUploadProgress: (event) => {
+          if (!filesToSend.length) return;
+          const total = event.total || filesToSend.reduce((sum, f) => sum + Number(f.size || 0), 0);
+          const loaded = event.loaded || 0;
+          const progress = total ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+          setPendingUploads((prev) => prev.map((u) => (
+            u.id === pendingId ? { ...u, loaded, total, progress } : u
+          )));
+        },
       });
       const created = unwrapData(res);
       if (created) {
-        setMessages((prev) => [...prev, created]);
+        setPendingUploads((prev) => prev.map((u) => (
+          u.id === pendingId ? { ...u, progress: 100, status: "sent" } : u
+        )));
+        await loadMessages(activeId, { silent: true });
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
         loadConversations({ silent: true });
+        setTimeout(() => {
+          setPendingUploads((prev) => prev.filter((u) => u.id !== pendingId));
+        }, 600);
       }
     } catch (e) {
       if (rep) setReplyTo(rep);
-      setError(e?.response?.data?.message || "Send failed");
+      const msg = e?.response?.data?.message || "Send failed";
+      setError(msg);
+      if (filesToSend.length) {
+        setPendingUploads((prev) => prev.map((u) => (
+          u.id === pendingId ? { ...u, status: "failed", error: msg } : u
+        )));
+      }
     }
   };
 
@@ -1584,6 +1626,48 @@ export default function MessengerApp() {
                 />
               </Box>
             ))}
+            {pendingUploads
+              .filter((u) => String(u.conversationId) === String(activeId))
+              .map((u) => (
+                <Box key={u.id} sx={{ display: "flex", justifyContent: "flex-end", mb: 0.8, px: 0.5 }}>
+                  <Box sx={{
+                    width: { xs: "82%", sm: 360 },
+                    maxWidth: "82%",
+                    px: 1.25,
+                    py: 1,
+                    borderRadius: "14px 14px 4px 14px",
+                    bgcolor: u.status === "failed" ? "error.dark" : "primary.main",
+                    color: "#fff",
+                    boxShadow: 1,
+                  }}>
+                    {u.body && (
+                      <Typography sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 14.5, mb: 0.5 }}>
+                        {u.body}
+                      </Typography>
+                    )}
+                    <Stack spacing={0.5}>
+                      {u.files.map((f, idx) => (
+                        <Typography key={`${f.name}-${idx}`} variant="caption" noWrap sx={{ opacity: 0.9 }}>
+                          {f.name || "file"}
+                        </Typography>
+                      ))}
+                      <LinearProgress
+                        variant={u.total ? "determinate" : "indeterminate"}
+                        value={u.progress || 0}
+                        sx={{
+                          height: 6,
+                          borderRadius: 3,
+                          bgcolor: "rgba(255,255,255,0.25)",
+                          "& .MuiLinearProgress-bar": { bgcolor: "#fff" },
+                        }}
+                      />
+                      <Typography variant="caption" sx={{ opacity: 0.85, textAlign: "right" }}>
+                        {u.status === "failed" ? (u.error || "Failed") : u.status === "sent" ? "Sent" : `${u.progress || 0}% uploading`}
+                      </Typography>
+                    </Stack>
+                  </Box>
+                </Box>
+              ))}
             <div ref={bottomRef} />
           </Box>
 
