@@ -146,6 +146,19 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
     //wavesurfer v7 — load() accepts a URL or HTMLMediaElement
     try {
       ws.load(nextSrc);
+      if (player.autoPlay) {
+        const playWhenReady = () => {
+          const p = ws.play();
+          if (p && typeof p.catch === "function") {
+            p.catch((err) => {
+              if (err && err.name !== "AbortError") {
+                setErrorMsg("Playback blocked. Click again to retry.");
+              }
+            });
+          }
+        };
+        ws.once("ready", playWhenReady);
+      }
     } catch (e) {
       setErrorMsg("Could not load audio");
       setLoadingWave(false);

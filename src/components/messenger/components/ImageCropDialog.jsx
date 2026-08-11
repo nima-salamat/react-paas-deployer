@@ -45,7 +45,7 @@ const PEN_COLORS = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#8e2
 
 export default function ImageCropDialog({
   open, file, onClose, onConfirm,
-  circular = true,
+  circular = false,
   outputSize = 512,
   title = "Edit image",
 }) {
@@ -333,80 +333,28 @@ export default function ImageCropDialog({
 
   // ============= Export =============
   const onConfirmClick = async () => {
-    if (!imgRef.current) return;
+    if (!imgRef.current || !imgCanvasRef.current || !drawCanvasRef.current) return;
     setSending(true);
     try {
-      const img = imgRef.current;
-      // Step 1: render the image (with zoom + rotation) to an offscreen canvas
-      // at the image's NATURAL resolution (so we don't lose quality).
       const off = document.createElement("canvas");
-      off.width = img.width;
-      off.height = img.height;
+      off.width = EDITOR_W;
+      off.height = EDITOR_H;
       const octx = off.getContext("2d");
-      octx.fillStyle = "#1a1a1a";
-      octx.fillRect(0, 0, off.width, off.height);
-      octx.save();
-      // Apply the same CSS filter at export time (so the saved image matches
-      // what the user sees in the live preview).
-      octx.filter = filterString();
-      octx.translate(off.width / 2, off.height / 2);
-      octx.rotate((rotation * Math.PI) / 180);
-      octx.scale(zoom, zoom);
-      const fitScale = Math.min(EDITOR_W / img.width, EDITOR_H / img.height);
-      // The image was drawn at scale `fitScale` in the display canvas.
-      // At natural resolution, we need to draw at scale 1 (the image's own size),
-      // but the zoom + rotation still apply. So draw at the natural size:
-      octx.drawImage(img, -img.width / 2, -img.height / 2, img.width, img.height);
-      octx.filter = "none";
-      octx.restore();
-      // Step 2: composite drawings (scale from display coords → natural coords)
-      const scaleX = img.width / EDITOR_W;
-      const scaleY = img.height / EDITOR_H;
-      // Adjust for fitScale (display canvas drew image at fitScale, so the
-      // drawing coords are in display space which is fitScale * natural).
-      // Actually the drawings were captured in canvas display coords (EDITOR_W×EDITOR_H).
-      // To map to natural coords, multiply by scaleX/scaleY.
-      strokes.forEach((s) => {
-        if (!s.points || s.points.length < 1) return;
-        octx.save();
-        octx.lineCap = "round";
-        octx.lineJoin = "round";
-        if (s.tool === "eraser") {
-          octx.globalCompositeOperation = "destination-out";
-          octx.strokeStyle = "rgba(0,0,0,1)";
-        } else if (s.tool === "highlighter") {
-          octx.globalCompositeOperation = "source-over";
-          octx.globalAlpha = 0.35;
-          octx.strokeStyle = s.color;
-        } else {
-          octx.globalCompositeOperation = "source-over";
-          octx.strokeStyle = s.color;
-        }
-        octx.lineWidth = s.size * Math.max(scaleX, scaleY);
-        octx.beginPath();
-        const pts = s.points;
-        octx.moveTo(pts[0].x * scaleX, pts[0].y * scaleY);
-        for (let i = 1; i < pts.length; i++) {
-          octx.lineTo(pts[i].x * scaleX, pts[i].y * scaleY);
-        }
-        octx.stroke();
-        octx.restore();
-      });
-      // Step 3: extract crop region (in natural coords)
-      const cx = crop.x * scaleX;
-      const cy = crop.y * scaleY;
-      const cw = crop.w * scaleX;
-      const ch = crop.h * scaleY;
-      // Step 4: scale to outputSize (max dimension)
+      octx.drawImage(imgCanvasRef.current, 0, 0);
+      octx.drawImage(drawCanvasRef.current, 0, 0);
+
+      const cx = crop.x;
+      const cy = crop.y;
+      const cw = crop.w;
+      const ch = crop.h;
       const outScale = Math.min(outputSize / cw, outputSize / ch, 1);
-      const outW = Math.round(cw * outScale);
-      const outH = Math.round(ch * outScale);
+      const outW = Math.max(1, Math.round(cw * outScale));
+      const outH = Math.max(1, Math.round(ch * outScale));
       const out = document.createElement("canvas");
       out.width = outW;
       out.height = outH;
       const octx2 = out.getContext("2d");
       if (circular) {
-        // Circular clip
         octx2.save();
         octx2.beginPath();
         octx2.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
@@ -415,7 +363,7 @@ export default function ImageCropDialog({
       }
       octx2.drawImage(off, cx, cy, cw, ch, 0, 0, outW, outH);
       if (circular) octx2.restore();
-      // Step 5: export as JPEG blob
+
       const blob = await new Promise((resolve) => {
         out.toBlob((b) => resolve(b), "image/jpeg", 0.92);
       });
@@ -426,7 +374,6 @@ export default function ImageCropDialog({
       setSending(false);
     }
   };
-
   const handles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
   const handleStyle = (h) => {
     const map = {
@@ -692,7 +639,7 @@ export default function ImageCropDialog({
             ref={imgCanvasRef}
             width={EDITOR_W}
             height={EDITOR_H}
-            sx={{ position: "absolute", inset: 0 }}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
           />
           {/* Drawing canvas (top, transparent) — captures pointer events in draw mode */}
           <canvas
@@ -700,9 +647,11 @@ export default function ImageCropDialog({
             width={EDITOR_W}
             height={EDITOR_H}
             onPointerDown={onDrawPointerDown}
-            sx={{
+            style={{
               position: "absolute",
               inset: 0,
+              width: "100%",
+              height: "100%",
               pointerEvents: mode === "draw" ? "auto" : "none",
             }}
           />

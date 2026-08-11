@@ -193,11 +193,12 @@ export default function MediaGalleryDialog({ open, conversationId, startAttachme
         ) : attachmentKind(current) === "video" ? (
           <Box
             component="video"
-            src={withTokenQuery(current.url)}
             controls
             autoPlay
             sx={{ maxWidth: "100%", maxHeight: "80vh" }}
-          />
+          >
+            <source src={withTokenQuery(current.url)} type={current.content_type || "video/mp4"} />
+          </Box>
         ) : (
           <Stack alignItems="center" spacing={2}>
             <Typography>{current.original_filename || "File"}</Typography>

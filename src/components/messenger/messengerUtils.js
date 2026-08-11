@@ -192,6 +192,7 @@ export function withTokenQuery(url) {
     if (u.origin !== window.location.origin && u.origin !== new URL(apiHost).origin) {
       return url;
     }
+    if (u.searchParams.has("token")) return u.toString();
   } catch {
     return url;
   }
@@ -199,6 +200,10 @@ export function withTokenQuery(url) {
   // Append the token (preserve any existing query string)
   const sep = abs.indexOf("?") === -1 ? "?" : "&";
   return `${abs}${sep}token=${encodeURIComponent(token)}`;
+}
+
+export function mediaUrl(url) {
+  return withTokenQuery(url);
 }
 
 /** Format unread count: 0..999 as number, >999 as "999+". */

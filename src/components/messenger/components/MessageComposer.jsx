@@ -148,12 +148,13 @@ export default function MessageComposer({
       chunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
       mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const recordedType = mr.mimeType || mimeType;
+        const blob = new Blob(chunksRef.current, { type: recordedType });
         const ts = Date.now();
         const filename = mode === "video"
           ? `video_message_${ts}.webm`
           : `voice_${ts}.webm`;
-        const file = new File([blob], filename, { type: mimeType });
+        const file = new File([blob], filename, { type: recordedType });
         setFiles((prev) => [...prev, file]);
         stopAllTracks();
         if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }

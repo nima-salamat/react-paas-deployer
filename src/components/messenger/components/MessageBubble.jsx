@@ -374,9 +374,9 @@ export default function MessageBubble({
                 /* Circular video message — VideoPlayer handles its own
                    circular styling + theater mode. The black ring around
                    the circle is part of the player's design. */
-                <VideoPlayer src={url} filename={a.original_filename} circular />
+                <VideoPlayer src={url} filename={a.original_filename} contentType={a.content_type} circular />
               ) : k === "video" ? (
-                <VideoPlayer src={url} filename={a.original_filename} maxWidth={360} maxHeight={360} />
+                <VideoPlayer src={url} filename={a.original_filename} contentType={a.content_type} maxWidth={360} maxHeight={360} />
               ) : voice ? (
                 /* Voice message — inline waveform + play button (also opens global player) */
                 <InlineAudioPlayer

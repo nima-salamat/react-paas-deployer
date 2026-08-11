@@ -55,6 +55,7 @@ const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 export default function VideoPlayer({
   src,
   filename = "video.mp4",
+  contentType,
   poster,
   circular = false,
   maxWidth = 360,
@@ -101,7 +102,7 @@ export default function VideoPlayer({
       },
       sources: [{
         src: withTokenQuery(src),
-        type: guessVideoType(src),
+        type: guessVideoType(src, contentType),
       }],
       // Suppress video.js' own error display — we surface errors in our UI
       errorDisplay: false,
@@ -155,7 +156,7 @@ export default function VideoPlayer({
       setCurrentTime(0);
       setDuration(0);
       setBuffered(0);
-      player.src({ src: nextSrc, type: guessVideoType(src) });
+      player.src({ src: nextSrc, type: guessVideoType(src, contentType) });
       if (poster) player.poster(poster);
       else player.poster("");
       if (autoPlay) {
@@ -163,7 +164,7 @@ export default function VideoPlayer({
         if (p && typeof p.catch === "function") p.catch(() => {});
       }
     }
-  }, [src, poster, autoPlay]);
+  }, [src, poster, autoPlay, contentType]);
 
   // ---- Cleanup on unmount ----
   useEffect(() => () => {
@@ -790,7 +791,11 @@ export default function VideoPlayer({
 }
 
 /** Guess the video MIME type from the URL — falls back to video/mp4. */
-function guessVideoType(url) {
+function guessVideoType(url, contentType) {
+  const ct = (contentType || "").toLowerCase().split(";")[0].trim();
+  if (ct.startsWith("video/") || ct === "application/x-mpegurl" || ct === "application/dash+xml") {
+    return ct;
+  }
   if (!url) return "video/mp4";
   const u = url.toLowerCase().split("?")[0];
   if (u.endsWith(".webm")) return "video/webm";

@@ -1302,7 +1302,7 @@ export default function MessengerApp() {
     }
     if (k === "text") {
       try {
-        const r = await fetch(att.url, { headers: authHeaders() });
+        const r = await fetch(withTokenQuery(att.url), { headers: authHeaders() });
         const textContent = await r.text();
         setPreview({ att, kind: k, textContent: textContent.slice(0, 200000) });
       } catch {
@@ -1573,7 +1573,7 @@ export default function MessengerApp() {
                   }}
                   onLoadUserProfile={loadUserProfile}
                   onJumpToMessage={onJumpToMessage}
-                  onPlayAudio={(att) => setAudioPlayer({ att, title: att.original_filename || "Audio" })}
+                  onPlayAudio={(att) => setAudioPlayer({ att, title: att.original_filename || "Audio", autoPlay: true })}
                   onToggleAudio={onToggleAudio}
                   onSeekAudio={onSeekAudio}
                   activeAudioId={audioState.attId}
@@ -1798,6 +1798,9 @@ export default function MessengerApp() {
           setFiles((prev) => [...prev, cropped]);
           setCropFile(null);
         }}
+        circular={false}
+        outputSize={1600}
+        title="Edit image"
       />
 
       {/* Video edit dialog (trim + crop before sending) */}
