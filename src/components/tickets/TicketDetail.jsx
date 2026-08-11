@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Box, Button, Chip, CircularProgress, Paper, Stack,
-  Typography, Alert, IconButton,
+  Box, Chip, CircularProgress, Stack, Typography, Alert, IconButton,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -9,8 +8,8 @@ import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, unwrapData } from "./api";
 import { useTicketNotify } from "./TicketNotifyContext";
 import MessageBubble from "./MessageBubble";
-import SimpleHtmlEditor, { htmlToPlain } from "./SimpleHtmlEditor";
-import PendingFilesBar from "./PendingFilesBar";
+import ChatComposer from "./ChatComposer";
+import { htmlToPlain } from "./SimpleHtmlEditor";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -29,8 +28,7 @@ export default function TicketDetail() {
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState([]);
   const bottomRef = useRef(null);
-  const ticketRef = useRef(null);
-  ticketRef.current = ticket;
+  const listRef = useRef(null);
 
   const applySeenLocal = useCallback((ids, at) => {
     if (!ids?.length) return;
@@ -136,9 +134,25 @@ export default function TicketDetail() {
       const form = new FormData();
       form.append("body", htmlToPlain(reply) ? reply : "<p></p>");
       files.forEach((f) => form.append("attachments", f));
-      await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/messages/`, data: form });
+      const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/messages/`, data: form });
+      const created = res.data?.data || res.data;
       setReply("");
       setFiles([]);
+      if (created && created.id) {
+        setTicket((prev) => {
+          if (!prev) return prev;
+          const exists = (prev.messages || []).some((m) => String(m.id) === String(created.id));
+          if (exists) {
+            return {
+              ...prev,
+              messages: prev.messages.map((m) =>
+                String(m.id) === String(created.id) ? { ...m, ...created } : m
+              ),
+            };
+          }
+          return { ...prev, messages: [...(prev.messages || []), created] };
+        });
+      }
       await load({ silent: true });
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to send");
@@ -159,7 +173,6 @@ export default function TicketDetail() {
     return (
       <Box p={3}>
         <Alert severity="error">{error}</Alert>
-        <Button sx={{ mt: 2 }} onClick={() => navigate("/tickets")}>Back</Button>
       </Box>
     );
   }
@@ -167,11 +180,34 @@ export default function TicketDetail() {
   if (!ticket) return null;
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: "auto", display: "flex", flexDirection: "column", minHeight: "70vh" }}>
-      <Stack direction="row" alignItems="center" gap={1} mb={2}>
-        <IconButton onClick={() => navigate("/tickets")}><ArrowBackIcon /></IconButton>
-        <Box flex={1}>
-          <Typography variant="h6" fontWeight={700}>{ticket.subject}</Typography>
+    <Box
+      sx={{
+        height: { xs: "calc(100vh - 64px)", md: "calc(100vh - 80px)" },
+        maxWidth: 900,
+        mx: "auto",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        bgcolor: "background.default",
+      }}
+    >
+      {/* Header */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        gap={1}
+        sx={{
+          px: 1.5,
+          py: 1,
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          flexShrink: 0,
+        }}
+      >
+        <IconButton onClick={() => navigate("/tickets")} size="small"><ArrowBackIcon /></IconButton>
+        <Box flex={1} minWidth={0}>
+          <Typography variant="subtitle1" fontWeight={700} noWrap>{ticket.subject}</Typography>
           <Typography variant="caption" color="text.secondary">
             {ticket.public_id}
             {refreshing ? " · updating…" : connected ? " · live" : " · offline"}
@@ -180,20 +216,22 @@ export default function TicketDetail() {
         <Chip size="small" label={ticket.status} color={STATUS_COLOR[ticket.status] || "default"} />
       </Stack>
 
-      {error && <Alert severity="warning" sx={{ mb: 1 }} onClose={() => setError("")}>{error}</Alert>}
+      {error && (
+        <Alert severity="warning" sx={{ borderRadius: 0 }} onClose={() => setError("")}>{error}</Alert>
+      )}
 
-      <Paper
-        variant="outlined"
+      {/* Messages */}
+      <Box
+        ref={listRef}
         sx={{
           flex: 1,
-          minHeight: 320,
-          maxHeight: { xs: "50vh", md: "58vh" },
+          minHeight: 0,
           overflow: "auto",
-          p: 1.5,
-          mb: 2,
+          px: 1,
+          py: 1.5,
           display: "flex",
           flexDirection: "column",
-          gap: 1.25,
+          gap: 1,
           bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
         }}
       >
@@ -202,41 +240,20 @@ export default function TicketDetail() {
           return <MessageBubble key={m.id} message={m} mine={mine} />;
         })}
         <div ref={bottomRef} />
-      </Paper>
+      </Box>
 
+      {/* Composer */}
       {ticket.status === "closed" ? (
-        <Alert severity="info">This ticket is closed.</Alert>
+        <Alert severity="info" sx={{ borderRadius: 0 }}>This ticket is closed.</Alert>
       ) : (
-        <Box>
-          <SimpleHtmlEditor value={reply} onChange={setReply} minHeight={100} disabled={sending} />
-          <PendingFilesBar
-            files={files}
-            onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
-            onClear={() => setFiles([])}
-          />
-          <Stack direction="row" justifyContent="space-between" alignItems="center" mt={1} gap={1}>
-            <Button component="label" size="small" variant="outlined">
-              Attach
-              <input
-                hidden
-                type="file"
-                multiple
-                accept="image/*,audio/*,video/*,.pdf,.zip,.txt,.doc,.docx,.xls,.xlsx"
-                onChange={(e) => {
-                  const picked = Array.from(e.target.files || []);
-                  setFiles((prev) => [...prev, ...picked].slice(0, 5));
-                  e.target.value = "";
-                }}
-              />
-            </Button>
-            <Typography variant="caption" color="text.secondary" flex={1}>
-              {files.length ? `${files.length} selected` : "Images, audio, video, docs"}
-            </Typography>
-            <Button variant="contained" disabled={sending || (!htmlToPlain(reply) && !files.length)} onClick={sendReply}>
-              {sending ? "Sending…" : "Send"}
-            </Button>
-          </Stack>
-        </Box>
+        <ChatComposer
+          value={reply}
+          onChange={setReply}
+          files={files}
+          onFilesChange={setFiles}
+          onSend={sendReply}
+          sending={sending}
+        />
       )}
     </Box>
   );

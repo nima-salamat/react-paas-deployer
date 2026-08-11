@@ -20,8 +20,8 @@ import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, EMAILS_API, unwrapData } from "../tickets/api";
 import EmailManagement from "../emails/EmailManagement.jsx";
 import MessageBubble from "../tickets/MessageBubble.jsx";
-import SimpleHtmlEditor, { htmlToPlain } from "../tickets/SimpleHtmlEditor.jsx";
-import PendingFilesBar from "../tickets/PendingFilesBar.jsx";
+import { htmlToPlain } from "../tickets/SimpleHtmlEditor.jsx";
+import ChatComposer from "../tickets/ChatComposer.jsx";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -377,9 +377,23 @@ export default function AdminDashboard() {
       const form = new FormData();
       form.append("body", htmlToPlain(reply) ? reply : "<p></p>");
       files.forEach((f) => form.append("attachments", f));
-      await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
+      const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
+      const created = res.data?.data || res.data;
       setReply("");
       setFiles([]);
+      if (created && created.id) {
+        setDetail((prev) => {
+          if (!prev) return prev;
+          const msgs = prev.messages || [];
+          const exists = msgs.some((m) => String(m.id) === String(created.id));
+          return {
+            ...prev,
+            messages: exists
+              ? msgs.map((m) => (String(m.id) === String(created.id) ? { ...m, ...created } : m))
+              : [...msgs, created],
+          };
+        });
+      }
       await openDetail(selectedId, { silent: true });
       loadTickets({ silent: true });
     } finally {
@@ -961,7 +975,7 @@ export default function AdminDashboard() {
 
       {/* Ticket drawer */}
       <Drawer anchor="right" open={Boolean(selectedId)} onClose={() => { setSelectedId(null); setDetail(null); }}
-        PaperProps={{ sx: { width: { xs: "100%", sm: "min(560px, 100vw)" }, maxWidth: 640 } }}>
+        PaperProps={{ sx: { width: { xs: "100%", sm: "min(560px, 100vw)" }, maxWidth: 640, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" } }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Typography fontWeight={700}>{detail?.public_id || "Ticket"}</Typography>
           <Stack direction="row">
@@ -972,67 +986,53 @@ export default function AdminDashboard() {
           </Stack>
         </Toolbar>
         <Divider />
-        <Box sx={{ p: 2, overflow: "auto" }}>
-          {detailLoading && !detail && <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>}
+        <Box sx={{ p: 0, display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {detailLoading && !detail && <Box display="flex" justifyContent="center" py={4} flex={1}><CircularProgress /></Box>}
           {detail && (
-            <>
-              <Typography variant="h6">{detail.subject}</Typography>
-              <Typography variant="body2" color="text.secondary" mb={1}>
-                {detail.user?.username} · {detail.user?.email}
-              </Typography>
-              <FormControl size="small" fullWidth sx={{ mb: 1 }}>
-                <InputLabel>Status</InputLabel>
-                <Select label="Status" value={detail.status} onChange={(e) => changeStatus(e.target.value)}>
-                  {["open", "in_progress", "waiting_user", "resolved", "closed"].map((s) => (
-                    <MenuItem key={s} value={s}>{s}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: 1.5, mt: 1 }}>
-              <Box sx={{
-                flex: 1, minHeight: 320, maxHeight: "calc(100vh - 260px)", overflow: "auto",
-                display: "flex", flexDirection: "column", gap: 1.25, p: 1,
-                bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
-                  borderRadius: 2, border: "none",
-              }}>
-                {(detail.messages || []).map((m) => (
-                  <MessageBubble key={m.id} message={m} mine={Boolean(m.is_staff_reply)} showHtmlToggle />
+            <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+              <Box sx={{ px: 2, pt: 1.5, pb: 1.25, flexShrink: 0, borderBottom: 1, borderColor: "divider" }}>
+                <Typography variant="h6" fontWeight={700} noWrap>{detail.subject}</Typography>
+                <Typography variant="body2" color="text.secondary" noWrap>
+                  {detail.user?.username} · {detail.user?.email}
+                </Typography>
+                <FormControl size="small" fullWidth sx={{ mt: 1 }}>
+                  <InputLabel>Status</InputLabel>
+                  <Select label="Status" value={detail.status} onChange={(e) => changeStatus(e.target.value)}>
+                    {["open", "in_progress", "waiting_user", "resolved", "closed"].map((s) => (
+                      <MenuItem key={s} value={s}>{s}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box
+                sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflow: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                  p: 1,
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
+                }}
+              >
+                {(detail.messages || []).map((msg) => (
+                  <MessageBubble key={msg.id} message={msg} mine={Boolean(msg.is_staff_reply)} showHtmlToggle />
                 ))}
               </Box>
               {detail.status !== "closed" && (
-                <Box>
-                  <SimpleHtmlEditor value={reply} onChange={setReply} minHeight={110} disabled={sending} />
-                  <PendingFilesBar
+                <Box sx={{ flexShrink: 0 }}>
+                  <ChatComposer
+                    value={reply}
+                    onChange={setReply}
                     files={files}
-                    onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                    onClear={() => setFiles([])}
+                    onFilesChange={setFiles}
+                    onSend={sendReply}
+                    sending={sending}
                   />
-                  <Stack direction="row" gap={1} alignItems="center" mt={1}>
-                    <Button component="label" size="small" variant="outlined">
-                      Attach
-                      <input
-                        hidden
-                        type="file"
-                        multiple
-                        accept="image/*,audio/*,video/*,.pdf,.zip,.txt,.doc,.docx"
-                        onChange={(e) => {
-                          const picked = Array.from(e.target.files || []);
-                          setFiles((prev) => [...prev, ...picked].slice(0, 5));
-                          e.target.value = "";
-                        }}
-                      />
-                    </Button>
-                    <Typography variant="caption" color="text.secondary" flex={1}>
-                      {files.length ? `${files.length} selected` : ""}
-                    </Typography>
-                    <Button variant="contained" disabled={sending || (!htmlToPlain(reply) && !files.length)} onClick={sendReply}>
-                      {sending ? "Sending…" : "Send reply"}
-                    </Button>
-                  </Stack>
                 </Box>
               )}
             </Box>
-            </>
           )}
         </Box>
       </Drawer>

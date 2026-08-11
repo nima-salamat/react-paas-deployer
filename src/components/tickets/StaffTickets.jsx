@@ -10,8 +10,8 @@ import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API } from "./api";
 import { useTicketNotify } from "./TicketNotifyContext";
 import MessageBubble from "./MessageBubble";
-import SimpleHtmlEditor, { htmlToPlain } from "./SimpleHtmlEditor";
-import PendingFilesBar from "./PendingFilesBar";
+import { htmlToPlain } from "./SimpleHtmlEditor";
+import ChatComposer from "./ChatComposer";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -173,9 +173,23 @@ export default function StaffTickets() {
       const form = new FormData();
       form.append("body", htmlToPlain(reply) ? reply : "<p></p>");
       files.forEach((f) => form.append("attachments", f));
-      await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
+      const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
+      const created = res.data?.data || res.data;
       setReply("");
       setFiles([]);
+      if (created && created.id) {
+        setDetail((prev) => {
+          if (!prev) return prev;
+          const msgs = prev.messages || [];
+          const exists = msgs.some((m) => String(m.id) === String(created.id));
+          return {
+            ...prev,
+            messages: exists
+              ? msgs.map((m) => (String(m.id) === String(created.id) ? { ...m, ...created } : m))
+              : [...msgs, created],
+          };
+        });
+      }
       await openDetail(selectedId, { silent: true });
       loadList({ silent: true });
     } catch (e) {
@@ -263,84 +277,82 @@ export default function StaffTickets() {
         </Paper>
       )}
 
+
       <Drawer
         anchor="right"
         open={Boolean(selectedId)}
         onClose={() => { setSelectedId(null); setDetail(null); }}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 520 }, maxWidth: "100vw" } }}
+        PaperProps={{
+          sx: {
+            width: { xs: "100%", sm: 520 },
+            maxWidth: "100vw",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          },
+        }}
       >
-        <Toolbar sx={{ justifyContent: "space-between" }}>
+        <Toolbar sx={{ justifyContent: "space-between", flexShrink: 0 }}>
           <Typography fontWeight={700}>{detail?.public_id || "Ticket"}</Typography>
           <IconButton onClick={() => { setSelectedId(null); setDetail(null); }}><CloseIcon /></IconButton>
         </Toolbar>
-        <Box sx={{ p: 2, display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-          {detailLoading && !detail && <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>}
-          {actionError && <Alert severity="error" sx={{ mb: 1 }}>{actionError}</Alert>}
+        <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {detailLoading && !detail && (
+            <Box display="flex" justifyContent="center" py={4} flex={1}><CircularProgress /></Box>
+          )}
+          {actionError && <Alert severity="error" sx={{ mx: 2, mt: 1 }}>{actionError}</Alert>}
           {detail && (
-            <>
-              <Typography variant="h6">{detail.subject}</Typography>
-              <Typography variant="body2" color="text.secondary" mb={1}>
-                {detail.user?.username} · {detail.user?.email}
-              </Typography>
-              <Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={2}>
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select label="Status" value={detail.status} onChange={(e) => changeStatus(e.target.value)}>
-                    {Object.keys(STATUS_COLOR).map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" fullWidth>
-                  <InputLabel>Priority</InputLabel>
-                  <Select label="Priority" value={detail.priority} onChange={(e) => changePriority(e.target.value)}>
-                    {Object.keys(PRIORITY_COLOR).map((p) => <MenuItem key={p} value={p}>{p}</MenuItem>)}
-                  </Select>
-                </FormControl>
-              </Stack>
-              <Divider sx={{ mb: 1 }} />
-              <Typography fontWeight={600} mb={1}>Conversation</Typography>
-              <Box sx={{
-                flex: 1, minHeight: 280, maxHeight: "calc(100vh - 320px)", overflow: "auto",
-                display: "flex", flexDirection: "column", gap: 1.1, p: 1, mb: 1.5,
-                bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
-                borderRadius: 2, border: "none",
-              }}>
+            <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+              <Box sx={{ px: 2, pt: 1.5, pb: 1.25, flexShrink: 0, borderBottom: 1, borderColor: "divider" }}>
+                <Typography variant="h6" fontWeight={700} noWrap>{detail.subject}</Typography>
+                <Typography variant="body2" color="text.secondary" noWrap mb={1}>
+                  {detail.user?.username} · {detail.user?.email}
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Status</InputLabel>
+                    <Select label="Status" value={detail.status} onChange={(e) => changeStatus(e.target.value)}>
+                      {Object.keys(STATUS_COLOR).map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Priority</InputLabel>
+                    <Select label="Priority" value={detail.priority} onChange={(e) => changePriority(e.target.value)}>
+                      {Object.keys(PRIORITY_COLOR).map((pr) => <MenuItem key={pr} value={pr}>{pr}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Box>
+              <Box
+                sx={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflow: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                  p: 1,
+                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
+                }}
+              >
                 {(detail.messages || []).map((m) => (
                   <MessageBubble key={m.id} message={m} mine={Boolean(m.is_staff_reply)} showHtmlToggle />
                 ))}
               </Box>
               {detail.status !== "closed" && (
-                <Box>
-                  <SimpleHtmlEditor value={reply} onChange={setReply} minHeight={100} disabled={sending} />
-                  <PendingFilesBar
+                <Box sx={{ flexShrink: 0 }}>
+                  <ChatComposer
+                    value={reply}
+                    onChange={setReply}
                     files={files}
-                    onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                    onClear={() => setFiles([])}
+                    onFilesChange={setFiles}
+                    onSend={sendReply}
+                    sending={sending}
                   />
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" mt={1} gap={1}>
-                    <Button component="label" size="small" variant="outlined">
-                      Attach
-                      <input
-                        hidden
-                        type="file"
-                        multiple
-                        accept="image/*,audio/*,video/*,.pdf,.zip,.txt,.doc,.docx,.xls,.xlsx"
-                        onChange={(e) => {
-                          const picked = Array.from(e.target.files || []);
-                          setFiles((prev) => [...prev, ...picked].slice(0, 5));
-                          e.target.value = "";
-                        }}
-                      />
-                    </Button>
-                    <Typography variant="caption" color="text.secondary" flex={1}>
-                      {files.length ? `${files.length} selected` : "Images, audio, video, docs"}
-                    </Typography>
-                    <Button variant="contained" disabled={sending || (!htmlToPlain(reply) && !files.length)} onClick={sendReply}>
-                      {sending ? "Sending…" : "Send reply"}
-                    </Button>
-                  </Stack>
                 </Box>
               )}
-            </>
+            </Box>
           )}
         </Box>
       </Drawer>

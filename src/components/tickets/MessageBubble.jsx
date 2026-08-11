@@ -63,6 +63,19 @@ function isVideo(ct, name = "") {
   return /\.(mp4|webm|mov|mkv)$/i.test(name || "");
 }
 
+const AVATAR_PALETTE = [
+  "#1abc9c", "#2ecc71", "#3498db", "#9b59b6", "#e67e22",
+  "#e74c3c", "#16a085", "#27ae60", "#2980b9", "#8e44ad",
+];
+function avatarColor(user) {
+  const c = user?.color;
+  if (typeof c === "number" && c >= 0) return AVATAR_PALETTE[c % AVATAR_PALETTE.length];
+  const name = user?.username || "?";
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i) * 17) % AVATAR_PALETTE.length;
+  return AVATAR_PALETTE[h];
+}
+
 function apiHost() {
   try {
     const base = import.meta.env?.VITE_API_BASE;
@@ -508,11 +521,13 @@ export default function MessageBubble({
     >
       {!mine && showAvatar ? (
         <Avatar
+          src={m.author?.avatar || undefined}
+          alt={name}
           sx={{
             width: 32,
             height: 32,
             fontSize: 13,
-            bgcolor: m.is_staff_reply ? "primary.main" : "grey.500",
+            bgcolor: avatarColor(m.author),
           }}
         >
           {name[0]?.toUpperCase()}
