@@ -48,6 +48,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import apiRequest from "../customHooks/apiRequest.jsx";
 import { MSG_API, unwrapData, unwrapList } from "./api";
+import MessengerProfileEditor from "./MessengerProfileEditor.jsx";
 
 const API_HOST = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
 const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉", "🤔", "👎"];
@@ -160,7 +161,7 @@ export default function MessengerApp() {
   const navigate = useNavigate();
   const meId = useAuthUserId();
 
-  const [drawerOpen, setDrawerOpen] = useState(!isMobile);
+  const [drawerOpen, setDrawerOpen] = useState(true);
   const [rightPanel, setRightPanel] = useState(null);
   const [mobileShowChat, setMobileShowChat] = useState(false);
 
@@ -204,6 +205,8 @@ export default function MessengerApp() {
   const [error, setError] = useState("");
   const [preview, setPreview] = useState(null); // { att, textContent? }
   const [confirmDelete, setConfirmDelete] = useState(null); // 'chat' | 'group'
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [addMemberSelected, setAddMemberSelected] = useState([]);
   const [hashReady, setHashReady] = useState(false);
 
   const bottomRef = useRef(null);
@@ -796,6 +799,25 @@ export default function MessengerApp() {
     }
   };
 
+  const addMembersToGroup = async () => {
+    if (!activeId || !addMemberSelected.length) return;
+    try {
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${activeId}/members/`,
+        data: { user_ids: addMemberSelected },
+      });
+      const data = unwrapData(res);
+      flash(data?.added?.length ? `Added ${data.added.map((u) => u.username).join(", ")}` : "No new members");
+      setAddMemberOpen(false);
+      setAddMemberSelected([]);
+      loadConversationDetail(activeId);
+      loadMessages(activeId, { silent: true });
+    } catch (e) {
+      setError(e?.response?.data?.message || "Add members failed");
+    }
+  };
+
   const openPreview = async (att) => {
     const k = attachmentKind(att);
     if (k === "text") {
@@ -983,6 +1005,13 @@ export default function MessengerApp() {
     }
     const mine = String(m.sender?.id) === String(meId);
     const bodyStr = typeof m.body === "string" ? m.body : String(m.body || "");
+    if (m.is_system) {
+      return (
+        <Box key={m.id} sx={{ textAlign: "center", my: 1 }}>
+          <Chip label={bodyStr} size="small" sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), fontSize: 12 }} />
+        </Box>
+      );
+    }
     return (
       <Box
         key={m.id}
@@ -1047,20 +1076,36 @@ export default function MessengerApp() {
               {bodyStr}
             </Typography>
           )}
-          {(m.attachments || []).map((a) => {
+          {m.is_system ? null : (m.attachments || []).map((a) => {
             const k = attachmentKind(a);
             return (
-              <Box key={a.id} sx={{ mt: 0.6 }}>
+              <Box key={a.id} sx={{ mt: 0.6, minWidth: k === "audio" ? 220 : undefined }}>
                 {k === "image" ? (
                   <Box component="img" src={a.url} alt={a.original_filename}
                     onClick={() => openPreview(a)}
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
                     sx={{ maxWidth: "100%", borderRadius: 1.5, maxHeight: 320, display: "block", cursor: "pointer" }} />
                 ) : k === "video" ? (
                   <Box component="video" src={a.url} controls
                     sx={{ maxWidth: "100%", borderRadius: 1.5, maxHeight: 320, display: "block" }} />
+                ) : k === "audio" ? (
+                  <Box sx={{
+                    bgcolor: mine ? "rgba(0,0,0,0.15)" : "action.hover",
+                    borderRadius: 2, px: 1.25, py: 1, minWidth: 220, maxWidth: 300,
+                  }}>
+                    <Typography variant="caption" display="block" noWrap sx={{ mb: 0.5, opacity: 0.9 }}>
+                      {a.original_filename || "Audio"}
+                    </Typography>
+                    <audio
+                      src={a.url}
+                      controls
+                      preload="metadata"
+                      style={{ width: "100%", height: 36, outline: "none" }}
+                    />
+                  </Box>
                 ) : (
                   <Chip
-                    icon={k === "audio" ? undefined : <VisibilityIcon />}
+                    icon={<VisibilityIcon />}
                     label={a.original_filename || "file"}
                     size="small"
                     onClick={() => openPreview(a)}
@@ -1117,10 +1162,11 @@ export default function MessengerApp() {
     <Box
       sx={{
         flex: 1, height: "100%",
-        display: (!activeId && isMobile) || (isMobile && !mobileShowChat) ? "none" : "flex",
+        display: "flex",
         flexDirection: "column",
         bgcolor: theme.palette.mode === "dark" ? "#0e1621" : "#e7ebf0",
         minWidth: 0,
+        width: "100%",
       }}
       onContextMenu={(e) => {
         // block browser menu on empty chat area
@@ -1454,6 +1500,20 @@ export default function MessengerApp() {
                   control={<Switch checked={Boolean(activeConv.is_closed)} onChange={(e) => patchGroup({ is_closed: e.target.checked })} />}
                   label="Closed"
                 />
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={activeConv.members_can_add !== false}
+                      onChange={(e) => patchGroup({ members_can_add: e.target.checked })}
+                    />
+                  }
+                  label="Members can add contacts"
+                />
+                <Button size="small" variant="contained" startIcon={<PersonAddIcon />}
+                  sx={{ mt: 1, mb: 1 }}
+                  onClick={async () => { await loadContacts(); setAddMemberSelected([]); setAddMemberOpen(true); }}>
+                  Add from contacts
+                </Button>
                 <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Invite links</Typography>
                 <Button size="small" variant="outlined" startIcon={<LinkIcon />} onClick={createInvite} sx={{ mb: 1 }}>Create link</Button>
                 {(inviteLinks || []).map((l) => (
@@ -1468,6 +1528,12 @@ export default function MessengerApp() {
               </>
             )}
 
+            {(role === "owner" || role === "admin" || activeConv.members_can_add !== false) && (
+              <Button size="small" fullWidth variant="outlined" startIcon={<PersonAddIcon />} sx={{ mb: 1 }}
+                onClick={async () => { await loadContacts(); setAddMemberSelected([]); setAddMemberOpen(true); }}>
+                Add members
+              </Button>
+            )}
             <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
               Members ({parts.length})
             </Typography>
@@ -1519,13 +1585,15 @@ export default function MessengerApp() {
     <Box sx={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", bgcolor: "background.default" }}
       onClick={() => { if (ctx) setCtx(null); }}
     >
-      {isMobile ? (
-        <Drawer open={drawerOpen && !mobileShowChat} onClose={() => setDrawerOpen(false)} variant="temporary"
-          ModalProps={{ keepMounted: true }}
-          sx={{ "& .MuiDrawer-paper": { width: "100%", maxWidth: 420 } }}>
+      {/* Mobile: always show chat list when no active chat (fixes blank blue screen) */}
+      {isMobile && (!activeId || !mobileShowChat) && (
+        <Box sx={{ width: "100%", height: "100%", position: "absolute", inset: 0, zIndex: 2, bgcolor: "background.paper" }}>
           {sidebarContent}
-        </Drawer>
-      ) : (
+        </Box>
+      )}
+
+      {/* Desktop sidebar */}
+      {!isMobile && (
         <Box sx={{
           width: drawerOpen ? 360 : 0, transition: "width 0.2s", overflow: "hidden", height: "100%",
           borderRight: drawerOpen ? "1px solid" : "none", borderColor: "divider", flexShrink: 0,
@@ -1534,15 +1602,73 @@ export default function MessengerApp() {
         </Box>
       )}
 
-      {chatPane}
+      {/* Chat: desktop always; mobile only when a chat is open */}
+      <Box sx={{
+        flex: 1, height: "100%", minWidth: 0, display: "flex",
+        visibility: isMobile && (!activeId || !mobileShowChat) ? "hidden" : "visible",
+        position: isMobile && (!activeId || !mobileShowChat) ? "absolute" : "relative",
+        width: isMobile && (!activeId || !mobileShowChat) ? 0 : "auto",
+        overflow: "hidden",
+      }}>
+        {chatPane}
+      </Box>
 
-      {!isMobile && rightPanel && renderRightPanel()}
-      {isMobile && (
-        <Drawer anchor="right" open={Boolean(rightPanel)} onClose={() => setRightPanel(null)}
+      {!isMobile && rightPanel && rightPanel !== "settings" && rightPanel !== "profile" && renderRightPanel()}
+      {isMobile && rightPanel && rightPanel !== "settings" && rightPanel !== "profile" && (
+        <Drawer anchor="right" open onClose={() => setRightPanel(null)}
           sx={{ "& .MuiDrawer-paper": { width: "100%", maxWidth: 360 } }}>
           {renderRightPanel()}
         </Drawer>
       )}
+
+      {/* Settings + Profile as centered popups */}
+      <Dialog open={rightPanel === "settings"} onClose={() => setRightPanel(null)} fullWidth maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center" }}>
+          <Typography fontWeight={700} sx={{ flex: 1 }}>Messenger settings</Typography>
+          <IconButton onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0 }}>
+          <List>
+            <ListItemButton onClick={() => setRightPanel("profile")}>
+              <ListItemIcon><AccountCircleIcon /></ListItemIcon>
+              <ListItemText primary="My profile photos" secondary="Upload & privacy" />
+            </ListItemButton>
+            <ListItemButton onClick={() => { loadContacts(); setRightPanel("contacts"); }}>
+              <ListItemIcon><ContactsIcon /></ListItemIcon>
+              <ListItemText primary="Contacts" />
+            </ListItemButton>
+            <ListItemButton onClick={() => { loadBlocks(); setRightPanel("blocks"); }}>
+              <ListItemIcon><BlockIcon /></ListItemIcon>
+              <ListItemText primary="Blocked users" />
+            </ListItemButton>
+            <ListItemButton onClick={() => { setCreateGroupOpen(true); setRightPanel(null); }}>
+              <ListItemIcon><GroupAddIcon /></ListItemIcon>
+              <ListItemText primary="New group" />
+            </ListItemButton>
+            <ListItemButton onClick={() => { setJoinOpen(true); setRightPanel(null); }}>
+              <ListItemIcon><LinkIcon /></ListItemIcon>
+              <ListItemText primary="Join with invite" />
+            </ListItemButton>
+            <Divider />
+            <ListItemButton onClick={() => navigate("/")}>
+              <ListItemIcon><HomeOutlinedIcon /></ListItemIcon>
+              <ListItemText primary="Back to Deployer" />
+            </ListItemButton>
+          </List>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rightPanel === "profile"} onClose={() => setRightPanel(null)} fullWidth maxWidth="sm"
+        PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ display: "flex", alignItems: "center" }}>
+          <Typography fontWeight={700} sx={{ flex: 1 }}>Profile</Typography>
+          <IconButton onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <MessengerProfileEditor onClose={() => setRightPanel(null)} />
+        </DialogContent>
+      </Dialog>
 
       {/* Custom right-click menu */}
       {ctx && (
@@ -1708,6 +1834,47 @@ export default function MessengerApp() {
         <DialogActions>
           <Button onClick={() => setJoinOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={joinByCode} disabled={!joinCode.trim()}>Join</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={addMemberOpen} onClose={() => setAddMemberOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Add members from contacts</DialogTitle>
+        <DialogContent dividers sx={{ maxHeight: 360 }}>
+          <List dense>
+            {contacts.map((c) => {
+              const u = c.contact;
+              if (!u) return null;
+              const checked = addMemberSelected.includes(u.id);
+              const already = (activeConv?.participants || []).some((p) => String(p.user?.id) === String(u.id));
+              return (
+                <ListItemButton
+                  key={u.id}
+                  disabled={already}
+                  onClick={() => {
+                    setAddMemberSelected((prev) =>
+                      checked ? prev.filter((x) => x !== u.id) : [...prev, u.id]
+                    );
+                  }}
+                >
+                  <ListItemAvatar>
+                    <Avatar src={u.avatar || undefined}>{u.username?.[0]}</Avatar>
+                  </ListItemAvatar>
+                  <ListItemText primary={u.username} secondary={already ? "Already in group" : (checked ? "Selected" : "")} />
+                </ListItemButton>
+              );
+            })}
+            {!contacts.length && (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                No contacts. Add contacts from search first.
+              </Typography>
+            )}
+          </List>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddMemberOpen(false)}>Cancel</Button>
+          <Button variant="contained" disabled={!addMemberSelected.length} onClick={addMembersToGroup}>
+            Add ({addMemberSelected.length})
+          </Button>
         </DialogActions>
       </Dialog>
 
