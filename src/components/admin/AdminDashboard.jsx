@@ -946,52 +946,6 @@ export default function AdminDashboard() {
                 )}
               </Paper>
 
-                <Paper variant="outlined" sx={{ p: 1.5, mt: 2 }}>
-                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                    Department memberships
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                    A user can belong to multiple departments. Managers can reassign tickets in that department.
-                  </Typography>
-                  {membershipLoading ? (
-                    <CircularProgress size={22} />
-                  ) : (
-                    <Stack gap={0.5}>
-                      {(deptCatalog || []).map((d) => {
-                        const mem = (userMemberships || []).find((m) => String(m.department_id) === String(d.id));
-                        const checked = Boolean(mem);
-                        return (
-                          <Stack key={d.id} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.25 }}>
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  size="small"
-                                  checked={checked}
-                                  onChange={(e) => toggleDeptMembership(d.id, e.target.checked)}
-                                />
-                              }
-                              label={<Typography variant="body2">{d.name}</Typography>}
-                            />
-                            <FormControlLabel
-                              disabled={!checked}
-                              control={
-                                <Switch
-                                  size="small"
-                                  checked={Boolean(mem?.is_manager)}
-                                  onChange={(e) => toggleDeptManager(d.id, e.target.checked)}
-                                />
-                              }
-                              label={<Typography variant="caption">Manager</Typography>}
-                            />
-                          </Stack>
-                        );
-                      })}
-                      {!deptCatalog?.length && (
-                        <Typography variant="caption" color="text.secondary">No departments defined.</Typography>
-                      )}
-                    </Stack>
-                  )}
-                </Paper>
 
             )}
           </>
@@ -1002,8 +956,7 @@ export default function AdminDashboard() {
 
       {/* Ticket drawer */}
       <Drawer anchor="right" open={Boolean(selectedId)} onClose={() => { setSelectedId(null); setDetail(null); }}
-        PaperProps={{ sx: { width: { xs: "100%", sm: "min(560px, 100vw)" }, maxWidth: 640 } }}
-        PaperProps={{ sx: { width: { xs: "100%", sm: "min(720px, 92vw)" }, maxWidth: 900 } }}>
+        PaperProps={{ sx: { width: { xs: "100%", sm: "min(560px, 100vw)" }, maxWidth: 640 } }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Typography fontWeight={700}>{detail?.public_id || "Ticket"}</Typography>
           <Stack direction="row">
@@ -1104,6 +1057,54 @@ export default function AdminDashboard() {
                     ))}
                   </Box>
                 </Paper>
+
+                <Paper variant="outlined" sx={{ p: 1.5, mt: 2 }}>
+                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                    Department memberships
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+                    A user can belong to multiple departments. Managers can reassign tickets in that department.
+                  </Typography>
+                  {membershipLoading ? (
+                    <CircularProgress size={22} />
+                  ) : (
+                    <Stack gap={0.5}>
+                      {(deptCatalog || []).map((d) => {
+                        const mem = (userMemberships || []).find((m) => String(m.department_id) === String(d.id));
+                        const checked = Boolean(mem);
+                        return (
+                          <Stack key={d.id} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.25 }}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  size="small"
+                                  checked={checked}
+                                  onChange={(e) => toggleDeptMembership(d.id, e.target.checked)}
+                                />
+                              }
+                              label={<Typography variant="body2">{d.name}</Typography>}
+                            />
+                            <FormControlLabel
+                              disabled={!checked}
+                              control={
+                                <Switch
+                                  size="small"
+                                  checked={Boolean(mem?.is_manager)}
+                                  onChange={(e) => toggleDeptManager(d.id, e.target.checked)}
+                                />
+                              }
+                              label={<Typography variant="caption">Manager</Typography>}
+                            />
+                          </Stack>
+                        );
+                      })}
+                      {!deptCatalog?.length && (
+                        <Typography variant="caption" color="text.secondary">No departments defined.</Typography>
+                      )}
+                    </Stack>
+                  )}
+                </Paper>
+
               </Box>
             </Stack>
           )}
