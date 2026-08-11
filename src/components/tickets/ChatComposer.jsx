@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { Box, IconButton, Stack, Tooltip } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import SendIcon from "@mui/icons-material/Send";
@@ -8,6 +8,7 @@ import PendingFilesBar from "./PendingFilesBar";
 /**
  * Messenger-style composer:
  * [attach] [ text input …………… ] [send]
+ * Enter = send · Shift+Enter = new line
  */
 export default function ChatComposer({
   value,
@@ -19,6 +20,11 @@ export default function ChatComposer({
   disabled = false,
   placeholder = "Message…",
 }) {
+  const valueRef = useRef(value);
+  const filesRef = useRef(files);
+  useEffect(() => { valueRef.current = value; }, [value]);
+  useEffect(() => { filesRef.current = files; }, [files]);
+
   const canSend = !sending && !disabled && (htmlToPlain(value) || files.length > 0);
 
   const onPick = (e) => {
@@ -27,9 +33,25 @@ export default function ChatComposer({
     e.target.value = "";
   };
 
-  const handleKey = (e) => {
-    // Enter to send is hard with contentEditable; skip
-  };
+  const handleSend = useCallback((htmlArg) => {
+    if (sending || disabled) return;
+    const html = htmlArg != null ? htmlArg : valueRef.current;
+    const fl = filesRef.current || [];
+    if (!htmlToPlain(html) && !fl.length) return;
+    onSend?.(html);
+  }, [sending, disabled, onSend]);
+
+  const handleSubmitFromEditor = useCallback((html) => {
+    if (sending || disabled) return;
+    if (html != null) {
+      valueRef.current = html;
+      onChange?.(html);
+    }
+    const body = html ?? valueRef.current;
+    const fl = filesRef.current || [];
+    if (!htmlToPlain(body) && !fl.length) return;
+    onSend?.(body);
+  }, [sending, disabled, onChange, onSend]);
 
   return (
     <Box sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", px: 1, py: 1 }}>
@@ -54,7 +76,11 @@ export default function ChatComposer({
 
         <SimpleHtmlEditor
           value={value}
-          onChange={onChange}
+          onChange={(html) => {
+            valueRef.current = html;
+            onChange?.(html);
+          }}
+          onSubmit={handleSubmitFromEditor}
           placeholder={placeholder}
           minHeight={40}
           maxHeight={120}
@@ -63,12 +89,12 @@ export default function ChatComposer({
           showToolbarToggle
         />
 
-        <Tooltip title="Send">
+        <Tooltip title="Send (Enter) · New line (Shift+Enter)">
           <span>
             <IconButton
               color="primary"
               disabled={!canSend}
-              onClick={onSend}
+              onClick={handleSend}
               size="medium"
               sx={{
                 mb: 0.25,

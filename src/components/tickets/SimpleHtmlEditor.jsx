@@ -12,11 +12,12 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 /**
  * Compact HTML editor. Toolbar hidden by default; expand with button.
- * When compact=true, looks like a single-line messenger input.
+ * Enter → onSubmit (send). Shift+Enter → new line.
  */
 export default function SimpleHtmlEditor({
   value = "",
   onChange,
+  onSubmit,
   placeholder = "Message…",
   minHeight = 40,
   maxHeight = 160,
@@ -64,6 +65,31 @@ export default function SimpleHtmlEditor({
     if (url) cmd("createLink", url);
   };
 
+  const onKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    // IME composition (e.g. Persian/Chinese) — don't send mid-composition
+    if (e.isComposing || e.keyCode === 229) return;
+
+    if (e.shiftKey) {
+      // Shift+Enter → allow default new line in contentEditable
+      return;
+    }
+
+    // Enter alone → send
+    if (onSubmit) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ref.current) {
+        const html = ref.current.innerHTML;
+        lastHtml.current = html;
+        onChange?.(html);
+        onSubmit(html);
+      } else {
+        onSubmit();
+      }
+    }
+  };
+
   return (
     <Paper
       variant="outlined"
@@ -97,6 +123,7 @@ export default function SimpleHtmlEditor({
           suppressContentEditableWarning
           onInput={emit}
           onBlur={emit}
+          onKeyDown={onKeyDown}
           data-placeholder={placeholder}
           sx={{
             flex: 1,

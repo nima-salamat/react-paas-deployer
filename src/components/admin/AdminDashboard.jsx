@@ -370,12 +370,13 @@ export default function AdminDashboard() {
     loadStats();
   };
 
-  const sendReply = async () => {
-    if (!htmlToPlain(reply) && !files.length) return;
+  const sendReply = async (bodyOverride) => {
+    const body = bodyOverride != null ? bodyOverride : reply;
+    if (!htmlToPlain(body) && !files.length) return;
     setSending(true);
     try {
       const form = new FormData();
-      form.append("body", htmlToPlain(reply) ? reply : "<p></p>");
+      form.append("body", htmlToPlain(body) ? body : "<p></p>");
       files.forEach((f) => form.append("attachments", f));
       const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
       const created = res.data?.data || res.data;
