@@ -147,6 +147,41 @@ export default function MessengerApp() {
 
   // Audio player bar — persists across chat switches
   const [audioPlayer, setAudioPlayer] = useState(null); // { att, title }
+  // Group description banners the user has dismissed (per conversation id)
+  const [dismissedGroupDesc, setDismissedGroupDesc] = useState(() => new Set());
+  // Lifted audio player state — shared with MessageBubble so the active voice/audio
+  // bubble can render inline progress + play/pause.
+  const [audioState, setAudioState] = useState({
+    isPlaying: false, currentTime: 0, duration: 0, attId: null,
+  });
+  // Stable callback so AudioPlayerBar's useEffect doesn't loop
+  const onAudioStateChange = useCallback((s) => {
+    setAudioState((prev) => {
+      // Avoid spamming re-renders if nothing meaningful changed
+      if (
+        prev.isPlaying === s.isPlaying
+        && Math.abs((prev.currentTime || 0) - (s.currentTime || 0)) < 0.05
+        && Math.abs((prev.duration || 0) - (s.duration || 0)) < 0.05
+        && prev.attId === s.attId
+      ) return prev;
+      return s;
+    });
+  }, []);
+
+  // Toggle play/pause for the currently-loaded audio attachment
+  const onToggleAudio = useCallback(() => {
+    // The AudioPlayerBar exposes toggle via a custom event hack — but the cleanest
+    // way is to use a ref. We don't have one, so we just no-op here: the inline
+    // play/pause on the bubble should toggle the global player. We implement that
+    // by setting the audioPlayer to itself (forcing re-eval) and flipping a flag.
+    // Simpler: dispatch a CustomEvent that AudioPlayerBar listens for.
+    window.dispatchEvent(new CustomEvent("messenger:audio-toggle"));
+  }, []);
+
+  // Seek the global player to a ratio (0..1) of the current duration
+  const onSeekAudio = useCallback((_att, ratio) => {
+    window.dispatchEvent(new CustomEvent("messenger:audio-seek", { detail: { ratio } }));
+  }, []);
 
   // Media gallery dialog
   const [galleryState, setGalleryState] = useState(null); // { startAttachment }
@@ -1061,11 +1096,15 @@ export default function MessengerApp() {
     try {
       const code = joinCode.trim().split("/").pop();
       const res = await apiRequest({ method: "POST", url: `${MSG_API}/join/${code}/` });
-      const conv = unwrapData(res);
+      // Backend returns {success, message, data: {joined, conversation: {...}}}
+      // unwrapData extracts .data, so we still have {joined, conversation}.
+      const payload = unwrapData(res);
+      const conv = payload?.conversation || (payload?.id ? payload : null);
       setJoinOpen(false); setJoinCode("");
       closePanel();
       await loadConversations({ silent: false });
-      if (conv) await openChat(conv);
+      if (conv?.id) await openChat(conv);
+      else flash("Joined — open the chat from the sidebar");
     } catch (e) {
       setError(e?.response?.data?.message || "Invalid invite");
     }
@@ -1357,8 +1396,25 @@ export default function MessengerApp() {
             />
           )}
 
+          {/* Group description banner — visible to non-admin members so they
+              see what the group is about without opening the info panel.
+              Admins see the editable description in the info panel instead. */}
+          {activeConv?.type === "group"
+            && activeConv.description
+            && role !== "owner" && role !== "admin"
+            && !dismissedGroupDesc.has(activeConv.id) && (
+            <GroupDescriptionBanner
+              description={activeConv.description}
+              onDismiss={() => setDismissedGroupDesc((s) => new Set(s).add(activeConv.id))}
+            />
+          )}
+
           {/* Top audio player bar (Telegram-style) */}
-          <AudioPlayerBar player={audioPlayer} onChange={setAudioPlayer} />
+          <AudioPlayerBar
+            player={audioPlayer}
+            onChange={setAudioPlayer}
+            onStateChange={onAudioStateChange}
+          />
 
           <Box
             ref={listRef} onScroll={onScrollMsgs}
@@ -1412,6 +1468,12 @@ export default function MessengerApp() {
                   onLoadUserProfile={loadUserProfile}
                   onJumpToMessage={onJumpToMessage}
                   onPlayAudio={(att) => setAudioPlayer({ att, title: att.original_filename || "Audio" })}
+                  onToggleAudio={onToggleAudio}
+                  onSeekAudio={onSeekAudio}
+                  activeAudioId={audioState.attId}
+                  audioIsPlaying={audioState.isPlaying}
+                  audioCurrentTime={audioState.currentTime}
+                  audioDuration={audioState.duration}
                   onMentionClick={loadUserProfileByUsername}
                 />
               </Box>
@@ -1556,6 +1618,7 @@ export default function MessengerApp() {
             onAddContact={addContact}
             onBlockUser={(uid) => setConfirmBlock({ user: { id: uid } })}
             onMessage={(u) => startDm(u)}
+            onViewProfile={(uid) => loadUserProfile(uid)}
             onOpenPhoto={(url) => openPreview({ url, original_filename: "photo", kind: "image", content_type: "image/jpeg" })}
             onDeleteChat={() => setConfirmDelete({ type: "chat", conv: activeConv })}
             onDeleteGroup={() => setConfirmDelete({ type: "group", conv: activeConv })}
@@ -1878,6 +1941,61 @@ function AddToContactsBanner({ username, onAdd }) {
         Add
       </Button>
       <IconButton size="small" onClick={() => setDismissed(true)}>
+        <CloseIcon fontSize="small" />
+      </IconButton>
+    </Box>
+  );
+}
+
+/**
+ * Group description banner — shown to non-admin members at the top of the chat
+ * so they can see what the group is about without opening the info panel.
+ * Dismissible per-conversation (parent tracks dismissed set).
+ */
+function GroupDescriptionBanner({ description, onDismiss }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = description.length > 140;
+  const display = expanded || !isLong ? description : `${description.slice(0, 140)}…`;
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 1.25,
+        px: 2,
+        py: 1,
+        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(33,150,243,0.10)" : "rgba(33,150,243,0.06)",
+        borderBottom: "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      <InfoOutlinedIcon fontSize="small" color="primary" sx={{ mt: 0.25 }} />
+      <Typography
+        variant="body2"
+        sx={{
+          flex: 1,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+          color: "text.primary",
+        }}
+      >
+        {display}
+        {isLong && (
+          <Box
+            component="span"
+            onClick={() => setExpanded((e) => !e)}
+            sx={{
+              color: "primary.main",
+              cursor: "pointer",
+              ml: 0.5,
+              fontWeight: 600,
+            }}
+          >
+            {expanded ? "Show less" : "Show more"}
+          </Box>
+        )}
+      </Typography>
+      <IconButton size="small" onClick={onDismiss} sx={{ mt: -0.25 }}>
         <CloseIcon fontSize="small" />
       </IconButton>
     </Box>

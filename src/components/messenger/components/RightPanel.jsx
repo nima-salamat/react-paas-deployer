@@ -24,6 +24,7 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
+import SendIcon from "@mui/icons-material/Send";
 import {
   convAvatar, convTitle, peerUser, myRole,
 } from "../messengerUtils";
@@ -64,7 +65,7 @@ export default function RightPanel({
   onOpenCreateGroup, onOpenJoin, onNavigateHome,
   onStartDm, onRemoveContact, onUnblock,
   onPatchGroup, onCreateInvite, onRevokeInvite,
-  onOpenAddMembers, onAddContact, onBlockUser, onMessage, onOpenPhoto,
+  onOpenAddMembers, onAddContact, onBlockUser, onMessage, onOpenPhoto, onViewProfile,
   onDeleteChat, onDeleteGroup, onCleanupChat,
   onRemoveMember, onChangeMemberRole, onTransferOwnership,
   onUploadGroupAvatar, onClearGroupAvatar,
@@ -346,10 +347,10 @@ export default function RightPanel({
     const isMe = String(tUser?.id) === String(meId);
     return (
       <>
-        <MenuItem onClick={() => { tUser?.id && onStartDm(tUser); setMemberCtx(null); closeMemberMenu(); }}>
+        <MenuItem onClick={() => { tUser?.id && onViewProfile(tUser.id); setMemberCtx(null); closeMemberMenu(); }}>
           <ListItemIcon><AccountCircleIcon fontSize="small" /></ListItemIcon> View profile
         </MenuItem>
-        <MenuItem onClick={() => { onMessage(tUser); setMemberCtx(null); closeMemberMenu(); }}>
+        <MenuItem onClick={() => { tUser?.id && onStartDm(tUser); setMemberCtx(null); closeMemberMenu(); }}>
           <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Message
         </MenuItem>
         {!isMe && isOwner && tRole !== "owner" && (
@@ -680,7 +681,8 @@ export default function RightPanel({
 
       {activeConv?.type === "private" && peer && (
         <Stack spacing={1} sx={{ px: 2, pb: 2 }}>
-          <Button variant="outlined" onClick={() => onMessage(peer)}>View profile</Button>
+          <Button variant="outlined" startIcon={<AccountCircleIcon />} onClick={() => onViewProfile(peer.id)}>View profile</Button>
+          <Button variant="outlined" startIcon={<SendIcon />} onClick={() => onMessage(peer)}>Send message</Button>
           <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={() => onAddContact(peer.id)}>Add contact</Button>
           <Button color="warning" variant="outlined" startIcon={<CleaningServicesIcon />} onClick={onCleanupChat}>
             Clear messages

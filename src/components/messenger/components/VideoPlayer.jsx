@@ -1,7 +1,9 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   Box, IconButton, Slider, Stack, Typography, Menu, MenuItem, Tooltip, alpha,
+  Dialog, Backdrop, Fade,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
@@ -13,22 +15,26 @@ import Forward10Icon from "@mui/icons-material/Forward10";
 import SpeedIcon from "@mui/icons-material/Speed";
 import DownloadIcon from "@mui/icons-material/Download";
 import PictureInPictureIcon from "@mui/icons-material/PictureInPicture";
+import CloseIcon from "@mui/icons-material/Close";
+import ExpandIcon from "@mui/icons-material/Expand";
 
 import { formatDuration, withTokenQuery } from "../messengerUtils";
 
 /**
- * Premium video player with custom controls (Telegram-style overlay).
+ * Premium video player with custom Telegram/iMessage-style overlay controls.
+ *
+ * Two rendering modes:
+ *  1. Inline (default) — rectangular video with overlay controls that auto-hide
+ *  2. Circular (video message) — small 220×220 circle in-chat; clicking opens
+ *     a Theater modal with a centered circular video on a darkened backdrop
  *
  * Features:
- *  - Play/pause, seek slider, time display
- *  - Skip ±10s
- *  - Volume control + mute
- *  - Playback speed (0.5×–2×) via menu
- *  - Fullscreen toggle
- *  - Picture-in-Picture support
- *  - Download button
- *  - Auto-hide controls after 3s of inactivity
- *  - Click on video to toggle play/pause
+ *  - Play/pause (center + bottom), seek slider, time display
+ *  - Skip ±10s, volume with mute, playback speed (0.25×–2×)
+ *  - Fullscreen, Picture-in-Picture, Download
+ *  - Auto-hide controls after 3s of inactivity (NO LONGER BROKEN — see fix below)
+ *  - Click on video toggles play/pause
+ *  - Theater mode for circular: full-screen dark backdrop + centered circle
  *
  * Props:
  *  - src: string (video URL)
@@ -37,6 +43,8 @@ import { formatDuration, withTokenQuery } from "../messengerUtils";
  *  - circular: boolean (default false) — Telegram-style circular video message
  *  - maxWidth: number (default 360)
  *  - maxHeight: number (default 360)
+ *  - autoPlay: boolean (default false)
+ *  - muted: boolean (default false)
  */
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
@@ -47,7 +55,10 @@ export default function VideoPlayer({
   circular = false,
   maxWidth = 360,
   maxHeight = 360,
+  autoPlay = false,
+  muted: mutedProp = false,
 }) {
+  const theme = useTheme();
   const videoRef = useRef(null);
   const containerRef = useRef(null);
   const hideTimerRef = useRef(null);
@@ -55,25 +66,36 @@ export default function VideoPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(mutedProp);
   const [speed, setSpeed] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [speedMenuAnchor, setSpeedMenuAnchor] = useState(null);
+  const [theaterOpen, setTheaterOpen] = useState(false);
+  const [buffered, setBuffered] = useState(0);
+
+  // The actual video element ref — points to whichever video is mounted.
+  // When theater is open, we render a second <video> in the modal; otherwise
+  // the inline one. To keep state in sync we mount only ONE at a time.
+  const inlineVideo = !theaterOpen;
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) v.play().catch(() => {});
-    else v.pause();
+    if (v.paused) {
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    } else {
+      v.pause();
+    }
   }, []);
 
-  const skip = (delta) => {
+  const skip = useCallback((delta) => {
     const v = videoRef.current;
     if (!v) return;
-    v.currentTime = Math.max(0, Math.min(duration, v.currentTime + delta));
+    v.currentTime = Math.max(0, Math.min(duration || v.duration, v.currentTime + delta));
     setCurrentTime(v.currentTime);
-  };
+  }, [duration]);
 
   const onSeek = (_, value) => {
     const v = videoRef.current;
@@ -82,12 +104,12 @@ export default function VideoPlayer({
     setCurrentTime(value);
   };
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     v.muted = !v.muted;
     setMuted(v.muted);
-  };
+  }, []);
 
   const onVolumeChange = (_, value) => {
     const v = videoRef.current;
@@ -110,13 +132,9 @@ export default function VideoPlayer({
     const el = containerRef.current;
     if (!el) return;
     if (!document.fullscreenElement) {
-      try {
-        await el.requestFullscreen();
-      } catch { /* */ }
+      try { await el.requestFullscreen(); } catch { /* */ }
     } else {
-      try {
-        await document.exitFullscreen();
-      } catch { /* */ }
+      try { await document.exitFullscreen(); } catch { /* */ }
     }
   };
 
@@ -137,165 +155,248 @@ export default function VideoPlayer({
     a.href = withTokenQuery(src);
     a.download = filename;
     a.target = "_blank";
+    a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
 
-  // Fullscreen change listener
+  // Fullscreen listener
   useEffect(() => {
     const onFs = () => setFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", onFs);
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
-  // Auto-hide controls
-  const pokeControls = useCallback(() => {
+  // ROBUST AUTO-HIDE: separate "user activity" from "timeupdate ticks".
+  // The previous version had `currentTime` in the deps, which re-armed the
+  // timer every 250ms — so controls never actually hid. Now we only re-arm
+  // on explicit user input (mousemove / touch / keypress) or when isPlaying
+  // changes.
+  const armHideTimer = useCallback(() => {
     setShowControls(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
-      if (isPlaying) setShowControls(false);
-    }, 3000);
-  }, [isPlaying]);
+      // Only hide if currently playing AND no menu open
+      if (videoRef.current && !videoRef.current.paused && !speedMenuAnchor) {
+        setShowControls(false);
+      }
+    }, 2800);
+  }, [speedMenuAnchor]);
 
+  // Re-arm on user activity OR play state change
   useEffect(() => {
-    pokeControls();
-  }, [pokeControls, isPlaying, currentTime]);
+    armHideTimer();
+  }, [armHideTimer, isPlaying, theaterOpen]);
 
-  // Cleanup
+  // Also re-arm on explicit interaction events
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onMove = () => armHideTimer();
+    const onKey = (e) => {
+      if (e.key === " " || e.key === "k") { e.preventDefault(); togglePlay(); }
+      else if (e.key === "ArrowLeft") skip(-10);
+      else if (e.key === "ArrowRight") skip(10);
+      else if (e.key === "m") toggleMute();
+      else if (e.key === "f") toggleFullscreen();
+      armHideTimer();
+    };
+    el.addEventListener("mousemove", onMove);
+    el.addEventListener("touchstart", onMove, { passive: true });
+    el.addEventListener("keydown", onKey);
+    return () => {
+      el.removeEventListener("mousemove", onMove);
+      el.removeEventListener("touchstart", onMove);
+      el.removeEventListener("keydown", onKey);
+    };
+  }, [armHideTimer, togglePlay, skip, toggleMute, toggleFullscreen]);
+
+  // Cleanup timer on unmount
   useEffect(() => () => {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
   }, []);
 
+  // Track buffered percentage for the seek bar
+  const onProgress = () => {
+    const v = videoRef.current;
+    if (!v || !v.buffered || !v.buffered.length) return;
+    try {
+      const last = v.buffered.length - 1;
+      setBuffered(v.buffered.end(last));
+    } catch { /* */ }
+  };
+
+  // When theater opens, focus the video for keyboard control
+  useEffect(() => {
+    if (theaterOpen && videoRef.current) {
+      videoRef.current.focus?.();
+      // Try to auto-play
+      const p = videoRef.current.play();
+      if (p && typeof p.catch === "function") p.catch(() => {});
+    }
+  }, [theaterOpen]);
+
+  // Open theater (for circular)
+  const openTheater = () => setTheaterOpen(true);
+  const closeTheater = () => {
+    if (videoRef.current) {
+      try { videoRef.current.pause(); } catch { /* */ }
+    }
+    setTheaterOpen(false);
+  };
+
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const containerSx = circular
-    ? { width: 220, height: 220, borderRadius: "50%", overflow: "hidden" }
-    : { width: "100%", maxWidth, maxHeight, borderRadius: 1.5, overflow: "hidden", aspectRatio: "auto" };
+  const bufferedPct = duration > 0 ? (buffered / duration) * 100 : 0;
 
-  return (
-    <Box
-      ref={containerRef}
-      onMouseMove={pokeControls}
-      onMouseLeave={() => isPlaying && setShowControls(false)}
-      sx={{
-        position: "relative",
-        bgcolor: "#000",
-        ...containerSx,
-        cursor: showControls ? "default" : "pointer",
+  // ---- RENDER: shared video element + controls ----
+  const renderVideo = (extraSx = {}) => (
+    <video
+      ref={videoRef}
+      src={withTokenQuery(src)}
+      poster={poster}
+      onClick={togglePlay}
+      onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime || 0)}
+      onLoadedMetadata={(e) => {
+        setDuration(e.currentTarget.duration || 0);
+        if (autoPlay) {
+          const p = e.currentTarget.play();
+          if (p && typeof p.catch === "function") p.catch(() => {});
+        }
       }}
-    >
-      <video
-        ref={videoRef}
-        src={withTokenQuery(src)}
-        poster={poster}
-        onClick={togglePlay}
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime || 0)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onEnded={() => setIsPlaying(false)}
-        onVolumeChange={(e) => { setVolume(e.currentTarget.volume); setMuted(e.currentTarget.muted); }}
-        playsInline
-        preload="metadata"
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: circular ? "cover" : "contain",
-          display: "block",
-        }}
-      />
+      onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
+      onPlay={() => setIsPlaying(true)}
+      onPause={() => setIsPlaying(false)}
+      onEnded={() => setIsPlaying(false)}
+      onVolumeChange={(e) => {
+        setVolume(e.currentTarget.volume);
+        setMuted(e.currentTarget.muted);
+      }}
+      onProgress={onProgress}
+      playsInline
+      preload="metadata"
+      muted={mutedProp}
+      tabIndex={0}
+      style={{
+        width: "100%",
+        height: "100%",
+        objectFit: circular ? "cover" : "contain",
+        display: "block",
+        ...extraSx,
+      }}
+    />
+  );
 
-      {/* Center play button (when paused) */}
-      {!isPlaying && (
-        <Box
-          onClick={togglePlay}
-          sx={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: "rgba(0,0,0,0.25)",
-            cursor: "pointer",
-          }}
-        >
-          <Box sx={{
-            bgcolor: "rgba(0,0,0,0.6)",
-            borderRadius: "50%",
-            width: 56, height: 56,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff",
-          }}>
-            <PlayArrowIcon sx={{ fontSize: 32 }} />
-          </Box>
-        </Box>
-      )}
-
-      {/* Bottom controls overlay */}
+  // ---- RENDER: shared bottom controls bar ----
+  const renderControls = (variant = "default") => {
+    const isLight = variant === "light";
+    const accentColor = "#fff";
+    return (
       <Box
         sx={{
           position: "absolute",
           left: 0, right: 0, bottom: 0,
-          background: "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)",
-          px: 1, py: 0.5,
+          background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.55) 55%, transparent 100%)",
+          px: 1.25, py: 0.75,
           opacity: showControls ? 1 : 0,
-          transition: "opacity 0.2s",
+          transition: "opacity 0.25s ease",
           pointerEvents: showControls ? "auto" : "none",
         }}
       >
-        {/* Progress bar with buffered indicator */}
-        <Box sx={{ position: "relative", mb: 0.5 }}>
-          <Slider
-            value={currentTime}
-            max={duration || 1}
-            min={0}
-            step={0.1}
-            onChange={onSeek}
-            size="small"
-            sx={{
-              color: "#1976d2",
-              height: 4,
-              "& .MuiSlider-thumb": { width: 12, height: 12, bgcolor: "#1976d2" },
-              "& .MuiSlider-rail": { bgcolor: "rgba(255,255,255,0.3)" },
-              "& .MuiSlider-track": { bgcolor: "#1976d2" },
-            }}
-          />
+        {/* Seek bar with buffered indicator */}
+        <Box sx={{ position: "relative", mb: 0.5, px: 0.5 }}>
+          <Box sx={{ position: "relative", height: 14, display: "flex", alignItems: "center" }}>
+            {/* Track */}
+            <Box sx={{
+              position: "absolute", left: 0, right: 0, height: 4,
+              bgcolor: "rgba(255,255,255,0.25)",
+              borderRadius: 2,
+              overflow: "hidden",
+            }}>
+              {/* Buffered */}
+              <Box sx={{
+                position: "absolute", left: 0, top: 0, bottom: 0,
+                width: `${bufferedPct}%`,
+                bgcolor: "rgba(255,255,255,0.4)",
+                transition: "width 0.2s linear",
+              }} />
+              {/* Played */}
+              <Box sx={{
+                position: "absolute", left: 0, top: 0, bottom: 0,
+                width: `${progress}%`,
+                bgcolor: "#1976d2",
+                transition: "width 0.05s linear",
+              }} />
+            </Box>
+            <Slider
+              value={currentTime}
+              max={duration || 1}
+              min={0}
+              step={0.1}
+              onChange={onSeek}
+              size="small"
+              sx={{
+                position: "relative",
+                zIndex: 2,
+                color: "transparent",
+                "& .MuiSlider-rail": { bgcolor: "transparent" },
+                "& .MuiSlider-track": { bgcolor: "transparent" },
+                "& .MuiSlider-thumb": {
+                  width: 14, height: 14,
+                  bgcolor: "#fff",
+                  border: "2px solid #1976d2",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+                  transition: "transform 0.15s",
+                  "&:hover": { transform: "scale(1.2)" },
+                },
+                "&:hover .MuiSlider-thumb": { transform: "scale(1.2)" },
+              }}
+            />
+          </Box>
         </Box>
-        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "#fff" }}>
-          <IconButton size="small" onClick={togglePlay} sx={{ color: "#fff" }}>
+
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: accentColor }}>
+          <IconButton size="small" onClick={togglePlay} sx={{ color: accentColor }}>
             {isPlaying ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
           </IconButton>
-          <IconButton size="small" onClick={() => skip(-10)} sx={{ color: "#fff" }}>
+          <IconButton size="small" onClick={() => skip(-10)} sx={{ color: accentColor }}>
             <Replay10Icon fontSize="small" />
           </IconButton>
-          <IconButton size="small" onClick={() => skip(10)} sx={{ color: "#fff" }}>
+          <IconButton size="small" onClick={() => skip(10)} sx={{ color: accentColor }}>
             <Forward10Icon fontSize="small" />
           </IconButton>
-          <Typography variant="caption" sx={{ fontVariantNumeric: "tabular-nums", minWidth: 80, color: "#fff", fontSize: 11 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              fontVariantNumeric: "tabular-nums",
+              minWidth: 76, color: accentColor, fontSize: 11,
+              fontWeight: 500,
+              ml: 0.5,
+            }}
+          >
             {formatDuration(currentTime)} / {formatDuration(duration)}
           </Typography>
           <Box sx={{ flex: 1 }} />
-          {/* Volume */}
-          <Box sx={{ display: "flex", alignItems: "center", "&:hover .vol-slider": { width: 60 } }}>
-            <IconButton size="small" onClick={toggleMute} sx={{ color: "#fff" }}>
+          {/* Volume — always visible (no hover-expand for mobile compat) */}
+          <Box sx={{ display: "flex", alignItems: "center", maxWidth: 110 }}>
+            <IconButton size="small" onClick={toggleMute} sx={{ color: accentColor }}>
               {muted || volume === 0 ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
             </IconButton>
             <Slider
-              className="vol-slider"
               size="small"
               min={0} max={1} step={0.05}
               value={muted ? 0 : volume}
               onChange={onVolumeChange}
               sx={{
-                width: 0, transition: "width 0.2s", color: "#fff",
+                width: 60, ml: 0.5, color: accentColor,
                 "& .MuiSlider-thumb": { width: 10, height: 10 },
+                "& .MuiSlider-rail": { bgcolor: "rgba(255,255,255,0.3)" },
               }}
             />
           </Box>
           {/* Speed */}
           <Tooltip title="Playback speed">
-            <IconButton size="small" onClick={(e) => setSpeedMenuAnchor(e.currentTarget)} sx={{ color: "#fff" }}>
+            <IconButton size="small" onClick={(e) => setSpeedMenuAnchor(e.currentTarget)} sx={{ color: accentColor }}>
               <SpeedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -315,27 +416,275 @@ export default function VideoPlayer({
           {/* PiP */}
           {"pictureInPictureEnabled" in document && (
             <Tooltip title="Picture in picture">
-              <IconButton size="small" onClick={togglePiP} sx={{ color: "#fff" }}>
+              <IconButton size="small" onClick={togglePiP} sx={{ color: accentColor }}>
                 <PictureInPictureIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
           {/* Download */}
           <Tooltip title="Download">
-            <IconButton size="small" onClick={onDownload} sx={{ color: "#fff" }}>
+            <IconButton size="small" onClick={onDownload} sx={{ color: accentColor }}>
               <DownloadIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          {/* Fullscreen */}
+          {/* Fullscreen — hidden in circular inline mode (theater handles it) */}
           {!circular && (
             <Tooltip title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
-              <IconButton size="small" onClick={toggleFullscreen} sx={{ color: "#fff" }}>
+              <IconButton size="small" onClick={toggleFullscreen} sx={{ color: accentColor }}>
                 {fullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
               </IconButton>
             </Tooltip>
           )}
         </Stack>
       </Box>
+    );
+  };
+
+  // ---- RENDER: center play button when paused ----
+  const renderCenterPlay = () => (
+    <Fade in={!isPlaying} timeout={200}>
+      <Box
+        onClick={togglePlay}
+        sx={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "rgba(0,0,0,0.35)",
+          cursor: "pointer",
+          transition: "background-color 0.2s",
+          "&:hover": { bgcolor: "rgba(0,0,0,0.45)" },
+        }}
+      >
+        <Box sx={{
+          bgcolor: "rgba(0,0,0,0.7)",
+          backdropFilter: "blur(8px)",
+          borderRadius: "50%",
+          width: 64, height: 64,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          border: "2px solid rgba(255,255,255,0.25)",
+        }}>
+          <PlayArrowIcon sx={{ fontSize: 36, ml: 0.5 }} />
+        </Box>
+      </Box>
+    </Fade>
+  );
+
+  // ---- RENDER: circular inline (in-chat video message) ----
+  if (circular) {
+    return (
+      <>
+        {/* In-chat: small 220×220 circle. Clicking opens theater. */}
+        <Box
+          sx={{
+            width: 220, height: 220,
+            position: "relative",
+            display: "inline-block",
+            borderRadius: "50%",
+            cursor: "pointer",
+            // The "black around it" — soft dark shadow ring
+            background: "#000",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4), 0 0 0 4px rgba(0,0,0,0.6)",
+          }}
+          onClick={openTheater}
+        >
+          <Box sx={{
+            width: "100%", height: "100%",
+            borderRadius: "50%",
+            overflow: "hidden",
+            position: "relative",
+            bgcolor: "#000",
+          }}>
+            {inlineVideo && renderVideo()}
+            {/* Always-visible play indicator (small) */}
+            <Box
+              onClick={(e) => { e.stopPropagation(); openTheater(); }}
+              sx={{
+                position: "absolute", inset: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                bgcolor: "rgba(0,0,0,0.25)",
+                "&:hover": { bgcolor: "rgba(0,0,0,0.4)" },
+                transition: "background-color 0.2s",
+              }}
+            >
+              <Box sx={{
+                bgcolor: "rgba(0,0,0,0.6)",
+                backdropFilter: "blur(6px)",
+                borderRadius: "50%",
+                width: 52, height: 52,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff",
+                border: "2px solid rgba(255,255,255,0.3)",
+              }}>
+                {isPlaying
+                  ? <PauseIcon sx={{ fontSize: 28 }} />
+                  : <PlayArrowIcon sx={{ fontSize: 28, ml: 0.5 }} />}
+              </Box>
+            </Box>
+            {/* Tiny expand icon (top-right) to signal "open" */}
+            <Box
+              onClick={(e) => { e.stopPropagation(); openTheater(); }}
+              sx={{
+                position: "absolute",
+                top: 8, right: 8,
+                bgcolor: "rgba(0,0,0,0.6)",
+                borderRadius: "50%",
+                width: 26, height: 26,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "rgba(255,255,255,0.85)",
+              }}
+            >
+              <ExpandIcon sx={{ fontSize: 16 }} />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* THEATER MODAL — full-screen dark backdrop + centered circle */}
+        <Dialog
+          open={theaterOpen}
+          onClose={closeTheater}
+          fullScreen
+          PaperProps={{
+            sx: {
+              bgcolor: "transparent",
+              boxShadow: "none",
+              overflow: "hidden",
+            },
+          }}
+          BackdropComponent={(props) => (
+            <Backdrop
+              {...props}
+              sx={{
+                bgcolor: "rgba(0,0,0,0.92)",
+                backdropFilter: "blur(4px)",
+              }}
+            />
+          )}
+          TransitionComponent={Fade}
+          transitionDuration={250}
+        >
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              p: 2,
+            }}
+          >
+            {/* Close button (top-right) */}
+            <IconButton
+              onClick={closeTheater}
+              sx={{
+                position: "absolute",
+                top: 16, right: 16,
+                color: "#fff",
+                bgcolor: "rgba(255,255,255,0.12)",
+                backdropFilter: "blur(8px)",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
+                width: 40, height: 40,
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+
+            {/* Centered circular video with dark ring around it */}
+            <Box
+              ref={containerRef}
+              onMouseMove={() => armHideTimer()}
+              onMouseLeave={() => {
+                if (isPlaying) setShowControls(false);
+              }}
+              sx={{
+                position: "relative",
+                width: { xs: 280, sm: 340, md: 400 },
+                height: { xs: 280, sm: 340, md: 400 },
+                borderRadius: "50%",
+                bgcolor: "#000",
+                boxShadow: "0 0 0 8px rgba(0,0,0,0.5), 0 0 80px rgba(0,0,0,0.9), 0 0 120px rgba(25, 118, 210, 0.2)",
+                overflow: "hidden",
+                cursor: showControls ? "default" : "pointer",
+              }}
+            >
+              {renderVideo()}
+              {/* Center play button when paused */}
+              {!isPlaying && (
+                <Box
+                  onClick={togglePlay}
+                  sx={{
+                    position: "absolute", inset: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    bgcolor: "rgba(0,0,0,0.4)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Box sx={{
+                    bgcolor: "rgba(0,0,0,0.7)",
+                    backdropFilter: "blur(8px)",
+                    borderRadius: "50%",
+                    width: 80, height: 80,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    color: "#fff",
+                    border: "2px solid rgba(255,255,255,0.3)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+                  }}>
+                    <PlayArrowIcon sx={{ fontSize: 44, ml: 0.5 }} />
+                  </Box>
+                </Box>
+              )}
+              {/* Bottom controls (circular-clipped to fit) */}
+              {renderControls("circular")}
+            </Box>
+
+            {/* Filename label below the circle */}
+            <Typography
+              variant="caption"
+              sx={{
+                mt: 3,
+                color: "rgba(255,255,255,0.7)",
+                fontSize: 12,
+                maxWidth: 400,
+                textAlign: "center",
+              }}
+            >
+              {filename}
+            </Typography>
+          </Box>
+        </Dialog>
+      </>
+    );
+  }
+
+  // ---- RENDER: rectangular inline player ----
+  const containerSx = {
+    width: "100%",
+    maxWidth,
+    maxHeight,
+    borderRadius: 2,
+    overflow: "hidden",
+    aspectRatio: "auto",
+  };
+
+  return (
+    <Box
+      ref={containerRef}
+      onMouseMove={() => armHideTimer()}
+      onMouseLeave={() => isPlaying && setShowControls(false)}
+      sx={{
+        position: "relative",
+        bgcolor: "#000",
+        ...containerSx,
+        cursor: showControls ? "default" : "pointer",
+      }}
+    >
+      {renderVideo()}
+      {renderCenterPlay()}
+      {renderControls()}
     </Box>
   );
 }

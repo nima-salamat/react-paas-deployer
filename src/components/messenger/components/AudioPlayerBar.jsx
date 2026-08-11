@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Box, Stack, Typography, IconButton, Slider, MenuItem, Select, FormControl, Tooltip, alpha,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import CloseIcon from "@mui/icons-material/Close";
+import StopIcon from "@mui/icons-material/Stop";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
@@ -18,26 +19,21 @@ import { formatDuration, withTokenQuery } from "../messengerUtils";
 
 /**
  * Premium audio player bar (Telegram-style). Renders a fixed bar at the top
- * of the chat pane when audioPlayer state is non-null.
+ * of the chat pane when `player` is non-null.
  *
- * Features:
- *  - Play/pause, seek slider, current time / duration display
- *  - Waveform-style visualization (canvas, computed from the audio buffer)
- *  - Playback speed control (0.5×–2×)
- *  - Volume control with mute toggle
- *  - Skip ±10 seconds
- *  - Loop toggle
- *  - Download button
- *  - Persists across chat switches (lives in MessengerApp, not MessageBubble)
+ * State is partially lifted to the parent via `onStateChange` so individual
+ * MessageBubble components can render an inline progress bar / play button
+ * for the currently-playing voice or audio message.
  *
  * Props:
  *  - player: { att, title } | null  — the currently-loaded audio attachment
  *  - onChange: (player) => void     — update parent state (e.g. to clear)
+ *  - onStateChange: ({ isPlaying, currentTime, duration, attId }) => void
  */
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const WAVE_BARS = 60;
 
-export default function AudioPlayerBar({ player, onChange }) {
+export default function AudioPlayerBar({ player, onChange, onStateChange }) {
   const audioRef = useRef(null);
   const waveCanvasRef = useRef(null);
   const waveDataRef = useRef(null);          // Float32Array of peak values
@@ -49,6 +45,17 @@ export default function AudioPlayerBar({ player, onChange }) {
   const [muted, setMuted] = useState(false);
   const [loop, setLoop] = useState(false);
   const [loadingWave, setLoadingWave] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  // Push state up to parent whenever it changes
+  useEffect(() => {
+    onStateChange?.({
+      isPlaying,
+      currentTime,
+      duration,
+      attId: player?.att?.id ?? null,
+    });
+  }, [isPlaying, currentTime, duration, player, onStateChange]);
 
   // Load new source when `player` changes
   useEffect(() => {
@@ -58,16 +65,33 @@ export default function AudioPlayerBar({ player, onChange }) {
       a.pause();
       a.removeAttribute("src");
       waveDataRef.current = null;
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      setErrorMsg("");
       return;
     }
     const nextSrc = withTokenQuery(player.att.url);
-    if (a.src !== nextSrc) {
+    // Always compare canonical (absolute) URLs to avoid unnecessary reloads
+    const currentSrc = a.currentSrc || a.src;
+    if (currentSrc !== nextSrc) {
       a.src = nextSrc;
       a.currentTime = 0;
       setCurrentTime(0);
+      setDuration(0);
+      setErrorMsg("");
       a.playbackRate = speed;
       a.volume = muted ? 0 : volume;
-      a.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      // Play — handle autoplay rejections gracefully
+      const p = a.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => setIsPlaying(true)).catch((err) => {
+          setIsPlaying(false);
+          if (err && err.name !== "AbortError") {
+            setErrorMsg("Click play to start audio");
+          }
+        });
+      }
       // Fetch the audio buffer to compute waveform
       loadWaveform(nextSrc);
     }
@@ -89,7 +113,6 @@ export default function AudioPlayerBar({ player, onChange }) {
       const ctx = new Ctx();
       const audioBuf = await ctx.decodeAudioData(buf);
       ctx.close();
-      // Downsample to WAVE_BARS peaks
       const channel = audioBuf.getChannelData(0);
       const block = Math.floor(channel.length / WAVE_BARS);
       const peaks = new Float32Array(WAVE_BARS);
@@ -104,7 +127,7 @@ export default function AudioPlayerBar({ player, onChange }) {
       waveDataRef.current = peaks;
       drawWaveform(currentTime);
     } catch (e) {
-      // Silent fail — waveform is a nice-to-have, not critical
+      // Silent — waveform is a nice-to-have
     } finally {
       setLoadingWave(false);
     }
@@ -134,30 +157,80 @@ export default function AudioPlayerBar({ player, onChange }) {
     }
   }, [duration]);
 
-  // Redraw waveform on time update
   useEffect(() => {
     drawWaveform(currentTime);
   }, [currentTime, drawWaveform]);
 
-  // Apply playback rate
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed;
   }, [speed]);
 
-  // Apply volume
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = muted ? 0 : volume;
   }, [volume, muted]);
 
+  // ---- ROBUST TOGGLE ----
+  // The previous version used `a.paused` which can lie when the play() promise
+  // is still pending. We track an explicit `pendingPlay` ref to avoid races.
+  const pendingPlayRef = useRef(false);
+
   const togglePlay = useCallback(() => {
     const a = audioRef.current;
-    if (!a) return;
+    if (!a || !player) return;
+    // If a play() call is in flight, ignore subsequent clicks until it resolves
+    if (pendingPlayRef.current) return;
     if (a.paused) {
-      a.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+      pendingPlayRef.current = true;
+      const p = a.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => {
+          pendingPlayRef.current = false;
+          setIsPlaying(true);
+        }).catch((err) => {
+          pendingPlayRef.current = false;
+          setIsPlaying(false);
+          if (err && err.name !== "AbortError") {
+            setErrorMsg("Playback blocked. Click again to retry.");
+          }
+        });
+      } else {
+        pendingPlayRef.current = false;
+        setIsPlaying(true);
+      }
     } else {
-      a.pause();
+      try { a.pause(); } catch { /* ignore */ }
       setIsPlaying(false);
     }
+  }, [player]);
+
+  // Listen for external toggle / seek requests (from inline bubble play button)
+  useEffect(() => {
+    if (!player) return;
+    const onToggle = () => togglePlay();
+    const onSeekEv = (e) => {
+      const a = audioRef.current;
+      const ratio = e?.detail?.ratio;
+      if (!a || typeof ratio !== "number" || !duration) return;
+      const t = Math.max(0, Math.min(1, ratio)) * duration;
+      a.currentTime = t;
+      setCurrentTime(t);
+    };
+    window.addEventListener("messenger:audio-toggle", onToggle);
+    window.addEventListener("messenger:audio-seek", onSeekEv);
+    return () => {
+      window.removeEventListener("messenger:audio-toggle", onToggle);
+      window.removeEventListener("messenger:audio-seek", onSeekEv);
+    };
+  }, [player, duration, togglePlay]);
+
+  // Stop button — reset to 0 and pause
+  const stopAll = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    try { a.pause(); } catch { /* ignore */ }
+    try { a.currentTime = 0; } catch { /* ignore */ }
+    setIsPlaying(false);
+    setCurrentTime(0);
   }, []);
 
   const onSeek = (_, value) => {
@@ -174,7 +247,7 @@ export default function AudioPlayerBar({ player, onChange }) {
     if (!a || !canvas || !duration) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const ratio = x / rect.width;
+    const ratio = Math.max(0, Math.min(1, x / rect.width));
     a.currentTime = ratio * duration;
     setCurrentTime(a.currentTime);
   };
@@ -188,11 +261,12 @@ export default function AudioPlayerBar({ player, onChange }) {
 
   const onClosePlayer = () => {
     const a = audioRef.current;
-    if (a) { a.pause(); a.removeAttribute("src"); }
+    if (a) { try { a.pause(); } catch { /* */ } a.removeAttribute("src"); }
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
     waveDataRef.current = null;
+    setErrorMsg("");
     onChange(null);
   };
 
@@ -209,7 +283,6 @@ export default function AudioPlayerBar({ player, onChange }) {
 
   const isVoice = player?.att?.kind === "voice" || (player?.att?.original_filename || "").startsWith("voice_");
 
-  // Canvas dimensions (responsive-ish)
   const waveW = 200;
   const waveH = 32;
 
@@ -238,27 +311,64 @@ export default function AudioPlayerBar({ player, onChange }) {
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
         onDurationChange={(e) => setDuration(e.currentTarget.duration || 0)}
         onEnded={() => {
-          if (!loop) setIsPlaying(false);
+          if (!loop) {
+            setIsPlaying(false);
+            try { audioRef.current.currentTime = 0; } catch { /* */ }
+            setCurrentTime(0);
+          }
         }}
         onPause={() => setIsPlaying(false)}
         onPlay={() => setIsPlaying(true)}
+        onError={() => {
+          setIsPlaying(false);
+          setErrorMsg("Could not load audio");
+        }}
         loop={loop}
         preload="metadata"
+        crossOrigin="anonymous"
       />
       <Stack direction="row" alignItems="center" spacing={0.75}>
-        {/* Play/pause + skip */}
+        {/* Skip back */}
         <Tooltip title="Back 10s">
-          <IconButton size="small" onClick={() => skip(-10)} disabled={!duration}>
-            <Replay10Icon fontSize="small" />
+          <span>
+            <IconButton size="small" onClick={() => skip(-10)} disabled={!duration}>
+              <Replay10Icon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        {/* Play/pause — prominent */}
+        <Tooltip title={isPlaying ? "Pause" : "Play"}>
+          <IconButton
+            onClick={togglePlay}
+            color="primary"
+            size="small"
+            sx={{
+              bgcolor: alpha("#1976d2", 0.15),
+              width: 36, height: 36,
+              "&:hover": { bgcolor: alpha("#1976d2", 0.28) },
+            }}
+          >
+            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
           </IconButton>
         </Tooltip>
-        <IconButton onClick={togglePlay} color="primary" size="small" sx={{ bgcolor: alpha("#1976d2", 0.1) }}>
-          {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-        </IconButton>
+
+        {/* Stop — reset to 0 */}
+        <Tooltip title="Stop">
+          <span>
+            <IconButton size="small" onClick={stopAll} disabled={!duration && !isPlaying}>
+              <StopIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        {/* Skip forward */}
         <Tooltip title="Forward 10s">
-          <IconButton size="small" onClick={() => skip(10)} disabled={!duration}>
-            <Forward10Icon fontSize="small" />
-          </IconButton>
+          <span>
+            <IconButton size="small" onClick={() => skip(10)} disabled={!duration}>
+              <Forward10Icon fontSize="small" />
+            </IconButton>
+          </span>
         </Tooltip>
 
         {/* Icon + title */}
@@ -349,6 +459,11 @@ export default function AudioPlayerBar({ player, onChange }) {
           <CloseIcon fontSize="small" />
         </IconButton>
       </Stack>
+      {errorMsg && (
+        <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.25, pl: 1 }}>
+          {errorMsg}
+        </Typography>
+      )}
     </Box>
   );
 }

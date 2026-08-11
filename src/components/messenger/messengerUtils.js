@@ -61,15 +61,27 @@ export function convTitle(c, meId) {
  * participants fallback uses a type-safe String comparison with a "" default.
  *
  * For groups: prefer avatar_url (absolute URL from backend) over the relative avatar path.
+ *
+ * IMPORTANT: group avatar URLs are now served by ProtectedMediaView, which
+ * requires JWT auth. <img> tags can't send Authorization headers, so we
+ * append ?token=<jwt> via withTokenQuery(). User avatars go through the
+ * same ProtectedMediaView path so they also need the token.
  */
 export function convAvatar(c, meId) {
   if (!c) return undefined;
-  if (c.type === "group") return c.avatar_url || c.avatar || undefined;
+  if (c.type === "group") {
+    const url = c.avatar_url || c.avatar;
+    return url ? withTokenQuery(url) : undefined;
+  }
   // Trust peer object even when avatar is null (privacy-restricted)
-  if (c.peer) return c.peer.avatar || undefined;
+  if (c.peer) {
+    const url = c.peer.avatar;
+    return url ? withTokenQuery(url) : undefined;
+  }
   const meStr = String(meId ?? "");
   const other = (c.participants || []).find((p) => String(p.user?.id) !== meStr);
-  return other?.user?.avatar || undefined;
+  const url = other?.user?.avatar;
+  return url ? withTokenQuery(url) : undefined;
 }
 
 /**
@@ -145,9 +157,24 @@ export function isVideoMessageAttachment(a) {
 
 /** Append the JWT as ?token=... to a URL — needed for <img src=...> since the
  *  browser cannot send Authorization headers with <img> requests.
- *  Backend AttachmentDownloadAPIView accepts ?token= as alternative auth. */
+ *  Backend AttachmentDownloadAPIView + ProtectedMediaView accept ?token= as
+ *  alternative auth.
+ *
+ *  SAFETY: only append to same-origin or relative URLs — never leak the JWT
+ *  to a third-party host. */
 export function withTokenQuery(url) {
   if (!url) return url;
+  // Don't add token to data: URLs or external URLs
+  if (url.startsWith("data:")) return url;
+  if (/^https?:\/\//i.test(url)) {
+    // Absolute URL — only add token if same-origin
+    try {
+      const u = new URL(url, window.location.origin);
+      if (u.origin !== window.location.origin) return url;
+    } catch {
+      return url;
+    }
+  }
   const token = localStorage.getItem("access");
   if (!token) return url;
   const sep = url.indexOf("?") === -1 ? "?" : "&";

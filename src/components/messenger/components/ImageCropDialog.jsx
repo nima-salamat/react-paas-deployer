@@ -12,7 +12,7 @@ import SendIcon from "@mui/icons-material/Send";
 import BrushIcon from "@mui/icons-material/Brush";
 import HighlightIcon from "@mui/icons-material/Highlight";
 import EditIcon from "@mui/icons-material/Edit";
-import EraserIcon from "@mui/icons-material/Erase";
+import EraserIcon from "@mui/icons-material/AutoFixOff";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import ClearIcon from "@mui/icons-material/Clear";

@@ -16,6 +16,7 @@ import NotificationsOffIcon from "@mui/icons-material/NotificationsOff";
 import PhoneIcon from "@mui/icons-material/Phone";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import MuteIcon from "@mui/icons-material/VolumeOff";
+import { withTokenQuery } from "../messengerUtils";
 
 /**
  * Read-only profile view for ANOTHER user (not me).
@@ -83,7 +84,7 @@ export default function ProfileView({
       <Box sx={{ textAlign: "center", mb: 2 }}>
         <Box sx={{ position: "relative", display: "inline-block" }}>
           <Avatar
-            src={profileData.avatar || (photos[0] && photos[0].url) || undefined}
+            src={withTokenQuery(profileData.avatar) || withTokenQuery(photos[0]?.url) || undefined}
             sx={{
               width: 110, height: 110, mx: "auto", mb: 1, fontSize: 40,
               cursor: photos.length ? "pointer" : "default",

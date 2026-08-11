@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem,
   alpha, Slider,
@@ -16,7 +16,9 @@ import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DoneIcon from "@mui/icons-material/Done";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import PauseIcon from "@mui/icons-material/Pause";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
+import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import {
   attachmentKind, formatTime, formatDuration, withTokenQuery, REACTIONS,
   parseMentions, isVoiceAttachment, isVideoMessageAttachment,
@@ -24,33 +26,164 @@ import {
 import VideoPlayer from "./VideoPlayer";
 
 /**
- * Single message bubble with attachments, reactions, read-receipt ticks,
- * @mention parsing, voice/video message rendering, and clickable reply preview.
+ * Deterministic pseudo-waveform — given an id, produce N peaks in [0..1].
+ * Looks like a real waveform but is cheap to compute (no audio decode).
+ */
+function pseudoWaveform(seedStr, bars = 36) {
+  // Simple seeded PRNG (mulberry32)
+  let seed = 0;
+  for (let i = 0; i < (seedStr || "").length; i++) {
+    seed = (seed * 31 + seedStr.charCodeAt(i)) | 0;
+  }
+  seed = Math.abs(seed) || 1;
+  const out = [];
+  for (let i = 0; i < bars; i++) {
+    seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    const rand = ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    // Bias toward middle, with a soft envelope so it looks like speech
+    const envelope = Math.sin((i / bars) * Math.PI) * 0.5 + 0.55;
+    out.push(0.25 + rand * 0.75 * envelope);
+  }
+  return out;
+}
+
+/**
+ * Inline voice / audio player rendered inside the message bubble.
+ * Shows: play/pause button, waveform (deterministic), progress fill,
+ * current time / duration. Clicking anywhere on the waveform seeks.
  *
  * Props:
- *  - m: message object (already shaped by serializer)
- *  - meId: current user id (raw)
- *  - activeConv: the active conversation (for group/peer detection)
- *  - onContextOpen: (event, message) => void
- *  - onReact: (msgId, emoji) => void
- *  - onReactAnchor: (event, message) => void  (open emoji picker)
- *  - onReply: (message) => void
- *  - onEdit: (message) => void
- *  - onDelete: (message) => void
- *  - onForward: (message) => void
- *  - onOpenPreview: (attachment) => void
- *  - onShowReaders: (message) => void
- *  - onCopyText: (text) => void
- *  - onLoadUserProfile: (userId) => void
- *  - onJumpToMessage: (msgId) => void   — scroll to replied message
- *  - onPlayAudio: (attachment) => void  — hand off to top player bar
- *  - onMentionClick: (username) => void — open that user's profile
+ *  - att: attachment
+ *  - mine: boolean — bubble direction
+ *  - active: boolean — this attachment is the one currently loaded in the player
+ *  - isPlaying: boolean — global player is currently playing
+ *  - currentTime, duration: from global player state (only meaningful if `active`)
+ *  - onPlay: (att) => void   — load + play this attachment in the global player
+ *  - onToggle: (att) => void — toggle play/pause for this attachment
+ *  - onSeek: (att, ratio) => void — seek the global player to ratio (0..1)
+ */
+function InlineAudioPlayer({
+  att, mine, active, isPlaying, currentTime, duration, onPlay, onToggle, onSeek,
+  variant = "voice",
+}) {
+  const theme = useTheme();
+  const peaks = useMemo(
+    () => pseudoWaveform(`${att.id || att.original_filename || ""}`, 32),
+    [att.id, att.original_filename]
+  );
+
+  // If this is the active message use the global player's duration, else use the attachment's reported duration
+  const dur = active ? duration : (att.duration || 0);
+  const cur = active ? currentTime : 0;
+  const progress = dur > 0 ? Math.min(1, cur / dur) : 0;
+  const playing = active && isPlaying;
+
+  // Use the waveform bars as a seekable progress surface
+  const onWaveClick = (e) => {
+    if (!active || !dur) {
+      onPlay?.(att);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    onSeek?.(att, ratio);
+  };
+
+  const accent = mine ? "#ffffff" : theme.palette.primary.main;
+  const trackBg = mine ? "rgba(255,255,255,0.25)" : alpha(theme.palette.primary.main, 0.18);
+  const playedBg = mine ? "rgba(255,255,255,0.95)" : theme.palette.primary.main;
+
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1}
+      onClick={(e) => { e.stopPropagation(); }}
+      sx={{
+        bgcolor: mine ? "rgba(0,0,0,0.18)" : "action.hover",
+        borderRadius: 3,
+        px: 1, py: 0.75,
+        minWidth: variant === "voice" ? 220 : 240,
+        maxWidth: 300,
+        "&:hover": { bgcolor: mine ? "rgba(0,0,0,0.25)" : "action.selected" },
+      }}
+    >
+      {/* Play / Pause */}
+      <IconButton
+        size="small"
+        onClick={() => (active ? onToggle?.(att) : onPlay?.(att))}
+        sx={{
+          bgcolor: accent,
+          color: mine ? theme.palette.primary.main : "#fff",
+          width: 32, height: 32,
+          "&:hover": { bgcolor: accent, opacity: 0.85 },
+        }}
+      >
+        {playing ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+      </IconButton>
+
+      {/* Waveform with progress overlay */}
+      <Box
+        onClick={onWaveClick}
+        sx={{
+          flex: 1,
+          minWidth: 80,
+          height: 28,
+          position: "relative",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: "1px",
+        }}
+      >
+        {peaks.map((p, i) => {
+          const filled = (i / peaks.length) <= progress;
+          return (
+            <Box
+              key={i}
+              sx={{
+                flex: 1,
+                height: `${Math.max(15, Math.min(100, p * 100))}%`,
+                bgcolor: filled ? playedBg : trackBg,
+                borderRadius: 0.5,
+                transition: "background-color 0.15s",
+              }}
+            />
+          );
+        })}
+      </Box>
+
+      {/* Time / duration */}
+      <Typography
+        variant="caption"
+        sx={{
+          fontVariantNumeric: "tabular-nums",
+          minWidth: 38,
+          fontSize: 11,
+          opacity: 0.85,
+          color: mine ? "inherit" : "text.secondary",
+        }}
+      >
+        {active && cur > 0 ? formatDuration(cur) : (dur ? formatDuration(dur) : "0:00")}
+      </Typography>
+    </Stack>
+  );
+}
+
+/**
+ * Single message bubble with attachments, reactions, read-receipt ticks,
+ * @mention parsing, voice/video message rendering, and clickable reply preview.
  */
 export default function MessageBubble({
   m, meId, activeConv,
   onContextOpen, onReact, onReactAnchor, onReply,
   onOpenPreview, onShowReaders, onLoadUserProfile,
-  onJumpToMessage, onPlayAudio, onMentionClick,
+  onJumpToMessage, onPlayAudio, onToggleAudio, onSeekAudio,
+  onMentionClick,
+  // Global audio player state — used to render inline progress on the active message
+  activeAudioId, audioIsPlaying, audioCurrentTime, audioDuration,
 }) {
   const theme = useTheme();
   if (m.type === "day") {
@@ -87,7 +220,6 @@ export default function MessageBubble({
     </Box>
   );
 
-  // Parse @mentions in body
   const bodySegments = parseMentions(bodyStr);
 
   return (
@@ -104,7 +236,7 @@ export default function MessageBubble({
       {!mine && (
         <Box sx={{ position: "relative", mr: 0.75, mt: 0.5, flexShrink: 0 }}>
           <Avatar
-            src={m.sender?.avatar || undefined}
+            src={withTokenQuery(m.sender?.avatar) || undefined}
             sx={{ width: 28, height: 28, cursor: "pointer" }}
             onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
           >
@@ -216,8 +348,9 @@ export default function MessageBubble({
           const url = withTokenQuery(a.url);
           const voice = isVoiceAttachment(a);
           const videoMsg = isVideoMessageAttachment(a);
+          const isActiveAudio = activeAudioId != null && String(activeAudioId) === String(a.id);
           return (
-            <Box key={a.id} sx={{ mt: 0.6, minWidth: (k === "audio" || voice) ? 220 : undefined }}>
+            <Box key={a.id} sx={{ mt: 0.6, minWidth: (k === "audio" || voice) ? 240 : undefined }}>
               {k === "image" ? (
                 <Box
                   component="img"
@@ -238,55 +371,48 @@ export default function MessageBubble({
                   }}
                 />
               ) : videoMsg ? (
-                /* Circular video message (Telegram-style) — uses premium VideoPlayer */
-                <Box sx={{
-                  width: 220, height: 220, borderRadius: "50%",
-                  border: `3px solid ${mine ? "rgba(255,255,255,0.3)" : alpha(theme.palette.primary.main, 0.3)}`,
-                  overflow: "hidden",
-                  display: "inline-block",
-                }}>
-                  <VideoPlayer src={url} filename={a.original_filename} circular />
-                </Box>
+                /* Circular video message — VideoPlayer handles its own
+                   circular styling + theater mode. The black ring around
+                   the circle is part of the player's design. */
+                <VideoPlayer src={url} filename={a.original_filename} circular />
               ) : k === "video" ? (
                 <VideoPlayer src={url} filename={a.original_filename} maxWidth={360} maxHeight={360} />
               ) : voice ? (
-                /* Voice message — custom UI delegates playback to the top audio bar */
-                <Box
-                  onClick={(e) => { e.stopPropagation(); onPlayAudio?.(a); }}
-                  sx={{
-                    bgcolor: mine ? "rgba(0,0,0,0.15)" : "action.hover",
-                    borderRadius: 3, px: 1.5, py: 1, minWidth: 200, maxWidth: 280,
-                    display: "flex", alignItems: "center", gap: 1, cursor: "pointer",
-                    "&:hover": { bgcolor: mine ? "rgba(0,0,0,0.22)" : "action.selected" },
-                  }}
-                >
-                  <PlayArrowIcon fontSize="small" />
-                  <GraphicEqIcon fontSize="small" sx={{ opacity: 0.7 }} />
-                  <Typography variant="caption" noWrap sx={{ flex: 1 }}>
-                    {a.duration ? formatDuration(a.duration) : "Voice message"}
-                  </Typography>
-                </Box>
+                /* Voice message — inline waveform + play button (also opens global player) */
+                <InlineAudioPlayer
+                  att={a}
+                  mine={mine}
+                  active={isActiveAudio}
+                  isPlaying={audioIsPlaying}
+                  currentTime={audioCurrentTime}
+                  duration={audioDuration}
+                  onPlay={onPlayAudio}
+                  onToggle={onToggleAudio}
+                  onSeek={onSeekAudio}
+                  variant="voice"
+                />
               ) : k === "audio" ? (
-                /* Regular audio file — also delegate to top player bar */
-                <Box
-                  onClick={(e) => { e.stopPropagation(); onPlayAudio?.(a); }}
-                  sx={{
-                    bgcolor: mine ? "rgba(0,0,0,0.15)" : "action.hover",
-                    borderRadius: 2, px: 1.25, py: 1, minWidth: 220, maxWidth: 300,
-                    display: "flex", alignItems: "center", gap: 1, cursor: "pointer",
-                    "&:hover": { bgcolor: mine ? "rgba(0,0,0,0.22)" : "action.selected" },
-                  }}
-                >
-                  <PlayArrowIcon fontSize="small" />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="caption" display="block" noWrap sx={{ opacity: 0.9 }}>
+                /* Regular audio file — inline player (music-style) */
+                <Stack direction="column" spacing={0.5} sx={{ mt: 0.25 }}>
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <MusicNoteIcon fontSize="small" sx={{ opacity: 0.85 }} />
+                    <Typography variant="caption" noWrap sx={{ opacity: 0.9, maxWidth: 220 }}>
                       {a.original_filename || "Audio"}
                     </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                      {a.duration ? formatDuration(a.duration) : "Tap to play"}
-                    </Typography>
-                  </Box>
-                </Box>
+                  </Stack>
+                  <InlineAudioPlayer
+                    att={a}
+                    mine={mine}
+                    active={isActiveAudio}
+                    isPlaying={audioIsPlaying}
+                    currentTime={audioCurrentTime}
+                    duration={audioDuration}
+                    onPlay={onPlayAudio}
+                    onToggle={onToggleAudio}
+                    onSeek={onSeekAudio}
+                    variant="audio"
+                  />
+                </Stack>
               ) : (
                 <Chip
                   icon={<VisibilityIcon />}
