@@ -391,7 +391,7 @@ export default function MessageBubble({
                     onSeek={onSeekAudio}
                     variant="voice"
                   />
-                  <Box component="audio" src={url} controls preload="metadata"
+                  <Box component="audio" src={url} controls preload="metadata" crossOrigin="anonymous"
                     sx={{ width: "100%", maxWidth: 300, height: 34, display: "block" }} />
                 </Stack>
               ) : k === "audio" ? (
@@ -415,7 +415,7 @@ export default function MessageBubble({
                     onSeek={onSeekAudio}
                     variant="audio"
                   />
-                  <Box component="audio" src={url} controls preload="metadata"
+                  <Box component="audio" src={url} controls preload="metadata" crossOrigin="anonymous"
                     sx={{ width: "100%", maxWidth: 300, height: 34, display: "block" }} />
                 </Stack>
               ) : (

@@ -122,6 +122,11 @@ function hasAccessToken() {
   }
 }
 
+/**
+ * Build a displayable absolute URL for a profile photo.
+ * Backend returns relative /media/images/... URLs protected by JWT.
+ * <img> cannot send Authorization headers, so we append ?token=<access>.
+ */
 export function resolveProfileImageUrl(profile) {
   if (!profile) return null;
   const candidates = [
@@ -135,21 +140,27 @@ export function resolveProfileImageUrl(profile) {
   for (const c of candidates) {
     if (typeof c === "string" && c.trim()) {
       let url = c.trim();
-      // Resolve relative URLs against the API host so <img src=...> works.
-      // The backend returns relative URLs like "/media/images/xxx.jpg" so the
-      // browser would otherwise try to load them from the frontend origin.
+      // Resolve relative URLs against the API host first
       if (url.startsWith("/")) {
         const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
         url = `${host}${url}`;
+      } else if (!/^https?:\/\//i.test(url) && import.meta.env.VITE_API_BASE) {
+        const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
+        url = `${host}/${url}`;
       }
-      // Profile photos are served by Django's ProtectedMediaView which
-      // requires a JWT (served via ?token=... since <img> can't send headers).
-      // Append the token for any /media/images/ URL we're about to render.
-      if (url.includes("/media/images/")) {
+
+      // Any /media/ path is JWT-protected (images, messenger, tickets)
+      if (/\/media\//i.test(url) || /\/api\/messenger\/attachments\//i.test(url)) {
         const token = localStorage.getItem("access");
         if (token) {
-          const sep = url.includes("?") ? "&" : "?";
-          url = `${url}${sep}token=${encodeURIComponent(token)}`;
+          try {
+            const u = new URL(url);
+            u.searchParams.set("token", token);
+            return u.toString();
+          } catch {
+            const sep = url.includes("?") ? "&" : "?";
+            return `${url}${sep}token=${encodeURIComponent(token)}`;
+          }
         }
       }
       return url;

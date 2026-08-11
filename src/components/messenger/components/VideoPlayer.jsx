@@ -148,20 +148,39 @@ export default function VideoPlayer({
   // ---- Update src when prop changes (e.g. theater opens, parent swaps video) ----
   useEffect(() => {
     const player = playerRef.current;
-    if (!player) return;
+    if (!player || !src) return;
     const nextSrc = withTokenQuery(src);
-    const currentSrc = player.src();
-    if (currentSrc !== nextSrc) {
+    // video.js player.src() may return a string or Tech object; normalize
+    let currentSrc = "";
+    try {
+      const s = player.currentSrc?.() || player.src();
+      currentSrc = typeof s === "string" ? s : (s?.src || "");
+    } catch { /* */ }
+    // Compare without token query noise for identity
+    const stripTok = (u) => {
+      try {
+        const x = new URL(u, window.location.origin);
+        x.searchParams.delete("token");
+        return x.toString();
+      } catch { return u; }
+    };
+    if (stripTok(currentSrc) !== stripTok(nextSrc)) {
       setErrorMsg("");
+      setLoading(true);
       setCurrentTime(0);
       setDuration(0);
       setBuffered(0);
-      player.src({ src: nextSrc, type: guessVideoType(src, contentType) });
-      if (poster) player.poster(poster);
-      else player.poster("");
-      if (autoPlay) {
-        const p = player.play();
-        if (p && typeof p.catch === "function") p.catch(() => {});
+      try {
+        player.src({ src: nextSrc, type: guessVideoType(src, contentType) });
+        if (poster) player.poster(poster);
+        else player.poster("");
+        if (autoPlay) {
+          const p = player.play();
+          if (p && typeof p.catch === "function") p.catch(() => {});
+        }
+      } catch (e) {
+        setErrorMsg("Could not load video");
+        setLoading(false);
       }
     }
   }, [src, poster, autoPlay, contentType]);
@@ -563,6 +582,7 @@ export default function VideoPlayer({
       ref={videoRef}
       playsInline
       preload="metadata"
+      crossOrigin="anonymous"
       style={{
         width: "100%",
         height: "100%",

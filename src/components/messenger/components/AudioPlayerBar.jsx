@@ -89,8 +89,11 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
       hideScrollbar: true,
       fillParent: true,
       minPxPerSec: 50,
-      // mediaControls: false — we use our own controls
-      backend: "MediaElement",  // use <audio> element so we can use crossOrigin
+      // MediaElement backend uses an <audio> element — works with Range + CORS
+      backend: "MediaElement",
+      mediaControls: false,
+      // Help cross-origin protected media (?token=) load without CORS decode errors
+      fetchParams: { mode: "cors", credentials: "omit" },
     });
     wsRef.current = ws;
 
@@ -138,14 +141,28 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
       try { ws.empty(); } catch { /* */ }
       return;
     }
-    const nextSrc = withTokenQuery(player.att.url);
+    const nextSrc = withTokenQuery(player.att?.url);
+    if (!nextSrc) {
+      setErrorMsg("No audio URL");
+      setLoadingWave(false);
+      return;
+    }
     setLoadingWave(true);
     setErrorMsg("");
     setCurrentTime(0);
     setDuration(0);
-    //wavesurfer v7 — load() accepts a URL or HTMLMediaElement
+    // wavesurfer v7 — load() accepts a URL or HTMLMediaElement
     try {
-      ws.load(nextSrc);
+      // Empty previous peaks so UI doesn't show stale waveform
+      try { ws.empty(); } catch { /* */ }
+      const loadPromise = ws.load(nextSrc);
+      if (loadPromise && typeof loadPromise.catch === "function") {
+        loadPromise.catch((err) => {
+          console.warn("WaveSurfer load failed", err);
+          setErrorMsg("Could not load audio");
+          setLoadingWave(false);
+        });
+      }
       if (player.autoPlay) {
         const playWhenReady = () => {
           const p = ws.play();
@@ -160,6 +177,7 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
         ws.once("ready", playWhenReady);
       }
     } catch (e) {
+      console.warn("WaveSurfer load exception", e);
       setErrorMsg("Could not load audio");
       setLoadingWave(false);
     }

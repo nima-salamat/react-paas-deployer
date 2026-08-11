@@ -25,6 +25,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import apiRequest from "../customHooks/apiRequest.jsx";
 import { MSG_API, unwrapData } from "./api";
 import ImageCropDialog from "./components/ImageCropDialog";
+import { withTokenQuery } from "./messengerUtils";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`.replace(/([^:]\/)\/+/g, "$1");
 
@@ -37,30 +38,9 @@ function resolveUrl(profile) {
     typeof profile.image === "string" ? profile.image : null,
     profile.image?.url,
   ].filter(Boolean);
-  let url = candidates[0] || null;
+  const url = candidates[0] || null;
   if (!url) return null;
-  if (url.startsWith("http")) {
-    // Already absolute — but still need ?token= for /media/images/ paths.
-    if (url.includes("/media/images/")) {
-      const token = localStorage.getItem("access");
-      if (token) {
-        const sep = url.includes("?") ? "&" : "?";
-        url = `${url}${sep}token=${encodeURIComponent(token)}`;
-      }
-    }
-    return url;
-  }
-  const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
-  url = url.startsWith("/") ? `${host}${url}` : `${host}/${url}`;
-  // Profile photos are JWT-protected — append ?token= for <img> tags.
-  if (url.includes("/media/images/")) {
-    const token = localStorage.getItem("access");
-    if (token) {
-      const sep = url.includes("?") ? "&" : "?";
-      url = `${url}${sep}token=${encodeURIComponent(token)}`;
-    }
-  }
-  return url;
+  return withTokenQuery(url);
 }
 
 export default function MessengerProfileEditor({ onClose }) {

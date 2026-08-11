@@ -164,42 +164,59 @@ export function isVideoMessageAttachment(a) {
  *  leak the JWT to a third-party host. The backend typically returns relative
  *  URLs like "/media/images/xxx.jpg" so we resolve them against VITE_API_BASE
  *  before comparing. */
+/**
+ * Attach JWT access token as ?token= so <img>/<audio>/<video> can load
+ * protected media (ProtectedMediaView + AttachmentDownloadAPIView).
+ *
+ * - Resolves relative paths against the API host (VITE_API_BASE)
+ * - Only attaches token for our API origin (never leaks JWT)
+ * - Replaces an existing token= so a refreshed access token is used
+ * - Safe for data: blob: and already-tokenized URLs
+ */
 export function withTokenQuery(url) {
-  if (!url) return url;
-  // Don't touch data: URLs
-  if (url.startsWith("data:")) return url;
+  if (!url || typeof url !== "string") return url;
+  if (url.startsWith("data:") || url.startsWith("blob:")) return url;
 
-  const token = localStorage.getItem("access");
-  if (!token) return url;
+  const rawBase = (import.meta.env.VITE_API_BASE || "").replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  if (!rawBase) {
+    // Misconfigured env — still try relative resolution on current origin
+    const token = localStorage.getItem("access");
+    if (!token) return url;
+    try {
+      const u = new URL(url, window.location.origin);
+      u.searchParams.set("token", token);
+      return u.toString();
+    } catch {
+      return url;
+    }
+  }
 
-  // Compute the API host once (e.g. https://api.echonode.website)
-  const apiHost = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
-
-  // Normalize the input URL to an absolute form for the origin check
+  const apiHost = `https://${rawBase}`;
   let abs = url;
   if (url.startsWith("/")) {
-    // Relative URL — resolve against the API host
     abs = `${apiHost}${url}`;
   } else if (!/^https?:\/\//i.test(url)) {
-    // No protocol — prepend API host
     abs = `${apiHost}/${url}`;
   }
 
-  // Parse and verify origin is the API host (don't leak JWT to third parties)
   try {
     const u = new URL(abs);
-    // Allow same-origin (frontend hosting media) OR the API host
-    if (u.origin !== window.location.origin && u.origin !== new URL(apiHost).origin) {
+    const apiOrigin = new URL(apiHost).origin;
+    // Only attach token for our API (or same origin if media is co-hosted)
+    if (u.origin !== apiOrigin && u.origin !== window.location.origin) {
       return url;
     }
-    if (u.searchParams.has("token")) return u.toString();
+    const token = localStorage.getItem("access");
+    if (!token) {
+      // Still return absolute API URL so the browser does not hit the SPA origin
+      return u.toString();
+    }
+    // Always refresh the token query param (handles rotated access tokens)
+    u.searchParams.set("token", token);
+    return u.toString();
   } catch {
     return url;
   }
-
-  // Append the token (preserve any existing query string)
-  const sep = abs.indexOf("?") === -1 ? "?" : "&";
-  return `${abs}${sep}token=${encodeURIComponent(token)}`;
 }
 
 export function mediaUrl(url) {
