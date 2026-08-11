@@ -1,159 +1,69 @@
 /**
- * Full-screen messenger — Telegram-like
+ * Messenger — Telegram-like full-screen UI
+ *
  * URL hash: #c/<conversationId> | #u/<username>  (survives reload)
  * Esc → leave chat to list (clears hash)
+ *
+ * Multi-module structure:
+ *   MessengerApp            — main shell + state orchestration
+ *   Sidebar                 — chat list + right-click menu + pin + 999+ unread
+ *   MessageBubble           — single message + attachments + read ticks + @mentions
+ *   MessageComposer         — text input + attach + reply/edit + voice/video record
+ *   ImageCropDialog         — preview + crop before sending images
+ *   ReadReceiptsDialog      — "Seen by" / unread list
+ *   RightPanel              — settings / contacts / blocks / info / profile
+ *   ProfileView             — read-only other-user profile (with photo gallery)
+ *   MessengerProfileEditor  — own profile photos + drag reorder + privacy
+ *   ConfirmDialog           — generic confirmation popup
+ *   ContextMenu             — reusable right-click menu (closes on outside click)
+ *   AudioPlayerBar          — top audio player bar (Telegram-style, cross-chat)
+ *   MediaGalleryDialog      — in-chat image gallery with < > navigation
  */
 import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Stack, Typography, IconButton, TextField, InputAdornment, Avatar,
-  List, ListItemButton, ListItemAvatar, ListItemText, Divider, CircularProgress,
-  MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Button,
-  Chip, Tooltip, Badge, Drawer, ListItemIcon, Switch, FormControlLabel,
-  Tabs, Tab, Fade, Paper, Popover, Select, FormControl,
-  useMediaQuery, alpha, Menu,
+  Box, Typography, IconButton, CircularProgress, Menu, MenuItem, ListItemIcon,
+  Stack, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
+  Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
+  ListItemText, Divider, Fade, Chip, Popover, useMediaQuery,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import SearchIcon from "@mui/icons-material/Search";
-import SendIcon from "@mui/icons-material/Send";
-import AttachFileIcon from "@mui/icons-material/AttachFile";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import MenuIcon from "@mui/icons-material/Menu";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import GroupAddIcon from "@mui/icons-material/GroupAdd";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import BlockIcon from "@mui/icons-material/Block";
-import ReplyIcon from "@mui/icons-material/Reply";
-import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
-import CloseIcon from "@mui/icons-material/Close";
-import PublicIcon from "@mui/icons-material/Public";
-import LinkIcon from "@mui/icons-material/Link";
-import MenuIcon from "@mui/icons-material/Menu";
-import SettingsIcon from "@mui/icons-material/Settings";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import ForwardIcon from "@mui/icons-material/Forward";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LogoutIcon from "@mui/icons-material/Logout";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import ContactsIcon from "@mui/icons-material/Contacts";
-import DoneAllIcon from "@mui/icons-material/DoneAll";
-import DoneIcon from "@mui/icons-material/Done";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import DownloadIcon from "@mui/icons-material/Download";
+import LinkIcon from "@mui/icons-material/Link";
+import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import DownloadIcon from "@mui/icons-material/Download";
+import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
+import CloseIcon from "@mui/icons-material/Close";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+
 import apiRequest from "../customHooks/apiRequest.jsx";
-import { MSG_API, unwrapData, unwrapList } from "./api";
-import MessengerProfileEditor from "./MessengerProfileEditor.jsx";
-
-const API_HOST = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
-const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉", "🤔", "👎"];
-const PAGE_SIZE = 30;
-
-function useAuthUserId() {
-  try {
-    const t = localStorage.getItem("access");
-    if (!t) return null;
-    const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return payload.user_id ?? payload.user ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function formatTime(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-}
-
-function formatDay(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const today = new Date();
-  const yday = new Date();
-  yday.setDate(today.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return "Today";
-  if (d.toDateString() === yday.toDateString()) return "Yesterday";
-  return d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
-}
-
-function convTitle(c, meId) {
-  if (!c) return "";
-  if (c.type === "group") return c.title || "Group";
-  if (c.peer) return c.peer.username || "User";
-  const other = (c.participants || []).find((p) => p.user?.id !== meId);
-  return other?.user?.username || "Chat";
-}
-
-function convAvatar(c, meId) {
-  if (!c) return undefined;
-  if (c.type === "group") return c.avatar || undefined;
-  if (c.peer?.avatar) return c.peer.avatar;
-  const other = (c.participants || []).find((p) => p.user?.id !== meId);
-  return other?.user?.avatar;
-}
-
-function peerUser(c, meId) {
-  if (!c || c.type === "group") return null;
-  if (c.peer) return c.peer;
-  const other = (c.participants || []).find((p) => p.user?.id !== meId);
-  return other?.user || null;
-}
-
-function myRole(c, meId) {
-  const p = (c?.participants || []).find((x) => String(x.user?.id) === String(meId));
-  return p?.role || "member";
-}
-
-async function copyText(t) {
-  try {
-    await navigator.clipboard.writeText(t || "");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function parseHash() {
-  const h = (window.location.hash || "").replace(/^#/, "");
-  if (h.startsWith("c/")) return { type: "c", value: h.slice(2) };
-  if (h.startsWith("u/")) return { type: "u", value: decodeURIComponent(h.slice(2)) };
-  return null;
-}
-
-function setHash(type, value) {
-  if (!type || value == null || value === "") {
-    const { pathname, search } = window.location;
-    window.history.replaceState(null, "", pathname + search);
-    return;
-  }
-  const hash = type === "u" ? `#u/${encodeURIComponent(value)}` : `#c/${value}`;
-  const { pathname, search } = window.location;
-  window.history.replaceState(null, "", pathname + search + hash);
-}
-
-function attachmentKind(a) {
-  const kind = (a?.kind || "").toLowerCase();
-  const ct = (a?.content_type || "").toLowerCase();
-  const name = (a?.original_filename || "").toLowerCase();
-  if (kind === "image" || kind === "gif" || ct.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/.test(name)) return "image";
-  if (kind === "video" || ct.startsWith("video/") || /\.(mp4|webm|mov|mkv)$/.test(name)) return "video";
-  if (kind === "audio" || kind === "voice" || ct.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|opus)$/.test(name)) return "audio";
-  if (ct === "application/pdf" || name.endsWith(".pdf")) return "pdf";
-  if (ct.startsWith("text/") || /\.(txt|md|csv|log|json)$/.test(name)) return "text";
-  return "file";
-}
-
-/* ================================================================== */
+import { MSG_API, WS_URL, unwrapData, unwrapList, authHeaders } from "./api";
+import {
+  useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
+  copyText, parseHash, setHash, attachmentKind, withTokenQuery, REACTIONS, PAGE_SIZE,
+} from "./messengerUtils";
+import Sidebar from "./components/Sidebar";
+import MessageBubble, { MessageContextMenuItems } from "./components/MessageBubble";
+import MessageComposer from "./components/MessageComposer";
+import ImageCropDialog from "./components/ImageCropDialog";
+import ReadReceiptsDialog from "./components/ReadReceiptsDialog";
+import RightPanel from "./components/RightPanel";
+import MessengerProfileEditor from "./MessengerProfileEditor";
+import ConfirmDialog from "./components/ConfirmDialog";
+import ContextMenu from "./components/ContextMenu";
+import AudioPlayerBar from "./components/AudioPlayerBar";
+import MediaGalleryDialog from "./components/MediaGalleryDialog";
 
 export default function MessengerApp() {
   const theme = useTheme();
@@ -161,10 +71,15 @@ export default function MessengerApp() {
   const navigate = useNavigate();
   const meId = useAuthUserId();
 
+  // Layout
   const [drawerOpen, setDrawerOpen] = useState(true);
-  const [rightPanel, setRightPanel] = useState(null);
+  // Panel history stack — supports back-button navigation inside the modal
+  // Each entry: "settings" | "contacts" | "blocks" | "info" | "profile" | "my-profile"
+  const [panelHistory, setPanelHistory] = useState([]);
+  const rightPanel = panelHistory.length ? panelHistory[panelHistory.length - 1] : null;
   const [mobileShowChat, setMobileShowChat] = useState(false);
 
+  // Conversations & messages
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const [activeDetail, setActiveDetail] = useState(null);
@@ -175,56 +90,82 @@ export default function MessengerApp() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  // Composer state
   const [text, setText] = useState("");
   const [files, setFiles] = useState([]);
   const [replyTo, setReplyTo] = useState(null);
   const [editingMsg, setEditingMsg] = useState(null);
 
+  // Search
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [listTab, setListTab] = useState(0);
 
-  // custom context menu: { x, y, message }
-  const [ctx, setCtx] = useState(null);
+  // Context menus + popovers
+  const [ctx, setCtx] = useState(null);            // message right-click { x, y, message }
   const [reactAnchor, setReactAnchor] = useState(null);
   const [headerMenu, setHeaderMenu] = useState(null);
+
+  // Dialogs
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [groupPublic, setGroupPublic] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(null);
   const [joinCode, setJoinCode] = useState("");
   const [joinOpen, setJoinOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [addMemberSelected, setAddMemberSelected] = useState([]);
+
+  // Image crop
+  const [cropFile, setCropFile] = useState(null);
+
+  // Read receipts
+  const [readersMessage, setReadersMessage] = useState(null);
+
+  // Profile / contacts / blocks / invites
   const [profileData, setProfileData] = useState(null);
-  const [privacyScope, setPrivacyScope] = useState("everyone");
   const [contacts, setContacts] = useState([]);
   const [blocks, setBlocks] = useState([]);
   const [inviteLinks, setInviteLinks] = useState([]);
   const [publicGroups, setPublicGroups] = useState([]);
+
+  // Misc
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
-  const [preview, setPreview] = useState(null); // { att, textContent? }
-  const [confirmDelete, setConfirmDelete] = useState(null); // 'chat' | 'group'
-  const [addMemberOpen, setAddMemberOpen] = useState(false);
-  const [addMemberSelected, setAddMemberSelected] = useState([]);
+  const [preview, setPreview] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // { type: 'chat' | 'group', conv }
+  const [confirmBlock, setConfirmBlock] = useState(null);   // { user }
+  const [confirmLeave, setConfirmLeave] = useState(null);   // { conv }
+  const [confirmCleanup, setConfirmCleanup] = useState(null); // { conv }
   const [hashReady, setHashReady] = useState(false);
 
+  // Audio player bar — persists across chat switches
+  const [audioPlayer, setAudioPlayer] = useState(null); // { att, title }
+
+  // Media gallery dialog
+  const [galleryState, setGalleryState] = useState(null); // { startAttachment }
+
+  // Online presence — set of user IDs currently online (updated via WebSocket)
+  const [onlineUsers, setOnlineUsers] = useState(() => new Set());
+
+  // Reply-jump highlight
+  const [jumpHighlightId, setJumpHighlightId] = useState(null);
+
+  // Refs
   const bottomRef = useRef(null);
   const listRef = useRef(null);
   const wsRef = useRef(null);
-  const fileRef = useRef(null);
   const inputRef = useRef(null);
   const searchTimer = useRef(null);
   const activeIdRef = useRef(null);
   const bootstrapped = useRef(false);
 
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
-
   useEffect(() => {
     if (!isMobile) setDrawerOpen(true);
   }, [isMobile]);
@@ -234,12 +175,28 @@ export default function MessengerApp() {
     setTimeout(() => setToast(""), 2200);
   };
 
+  /* -------------------- panel navigation -------------------- */
+
+  const pushPanel = useCallback((kind) => {
+    setPanelHistory((prev) => [...prev, kind]);
+  }, []);
+  const popPanel = useCallback(() => {
+    setPanelHistory((prev) => (prev.length > 1 ? prev.slice(0, -1) : []));
+  }, []);
+  const closePanel = useCallback(() => setPanelHistory([]), []);
+
   /* -------------------- loaders -------------------- */
 
-  const loadConversations = useCallback(async () => {
-    setLoadingConvs(true);
+  const loadConversations = useCallback(async ({ silent = false } = {}) => {
+    // Only show the spinner on the very first load — background refreshes
+    // (WebSocket-driven) must NOT toggle loadingConvs, otherwise the chat
+    // list flickers with a spinner every few seconds.
+    if (!silent) setLoadingConvs(true);
     try {
-      const res = await apiRequest({ method: "GET", url: `${MSG_API}/conversations/?page_size=50` });
+      const res = await apiRequest({
+        method: "GET",
+        url: `${MSG_API}/conversations/?page_size=50${localStorage.getItem("access") ? `&token=${encodeURIComponent(localStorage.getItem("access"))}` : ""}`,
+      });
       const data = unwrapData(res);
       setConversations(data?.results || []);
       return data?.results || [];
@@ -247,7 +204,7 @@ export default function MessengerApp() {
       setError(e?.response?.data?.message || "Failed to load chats");
       return [];
     } finally {
-      setLoadingConvs(false);
+      if (!silent) setLoadingConvs(false);
     }
   }, []);
 
@@ -263,14 +220,14 @@ export default function MessengerApp() {
     }
   }, []);
 
-  const loadMessages = useCallback(async (cid, { silent = false, reset = true } = {}) => {
+  const loadMessages = useCallback(async (cid, { silent = false } = {}) => {
     if (!cid) return;
     if (!silent) setLoadingMsgs(true);
     try {
-      const res = await apiRequest({
-        method: "GET",
-        url: `${MSG_API}/conversations/${cid}/messages/?limit=${PAGE_SIZE}`,
-      });
+      const token = localStorage.getItem("access") || "";
+      const url = `${MSG_API}/conversations/${cid}/messages/?limit=${PAGE_SIZE}`
+        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const items = data?.results || [];
       setMessages(items);
@@ -297,10 +254,10 @@ export default function MessengerApp() {
     const prevH = el?.scrollHeight || 0;
     const prevTop = el?.scrollTop || 0;
     try {
-      const res = await apiRequest({
-        method: "GET",
-        url: `${MSG_API}/conversations/${activeIdRef.current}/messages/?limit=${PAGE_SIZE}&before_id=${nextBefore}`,
-      });
+      const token = localStorage.getItem("access") || "";
+      const url = `${MSG_API}/conversations/${activeIdRef.current}/messages/?limit=${PAGE_SIZE}&before_id=${nextBefore}`
+        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const older = data?.results || [];
       if (!older.length) {
@@ -334,11 +291,11 @@ export default function MessengerApp() {
     setReplyTo(null);
     setEditingMsg(null);
     setText("");
-    setRightPanel(null);
+    closePanel();
     setHashReady(true);
     setHash(null);
     if (isMobile) setDrawerOpen(true);
-  }, [isMobile]);
+  }, [isMobile, closePanel]);
 
   const openChat = useCallback(async (c, { hashUser } = {}) => {
     if (!c?.id) return;
@@ -352,10 +309,7 @@ export default function MessengerApp() {
     if (hashUser) setHash("u", hashUser);
     else if (c.type === "private" && c.peer?.username) setHash("u", c.peer.username);
     else setHash("c", c.id);
-    await Promise.all([
-      loadMessages(c.id),
-      loadConversationDetail(c.id),
-    ]);
+    await Promise.all([loadMessages(c.id), loadConversationDetail(c.id)]);
   }, [isMobile, loadMessages, loadConversationDetail]);
 
   /* bootstrap + hash restore */
@@ -366,10 +320,7 @@ export default function MessengerApp() {
       if (cancelled || bootstrapped.current) return;
       bootstrapped.current = true;
       const h = parseHash();
-      if (!h) {
-        setHashReady(true);
-        return;
-      }
+      if (!h) { setHashReady(true); return; }
       if (h.type === "c") {
         const found = list.find((x) => String(x.id) === String(h.value));
         if (found) await openChat(found);
@@ -390,24 +341,21 @@ export default function MessengerApp() {
         if (byPeer) {
           await openChat(byPeer, { hashUser: h.value });
         } else {
+          // For #u/<username> with no existing chat, OPEN THE PROFILE (no DM creation)
+          // — matches "clicking search result opens profile, not DM"
           try {
             const res = await apiRequest({
               method: "GET",
-              url: `${MSG_API}/users/search/?q=${encodeURIComponent(h.value)}`,
+              url: `${MSG_API}/users/by-username/?username=${encodeURIComponent(h.value)}`,
             });
-            const users = unwrapList(res);
-            const user = users.find((u) => u.username?.toLowerCase() === h.value.toLowerCase()) || users[0];
-            if (user) {
-              const cr = await apiRequest({
-                method: "POST",
-                url: `${MSG_API}/conversations/`,
-                data: { type: "private", user_id: user.id },
-              });
-              const conv = unwrapData(cr);
-              await loadConversations();
-              if (conv) await openChat(conv, { hashUser: user.username });
+            const data = unwrapData(res);
+            if (data) {
+              setProfileData(data);
+              pushPanel("profile");
             }
-          } catch { /* */ }
+          } catch {
+            // User not found — silently ignore
+          }
         }
       }
       setHashReady(true);
@@ -419,17 +367,54 @@ export default function MessengerApp() {
   useEffect(() => {
     const token = localStorage.getItem("access");
     if (!token) return undefined;
-    const host = API_HOST.replace(/^https/, "wss").replace(/^http/, "ws");
-    const ws = new WebSocket(`${host}/ws/messenger/?token=${token}`);
+    const ws = new WebSocket(`${WS_URL}?token=${token}`);
     wsRef.current = ws;
     ws.onmessage = (ev) => {
       let data;
       try { data = JSON.parse(ev.data); } catch { return; }
-      if (data.type === "message.new" || data.type === "message.edited" || data.type === "message.reaction") {
+      if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
+        // IMPORTANT: the backend only sends the event to participants of the
+        // conversation — so non-members never receive this. The reload here
+        // is safe and only refreshes this user's own chat list (no spinner
+        // because we pass silent:true).
         if (String(data.conversation_id) === String(activeIdRef.current)) {
           loadMessages(activeIdRef.current, { silent: true });
         }
-        loadConversations();
+        loadConversations({ silent: true });
+      }
+      // Presence updates — toggle user's online status
+      if (data.type === "presence.update" && data.user_id != null) {
+        setOnlineUsers((prev) => {
+          const next = new Set(prev);
+          if (data.online) next.add(Number(data.user_id));
+          else next.delete(Number(data.user_id));
+          return next;
+        });
+        // Reload conversations so the chat list updates the online dot — silent
+        loadConversations({ silent: true });
+      }
+      // Member changes — reload conversation detail + messages
+      if ([
+        "member.left", "member.removed", "member.role_changed",
+        "ownership.transferred", "conversation.deleted",
+      ].includes(data.type)) {
+        // If the current user was removed from the group, redirect them out
+        if (
+          (data.type === "member.removed" || data.type === "conversation.deleted")
+          && String(data.user_id) === String(meId)
+        ) {
+          flash(data.type === "conversation.deleted"
+            ? "The group was deleted"
+            : "You were removed from the group");
+          closeChat();
+          loadConversations({ silent: false });
+          return;
+        }
+        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
+          loadConversationDetail(data.conversation_id);
+          loadMessages(data.conversation_id, { silent: true });
+        }
+        loadConversations({ silent: true });
       }
     };
     const ping = setInterval(() => {
@@ -441,29 +426,29 @@ export default function MessengerApp() {
     };
   }, [loadConversations, loadMessages]);
 
-  /* Esc global */
+  /* Esc global — closes dialogs/panels in priority order */
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
       if (preview) { setPreview(null); return; }
+      if (galleryState) { setGalleryState(null); return; }
+      if (readersMessage) { setReadersMessage(null); return; }
+      if (cropFile) { setCropFile(null); return; }
       if (ctx) { setCtx(null); return; }
       if (reactAnchor) { setReactAnchor(null); return; }
       if (editingMsg) { setEditingMsg(null); setText(""); return; }
       if (replyTo) { setReplyTo(null); return; }
-      if (rightPanel) { setRightPanel(null); return; }
+      if (panelHistory.length) { popPanel(); return; }
       if (activeId) { closeChat(); return; }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [preview, ctx, reactAnchor, editingMsg, replyTo, rightPanel, activeId, closeChat]);
+  }, [preview, galleryState, readersMessage, cropFile, ctx, reactAnchor, editingMsg, replyTo, panelHistory, activeId, closeChat, popPanel]);
 
   /* search users */
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!searchQ.trim()) {
-      setSearchResults([]);
-      return undefined;
-    }
+    if (!searchQ.trim()) { setSearchResults([]); return undefined; }
     searchTimer.current = setTimeout(async () => {
       setSearching(true);
       try {
@@ -472,27 +457,23 @@ export default function MessengerApp() {
           url: `${MSG_API}/users/search/?q=${encodeURIComponent(searchQ.trim())}&page_size=30`,
         });
         setSearchResults(unwrapList(res));
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
+      } catch { setSearchResults([]); } finally { setSearching(false); }
     }, 280);
     return () => clearTimeout(searchTimer.current);
   }, [searchQ]);
 
   /* -------------------- actions -------------------- */
 
+  // startDm is only called when the user explicitly picks "Message" — NOT on search-result click
   const startDm = async (user) => {
     try {
       const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/`,
+        method: "POST", url: `${MSG_API}/conversations/`,
         data: { type: "private", user_id: user.id },
       });
       const conv = unwrapData(res);
-      setSearchQ("");
-      setSearchResults([]);
+      setSearchQ(""); setSearchResults([]);
+      closePanel();
       await loadConversations();
       if (conv) await openChat(conv, { hashUser: user.username });
     } catch (e) {
@@ -504,14 +485,12 @@ export default function MessengerApp() {
     if (!groupTitle.trim()) return;
     try {
       const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/`,
+        method: "POST", url: `${MSG_API}/conversations/`,
         data: { type: "group", title: groupTitle.trim(), is_public: groupPublic },
       });
       const conv = unwrapData(res);
-      setCreateGroupOpen(false);
-      setGroupTitle("");
-      setGroupPublic(false);
+      setCreateGroupOpen(false); setGroupTitle(""); setGroupPublic(false);
+      closePanel();
       await loadConversations();
       if (conv) await openChat(conv);
     } catch (e) {
@@ -526,14 +505,12 @@ export default function MessengerApp() {
       if (!body) return;
       try {
         const res = await apiRequest({
-          method: "PATCH",
-          url: `${MSG_API}/messages/${editingMsg.id}/edit/`,
+          method: "PATCH", url: `${MSG_API}/messages/${editingMsg.id}/edit/`,
           data: { body },
         });
         const updated = unwrapData(res);
         setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)));
-        setEditingMsg(null);
-        setText("");
+        setEditingMsg(null); setText("");
         flash("Edited");
       } catch (e) {
         setError(e?.response?.data?.message || "Edit failed");
@@ -545,21 +522,18 @@ export default function MessengerApp() {
     form.append("body", body);
     if (replyTo) form.append("reply_to", replyTo.id);
     files.forEach((f) => form.append("files", f));
-    setText("");
-    setFiles([]);
-    const rep = replyTo;
-    setReplyTo(null);
+    setText(""); setFiles([]);
+    const rep = replyTo; setReplyTo(null);
     try {
       const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/${activeId}/messages/`,
+        method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`,
         data: form,
       });
       const created = unwrapData(res);
       if (created) {
         setMessages((prev) => [...prev, created]);
         setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
-        loadConversations();
+        loadConversations({ silent: true });
       }
     } catch (e) {
       if (rep) setReplyTo(rep);
@@ -577,17 +551,13 @@ export default function MessengerApp() {
 
   const onComposerKeyDown = (e) => {
     if (e.key === "ArrowUp" && !text.trim() && !editingMsg) {
-      const lastMine = [...messages].reverse().find((m) => String(m.sender?.id) === String(meId) && !m.is_deleted);
-      if (lastMine) {
-        e.preventDefault();
-        startEdit(lastMine);
-      }
+      const lastMine = [...messages].reverse().find(
+        (m) => String(m.sender?.id) === String(meId) && !m.is_deleted
+      );
+      if (lastMine) { e.preventDefault(); startEdit(lastMine); }
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendOrEdit();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendOrEdit(); }
   };
 
   const react = async (msgId, emoji) => {
@@ -595,8 +565,7 @@ export default function MessengerApp() {
       await apiRequest({ method: "POST", url: `${MSG_API}/messages/${msgId}/react/`, data: { emoji } });
       loadMessages(activeId, { silent: true });
     } catch { /* */ }
-    setReactAnchor(null);
-    setCtx(null);
+    setReactAnchor(null); setCtx(null);
   };
 
   const deleteMsg = async (m) => {
@@ -614,14 +583,13 @@ export default function MessengerApp() {
     if (!forwardOpen) return;
     try {
       await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/messages/${forwardOpen.id}/forward/`,
+        method: "POST", url: `${MSG_API}/messages/${forwardOpen.id}/forward/`,
         data: { conversation_id: convId },
       });
       flash("Forwarded");
       setForwardOpen(null);
       if (String(convId) === String(activeId)) loadMessages(activeId, { silent: true });
-      loadConversations();
+      loadConversations({ silent: true });
     } catch (e) {
       setError(e?.response?.data?.message || "Forward failed");
     }
@@ -631,6 +599,25 @@ export default function MessengerApp() {
     try {
       await apiRequest({ method: "POST", url: `${MSG_API}/contacts/`, data: { user_id: userId } });
       flash("Added to contacts");
+      // If profile panel is showing, refresh its is_contact flag
+      if (profileData?.id === userId) {
+        setProfileData((p) => ({ ...p, is_contact: true }));
+      }
+      // Update peer.is_contact in the active conversation detail (so the
+      // "Add to contacts" banner disappears immediately after adding).
+      if (activeDetail?.type === "private" && activeDetail.peer?.id === userId) {
+        setActiveDetail((d) => ({ ...d, peer: { ...d.peer, is_contact: true } }));
+      }
+      // Also update the conversation in the sidebar list
+      setConversations((prev) => prev.map((c) => (
+        c.type === "private" && c.peer?.id === userId
+          ? { ...c, peer: { ...c.peer, is_contact: true } }
+          : c
+      )));
+      if (contacts.length || panelHistory.includes("contacts")) {
+        const res = await apiRequest({ method: "GET", url: `${MSG_API}/contacts/` });
+        setContacts(unwrapData(res) || []);
+      }
     } catch (e) {
       setError(e?.response?.data?.message || "Failed");
     }
@@ -649,7 +636,11 @@ export default function MessengerApp() {
       await apiRequest({ method: "POST", url: `${MSG_API}/blocks/`, data: { user_id: userId } });
       flash("Blocked");
       setHeaderMenu(null);
-      loadConversations();
+      setConfirmBlock(null);
+      if (profileData?.id === userId) {
+        setProfileData((p) => ({ ...p, is_blocked: true, is_contact: false }));
+      }
+      loadConversations({ silent: true });
     } catch (e) {
       setError(e?.response?.data?.message || "Block failed");
     }
@@ -668,8 +659,9 @@ export default function MessengerApp() {
     try {
       await apiRequest({ method: "POST", url: `${MSG_API}/conversations/${activeId}/leave/` });
       setHeaderMenu(null);
+      setConfirmLeave(null);
       closeChat();
-      loadConversations();
+      loadConversations({ silent: false });
       flash("Left chat");
     } catch (e) {
       setError(e?.response?.data?.message || "Leave failed");
@@ -677,26 +669,60 @@ export default function MessengerApp() {
   };
 
   const deleteConversation = async () => {
-    if (!activeId) return;
+    const conv = confirmDelete?.conv;
+    if (!conv) return;
     try {
-      await apiRequest({ method: "DELETE", url: `${MSG_API}/conversations/${activeId}/delete/` });
+      await apiRequest({ method: "DELETE", url: `${MSG_API}/conversations/${conv.id}/delete/` });
       setConfirmDelete(null);
       setHeaderMenu(null);
-      closeChat();
-      loadConversations();
-      flash(confirmDelete === "group" ? "Group deleted" : "Chat deleted");
+      if (String(conv.id) === String(activeId)) closeChat();
+      loadConversations({ silent: false });
+      flash(conv.type === "group" ? "Group deleted" : "Chat deleted");
     } catch (e) {
       setError(e?.response?.data?.message || "Delete failed");
       setConfirmDelete(null);
     }
   };
 
+  const cleanupConversation = async () => {
+    const conv = confirmCleanup?.conv;
+    if (!conv) return;
+    try {
+      await apiRequest({ method: "POST", url: `${MSG_API}/conversations/${conv.id}/cleanup/` });
+      setConfirmCleanup(null);
+      if (String(conv.id) === String(activeId)) {
+        setMessages([]);
+        loadConversationDetail(conv.id);
+      }
+      loadConversations({ silent: true });
+      flash("Messages cleared");
+    } catch (e) {
+      setError(e?.response?.data?.message || "Cleanup failed");
+      setConfirmCleanup(null);
+    }
+  };
+
+  const togglePin = async (conv) => {
+    try {
+      await apiRequest({ method: "POST", url: `${MSG_API}/conversations/${conv.id}/pin/` });
+      loadConversations({ silent: true });
+    } catch (e) {
+      setError(e?.response?.data?.message || "Pin failed");
+    }
+  };
+
+  const markChatRead = async (conv) => {
+    try {
+      await apiRequest({ method: "POST", url: `${MSG_API}/conversations/${conv.id}/read/` });
+      loadConversations({ silent: true });
+    } catch { /* */ }
+  };
+
   const patchGroup = async (patch) => {
     if (!activeId) return;
     try {
       const res = await apiRequest({
-        method: "PATCH",
-        url: `${MSG_API}/conversations/${activeId}/`,
+        method: "PATCH", url: `${MSG_API}/conversations/${activeId}/`,
         data: patch,
       });
       const data = unwrapData(res);
@@ -705,6 +731,102 @@ export default function MessengerApp() {
       flash("Updated");
     } catch (e) {
       setError(e?.response?.data?.message || "Update failed");
+    }
+  };
+
+  // Upload / clear a group avatar — owner/admin only.
+  // The file is sent to /conversations/<pk>/avatar/ as multipart/form-data.
+  const uploadGroupAvatar = async (convId, file) => {
+    if (!convId || !file) return;
+    try {
+      const form = new FormData();
+      form.append("avatar", file);
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${convId}/avatar/`,
+        data: form,
+      });
+      const data = unwrapData(res);
+      setActiveDetail(data);
+      setConversations((prev) => prev.map((c) => (c.id === data.id ? { ...c, ...data } : c)));
+      flash("Group photo updated");
+    } catch (e) {
+      setError(e?.response?.data?.message || "Avatar upload failed");
+    }
+  };
+
+  const clearGroupAvatar = async (convId) => {
+    if (!convId) return;
+    try {
+      await apiRequest({ method: "DELETE", url: `${MSG_API}/conversations/${convId}/avatar/` });
+      // Reload conversation detail
+      await loadConversationDetail(convId);
+      setConversations((prev) => prev.map((c) => (
+        c.id === convId ? { ...c, avatar: null, avatar_url: null } : c
+      )));
+      flash("Group photo removed");
+    } catch (e) {
+      setError(e?.response?.data?.message || "Avatar removal failed");
+    }
+  };
+
+  // Save current user's bio (Telegram-style 'about' field)
+  const saveMyBio = async (text) => {
+    try {
+      await apiRequest({ method: "PATCH", url: `${MSG_API}/me/bio/`, data: { text } });
+      flash("Bio saved");
+    } catch (e) {
+      setError(e?.response?.data?.message || "Bio save failed");
+    }
+  };
+
+  // Load current user's bio (for editing in profile editor)
+  const loadMyBio = async () => {
+    try {
+      const res = await apiRequest({ method: "GET", url: `${MSG_API}/me/bio/` });
+      return unwrapData(res)?.text || "";
+    } catch {
+      return "";
+    }
+  };
+
+  // Group management — remove member, promote/demote admin, transfer ownership
+  const removeMember = async (convId, userId) => {
+    try {
+      await apiRequest({ method: "DELETE", url: `${MSG_API}/conversations/${convId}/members/${userId}/` });
+      flash("Member removed");
+      await loadConversationDetail(convId);
+      loadMessages(convId, { silent: true });
+    } catch (e) {
+      setError(e?.response?.data?.message || "Remove failed");
+    }
+  };
+
+  const changeMemberRole = async (convId, userId, role) => {
+    try {
+      await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${convId}/members/${userId}/role/`,
+        data: { role },
+      });
+      flash(role === "admin" ? "Promoted to admin" : "Demoted to member");
+      await loadConversationDetail(convId);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Role change failed");
+    }
+  };
+
+  const transferOwnership = async (convId, userId) => {
+    try {
+      await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${convId}/transfer-ownership/`,
+        data: { user_id: userId },
+      });
+      flash("Ownership transferred");
+      await loadConversationDetail(convId);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Transfer failed");
     }
   };
 
@@ -721,8 +843,7 @@ export default function MessengerApp() {
   const revokeInvite = async (linkId) => {
     try {
       await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/${activeId}/invite-links/${linkId}/revoke/`,
+        method: "POST", url: `${MSG_API}/conversations/${activeId}/invite-links/${linkId}/revoke/`,
       });
       loadConversationDetail(activeId);
       flash("Revoked");
@@ -735,22 +856,12 @@ export default function MessengerApp() {
       const code = joinCode.trim().split("/").pop();
       const res = await apiRequest({ method: "POST", url: `${MSG_API}/join/${code}/` });
       const conv = unwrapData(res);
-      setJoinOpen(false);
-      setJoinCode("");
-      await loadConversations();
+      setJoinOpen(false); setJoinCode("");
+      closePanel();
+      await loadConversations({ silent: false });
       if (conv) await openChat(conv);
     } catch (e) {
       setError(e?.response?.data?.message || "Invalid invite");
-    }
-  };
-
-  const savePrivacy = async (scope) => {
-    try {
-      await apiRequest({ method: "PATCH", url: `${MSG_API}/me/photo-privacy/`, data: { scope } });
-      setPrivacyScope(scope);
-      flash("Privacy saved");
-    } catch (e) {
-      setError(e?.response?.data?.message || "Failed");
     }
   };
 
@@ -768,51 +879,57 @@ export default function MessengerApp() {
     } catch { setBlocks([]); }
   };
 
-  const loadMyPrivacy = async () => {
-    try {
-      const res = await apiRequest({ method: "GET", url: `${MSG_API}/me/photos/` });
-      const data = unwrapData(res);
-      setPrivacyScope(data?.privacy?.scope || "everyone");
-      setProfileData((p) => ({ ...(p || { id: meId }), photos: data?.photos || [], privacy: data?.privacy }));
-    } catch { /* */ }
-  };
-
   const loadUserProfile = async (userId) => {
     try {
       const res = await apiRequest({ method: "GET", url: `${MSG_API}/users/${userId}/profile/` });
       setProfileData(unwrapData(res));
-      setRightPanel("profile");
+      pushPanel("profile");
     } catch (e) {
       flash(e?.response?.data?.message || "Could not load profile");
+    }
+  };
+
+  // Used by @mention clicks — fetch by username, open profile (no DM, no contact add)
+  const loadUserProfileByUsername = async (username) => {
+    try {
+      const res = await apiRequest({
+        method: "GET",
+        url: `${MSG_API}/users/by-username/?username=${encodeURIComponent(username)}`,
+      });
+      const data = unwrapData(res);
+      if (data) {
+        setProfileData(data);
+        pushPanel("profile");
+      } else {
+        flash(`@${username} not found`);
+      }
+    } catch (e) {
+      flash(e?.response?.data?.message || `@${username} not found`);
     }
   };
 
   const searchPublicGroups = async (q) => {
     try {
       const res = await apiRequest({
-        method: "GET",
-        url: `${MSG_API}/groups/search/?q=${encodeURIComponent(q || "")}`,
+        method: "GET", url: `${MSG_API}/groups/search/?q=${encodeURIComponent(q || "")}`,
       });
       setPublicGroups(unwrapData(res) || []);
-    } catch {
-      setPublicGroups([]);
-    }
+    } catch { setPublicGroups([]); }
   };
 
   const addMembersToGroup = async () => {
     if (!activeId || !addMemberSelected.length) return;
     try {
       const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/${activeId}/members/`,
+        method: "POST", url: `${MSG_API}/conversations/${activeId}/members/`,
         data: { user_ids: addMemberSelected },
       });
       const data = unwrapData(res);
       flash(data?.added?.length ? `Added ${data.added.map((u) => u.username).join(", ")}` : "No new members");
-      setAddMemberOpen(false);
-      setAddMemberSelected([]);
+      setAddMemberOpen(false); setAddMemberSelected([]);
       loadConversationDetail(activeId);
       loadMessages(activeId, { silent: true });
+      loadConversations({ silent: true });
     } catch (e) {
       setError(e?.response?.data?.message || "Add members failed");
     }
@@ -820,10 +937,19 @@ export default function MessengerApp() {
 
   const openPreview = async (att) => {
     const k = attachmentKind(att);
+    // Images & videos open the in-chat gallery dialog (with < > navigation)
+    if (k === "image" || k === "video") {
+      setGalleryState({ startAttachment: att });
+      return;
+    }
+    if (k === "audio") {
+      // Hand off to top player bar
+      setAudioPlayer({ att, title: att.original_filename || "Audio" });
+      return;
+    }
     if (k === "text") {
       try {
-        const token = localStorage.getItem("access");
-        const r = await fetch(att.url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        const r = await fetch(att.url, { headers: authHeaders() });
         const textContent = await r.text();
         setPreview({ att, kind: k, textContent: textContent.slice(0, 200000) });
       } catch {
@@ -834,14 +960,27 @@ export default function MessengerApp() {
     setPreview({ att, kind: k });
   };
 
+  // Reply-jump: scroll the replied message into view + flash highlight
+  const onJumpToMessage = useCallback((msgId) => {
+    if (!msgId) return;
+    const el = document.getElementById(`msg-${msgId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setJumpHighlightId(msgId);
+      setTimeout(() => setJumpHighlightId((cur) => (cur === msgId ? null : cur)), 2000);
+    } else {
+      flash("Message not loaded — try scrolling up");
+    }
+  }, []);
+
+  /* -------------------- derived -------------------- */
+
   const activeConv = activeDetail || conversations.find((c) => c.id === activeId);
   const peer = peerUser(activeConv, meId);
   const role = myRole(activeConv, meId);
 
   const onScrollMsgs = (e) => {
-    if (e.target.scrollTop < 100 && hasMoreMsgs && !loadingMore) {
-      loadOlder();
-    }
+    if (e.target.scrollTop < 100 && hasMoreMsgs && !loadingMore) loadOlder();
   };
 
   const messagesWithDays = useMemo(() => {
@@ -864,346 +1003,81 @@ export default function MessengerApp() {
     setCtx({ x: e.clientX, y: e.clientY, message });
   };
 
-  /* -------------------- sidebar -------------------- */
-
-  const sidebarContent = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "background.paper" }}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ p: 1.25 }}>
-        <Tooltip title="Menu">
-          <IconButton size="small" onClick={() => setRightPanel((p) => (p === "settings" ? null : "settings"))}>
-            <MenuIcon />
-          </IconButton>
-        </Tooltip>
-        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Messenger</Typography>
-        <Tooltip title="New group">
-          <IconButton size="small" onClick={() => setCreateGroupOpen(true)}><GroupAddIcon fontSize="small" /></IconButton>
-        </Tooltip>
-        <Tooltip title="Join invite">
-          <IconButton size="small" onClick={() => setJoinOpen(true)}><LinkIcon fontSize="small" /></IconButton>
-        </Tooltip>
-        <Tooltip title="Back to Deployer">
-          <IconButton size="small" color="primary" onClick={() => navigate("/")}>
-            <HomeOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-
-      <Box sx={{ px: 1.25, pb: 1 }}>
-        <TextField
-          fullWidth size="small" placeholder="Search users…"
-          value={searchQ} onChange={(e) => setSearchQ(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                {searching ? <CircularProgress size={14} /> : <SearchIcon fontSize="small" />}
-              </InputAdornment>
-            ),
-            endAdornment: searchQ ? (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchQ("")}><CloseIcon fontSize="small" /></IconButton>
-              </InputAdornment>
-            ) : null,
-          }}
-        />
-      </Box>
-
-      {!searchQ.trim() && (
-        <Tabs value={listTab} onChange={(_, v) => { setListTab(v); if (v === 1) searchPublicGroups(""); }}
-          variant="fullWidth" sx={{ minHeight: 36, "& .MuiTab-root": { minHeight: 36, py: 0.5, fontSize: 13 } }}>
-          <Tab label="Chats" />
-          <Tab label="Public groups" />
-        </Tabs>
-      )}
-
-      {searchQ.trim() ? (
-        <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
-          {searchResults.map((u) => (
-            <ListItemButton key={u.id} onClick={() => startDm(u)}>
-              <ListItemAvatar>
-                <Avatar src={u.avatar || undefined}>{u.username?.[0]?.toUpperCase()}</Avatar>
-              </ListItemAvatar>
-              <ListItemText primary={u.username} secondary={u.is_contact ? "Contact" : "User"} />
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); addContact(u.id); }}>
-                <PersonAddIcon fontSize="small" />
-              </IconButton>
-            </ListItemButton>
-          ))}
-          {!searching && !searchResults.length && (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>No users found</Typography>
-          )}
-        </List>
-      ) : listTab === 1 ? (
-        <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
-          <Box sx={{ px: 1.25, py: 1 }}>
-            <TextField fullWidth size="small" placeholder="Search public groups…"
-              onChange={(e) => searchPublicGroups(e.target.value)} />
-          </Box>
-          {publicGroups.map((g) => (
-            <ListItemButton key={g.id} onClick={() => openChat(g)}>
-              <ListItemAvatar><Avatar src={g.avatar || undefined}><PublicIcon /></Avatar></ListItemAvatar>
-              <ListItemText primary={g.title} secondary={g.description || "Public group"} />
-            </ListItemButton>
-          ))}
-        </List>
-      ) : (
-        <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
-          {loadingConvs && <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress size={22} /></Box>}
-          {!loadingConvs && !conversations.length && (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
-              No chats yet. Search a username to start.
-            </Typography>
-          )}
-          {conversations.map((c) => (
-            <ListItemButton
-              key={c.id}
-              selected={c.id === activeId}
-              onClick={() => openChat(c)}
-              sx={{ py: 1.1, "&.Mui-selected": { bgcolor: (t) => alpha(t.palette.primary.main, 0.12) } }}
-            >
-              <ListItemAvatar>
-                <Badge badgeContent={c.unread_count || 0} color="primary" max={99} overlap="circular">
-                  <Avatar src={convAvatar(c, meId)} sx={{ width: 48, height: 48 }}>
-                    {convTitle(c, meId)[0]?.toUpperCase()}
-                  </Avatar>
-                </Badge>
-              </ListItemAvatar>
-              <ListItemText
-                primary={
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
-                    <Typography noWrap fontWeight={c.unread_count ? 700 : 600} fontSize={14.5}>
-                      {convTitle(c, meId)}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-                      {formatTime(c.last_message_at)}
-                    </Typography>
-                  </Stack>
-                }
-                secondary={
-                  <Typography noWrap variant="body2" color="text.secondary" fontSize={13}>
-                    {c.last_message?.body || (c.last_message?.has_attachments ? "📎 Attachment" : "No messages yet")}
-                  </Typography>
-                }
-              />
-            </ListItemButton>
-          ))}
-        </List>
-      )}
-    </Box>
-  );
-
-  /* -------------------- message row -------------------- */
-
-  const renderMessage = (m) => {
-    if (m.type === "day") {
-      return (
-        <Box key={m.id} sx={{ textAlign: "center", my: 1.5 }}>
-          <Chip label={m.label} size="small" sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), fontSize: 11 }} />
-        </Box>
-      );
-    }
-    const mine = String(m.sender?.id) === String(meId);
-    const bodyStr = typeof m.body === "string" ? m.body : String(m.body || "");
-    if (m.is_system) {
-      return (
-        <Box key={m.id} sx={{ textAlign: "center", my: 1 }}>
-          <Chip label={bodyStr} size="small" sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), fontSize: 12 }} />
-        </Box>
-      );
-    }
-    return (
-      <Box
-        key={m.id}
-        sx={{
-          display: "flex",
-          justifyContent: mine ? "flex-end" : "flex-start",
-          mb: 0.6,
-          px: 0.5,
-          "&:hover .msg-actions": { opacity: 1 },
-        }}
-        onContextMenu={(e) => openCtx(e, m)}
-      >
-        {!mine && (
-          <Avatar
-            src={m.sender?.avatar || undefined}
-            sx={{ width: 28, height: 28, mr: 0.75, mt: 0.5, cursor: "pointer" }}
-            onClick={() => m.sender?.id && loadUserProfile(m.sender.id)}
-          >
-            {m.sender?.username?.[0]?.toUpperCase()}
-          </Avatar>
-        )}
-        <Box
-          sx={{
-            maxWidth: { xs: "82%", sm: "70%" },
-            px: 1.35,
-            py: 0.85,
-            borderRadius: mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-            bgcolor: mine
-              ? (theme.palette.mode === "dark" ? "#2b5278" : theme.palette.primary.main)
-              : "background.paper",
-            color: mine ? "#fff" : "text.primary",
-            boxShadow: theme.palette.mode === "dark" ? "none" : 1,
-          }}
-        >
-          {!mine && activeConv?.type === "group" && (
-            <Typography variant="caption" fontWeight={700} sx={{ color: "primary.light", cursor: "pointer", display: "block" }}
-              onClick={() => m.sender?.id && loadUserProfile(m.sender.id)}>
-              {m.sender?.username}
-            </Typography>
-          )}
-          {m.reply_to_preview && (
-            <Box sx={{
-              borderLeft: "3px solid", borderColor: mine ? "rgba(255,255,255,0.55)" : "primary.main",
-              pl: 1, mb: 0.5, fontSize: 12,
-              bgcolor: mine ? "rgba(0,0,0,0.12)" : alpha(theme.palette.primary.main, 0.06),
-              borderRadius: "0 6px 6px 0", py: 0.35, pr: 0.5,
-            }}>
-              <Typography variant="caption" fontWeight={700} display="block">
-                {m.reply_to_preview.sender?.username || "…"}
-              </Typography>
-              <Typography variant="caption" noWrap display="block">{m.reply_to_preview.body}</Typography>
-            </Box>
-          )}
-          {m.forwarded_from_user && (
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ opacity: 0.85, mb: 0.25 }}>
-              <ForwardIcon sx={{ fontSize: 12 }} />
-              <Typography variant="caption">Forwarded from {m.forwarded_from_user.username}</Typography>
-            </Stack>
-          )}
-          {bodyStr && (
-            <Typography sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 14.5, lineHeight: 1.45 }}>
-              {bodyStr}
-            </Typography>
-          )}
-          {m.is_system ? null : (m.attachments || []).map((a) => {
-            const k = attachmentKind(a);
-            return (
-              <Box key={a.id} sx={{ mt: 0.6, minWidth: k === "audio" ? 220 : undefined }}>
-                {k === "image" ? (
-                  <Box component="img" src={a.url} alt={a.original_filename}
-                    onClick={() => openPreview(a)}
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
-                    sx={{ maxWidth: "100%", borderRadius: 1.5, maxHeight: 320, display: "block", cursor: "pointer" }} />
-                ) : k === "video" ? (
-                  <Box component="video" src={a.url} controls
-                    sx={{ maxWidth: "100%", borderRadius: 1.5, maxHeight: 320, display: "block" }} />
-                ) : k === "audio" ? (
-                  <Box sx={{
-                    bgcolor: mine ? "rgba(0,0,0,0.15)" : "action.hover",
-                    borderRadius: 2, px: 1.25, py: 1, minWidth: 220, maxWidth: 300,
-                  }}>
-                    <Typography variant="caption" display="block" noWrap sx={{ mb: 0.5, opacity: 0.9 }}>
-                      {a.original_filename || "Audio"}
-                    </Typography>
-                    <audio
-                      src={a.url}
-                      controls
-                      preload="metadata"
-                      style={{ width: "100%", height: 36, outline: "none" }}
-                    />
-                  </Box>
-                ) : (
-                  <Chip
-                    icon={<VisibilityIcon />}
-                    label={a.original_filename || "file"}
-                    size="small"
-                    onClick={() => openPreview(a)}
-                    onDelete={() => window.open(a.url, "_blank")}
-                    deleteIcon={<DownloadIcon />}
-                    sx={{ maxWidth: "100%", cursor: "pointer" }}
-                  />
-                )}
-              </Box>
-            );
-          })}
-          {(m.reactions || []).length > 0 && (
-            <Stack direction="row" spacing={0.35} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-              {[...new Set((m.reactions || []).map((r) => r.emoji))].map((em) => {
-                const count = (m.reactions || []).filter((r) => r.emoji === em).length;
-                const mineReact = (m.reactions || []).some((r) => r.emoji === em && String(r.user?.id) === String(meId));
-                return (
-                  <Chip key={em} size="small" label={`${em} ${count}`} onClick={() => react(m.id, em)}
-                    sx={{
-                      height: 22, fontSize: 11,
-                      bgcolor: mineReact
-                        ? alpha(theme.palette.primary.main, mine ? 0.35 : 0.15)
-                        : (mine ? "rgba(255,255,255,0.12)" : "action.hover"),
-                      color: mine ? "#fff" : "text.primary",
-                    }}
-                  />
-                );
-              })}
-            </Stack>
-          )}
-          <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.4} mt={0.35}>
-            <IconButton className="msg-actions" size="small"
-              sx={{ p: 0.2, opacity: { xs: 0.65, md: 0 }, color: mine ? "rgba(255,255,255,0.75)" : "text.secondary" }}
-              onClick={(e) => setReactAnchor({ anchorEl: e.currentTarget, message: m })}>
-              <EmojiEmotionsIcon sx={{ fontSize: 15 }} />
-            </IconButton>
-            <IconButton className="msg-actions" size="small"
-              sx={{ p: 0.2, opacity: { xs: 0.65, md: 0 }, color: mine ? "rgba(255,255,255,0.75)" : "text.secondary" }}
-              onClick={() => { setReplyTo(m); setEditingMsg(null); inputRef.current?.focus(); }}>
-              <ReplyIcon sx={{ fontSize: 15 }} />
-            </IconButton>
-            {m.is_edited && <Typography variant="caption" sx={{ opacity: 0.7, fontSize: 10 }}>edited</Typography>}
-            <Typography variant="caption" sx={{ opacity: 0.75, fontSize: 11 }}>{formatTime(m.created_at)}</Typography>
-            {mine && <DoneAllIcon sx={{ fontSize: 14, opacity: 0.75 }} />}
-          </Stack>
-        </Box>
-      </Box>
-    );
-  };
-
   /* -------------------- chat pane -------------------- */
 
   const chatPane = (
     <Box
       sx={{
         flex: 1, height: "100%",
-        display: "flex",
-        flexDirection: "column",
+        display: "flex", flexDirection: "column",
         bgcolor: theme.palette.mode === "dark" ? "#0e1621" : "#e7ebf0",
-        minWidth: 0,
-        width: "100%",
+        minWidth: 0, width: "100%",
+        position: "relative",
       }}
-      onContextMenu={(e) => {
-        // block browser menu on empty chat area
-        if (e.target === e.currentTarget) e.preventDefault();
-      }}
+      onContextMenu={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
     >
       {!activeId ? (
-        <Box sx={{ flex: 1, display: { xs: "none", md: "flex" }, alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 1 }}>
+        <Box sx={{
+          flex: 1, display: { xs: "none", md: "flex" },
+          alignItems: "center", justifyContent: "center",
+          flexDirection: "column", gap: 1,
+        }}>
           <Typography color="text.secondary" variant="h6" fontWeight={500}>Messenger</Typography>
           <Typography color="text.secondary" variant="body2">Select a chat or search for a user</Typography>
-          <Typography color="text.secondary" variant="caption">Tip: Esc closes a chat · ArrowUp edits your last message</Typography>
-          <Button startIcon={<HomeOutlinedIcon />} onClick={() => navigate("/")} sx={{ mt: 2 }}>Back to Deployer</Button>
+          <Typography color="text.secondary" variant="caption">
+            Tip: Esc closes a chat · ArrowUp edits your last message · Right-click for more
+          </Typography>
+          <Button startIcon={<HomeOutlinedIcon />} onClick={() => navigate("/")} sx={{ mt: 2 }}>
+            Back to Deployer
+          </Button>
         </Box>
       ) : (
         <>
           <Stack direction="row" alignItems="center" spacing={1}
-            sx={{ px: 1, py: 0.85, bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider", minHeight: 56 }}>
-            {isMobile && (
-              <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>
-            )}
+            sx={{
+              px: 1, py: 0.85, bgcolor: "background.paper",
+              borderBottom: "1px solid", borderColor: "divider", minHeight: 56,
+              position: "relative", zIndex: 11,
+            }}>
+            {isMobile && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
             {!isMobile && (
               <IconButton onClick={() => setDrawerOpen((v) => !v)} size="small"><MenuIcon /></IconButton>
             )}
-            <Avatar src={convAvatar(activeConv, meId)} sx={{ width: 40, height: 40, cursor: "pointer" }}
-              onClick={() => (peer?.id ? loadUserProfile(peer.id) : setRightPanel("info"))}>
-              {convTitle(activeConv, meId)[0]?.toUpperCase()}
-            </Avatar>
+            <Box sx={{ position: "relative" }}>
+              <Avatar src={convAvatar(activeConv, meId)} sx={{ width: 40, height: 40, cursor: "pointer" }}
+                onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
+                {convTitle(activeConv, meId)[0]?.toUpperCase()}
+              </Avatar>
+              {peer?.id && onlineUsers.has(Number(peer.id)) && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    bottom: 0,
+                    right: 0,
+                    width: 11,
+                    height: 11,
+                    borderRadius: "50%",
+                    bgcolor: "#4caf50",
+                    border: "2px solid",
+                    borderColor: "background.paper",
+                  }}
+                />
+              )}
+            </Box>
             <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }}
-              onClick={() => (peer?.id ? loadUserProfile(peer.id) : setRightPanel("info"))}>
+              onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
               <Typography fontWeight={600} noWrap fontSize={15}>{convTitle(activeConv, meId)}</Typography>
               <Typography variant="caption" color="text.secondary">
                 {activeConv?.type === "group"
                   ? `${(activeConv?.participants || []).length} members`
-                  : peer?.username ? `@${peer.username}` : "tap for info"}
+                  : peer?.id && onlineUsers.has(Number(peer.id))
+                    ? "online"
+                    : peer?.username ? `@${peer.username}` : "tap for info"}
               </Typography>
             </Box>
-            <IconButton onClick={() => setRightPanel((p) => (p === "info" ? null : "info"))}><InfoOutlinedIcon /></IconButton>
+            <IconButton onClick={() => pushPanel("info")}>
+              <InfoOutlinedIcon />
+            </IconButton>
             <IconButton onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
             <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
               {peer && (
@@ -1216,393 +1090,196 @@ export default function MessengerApp() {
                   <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Add contact
                 </MenuItem>
               )}
+              <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
+                <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon> Clear messages
+              </MenuItem>
               {peer && (
-                <MenuItem onClick={() => blockUser(peer.id)}>
+                <MenuItem onClick={() => { setConfirmBlock({ user: peer }); setHeaderMenu(null); }}>
                   <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon> Block
                 </MenuItem>
               )}
               {activeConv?.type === "private" && (
-                <MenuItem onClick={() => { setConfirmDelete("chat"); setHeaderMenu(null); }} sx={{ color: "error.main" }}>
+                <MenuItem
+                  onClick={() => { setConfirmDelete({ type: "chat", conv: activeConv }); setHeaderMenu(null); }}
+                  sx={{ color: "error.main" }}
+                >
                   <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete chat
                 </MenuItem>
               )}
               {activeConv?.type === "group" && (role === "owner" || role === "admin") && (
-                <MenuItem onClick={() => { setConfirmDelete("group"); setHeaderMenu(null); }} sx={{ color: "error.main" }}>
+                <MenuItem
+                  onClick={() => { setConfirmDelete({ type: "group", conv: activeConv }); setHeaderMenu(null); }}
+                  sx={{ color: "error.main" }}
+                >
                   <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete group
                 </MenuItem>
               )}
-              <MenuItem onClick={leaveChat}>
+              <MenuItem onClick={() => { setConfirmLeave({ conv: activeConv }); setHeaderMenu(null); }}>
                 <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon> Leave
               </MenuItem>
             </Menu>
           </Stack>
 
-          <Box ref={listRef} onScroll={onScrollMsgs} sx={{ flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, py: 1 }}
+          {/* "Add to contacts?" banner — Telegram-style.
+              Shows when the active chat is private AND the peer is NOT in the
+              current user's contacts. The user can dismiss (X) or accept (Add). */}
+          {activeConv?.type === "private" && peer && peer.is_contact === false && !peer.is_blocked && (
+            <AddToContactsBanner
+              username={peer.username}
+              onAdd={() => addContact(peer.id)}
+            />
+          )}
+
+          {/* Top audio player bar (Telegram-style) */}
+          <AudioPlayerBar player={audioPlayer} onChange={setAudioPlayer} />
+
+          <Box
+            ref={listRef} onScroll={onScrollMsgs}
+            sx={{ flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, py: 1 }}
             onContextMenu={(e) => e.preventDefault()}
           >
             {hasMoreMsgs && (
               <Box sx={{ textAlign: "center", py: 1 }}>
-                {loadingMore ? <CircularProgress size={18} /> : (
-                  <Button size="small" onClick={loadOlder}>Load older messages</Button>
-                )}
+                {loadingMore
+                  ? <CircularProgress size={18} />
+                  : <Button size="small" onClick={loadOlder}>Load older messages</Button>}
               </Box>
             )}
             {loadingMsgs && !messages.length && (
               <Box sx={{ textAlign: "center", py: 6 }}><CircularProgress /></Box>
             )}
-            {messagesWithDays.map((m) => renderMessage(m))}
+            {messagesWithDays.map((m) => (
+              <Box
+                key={m.id}
+                id={m.type === "msg" ? `msg-${m.id}` : undefined}
+                sx={
+                  m.type === "msg" && jumpHighlightId === m.id
+                    ? {
+                        animation: "msgFlash 1.6s ease-out",
+                        borderRadius: 2,
+                        "@keyframes msgFlash": {
+                          "0%": { bgcolor: (t) => t.palette.warning.main, boxShadow: "0 0 0 4px rgba(255,193,7,0.4)" },
+                          "70%": { bgcolor: "transparent", boxShadow: "0 0 0 0 rgba(255,193,7,0)" },
+                          "100%": { bgcolor: "transparent", boxShadow: "none" },
+                        },
+                      }
+                    : undefined
+                }
+              >
+                <MessageBubble
+                  m={m} meId={meId} activeConv={activeConv}
+                  onContextOpen={openCtx}
+                  onReact={react}
+                  onReactAnchor={(e, message) => setReactAnchor({ anchorPosition: { top: e.clientY, left: e.clientX }, message })}
+                  onReply={(message) => { setReplyTo(message); setEditingMsg(null); inputRef.current?.focus(); }}
+                  onEdit={startEdit}
+                  onDelete={deleteMsg}
+                  onForward={(message) => setForwardOpen(message)}
+                  onOpenPreview={openPreview}
+                  onShowReaders={(message) => setReadersMessage(message)}
+                  onCopyText={async (msg) => {
+                    await copyText(typeof msg?.body === "string" ? msg.body : "");
+                    flash("Copied");
+                    setCtx(null);
+                  }}
+                  onLoadUserProfile={loadUserProfile}
+                  onJumpToMessage={onJumpToMessage}
+                  onPlayAudio={(att) => setAudioPlayer({ att, title: att.original_filename || "Audio" })}
+                  onMentionClick={loadUserProfileByUsername}
+                />
+              </Box>
+            ))}
             <div ref={bottomRef} />
           </Box>
 
-          {(replyTo || editingMsg) && (
-            <Stack direction="row" alignItems="center"
-              sx={{ px: 1.5, py: 0.7, bgcolor: "background.paper", borderTop: "1px solid", borderColor: "divider" }}>
-              {editingMsg ? <EditIcon fontSize="small" sx={{ mr: 1, color: "warning.main" }} /> : <ReplyIcon fontSize="small" sx={{ mr: 1 }} />}
-              <Box sx={{ flex: 1, minWidth: 0, borderLeft: "3px solid", borderColor: editingMsg ? "warning.main" : "primary.main", pl: 1 }}>
-                <Typography variant="caption" fontWeight={700}>
-                  {editingMsg ? "Edit message" : `Reply to ${replyTo?.sender?.username || ""}`}
-                </Typography>
-                <Typography variant="caption" display="block" noWrap color="text.secondary">
-                  {editingMsg ? editingMsg.body : replyTo?.body}
-                </Typography>
-              </Box>
-              <IconButton size="small" onClick={() => { setReplyTo(null); setEditingMsg(null); setText(""); }}>
-                <CloseIcon fontSize="small" />
-              </IconButton>
-            </Stack>
-          )}
-
-          <Stack direction="row" alignItems="flex-end" spacing={0.5}
-            sx={{ p: 1, bgcolor: "background.paper", borderTop: "1px solid", borderColor: "divider" }}>
-            <input ref={fileRef} type="file" multiple hidden
-              accept="image/*,video/*,audio/*,.gif,.pdf,.txt,.zip,.doc,.docx,.md,.csv"
-              onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-            {!editingMsg && (
-              <IconButton onClick={() => fileRef.current?.click()}><AttachFileIcon /></IconButton>
-            )}
-            {editingMsg && (
-              <IconButton onClick={() => { setEditingMsg(null); setText(""); }}>
-                <KeyboardArrowUpIcon color="warning" />
-              </IconButton>
-            )}
-            <TextField
-              inputRef={inputRef} fullWidth multiline maxRows={6} size="small"
-              placeholder={editingMsg ? "Edit message…" : "Message"}
-              value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onComposerKeyDown}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 3, bgcolor: "action.hover" } }}
+          {/* Channel mode: if only_admins_send is on and the current user is not
+              an admin, show a notice instead of the composer. */}
+          {activeConv?.type === "group"
+            && Boolean(activeConv.only_admins_send)
+            && role !== "owner" && role !== "admin" ? (
+            <Box sx={{
+              px: 2, py: 1.5, bgcolor: "action.hover",
+              borderTop: "1px solid", borderColor: "divider",
+              display: "flex", alignItems: "center", gap: 1,
+            }}>
+              <LockOutlinedIcon fontSize="small" color="action" />
+              <Typography variant="body2" color="text.secondary">
+                Only admins can send messages in this group.
+              </Typography>
+            </Box>
+          ) : (
+            <MessageComposer
+              text={text} setText={setText}
+              files={files} setFiles={setFiles}
+              replyTo={replyTo} editingMsg={editingMsg}
+              onCancelReplyOrEdit={() => { setReplyTo(null); setEditingMsg(null); setText(""); }}
+              onSend={sendOrEdit}
+              onPickImage={(f) => setCropFile(f)}
+              inputRef={inputRef}
+              onKeyDown={onComposerKeyDown}
             />
-            <IconButton color="primary" onClick={sendOrEdit}
-              disabled={!text.trim() && !files.length && !editingMsg}
-              sx={{
-                bgcolor: "primary.main", color: "#fff",
-                "&:hover": { bgcolor: "primary.dark" },
-                "&.Mui-disabled": { bgcolor: "action.disabledBackground" },
-              }}>
-              {editingMsg ? <DoneIcon /> : <SendIcon />}
-            </IconButton>
-          </Stack>
-          {files.length > 0 && (
-            <Stack direction="row" spacing={0.5} sx={{ px: 1, pb: 1, bgcolor: "background.paper", flexWrap: "wrap", gap: 0.5 }}>
-              {files.map((f, i) => (
-                <Chip key={i} size="small" label={f.name} onDelete={() => setFiles((prev) => prev.filter((_, j) => j !== i))} />
-              ))}
-            </Stack>
           )}
         </>
       )}
     </Box>
   );
 
-  /* -------------------- right panel -------------------- */
+  /* -------------------- sidebar (rendered for both desktop & mobile) -------------------- */
 
-  const rightPanelWidth = 320;
-  const renderRightPanel = () => {
-    if (!rightPanel) return null;
+  const sidebarEl = (
+    <Sidebar
+      meId={meId} conversations={conversations} loadingConvs={loadingConvs}
+      activeId={activeId} openChat={openChat}
+      searchQ={searchQ} setSearchQ={setSearchQ}
+      searchResults={searchResults} searching={searching}
+      onViewUserProfile={loadUserProfile}
+      startDm={startDm} addContact={addContact}
+      listTab={listTab} setListTab={setListTab}
+      publicGroups={publicGroups} searchPublicGroups={searchPublicGroups}
+      onTogglePin={togglePin}
+      onMarkRead={markChatRead}
+      onCleanupChat={(conv) => setConfirmCleanup({ conv })}
+      onLeaveChat={(conv) => setConfirmLeave({ conv })}
+      onDeleteChat={(conv) => setConfirmDelete({ type: conv.type, conv })}
+      onBlockPeer={(peer) => setConfirmBlock({ user: peer })}
+      onOpenCreateGroup={() => setCreateGroupOpen(true)}
+      onOpenJoin={() => setJoinOpen(true)}
+      onOpenSettings={() => pushPanel("settings")}
+      onNavigateHome={() => navigate("/")}
+      onlineUsers={onlineUsers}
+    />
+  );
 
-    if (rightPanel === "settings") {
-      return (
-        <Box sx={{ width: isMobile ? "100%" : rightPanelWidth, height: "100%", borderLeft: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
-          <Stack direction="row" alignItems="center" sx={{ p: 1.5 }}>
-            <Typography fontWeight={700} sx={{ flex: 1 }}>Menu</Typography>
-            <IconButton size="small" onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
-          </Stack>
-          <Divider />
-          <List>
-            <ListItemButton onClick={() => { loadMyPrivacy(); setProfileData((p) => ({ ...p, id: meId, username: "me" })); setRightPanel("profile"); }}>
-              <ListItemIcon><AccountCircleIcon /></ListItemIcon>
-              <ListItemText primary="My profile & photo privacy" />
-            </ListItemButton>
-            <ListItemButton onClick={() => { loadContacts(); setRightPanel("contacts"); }}>
-              <ListItemIcon><ContactsIcon /></ListItemIcon>
-              <ListItemText primary="Contacts" />
-            </ListItemButton>
-            <ListItemButton onClick={() => { loadBlocks(); setRightPanel("blocks"); }}>
-              <ListItemIcon><BlockIcon /></ListItemIcon>
-              <ListItemText primary="Blocked users" />
-            </ListItemButton>
-            <ListItemButton onClick={() => setCreateGroupOpen(true)}>
-              <ListItemIcon><GroupAddIcon /></ListItemIcon>
-              <ListItemText primary="New group" />
-            </ListItemButton>
-            <ListItemButton onClick={() => setJoinOpen(true)}>
-              <ListItemIcon><LinkIcon /></ListItemIcon>
-              <ListItemText primary="Join with invite" />
-            </ListItemButton>
-            <Divider sx={{ my: 1 }} />
-            <ListItemButton onClick={() => navigate("/")}>
-              <ListItemIcon><HomeOutlinedIcon /></ListItemIcon>
-              <ListItemText primary="Back to Deployer" />
-            </ListItemButton>
-          </List>
-        </Box>
-      );
-    }
-
-    if (rightPanel === "contacts") {
-      return (
-        <Box sx={{ width: isMobile ? "100%" : rightPanelWidth, height: "100%", borderLeft: "1px solid", borderColor: "divider", bgcolor: "background.paper", display: "flex", flexDirection: "column" }}>
-          <Stack direction="row" alignItems="center" sx={{ p: 1.5 }}>
-            <Typography fontWeight={700} sx={{ flex: 1 }}>Contacts</Typography>
-            <IconButton size="small" onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
-          </Stack>
-          <Divider />
-          <List dense sx={{ overflow: "auto", flex: 1 }}>
-            {contacts.map((c) => (
-              <ListItemButton key={c.id} onClick={() => c.contact && startDm(c.contact)}>
-                <ListItemAvatar><Avatar src={c.contact?.avatar || undefined}>{c.contact?.username?.[0]}</Avatar></ListItemAvatar>
-                <ListItemText primary={c.nickname || c.contact?.username} secondary={c.contact?.username} />
-                <IconButton size="small" onClick={(e) => { e.stopPropagation(); removeContact(c.contact?.id); }}>
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-              </ListItemButton>
-            ))}
-            {!contacts.length && <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>No contacts</Typography>}
-          </List>
-        </Box>
-      );
-    }
-
-    if (rightPanel === "blocks") {
-      return (
-        <Box sx={{ width: isMobile ? "100%" : rightPanelWidth, height: "100%", borderLeft: "1px solid", borderColor: "divider", bgcolor: "background.paper", display: "flex", flexDirection: "column" }}>
-          <Stack direction="row" alignItems="center" sx={{ p: 1.5 }}>
-            <Typography fontWeight={700} sx={{ flex: 1 }}>Blocked</Typography>
-            <IconButton size="small" onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
-          </Stack>
-          <Divider />
-          <List dense sx={{ overflow: "auto", flex: 1 }}>
-            {blocks.map((u) => (
-              <ListItemButton key={u.id}>
-                <ListItemAvatar><Avatar src={u.avatar || undefined}>{u.username?.[0]}</Avatar></ListItemAvatar>
-                <ListItemText primary={u.username} />
-                <Button size="small" onClick={() => unblockUser(u.id)}>Unblock</Button>
-              </ListItemButton>
-            ))}
-            {!blocks.length && <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>None</Typography>}
-          </List>
-        </Box>
-      );
-    }
-
-    if (rightPanel === "profile") {
-      const isMe = profileData && (String(profileData.id) === String(meId) || profileData.username === "me");
-      return (
-        <Box sx={{ width: isMobile ? "100%" : rightPanelWidth, height: "100%", borderLeft: "1px solid", borderColor: "divider", bgcolor: "background.paper", overflow: "auto" }}>
-          <Stack direction="row" alignItems="center" sx={{ p: 1.5 }}>
-            <Typography fontWeight={700} sx={{ flex: 1 }}>{isMe ? "My profile" : "Profile"}</Typography>
-            <IconButton size="small" onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
-          </Stack>
-          <Divider />
-          <Box sx={{ p: 2, textAlign: "center" }}>
-            <Avatar src={profileData?.avatar || profileData?.photos?.[0]?.url} sx={{ width: 96, height: 96, mx: "auto", mb: 1, fontSize: 36 }}>
-              {profileData?.username?.[0]?.toUpperCase()}
-            </Avatar>
-            <Typography variant="h6">{isMe ? "You" : profileData?.username}</Typography>
-          </Box>
-          {(profileData?.photos || []).length > 0 && (
-            <Box sx={{ px: 2, pb: 2 }}>
-              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>Photos</Typography>
-              <Stack direction="row" spacing={1} sx={{ overflowX: "auto" }}>
-                {profileData.photos.map((ph) => (
-                  <Box key={ph.id} component="img" src={ph.url} alt=""
-                    onClick={() => openPreview({ url: ph.url, original_filename: "photo", kind: "image", content_type: "image/jpeg" })}
-                    sx={{ width: 72, height: 72, borderRadius: 1, objectFit: "cover", flexShrink: 0, cursor: "pointer" }} />
-                ))}
-              </Stack>
-            </Box>
-          )}
-          {isMe && (
-            <Box sx={{ px: 2, pb: 2 }}>
-              <Typography variant="subtitle2" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                <LockOutlinedIcon fontSize="small" /> Who can see my photos
-              </Typography>
-              <FormControl fullWidth size="small">
-                <Select value={privacyScope} onChange={(e) => savePrivacy(e.target.value)}>
-                  <MenuItem value="everyone">Everyone</MenuItem>
-                  <MenuItem value="contacts">Contacts only</MenuItem>
-                  <MenuItem value="nobody">Nobody</MenuItem>
-                  <MenuItem value="specific">Specific users</MenuItem>
-                </Select>
-              </FormControl>
-              <Button fullWidth variant="outlined" sx={{ mt: 1.5 }} onClick={() => navigate("/profile")}>
-                Edit profile photos
-              </Button>
-            </Box>
-          )}
-          {!isMe && profileData?.id && (
-            <Stack spacing={1} sx={{ px: 2, pb: 2 }}>
-              <Button variant="contained" onClick={() => startDm(profileData)}>Message</Button>
-              <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={() => addContact(profileData.id)}>Add contact</Button>
-              <Button color="error" variant="outlined" startIcon={<BlockIcon />} onClick={() => blockUser(profileData.id)}>Block</Button>
-            </Stack>
-          )}
-        </Box>
-      );
-    }
-
-    // info
-    const parts = activeConv?.participants || [];
-    return (
-      <Box sx={{ width: isMobile ? "100%" : rightPanelWidth, height: "100%", borderLeft: "1px solid", borderColor: "divider", bgcolor: "background.paper", overflow: "auto" }}>
-        <Stack direction="row" alignItems="center" sx={{ p: 1.5 }}>
-          <Typography fontWeight={700} sx={{ flex: 1 }}>
-            {activeConv?.type === "group" ? "Group info" : "Chat info"}
-          </Typography>
-          <IconButton size="small" onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
-        </Stack>
-        <Divider />
-        <Box sx={{ p: 2, textAlign: "center" }}>
-          <Avatar src={convAvatar(activeConv, meId)} sx={{ width: 80, height: 80, mx: "auto", mb: 1 }}>
-            {convTitle(activeConv, meId)[0]?.toUpperCase()}
-          </Avatar>
-          <Typography variant="h6">{convTitle(activeConv, meId)}</Typography>
-          {peer && <Typography variant="body2" color="text.secondary">@{peer.username}</Typography>}
-        </Box>
-
-        {activeConv?.type === "group" && (
-          <Box sx={{ px: 2, pb: 2 }}>
-            {(role === "owner" || role === "admin") && (
-              <>
-                <TextField fullWidth size="small" label="Group title" defaultValue={activeConv.title || ""}
-                  onBlur={(e) => {
-                    if (e.target.value.trim() && e.target.value !== activeConv.title) patchGroup({ title: e.target.value.trim() });
-                  }} sx={{ mb: 1.5 }} />
-                <TextField fullWidth size="small" label="Description" multiline minRows={2}
-                  defaultValue={activeConv.description || ""}
-                  onBlur={(e) => {
-                    if (e.target.value !== (activeConv.description || "")) patchGroup({ description: e.target.value });
-                  }} sx={{ mb: 1.5 }} />
-                <FormControlLabel
-                  control={<Switch checked={Boolean(activeConv.is_public)} onChange={(e) => patchGroup({ is_public: e.target.checked })} />}
-                  label="Public (searchable)"
-                />
-                <FormControlLabel
-                  control={<Switch checked={Boolean(activeConv.is_closed)} onChange={(e) => patchGroup({ is_closed: e.target.checked })} />}
-                  label="Closed"
-                />
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={activeConv.members_can_add !== false}
-                      onChange={(e) => patchGroup({ members_can_add: e.target.checked })}
-                    />
-                  }
-                  label="Members can add contacts"
-                />
-                <Button size="small" variant="contained" startIcon={<PersonAddIcon />}
-                  sx={{ mt: 1, mb: 1 }}
-                  onClick={async () => { await loadContacts(); setAddMemberSelected([]); setAddMemberOpen(true); }}>
-                  Add from contacts
-                </Button>
-                <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>Invite links</Typography>
-                <Button size="small" variant="outlined" startIcon={<LinkIcon />} onClick={createInvite} sx={{ mb: 1 }}>Create link</Button>
-                {(inviteLinks || []).map((l) => (
-                  <Paper key={l.id} variant="outlined" sx={{ p: 1, mb: 1 }}>
-                    <Typography variant="caption" sx={{ wordBreak: "break-all" }}>{l.url || l.code}</Typography>
-                    <Stack direction="row" spacing={1} mt={0.5}>
-                      <Button size="small" onClick={() => { copyText(l.url || l.code); flash("Copied"); }}>Copy</Button>
-                      <Button size="small" color="error" onClick={() => revokeInvite(l.id)}>Revoke</Button>
-                    </Stack>
-                  </Paper>
-                ))}
-              </>
-            )}
-
-            {(role === "owner" || role === "admin" || activeConv.members_can_add !== false) && (
-              <Button size="small" fullWidth variant="outlined" startIcon={<PersonAddIcon />} sx={{ mb: 1 }}
-                onClick={async () => { await loadContacts(); setAddMemberSelected([]); setAddMemberOpen(true); }}>
-                Add members
-              </Button>
-            )}
-            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
-              Members ({parts.length})
-            </Typography>
-            <List dense>
-              {parts.map((p) => (
-                <ListItemButton key={p.id || p.user?.id} onClick={() => p.user?.id && loadUserProfile(p.user.id)}>
-                  <ListItemAvatar>
-                    <Avatar src={p.user?.avatar || undefined} sx={{ width: 36, height: 36 }}>{p.user?.username?.[0]}</Avatar>
-                  </ListItemAvatar>
-                  <ListItemText primary={p.user?.username} secondary={p.role} />
-                </ListItemButton>
-              ))}
-              {!parts.length && (
-                <Typography variant="body2" color="text.secondary" sx={{ px: 1 }}>No members loaded</Typography>
-              )}
-            </List>
-
-            {(role === "owner" || role === "admin") && (
-              <Button fullWidth color="error" variant="outlined" sx={{ mt: 2 }}
-                onClick={() => setConfirmDelete("group")}>
-                Delete group
-              </Button>
-            )}
-          </Box>
-        )}
-
-        {activeConv?.type === "private" && peer && (
-          <Stack spacing={1} sx={{ px: 2, pb: 2 }}>
-            <Button variant="outlined" onClick={() => loadUserProfile(peer.id)}>View profile</Button>
-            <Button variant="outlined" startIcon={<PersonAddIcon />} onClick={() => addContact(peer.id)}>Add contact</Button>
-            <Button color="error" variant="outlined" startIcon={<BlockIcon />} onClick={() => blockUser(peer.id)}>Block</Button>
-            <Button color="error" variant="contained" startIcon={<DeleteOutlineIcon />}
-              onClick={() => setConfirmDelete("chat")}>
-              Delete chat
-            </Button>
-          </Stack>
-        )}
-      </Box>
-    );
-  };
-
-  /* -------------------- custom context menu -------------------- */
+  /* -------------------- render -------------------- */
 
   const ctxMsg = ctx?.message;
-  const ctxAtts = ctxMsg?.attachments || [];
   const ctxMine = ctxMsg && String(ctxMsg.sender?.id) === String(meId);
 
+  // Right panel content (rendered inside the centered modal Dialog below)
+  const panelIsOpen = Boolean(rightPanel) && rightPanel !== "my-profile";
+
   return (
-    <Box sx={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", bgcolor: "background.default" }}
+    <Box
+      sx={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", bgcolor: "background.default" }}
       onClick={() => { if (ctx) setCtx(null); }}
     >
-      {/* Mobile: always show chat list when no active chat (fixes blank blue screen) */}
+      {/* Mobile sidebar */}
       {isMobile && (!activeId || !mobileShowChat) && (
         <Box sx={{ width: "100%", height: "100%", position: "absolute", inset: 0, zIndex: 2, bgcolor: "background.paper" }}>
-          {sidebarContent}
+          {sidebarEl}
         </Box>
       )}
-
       {/* Desktop sidebar */}
       {!isMobile && (
         <Box sx={{
           width: drawerOpen ? 360 : 0, transition: "width 0.2s", overflow: "hidden", height: "100%",
           borderRight: drawerOpen ? "1px solid" : "none", borderColor: "divider", flexShrink: 0,
         }}>
-          <Box sx={{ width: 360, height: "100%" }}>{sidebarContent}</Box>
+          <Box sx={{ width: 360, height: "100%" }}>{sidebarEl}</Box>
         </Box>
       )}
 
-      {/* Chat: desktop always; mobile only when a chat is open */}
+      {/* Chat pane */}
       <Box sx={{
         flex: 1, height: "100%", minWidth: 0, display: "flex",
         visibility: isMobile && (!activeId || !mobileShowChat) ? "hidden" : "visible",
@@ -1613,140 +1290,124 @@ export default function MessengerApp() {
         {chatPane}
       </Box>
 
-      {!isMobile && rightPanel && rightPanel !== "settings" && rightPanel !== "profile" && renderRightPanel()}
-      {isMobile && rightPanel && rightPanel !== "settings" && rightPanel !== "profile" && (
-        <Drawer anchor="right" open onClose={() => setRightPanel(null)}
-          sx={{ "& .MuiDrawer-paper": { width: "100%", maxWidth: 360 } }}>
-          {renderRightPanel()}
-        </Drawer>
-      )}
+      {/* Centered settings / panel modal (with back-button navigation) */}
+      <Dialog
+        open={panelIsOpen}
+        onClose={closePanel}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3, maxHeight: "90vh", height: "auto", minHeight: 320 } }}
+      >
+        {panelIsOpen && (
+          <RightPanel
+            kind={rightPanel} meId={meId} activeConv={activeConv}
+            profileData={profileData} contacts={contacts} blocks={blocks}
+            inviteLinks={inviteLinks}
+            onlineUsers={onlineUsers}
+            canGoBack={panelHistory.length > 1}
+            onBack={popPanel}
+            onClose={closePanel}
+            onOpenMyProfile={() => pushPanel("my-profile")}
+            onOpenContacts={() => { loadContacts(); pushPanel("contacts"); }}
+            onOpenBlocks={() => { loadBlocks(); pushPanel("blocks"); }}
+            onOpenCreateGroup={() => setCreateGroupOpen(true)}
+            onOpenJoin={() => setJoinOpen(true)}
+            onNavigateHome={() => navigate("/")}
+            onStartDm={startDm}
+            onRemoveContact={removeContact}
+            onUnblock={unblockUser}
+            onPatchGroup={patchGroup}
+            onCreateInvite={createInvite}
+            onRevokeInvite={revokeInvite}
+            onOpenAddMembers={async () => { await loadContacts(); setAddMemberSelected([]); setAddMemberOpen(true); }}
+            onAddContact={addContact}
+            onBlockUser={(uid) => setConfirmBlock({ user: { id: uid } })}
+            onMessage={(u) => startDm(u)}
+            onOpenPhoto={(url) => openPreview({ url, original_filename: "photo", kind: "image", content_type: "image/jpeg" })}
+            onDeleteChat={() => setConfirmDelete({ type: "chat", conv: activeConv })}
+            onDeleteGroup={() => setConfirmDelete({ type: "group", conv: activeConv })}
+            onCleanupChat={() => setConfirmCleanup({ conv: activeConv })}
+            onRemoveMember={removeMember}
+            onChangeMemberRole={changeMemberRole}
+            onTransferOwnership={transferOwnership}
+            onUploadGroupAvatar={uploadGroupAvatar}
+            onClearGroupAvatar={clearGroupAvatar}
+          />
+        )}
+      </Dialog>
 
-      {/* Settings + Profile as centered popups */}
-      <Dialog open={rightPanel === "settings"} onClose={() => setRightPanel(null)} fullWidth maxWidth="xs"
+      {/* My-profile editor dialog */}
+      <Dialog open={rightPanel === "my-profile"} onClose={popPanel} fullWidth maxWidth="sm"
         PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ display: "flex", alignItems: "center" }}>
-          <Typography fontWeight={700} sx={{ flex: 1 }}>Messenger settings</Typography>
-          <IconButton onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
-        </DialogTitle>
         <DialogContent dividers sx={{ p: 0 }}>
-          <List>
-            <ListItemButton onClick={() => setRightPanel("profile")}>
-              <ListItemIcon><AccountCircleIcon /></ListItemIcon>
-              <ListItemText primary="My profile photos" secondary="Upload & privacy" />
-            </ListItemButton>
-            <ListItemButton onClick={() => { loadContacts(); setRightPanel("contacts"); }}>
-              <ListItemIcon><ContactsIcon /></ListItemIcon>
-              <ListItemText primary="Contacts" />
-            </ListItemButton>
-            <ListItemButton onClick={() => { loadBlocks(); setRightPanel("blocks"); }}>
-              <ListItemIcon><BlockIcon /></ListItemIcon>
-              <ListItemText primary="Blocked users" />
-            </ListItemButton>
-            <ListItemButton onClick={() => { setCreateGroupOpen(true); setRightPanel(null); }}>
-              <ListItemIcon><GroupAddIcon /></ListItemIcon>
-              <ListItemText primary="New group" />
-            </ListItemButton>
-            <ListItemButton onClick={() => { setJoinOpen(true); setRightPanel(null); }}>
-              <ListItemIcon><LinkIcon /></ListItemIcon>
-              <ListItemText primary="Join with invite" />
-            </ListItemButton>
-            <Divider />
-            <ListItemButton onClick={() => navigate("/")}>
-              <ListItemIcon><HomeOutlinedIcon /></ListItemIcon>
-              <ListItemText primary="Back to Deployer" />
-            </ListItemButton>
-          </List>
+          <MessengerProfileEditor onClose={popPanel} />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={rightPanel === "profile"} onClose={() => setRightPanel(null)} fullWidth maxWidth="sm"
-        PaperProps={{ sx: { borderRadius: 3 } }}>
-        <DialogTitle sx={{ display: "flex", alignItems: "center" }}>
-          <Typography fontWeight={700} sx={{ flex: 1 }}>Profile</Typography>
-          <IconButton onClick={() => setRightPanel(null)}><CloseIcon /></IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          <MessengerProfileEditor onClose={() => setRightPanel(null)} />
-        </DialogContent>
-      </Dialog>
+      {/* Message right-click context menu */}
+      <ContextMenu ctx={ctx} onClose={() => setCtx(null)}>
+        <MessageContextMenuItems
+          ctxMsg={ctxMsg} isMine={ctxMine}
+          onReply={(m) => { setReplyTo(m); setEditingMsg(null); setCtx(null); inputRef.current?.focus(); }}
+          onReact={(e, m) => { setReactAnchor({ anchorPosition: { top: e.clientY, left: e.clientX }, message: m }); setCtx(null); }}
+          onForward={(m) => { setForwardOpen(m); setCtx(null); }}
+          onCopy={async (m) => { await copyText(typeof m?.body === "string" ? m.body : ""); flash("Copied"); setCtx(null); }}
+          onPreview={(a) => { openPreview(a); setCtx(null); }}
+          onDownload={(a) => { window.open(withTokenQuery(a.url), "_blank"); setCtx(null); }}
+          onEdit={(m) => startEdit(m)}
+          onDelete={(m) => deleteMsg(m)}
+          onShowReaders={(m) => { setReadersMessage(m); setCtx(null); }}
+        />
+      </ContextMenu>
 
-      {/* Custom right-click menu */}
-      {ctx && (
-        <Paper
-          elevation={8}
-          onClick={(e) => e.stopPropagation()}
-          onContextMenu={(e) => e.preventDefault()}
-          sx={{
-            position: "fixed",
-            top: Math.min(ctx.y, window.innerHeight - 320),
-            left: Math.min(ctx.x, window.innerWidth - 220),
-            zIndex: 2000,
-            minWidth: 200,
-            py: 0.5,
-            borderRadius: 2,
-          }}
-        >
-          <MenuItem onClick={() => { setReplyTo(ctxMsg); setEditingMsg(null); setCtx(null); inputRef.current?.focus(); }}>
-            <ListItemIcon><ReplyIcon fontSize="small" /></ListItemIcon> Reply
-          </MenuItem>
-          <MenuItem onClick={(e) => {
-            setReactAnchor({ anchorEl: e.currentTarget, message: ctxMsg });
-            setCtx(null);
-          }}>
-            <ListItemIcon><EmojiEmotionsIcon fontSize="small" /></ListItemIcon> React
-          </MenuItem>
-          <MenuItem onClick={() => { setForwardOpen(ctxMsg); setCtx(null); }}>
-            <ListItemIcon><ForwardIcon fontSize="small" /></ListItemIcon> Forward
-          </MenuItem>
-          <MenuItem onClick={async () => {
-            await copyText(typeof ctxMsg?.body === "string" ? ctxMsg.body : "");
-            flash("Copied");
-            setCtx(null);
-          }}>
-            <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon> Copy text
-          </MenuItem>
-          {ctxAtts.map((a) => (
-            <MenuItem key={a.id} onClick={() => { openPreview(a); setCtx(null); }}>
-              <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
-              Preview {a.original_filename || "file"}
-            </MenuItem>
-          ))}
-          {ctxAtts.map((a) => (
-            <MenuItem key={`dl-${a.id}`} onClick={() => { window.open(a.url, "_blank"); setCtx(null); }}>
-              <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
-              Download {a.original_filename || "file"}
-            </MenuItem>
-          ))}
-          {ctxMine && (
-            <MenuItem onClick={() => startEdit(ctxMsg)}>
-              <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon> Edit
-            </MenuItem>
-          )}
-          {ctxMine && (
-            <MenuItem onClick={() => deleteMsg(ctxMsg)} sx={{ color: "error.main" }}>
-              <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete
-            </MenuItem>
-          )}
-        </Paper>
-      )}
-
+      {/* Emoji react popover — uses anchorPosition to avoid losing the anchor
+          element when the context menu closes (which caused the popover to
+          jump to the top-left corner). */}
       <Popover
         open={Boolean(reactAnchor)}
-        anchorEl={reactAnchor?.anchorEl}
+        anchorReference="anchorPosition"
+        anchorPosition={reactAnchor?.anchorPosition || { top: 100, left: 100 }}
         onClose={() => setReactAnchor(null)}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         transformOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Stack direction="row" spacing={0.25} sx={{ p: 0.75, flexWrap: "wrap", maxWidth: 280 }}>
           {REACTIONS.map((em) => (
-            <IconButton key={em} size="small" onClick={() => react(reactAnchor.message.id, em)} sx={{ fontSize: 22 }}>
+            <IconButton key={em} size="small"
+              onClick={() => react(reactAnchor.message.id, em)} sx={{ fontSize: 22 }}>
               {em}
             </IconButton>
           ))}
         </Stack>
       </Popover>
 
-      {/* Media / file preview popup */}
+      {/* Image crop dialog */}
+      <ImageCropDialog
+        open={Boolean(cropFile)}
+        file={cropFile}
+        onClose={() => setCropFile(null)}
+        onConfirm={(blob, filename) => {
+          const cropped = new File([blob], filename, { type: "image/jpeg" });
+          setFiles((prev) => [...prev, cropped]);
+          setCropFile(null);
+        }}
+      />
+
+      {/* Read receipts ("Seen by") dialog */}
+      <ReadReceiptsDialog
+        message={readersMessage}
+        onClose={() => setReadersMessage(null)}
+      />
+
+      {/* In-chat media gallery dialog (image / video, with < > navigation) */}
+      <MediaGalleryDialog
+        open={Boolean(galleryState)}
+        conversationId={activeId}
+        startAttachment={galleryState?.startAttachment}
+        onClose={() => setGalleryState(null)}
+      />
+
+      {/* Text / file preview dialog (non-media) */}
       <Dialog open={Boolean(preview)} onClose={() => setPreview(null)} maxWidth="md" fullWidth
         PaperProps={{ sx: { bgcolor: "background.default" } }}>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -1754,31 +1415,22 @@ export default function MessengerApp() {
             {preview?.att?.original_filename || "Preview"}
           </Typography>
           {preview?.att?.url && (
-            <IconButton onClick={() => window.open(preview.att.url, "_blank")}><DownloadIcon /></IconButton>
+            <IconButton onClick={() => window.open(withTokenQuery(preview.att.url), "_blank")}>
+              <DownloadIcon />
+            </IconButton>
           )}
-          <IconButton onClick={() => setPreview(null)}><CloseIcon /></IconButton>
+          <IconButton onClick={() => setPreview(null)}><ArrowBackIcon /></IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ minHeight: 240, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          {preview?.kind === "image" && (
-            <Box component="img" src={preview.att.url} alt="" sx={{ maxWidth: "100%", maxHeight: "70vh", borderRadius: 1 }} />
-          )}
-          {preview?.kind === "video" && (
-            <Box component="video" src={preview.att.url} controls autoPlay sx={{ maxWidth: "100%", maxHeight: "70vh" }} />
-          )}
-          {preview?.kind === "audio" && (
-            <Box sx={{ width: "100%", p: 2 }}>
-              <Typography gutterBottom>{preview.att.original_filename}</Typography>
-              <audio src={preview.att.url} controls style={{ width: "100%" }} />
-            </Box>
-          )}
           {preview?.kind === "pdf" && (
-            <Box component="iframe" src={preview.att.url} title="pdf"
+            <Box component="iframe" src={withTokenQuery(preview.att.url)} title="pdf"
               sx={{ width: "100%", height: "70vh", border: 0, borderRadius: 1 }} />
           )}
           {preview?.kind === "text" && (
             <Box component="pre" sx={{
               m: 0, p: 2, width: "100%", maxHeight: "70vh", overflow: "auto",
-              bgcolor: "action.hover", borderRadius: 1, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-word",
+              bgcolor: "action.hover", borderRadius: 1, fontSize: 13,
+              whiteSpace: "pre-wrap", wordBreak: "break-word",
             }}>
               {preview.textContent}
             </Box>
@@ -1787,7 +1439,7 @@ export default function MessengerApp() {
             <Stack alignItems="center" spacing={2}>
               <Typography>No inline preview for this file type.</Typography>
               <Button variant="contained" startIcon={<DownloadIcon />}
-                onClick={() => window.open(preview.att.url, "_blank")}>
+                onClick={() => window.open(withTokenQuery(preview.att.url), "_blank")}>
                 Download
               </Button>
             </Stack>
@@ -1795,6 +1447,7 @@ export default function MessengerApp() {
         </DialogContent>
       </Dialog>
 
+      {/* Forward dialog */}
       <Dialog open={Boolean(forwardOpen)} onClose={() => setForwardOpen(null)} fullWidth maxWidth="xs">
         <DialogTitle>Forward to…</DialogTitle>
         <DialogContent dividers sx={{ maxHeight: 360 }}>
@@ -1812,10 +1465,12 @@ export default function MessengerApp() {
         <DialogActions><Button onClick={() => setForwardOpen(null)}>Cancel</Button></DialogActions>
       </Dialog>
 
+      {/* Create group dialog */}
       <Dialog open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>New group</DialogTitle>
         <DialogContent>
-          <TextField fullWidth label="Group title" value={groupTitle} onChange={(e) => setGroupTitle(e.target.value)} sx={{ mt: 1 }} />
+          <TextField fullWidth label="Group title" value={groupTitle}
+            onChange={(e) => setGroupTitle(e.target.value)} sx={{ mt: 1 }} />
           <FormControlLabel sx={{ mt: 1.5 }}
             control={<Switch checked={groupPublic} onChange={(e) => setGroupPublic(e.target.checked)} />}
             label="Public (appears in search)" />
@@ -1826,10 +1481,12 @@ export default function MessengerApp() {
         </DialogActions>
       </Dialog>
 
+      {/* Join invite dialog */}
       <Dialog open={joinOpen} onClose={() => setJoinOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Join with invite code</DialogTitle>
         <DialogContent>
-          <TextField fullWidth label="Invite code" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} sx={{ mt: 1 }} />
+          <TextField fullWidth label="Invite code" value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)} sx={{ mt: 1 }} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setJoinOpen(false)}>Cancel</Button>
@@ -1837,6 +1494,7 @@ export default function MessengerApp() {
         </DialogActions>
       </Dialog>
 
+      {/* Add members dialog */}
       <Dialog open={addMemberOpen} onClose={() => setAddMemberOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Add members from contacts</DialogTitle>
         <DialogContent dividers sx={{ maxHeight: 360 }}>
@@ -1848,8 +1506,7 @@ export default function MessengerApp() {
               const already = (activeConv?.participants || []).some((p) => String(p.user?.id) === String(u.id));
               return (
                 <ListItemButton
-                  key={u.id}
-                  disabled={already}
+                  key={u.id} disabled={already}
                   onClick={() => {
                     setAddMemberSelected((prev) =>
                       checked ? prev.filter((x) => x !== u.id) : [...prev, u.id]
@@ -1859,7 +1516,10 @@ export default function MessengerApp() {
                   <ListItemAvatar>
                     <Avatar src={u.avatar || undefined}>{u.username?.[0]}</Avatar>
                   </ListItemAvatar>
-                  <ListItemText primary={u.username} secondary={already ? "Already in group" : (checked ? "Selected" : "")} />
+                  <ListItemText
+                    primary={u.username}
+                    secondary={already ? "Already in group" : (checked ? "Selected" : "")}
+                  />
                 </ListItemButton>
               );
             })}
@@ -1878,21 +1538,49 @@ export default function MessengerApp() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(confirmDelete)} onClose={() => setConfirmDelete(null)}>
-        <DialogTitle>{confirmDelete === "group" ? "Delete group?" : "Delete chat?"}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {confirmDelete === "group"
-              ? "This permanently deletes the group and all messages for everyone."
-              : "This deletes the conversation for both sides."}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={deleteConversation}>Delete</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Sensitive-operation confirmation dialogs */}
+      <ConfirmDialog
+        open={Boolean(confirmDelete)}
+        title={confirmDelete?.type === "group" ? "Delete group?" : "Delete chat?"}
+        message={confirmDelete?.type === "group"
+          ? "This permanently deletes the group and all messages for everyone. This cannot be undone."
+          : "This deletes the conversation for both sides. This cannot be undone."}
+        confirmLabel="Delete"
+        confirmColor="error"
+        onConfirm={deleteConversation}
+        onClose={() => setConfirmDelete(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(confirmCleanup)}
+        title="Clear messages?"
+        message="This clears all messages in this conversation for you. Other participants will still see their copies. This cannot be undone."
+        confirmLabel="Clear"
+        confirmColor="warning"
+        onConfirm={cleanupConversation}
+        onClose={() => setConfirmCleanup(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(confirmBlock)}
+        title="Block user?"
+        message={confirmBlock?.user?.username
+          ? `@${confirmBlock.user.username} will no longer be able to message you. They'll be removed from your contacts.`
+          : "This user will no longer be able to message you. They'll be removed from your contacts."}
+        confirmLabel="Block"
+        confirmColor="error"
+        onConfirm={() => confirmBlock?.user?.id && blockUser(confirmBlock.user.id)}
+        onClose={() => setConfirmBlock(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(confirmLeave)}
+        title="Leave chat?"
+        message="You will no longer receive messages from this chat. Other members will see that you left."
+        confirmLabel="Leave"
+        confirmColor="warning"
+        onConfirm={leaveChat}
+        onClose={() => setConfirmLeave(null)}
+      />
 
+      {/* Toasts */}
       {toast && (
         <Fade in>
           <Chip label={toast} color="success"
@@ -1906,10 +1594,57 @@ export default function MessengerApp() {
         </Fade>
       )}
       {!hashReady && (
-        <Box sx={{ position: "fixed", inset: 0, bgcolor: "background.default", zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Box sx={{
+          position: "fixed", inset: 0, bgcolor: "background.default",
+          zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
           <CircularProgress />
         </Box>
       )}
+    </Box>
+  );
+}
+
+/**
+ * Telegram-style "Add to contacts?" banner shown at the top of a private chat
+ * when the peer is not yet in the user's contacts.
+ *
+ * Behaviour:
+ *  - Clicking "Add" calls onAdd() and the parent calls the contacts API
+ *  - Clicking X dismisses the banner for the current session (per-peer)
+ */
+function AddToContactsBanner({ username, onAdd }) {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+        px: 2,
+        py: 1,
+        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(33,150,243,0.12)" : "rgba(33,150,243,0.08)",
+        borderBottom: "1px solid",
+        borderColor: "divider",
+      }}
+    >
+      <PersonAddIcon fontSize="small" color="primary" />
+      <Typography variant="body2" sx={{ flex: 1 }}>
+        <strong>@{username || "this user"}</strong> is not in your contacts. Add them?
+      </Typography>
+      <Button
+        size="small"
+        variant="contained"
+        color="primary"
+        startIcon={<PersonAddIcon />}
+        onClick={() => { onAdd(); setDismissed(true); }}
+      >
+        Add
+      </Button>
+      <IconButton size="small" onClick={() => setDismissed(true)}>
+        <CloseIcon fontSize="small" />
+      </IconButton>
     </Box>
   );
 }
