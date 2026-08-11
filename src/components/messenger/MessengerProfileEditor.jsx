@@ -136,6 +136,11 @@ export default function MessengerProfileEditor({ onClose }) {
       await apiRequest({ url: `${API_BASE}profile/set/`, method: "POST", data: form });
       flash("Photo added");
       await load();
+      // Notify all conversations the user is part of that their profile changed
+      // so the new avatar propagates everywhere in real time.
+      try {
+        await apiRequest({ method: "POST", url: `${MSG_API}/me/profile-broadcast/` });
+      } catch { /* optional */ }
     } catch (err) {
       const msg = err?.response?.data?.message || err?.response?.data?.errors || "Upload failed";
       setError(typeof msg === "string" ? msg : JSON.stringify(msg));
@@ -153,11 +158,18 @@ export default function MessengerProfileEditor({ onClose }) {
       });
       flash("Deleted");
       await load();
+      // Broadcast the change so other chats see the avatar removed/changed
+      try {
+        await apiRequest({ method: "POST", url: `${MSG_API}/me/profile-broadcast/` });
+      } catch { /* optional */ }
     } catch {
       try {
         await apiRequest({ url: `${API_BASE}profile/delete/?id=${id}`, method: "DELETE" });
         flash("Deleted");
         await load();
+        try {
+          await apiRequest({ method: "POST", url: `${MSG_API}/me/profile-broadcast/` });
+        } catch { /* optional */ }
       } catch (e2) {
         setError(e2?.response?.data?.message || "Delete failed");
       }
@@ -186,6 +198,10 @@ export default function MessengerProfileEditor({ onClose }) {
       setBio(text);
       setBioEditing(false);
       flash("Bio saved");
+      // Broadcast so other chats/profiles see the new bio
+      try {
+        await apiRequest({ method: "POST", url: `${MSG_API}/me/profile-broadcast/` });
+      } catch { /* optional */ }
     } catch (e) {
       setError(e?.response?.data?.message || "Bio save failed");
     }
@@ -237,6 +253,11 @@ export default function MessengerProfileEditor({ onClose }) {
         data: { order: orderMap },
       });
       flash("Order saved");
+      // Reordering can change which photo is the primary avatar — broadcast
+      // so other chats see the new primary avatar.
+      try {
+        await apiRequest({ method: "POST", url: `${MSG_API}/me/profile-broadcast/` });
+      } catch { /* optional */ }
     } catch (err) {
       setError(err?.response?.data?.message || "Reorder failed");
       await load(); // rollback

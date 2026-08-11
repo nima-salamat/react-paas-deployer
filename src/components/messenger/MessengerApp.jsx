@@ -129,6 +129,10 @@ export default function MessengerApp() {
   const [blocks, setBlocks] = useState([]);
   const [inviteLinks, setInviteLinks] = useState([]);
   const [publicGroups, setPublicGroups] = useState([]);
+  // Join requests (Telegram-style — for public groups that require approval)
+  const [myJoinRequests, setMyJoinRequests] = useState([]);   // requests the current user has sent
+  const [convJoinRequests, setConvJoinRequests] = useState([]); // requests pending on the active group (admin view)
+  const [myRequestsBadge, setMyRequestsBadge] = useState(0);  // count of pending outgoing requests
 
   // Misc
   const [toast, setToast] = useState("");
@@ -160,8 +164,29 @@ export default function MessengerApp() {
   const searchTimer = useRef(null);
   const activeIdRef = useRef(null);
   const bootstrapped = useRef(false);
+  // Mirror state into refs so the WebSocket handler (which is bound once on mount)
+  // can read the latest values without re-binding every render.
+  const panelHistoryRef = useRef([]);
+  const profileDataRef = useRef(null);
+  useEffect(() => { panelHistoryRef.current = panelHistory; }, [panelHistory]);
+  useEffect(() => { profileDataRef.current = profileData; }, [profileData]);
 
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+  // Auto-load join requests when the active group requires approval and the
+  // current user is an admin (so the "Join requests (N)" badge is up-to-date).
+  useEffect(() => {
+    if (!activeDetail || activeDetail.type !== "group") {
+      setConvJoinRequests([]);
+      return;
+    }
+    if (!activeDetail.requires_approval) {
+      setConvJoinRequests([]);
+      return;
+    }
+    const role = myRole(activeDetail, meId);
+    if (role !== "owner" && role !== "admin") return;
+    loadConvJoinRequests(activeDetail.id);
+  }, [activeDetail?.id, activeDetail?.requires_approval, meId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -396,7 +421,7 @@ export default function MessengerApp() {
       // Member changes — reload conversation detail + messages
       if ([
         "member.left", "member.removed", "member.role_changed",
-        "ownership.transferred", "conversation.deleted",
+        "ownership.transferred", "conversation.deleted", "member.joined",
       ].includes(data.type)) {
         // If the current user was removed from the group, redirect them out
         if (
@@ -410,11 +435,65 @@ export default function MessengerApp() {
           loadConversations({ silent: false });
           return;
         }
+        // If user left (themselves) — they were the leaver; close chat
+        if (
+          data.type === "member.left"
+          && String(data.user_id) === String(meId)
+        ) {
+          flash("You left the group");
+          closeChat();
+          loadConversations({ silent: false });
+          return;
+        }
         if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
           loadConversationDetail(data.conversation_id);
           loadMessages(data.conversation_id, { silent: true });
+          // If admin is viewing this group's join requests panel, refresh those too
+          if (panelHistoryRef.current.includes("join-requests")) {
+            loadConvJoinRequests(data.conversation_id);
+          }
         }
         loadConversations({ silent: true });
+      }
+      // Profile update — another user's avatar/bio/username changed.
+      // Reload everything so the new avatar propagates to chat list, chat header,
+      // member list, etc.
+      if (data.type === "profile.update") {
+        loadConversations({ silent: true });
+        if (activeIdRef.current) {
+          loadConversationDetail(activeIdRef.current);
+          loadMessages(activeIdRef.current, { silent: true });
+        }
+        // If the profile panel is showing this user, refresh it too
+        if (profileDataRef.current?.id && String(profileDataRef.current.id) === String(data.user_id)) {
+          refreshProfileData(profileDataRef.current.id);
+        }
+      }
+      // Join request events (Telegram-style — public groups requiring approval)
+      if ([
+        "join_request.new", "join_request.approved",
+        "join_request.rejected", "join_request.cancelled",
+      ].includes(data.type)) {
+        // If admin is viewing this group's join requests panel, refresh
+        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
+          loadConvJoinRequests(data.conversation_id);
+        }
+        // Refresh the user's own outgoing requests list
+        if (panelHistoryRef.current.includes("my-requests")) {
+          loadMyJoinRequests();
+        }
+        // If approved — open the chat
+        if (data.type === "join_request.approved" && String(data.user_id) === String(meId)) {
+          flash("Your join request was approved!");
+          loadConversations({ silent: false }).then((list) => {
+            const conv = list.find((c) => String(c.id) === String(data.conversation_id));
+            if (conv) openChat(conv);
+          });
+        }
+        if (data.type === "join_request.rejected" && String(data.user_id) === String(meId)) {
+          flash("Your join request was rejected");
+          loadMyJoinRequests();
+        }
       }
     };
     const ping = setInterval(() => {
@@ -790,6 +869,121 @@ export default function MessengerApp() {
     }
   };
 
+  // Notify all conversations the current user is part of that their profile
+  // (avatar / bio / username) has changed. The backend fans out a
+  // `profile.update` WebSocket event so every chat the user is in refreshes
+  // its avatar copy. Called after the user uploads/clears a profile photo
+  // or updates their bio.
+  const broadcastProfileUpdate = async () => {
+    try {
+      await apiRequest({ method: "POST", url: `${MSG_API}/me/profile-broadcast/` });
+    } catch { /* */ }
+  };
+
+  // ─── Join Requests (Telegram-style — public groups requiring approval) ───
+
+  // Join (or request to join) a public group directly from the search results.
+  // If the group has `requires_approval=true`, this creates a pending request.
+  // Otherwise the user is added as a member immediately and the chat opens.
+  const joinPublicGroup = async (group) => {
+    if (!group?.id) return;
+    try {
+      const res = await apiRequest({
+        method: "POST", url: `${MSG_API}/groups/${group.id}/join/`,
+      });
+      const data = unwrapData(res);
+      if (data?.pending) {
+        flash("Join request sent — waiting for admin approval");
+        // Refresh search results so the button shows "Pending"
+        searchPublicGroups(publicSearchQRef.current || "");
+        loadMyJoinRequests();
+      } else if (data?.joined && data?.conversation) {
+        flash("Joined group");
+        await loadConversations({ silent: false });
+        openChat(data.conversation);
+      }
+    } catch (e) {
+      setError(e?.response?.data?.message || "Join failed");
+    }
+  };
+
+  // Cancel (delete) the current user's own pending join request.
+  const cancelJoinRequest = async (reqId) => {
+    if (!reqId) return;
+    try {
+      await apiRequest({ method: "DELETE", url: `${MSG_API}/join-requests/${reqId}/` });
+      flash("Request cancelled");
+      // Update local state immediately
+      setMyJoinRequests((prev) => prev.filter((r) => r.id !== reqId));
+      setMyRequestsBadge((n) => Math.max(0, n - 1));
+      // Refresh search results so the button no longer shows "Pending"
+      searchPublicGroups(publicSearchQRef.current || "");
+    } catch (e) {
+      setError(e?.response?.data?.message || "Cancel failed");
+    }
+  };
+
+  // Load the current user's outgoing join requests (any status).
+  const loadMyJoinRequests = async () => {
+    try {
+      const res = await apiRequest({ method: "GET", url: `${MSG_API}/me/join-requests/` });
+      const list = unwrapData(res) || [];
+      setMyJoinRequests(list);
+      setMyRequestsBadge(list.filter((r) => r.status === "pending").length);
+      return list;
+    } catch {
+      return [];
+    }
+  };
+
+  // Load pending join requests for a specific group (admin view).
+  const loadConvJoinRequests = async (convId) => {
+    if (!convId) return;
+    try {
+      const res = await apiRequest({
+        method: "GET", url: `${MSG_API}/conversations/${convId}/join-requests/`,
+      });
+      setConvJoinRequests(unwrapData(res) || []);
+    } catch {
+      setConvJoinRequests([]);
+    }
+  };
+
+  // Approve or reject a join request (admin only).
+  const actOnJoinRequest = async (convId, reqId, action) => {
+    try {
+      await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${convId}/join-requests/${reqId}/action/`,
+        data: { action },
+      });
+      flash(action === "approve" ? "Request approved — user added" : "Request rejected");
+      loadConvJoinRequests(convId);
+      // Also refresh the conversation detail (member count changed on approve)
+      if (action === "approve") {
+        loadConversationDetail(convId);
+      }
+    } catch (e) {
+      setError(e?.response?.data?.message || "Action failed");
+    }
+  };
+
+  // Refresh the profile panel data (used after a profile.update WS event
+  // so the avatar/bio shown in the panel reflects the latest server state).
+  const refreshProfileData = async (userId) => {
+    if (!userId) return;
+    try {
+      const res = await apiRequest({ method: "GET", url: `${MSG_API}/users/${userId}/profile/` });
+      const data = unwrapData(res);
+      if (data) setProfileData(data);
+    } catch { /* */ }
+  };
+
+  // Ref mirror for the public-group search query (used inside WS callbacks
+  // to refresh search results after a join/cancel without needing to lift
+  // the search input state to the parent).
+  const publicSearchQRef = useRef("");
+
   // Group management — remove member, promote/demote admin, transfer ownership
   const removeMember = async (convId, userId) => {
     try {
@@ -909,6 +1103,8 @@ export default function MessengerApp() {
   };
 
   const searchPublicGroups = async (q) => {
+    // Track the latest query so we can refresh results after a join/cancel
+    publicSearchQRef.current = q || "";
     try {
       const res = await apiRequest({
         method: "GET", url: `${MSG_API}/groups/search/?q=${encodeURIComponent(q || "")}`,
@@ -1236,6 +1432,7 @@ export default function MessengerApp() {
       startDm={startDm} addContact={addContact}
       listTab={listTab} setListTab={setListTab}
       publicGroups={publicGroups} searchPublicGroups={searchPublicGroups}
+      onJoinPublicGroup={joinPublicGroup}
       onTogglePin={togglePin}
       onMarkRead={markChatRead}
       onCleanupChat={(conv) => setConfirmCleanup({ conv })}
@@ -1245,6 +1442,7 @@ export default function MessengerApp() {
       onOpenCreateGroup={() => setCreateGroupOpen(true)}
       onOpenJoin={() => setJoinOpen(true)}
       onOpenSettings={() => pushPanel("settings")}
+      onOpenMyRequests={() => { loadMyJoinRequests(); pushPanel("my-requests"); }}
       onNavigateHome={() => navigate("/")}
       onlineUsers={onlineUsers}
     />
@@ -1304,12 +1502,16 @@ export default function MessengerApp() {
             profileData={profileData} contacts={contacts} blocks={blocks}
             inviteLinks={inviteLinks}
             onlineUsers={onlineUsers}
+            myJoinRequests={myJoinRequests}
+            convJoinRequests={convJoinRequests}
             canGoBack={panelHistory.length > 1}
             onBack={popPanel}
             onClose={closePanel}
             onOpenMyProfile={() => pushPanel("my-profile")}
             onOpenContacts={() => { loadContacts(); pushPanel("contacts"); }}
             onOpenBlocks={() => { loadBlocks(); pushPanel("blocks"); }}
+            onOpenMyRequests={() => { loadMyJoinRequests(); pushPanel("my-requests"); }}
+            onOpenConvJoinRequests={() => { loadConvJoinRequests(activeConv?.id); pushPanel("conv-requests"); }}
             onOpenCreateGroup={() => setCreateGroupOpen(true)}
             onOpenJoin={() => setJoinOpen(true)}
             onNavigateHome={() => navigate("/")}
@@ -1332,6 +1534,8 @@ export default function MessengerApp() {
             onTransferOwnership={transferOwnership}
             onUploadGroupAvatar={uploadGroupAvatar}
             onClearGroupAvatar={clearGroupAvatar}
+            onCancelJoinRequest={cancelJoinRequest}
+            onActOnJoinRequest={actOnJoinRequest}
           />
         )}
       </Dialog>

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import {
   Box, Stack, Typography, IconButton, TextField, InputAdornment, Avatar,
   List, ListItemButton, ListItemAvatar, ListItemText, CircularProgress,
-  Tabs, Tab, Badge, MenuItem, ListItemIcon, alpha,
+  Tabs, Tab, Badge, MenuItem, ListItemIcon, alpha, Button,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
@@ -20,6 +20,8 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import LogoutIcon from "@mui/icons-material/Logout";
 import BlockIcon from "@mui/icons-material/Block";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import {
   convAvatar, convTitle, formatTime, formatUnread,
 } from "../messengerUtils";
@@ -30,10 +32,14 @@ import OnlineDot from "./OnlineDot";
  * Sidebar — chat list, tabs (Chats / Public groups), user search,
  * right-click context menu on chat rows (pin / mark read / cleanup / delete / leave / block).
  *
- * Search-result behaviour:
- *   Clicking a search result opens the OTHER user's profile (read-only).
- *   It does NOT start a DM and does NOT add the user to contacts.
- *   The user can then choose "Message" (start DM) or "Add contact" from the profile.
+ * Public groups tab behaviour (Telegram-style):
+ *   - Public groups are NEVER listed automatically.
+ *   - The user must type a query in the search box — results appear as they type.
+ *   - Each result has a button:
+ *       • "Join"      if the group is open (no approval required)
+ *       • "Request"   if the group requires admin approval
+ *       • "Pending"   if the user already has a pending request (clicking cancels)
+ *       • "Open"      if the user is already a member
  *
  * Props (all callbacks/state passed down from parent):
  *  - meId, conversations, loadingConvs
@@ -43,9 +49,11 @@ import OnlineDot from "./OnlineDot";
  *  - startDm: (user) => void               (only called when user explicitly picks "Message")
  *  - addContact: (userId) => void
  *  - listTab, setListTab, publicGroups, searchPublicGroups
+ *  - onJoinPublicGroup: (group) => void    (direct join or send request)
  *  - onTogglePin(conv), onMarkRead(conv), onCleanupChat(conv), onLeaveChat(conv),
  *    onDeleteChat(conv), onBlockPeer(peer)
  *  - onOpenCreateGroup, onOpenJoin, onOpenSettings, onNavigateHome
+ *  - onOpenMyRequests: () => void          (open the "My Join Requests" panel)
  */
 export default function Sidebar({
   meId, conversations, loadingConvs,
@@ -53,11 +61,14 @@ export default function Sidebar({
   searchQ, setSearchQ, searchResults, searching,
   onViewUserProfile, startDm, addContact,
   listTab, setListTab, publicGroups, searchPublicGroups,
+  onJoinPublicGroup,
   onTogglePin, onMarkRead, onCleanupChat, onLeaveChat, onDeleteChat, onBlockPeer,
   onOpenCreateGroup, onOpenJoin, onOpenSettings, onNavigateHome,
+  onOpenMyRequests,
   onlineUsers,
 }) {
   const [ctx, setCtx] = useState(null); // { x, y, conv, peer, role }
+  const [publicSearchQ, setPublicSearchQ] = useState("");
 
   const onRowContext = (e, conv) => {
     e.preventDefault();
@@ -67,6 +78,23 @@ export default function Sidebar({
       : null;
     const myP = (conv.participants || []).find((p) => String(p.user?.id) === String(meId ?? ""));
     setCtx({ x: e.clientX, y: e.clientY, conv, peer: other, role: myP?.role || "member" });
+  };
+
+  // Local handler for the public-group search input — debounces + clears
+  // when the user empties the box (so public groups never show by default).
+  const publicSearchTimer = React.useRef(null);
+  const onPublicSearchChange = (e) => {
+    const v = e.target.value;
+    setPublicSearchQ(v);
+    if (publicSearchTimer.current) clearTimeout(publicSearchTimer.current);
+    if (!v.trim()) {
+      // Clear immediately when empty
+      searchPublicGroups("");
+      return;
+    }
+    publicSearchTimer.current = setTimeout(() => {
+      searchPublicGroups(v);
+    }, 280);
   };
 
   return (
@@ -113,7 +141,14 @@ export default function Sidebar({
       </Box>
 
       {!searchQ.trim() && (
-        <Tabs value={listTab} onChange={(_, v) => { setListTab(v); if (v === 1) searchPublicGroups(""); }}
+        <Tabs value={listTab} onChange={(_, v) => {
+          setListTab(v);
+          // When switching to "Public groups" tab, do NOT auto-load — clear results
+          if (v === 1) {
+            setPublicSearchQ("");
+            searchPublicGroups("");
+          }
+        }}
           variant="fullWidth" sx={{ minHeight: 36, "& .MuiTab-root": { minHeight: 36, py: 0.5, fontSize: 13 } }}>
           <Tab label="Chats" />
           <Tab label="Public groups" />
@@ -158,18 +193,114 @@ export default function Sidebar({
           )}
         </List>
       ) : listTab === 1 ? (
-        <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
-          <Box sx={{ px: 1.25, py: 1 }}>
-            <TextField fullWidth size="small" placeholder="Search public groups…"
-              onChange={(e) => searchPublicGroups(e.target.value)} />
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <Box sx={{ px: 1.25, py: 1.25 }}>
+            <TextField
+              fullWidth size="small"
+              placeholder="Search public groups by name…"
+              value={publicSearchQ}
+              onChange={onPublicSearchChange}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+                endAdornment: publicSearchQ ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => {
+                      setPublicSearchQ("");
+                      searchPublicGroups("");
+                    }}><CloseIcon fontSize="small" /></IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, px: 0.5 }}>
+              Type to discover public groups. They are not listed automatically.
+            </Typography>
           </Box>
-          {publicGroups.map((g) => (
-            <ListItemButton key={g.id} onClick={() => openChat(g)}>
-              <ListItemAvatar><Avatar src={g.avatar || undefined}><PublicIcon /></Avatar></ListItemAvatar>
-              <ListItemText primary={g.title} secondary={g.description || "Public group"} />
-            </ListItemButton>
-          ))}
-        </List>
+          <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
+            {publicGroups.map((g) => {
+              const isMember = Boolean(g.is_member);
+              const pending = Boolean(g.my_pending_request);
+              const requiresApproval = Boolean(g.requires_approval);
+              return (
+                <ListItemButton
+                  key={g.id}
+                  onClick={() => isMember && openChat(g)}
+                  sx={{ py: 1, opacity: isMember ? 1 : 0.9 }}
+                >
+                  <ListItemAvatar>
+                    <Avatar src={g.avatar_url || g.avatar || undefined}><PublicIcon /></Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography component="span" noWrap fontWeight={600}>{g.title}</Typography>
+                        {requiresApproval && (
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{
+                              bgcolor: alpha("#9c27b0", 0.12),
+                              color: "#9c27b0",
+                              px: 0.5, borderRadius: 1, fontSize: 10, lineHeight: "16px",
+                            }}
+                          >
+                            approval
+                          </Typography>
+                        )}
+                      </Stack>
+                    }
+                    secondary={
+                      <Typography variant="body2" color="text.secondary" component="span" noWrap>
+                        {(g.participants?.length || 0) + " members"}
+                        {g.description ? ` · ${g.description}` : ""}
+                      </Typography>
+                    }
+                  />
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    {isMember ? (
+                      <Button size="small" color="primary" startIcon={<HowToRegIcon fontSize="small" />}
+                        onClick={(e) => { e.stopPropagation(); openChat(g); }}>
+                        Open
+                      </Button>
+                    ) : pending ? (
+                      <Button size="small" disabled startIcon={<HourglassEmptyIcon fontSize="small" />}>
+                        Pending
+                      </Button>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant={requiresApproval ? "outlined" : "contained"}
+                        onClick={(e) => { e.stopPropagation(); onJoinPublicGroup(g); }}
+                      >
+                        {requiresApproval ? "Request" : "Join"}
+                      </Button>
+                    )}
+                  </Stack>
+                </ListItemButton>
+              );
+            })}
+            {publicSearchQ.trim() && !publicGroups.length && (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
+                No public groups match "{publicSearchQ}"
+              </Typography>
+            )}
+            {!publicSearchQ.trim() && (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
+                Start typing to search public groups.
+              </Typography>
+            )}
+          </List>
+          {/* "My requests" entry — shows pending requests the current user has sent */}
+          <Box sx={{ p: 1, borderTop: "1px solid", borderColor: "divider" }}>
+            <Button size="small" fullWidth startIcon={<HourglassEmptyIcon fontSize="small" />} onClick={onOpenMyRequests}>
+              My join requests
+            </Button>
+          </Box>
+        </Box>
       ) : (
         <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
           {loadingConvs && <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress size={22} /></Box>}

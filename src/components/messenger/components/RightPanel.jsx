@@ -20,6 +20,10 @@ import CrownIcon from "@mui/icons-material/EmojiEvents";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import CheckIcon from "@mui/icons-material/Check";
+import CloseIcon from "@mui/icons-material/Close";
+import HowToRegIcon from "@mui/icons-material/HowToReg";
 import {
   convAvatar, convTitle, peerUser, myRole,
 } from "../messengerUtils";
@@ -28,7 +32,7 @@ import ContextMenu from "./ContextMenu";
 import OnlineDot from "./OnlineDot";
 
 /**
- * Right panel — settings menu / contacts / blocked / info / profile.
+ * Right panel — settings menu / contacts / blocked / info / profile / join-requests.
  * Rendered inside a centered modal Dialog (see MessengerApp). The parent manages
  * a panel-history stack; `onBack` pops one level, `onClose` closes the modal.
  *
@@ -43,13 +47,20 @@ import OnlineDot from "./OnlineDot";
  *  - Group avatar upload/clear (owner/admin)
  *  - Channel mode toggle (only_admins_send) — admins only
  *  - History visibility for new members (all / from_join / none) — owner only
+ *  - "Requires approval" toggle (owner only) — public groups can require admin
+ *    approval before new users can join
+ *  - "Join requests" button — admins see pending requests for this group
+ *
+ * Settings menu includes:
+ *  - My join requests — see/cancel requests the current user has sent
  */
 export default function RightPanel({
   kind, meId, activeConv, profileData,
   contacts, blocks, inviteLinks,
   onlineUsers,
+  myJoinRequests, convJoinRequests,
   canGoBack, onBack, onClose,
-  onOpenMyProfile, onOpenContacts, onOpenBlocks,
+  onOpenMyProfile, onOpenContacts, onOpenBlocks, onOpenMyRequests, onOpenConvJoinRequests,
   onOpenCreateGroup, onOpenJoin, onNavigateHome,
   onStartDm, onRemoveContact, onUnblock,
   onPatchGroup, onCreateInvite, onRevokeInvite,
@@ -57,6 +68,7 @@ export default function RightPanel({
   onDeleteChat, onDeleteGroup, onCleanupChat,
   onRemoveMember, onChangeMemberRole, onTransferOwnership,
   onUploadGroupAvatar, onClearGroupAvatar,
+  onCancelJoinRequest, onActOnJoinRequest,
 }) {
   const [memberCtx, setMemberCtx] = useState(null); // { x, y, user, role }
   const [memberMenuAnchor, setMemberMenuAnchor] = useState(null); // for ⋮ button
@@ -68,6 +80,8 @@ export default function RightPanel({
       case "contacts": return "Contacts";
       case "blocks": return "Blocked users";
       case "profile": return "Profile";
+      case "my-requests": return "My join requests";
+      case "conv-requests": return "Join requests";
       default: return activeConv?.type === "group" ? "Group info" : "Chat info";
     }
   })();
@@ -106,6 +120,13 @@ export default function RightPanel({
             <ListItemIcon><BlockIcon /></ListItemIcon>
             <ListItemText primary="Blocked users" />
           </ListItemButton>
+          <ListItemButton onClick={onOpenMyRequests}>
+            <ListItemIcon><HourglassEmptyIcon /></ListItemIcon>
+            <ListItemText
+              primary="My join requests"
+              secondary={myJoinRequests?.length ? `${myJoinRequests.filter((r) => r.status === "pending").length} pending` : "No pending requests"}
+            />
+          </ListItemButton>
           <ListItemButton onClick={onOpenCreateGroup}>
             <ListItemIcon><GroupAddIcon /></ListItemIcon>
             <ListItemText primary="New group" />
@@ -120,6 +141,111 @@ export default function RightPanel({
             <ListItemText primary="Back to Deployer" />
           </ListItemButton>
         </List>
+      </Box>
+    );
+  }
+
+  // My outgoing join requests (any status — pending, approved, rejected)
+  if (kind === "my-requests") {
+    return (
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.paper", display: "flex", flexDirection: "column" }}>
+        {header}
+        <List dense sx={{ overflow: "auto", flex: 1 }}>
+          {(myJoinRequests || []).map((r) => (
+            <ListItemButton key={r.id}>
+              <ListItemAvatar>
+                <Avatar src={r.user?.avatar || undefined}>
+                  {r.user?.username?.[0]?.toUpperCase() || r.conversation_title?.[0]?.toUpperCase()}
+                </Avatar>
+              </ListItemAvatar>
+              <ListItemText
+                primary={r.conversation_title || "Group"}
+                secondary={
+                  <Typography variant="caption" component="span" sx={{
+                    color: r.status === "pending" ? "warning.main"
+                      : r.status === "approved" ? "success.main"
+                      : "error.main",
+                    fontWeight: 600,
+                  }}>
+                    {r.status.toUpperCase()} · {new Date(r.created_at).toLocaleDateString()}
+                  </Typography>
+                }
+              />
+              {r.status === "pending" && (
+                <Button
+                  size="small"
+                  color="error"
+                  variant="outlined"
+                  startIcon={<CloseIcon fontSize="small" />}
+                  onClick={() => onCancelJoinRequest(r.id)}
+                >
+                  Cancel
+                </Button>
+              )}
+            </ListItemButton>
+          ))}
+          {!(myJoinRequests || []).length && (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+              You have no join requests. Search public groups and request to join one.
+            </Typography>
+          )}
+        </List>
+      </Box>
+    );
+  }
+
+  // Pending join requests for the active group (admin view)
+  if (kind === "conv-requests") {
+    const role = myRole(activeConv, meId);
+    const canManage = role === "owner" || role === "admin";
+    return (
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.paper", display: "flex", flexDirection: "column" }}>
+        {header}
+        {!canManage ? (
+          <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+            Only group admins can view join requests.
+          </Typography>
+        ) : (
+          <List dense sx={{ overflow: "auto", flex: 1 }}>
+            {(convJoinRequests || []).map((r) => (
+              <ListItemButton key={r.id}>
+                <ListItemAvatar>
+                  <Box sx={{ position: "relative" }}>
+                    <Avatar src={r.user?.avatar || undefined}>{r.user?.username?.[0]?.toUpperCase()}</Avatar>
+                    {r.user?.id && onlineUsers?.has(Number(r.user.id)) && <OnlineDot size={10} />}
+                  </Box>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={r.user?.username || "Unknown"}
+                  secondary={`Requested ${new Date(r.created_at).toLocaleString()}`}
+                />
+                <Stack direction="row" spacing={0.5}>
+                  <IconButton
+                    size="small"
+                    color="success"
+                    title="Approve"
+                    onClick={() => onActOnJoinRequest(activeConv?.id, r.id, "approve")}
+                  >
+                    <CheckIcon fontSize="small" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    title="Reject"
+                    onClick={() => onActOnJoinRequest(activeConv?.id, r.id, "reject")}
+                  >
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              </ListItemButton>
+            ))}
+            {!(convJoinRequests || []).length && (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
+                No pending join requests.
+              </Typography>
+            )}
+          </List>
+        )}
       </Box>
     );
   }
@@ -345,6 +471,17 @@ export default function RightPanel({
                 control={<Switch checked={Boolean(activeConv.is_closed)} onChange={(e) => onPatchGroup({ is_closed: e.target.checked })} />}
                 label="Closed"
               />
+              {/* Public groups can require admin approval before new users can join.
+                  Owner-only — Telegram-style "private public groups". */}
+              {isOwner && Boolean(activeConv.is_public) && (
+                <FormControlLabel
+                  control={<Switch
+                    checked={Boolean(activeConv.requires_approval)}
+                    onChange={(e) => onPatchGroup({ requires_approval: e.target.checked })}
+                  />}
+                  label="Require admin approval to join"
+                />
+              )}
               <FormControlLabel
                 control={<Switch checked={activeConv.members_can_add !== false} onChange={(e) => onPatchGroup({ members_can_add: e.target.checked })} />}
                 label="Members can add contacts"
@@ -371,6 +508,20 @@ export default function RightPanel({
                     <MenuItem value="none">No history for new members</MenuItem>
                   </Select>
                 </FormControl>
+              )}
+              {/* "Join requests" button — admins see this when the group requires
+                  approval. Shows the count of pending requests. */}
+              {Boolean(activeConv.requires_approval) && (
+                <Button
+                  size="small"
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<HowToRegIcon fontSize="small" />}
+                  sx={{ mt: 1, mb: 1 }}
+                  onClick={onOpenConvJoinRequests}
+                >
+                  Join requests{(convJoinRequests || []).length ? ` (${convJoinRequests.length})` : ""}
+                </Button>
               )}
               <Button size="small" variant="contained" startIcon={<PersonAddIcon />}
                 sx={{ mt: 1, mb: 1 }} onClick={onOpenAddMembers}>
