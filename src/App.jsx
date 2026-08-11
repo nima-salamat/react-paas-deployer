@@ -21,6 +21,7 @@ import StaffConsole from "./components/staff/StaffConsole.jsx";
 import EmailManagement from "./components/emails/EmailManagement.jsx";
 import AdminDashboard from "./components/admin/AdminDashboard.jsx";
 import { TicketNotifyProvider } from "./components/tickets/TicketNotifyContext.jsx";
+import MessengerApp from "./components/messenger/MessengerApp.jsx";
 
 const THEME_STORAGE_KEY = "paas-theme-mode";
 const allowedThemeModes = new Set(["light", "dark", "system"]);
@@ -168,6 +169,8 @@ function App() {
       <TicketNotifyProvider>
       <Router>
         <Routes>
+          <Route path="/messenger" element={<MessengerApp />} />
+          <Route path="/messenger/*" element={<MessengerApp />} />
           <Route path="/" element={<Layout themeMode={themeMode} setThemeMode={setThemeMode} />}>
             <Route index element={<Home />} />
             <Route path="services" element={<Services />} />

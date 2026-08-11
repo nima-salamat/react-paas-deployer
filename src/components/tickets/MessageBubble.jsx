@@ -494,7 +494,8 @@ export default function MessageBubble({
   const time = m.created_at
     ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
-  const bodyHtml = m.body || "";
+  // Coerce body to string to avoid "[object Object]" when API returns non-string
+  const bodyHtml = typeof m.body === "string" ? m.body : (m.body != null ? String(m.body) : "");
   const bodyText = bodyHtml.replace(/<[^>]+>/g, "").trim();
   const hasBody = Boolean(bodyText);
   const attachments = m.attachments || [];
