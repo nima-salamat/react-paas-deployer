@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import {
   Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem, Dialog,
-  alpha, Slider,
+  alpha, Slider, Tooltip, Button,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ReplyIcon from "@mui/icons-material/Reply";
@@ -82,7 +82,8 @@ function InlineAudioPlayer({
   // Seek helpers — work while playing OR paused (and when first loading)
   const ratioFromEvent = (e, el) => {
     const rect = el.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0]?.clientX : e.clientX;
+    const touch = e.touches?.[0] || e.changedTouches?.[0];
+    const clientX = touch ? touch.clientX : e.clientX;
     if (clientX == null || rect.width <= 0) return 0;
     return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
   };
@@ -107,18 +108,24 @@ function InlineAudioPlayer({
     const ratio = ratioFromEvent(e, el);
     applySeek(ratio);
     const move = (ev) => {
+      ev.preventDefault?.();
       applySeek(ratioFromEvent(ev, el));
     };
-    const up = () => {
+    const up = (ev) => {
+      try { applySeek(ratioFromEvent(ev, el)); } catch { /* */ }
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       window.removeEventListener("touchmove", move);
       window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
     window.addEventListener("touchmove", move, { passive: false });
     window.addEventListener("touchend", up);
+    window.addEventListener("touchcancel", up);
   };
 
   const accent = mine ? "#ffffff" : theme.palette.primary.main;
@@ -412,6 +419,10 @@ export default function MessageBubble({
   onMentionClick,
   // Global audio player state — used to render inline progress on the active message
   activeAudioId, audioIsPlaying, audioCurrentTime, audioDuration,
+  selectionMode = false,
+  selected = false,
+  isUnread = false,
+  onToggleSelect,
 }) {
   const theme = useTheme();
   if (m.type === "day") {
@@ -450,17 +461,90 @@ export default function MessageBubble({
 
   const bodySegments = parseMentions(bodyStr);
 
+  const longPressTimer = React.useRef(null);
+  const longPressMoved = React.useRef(false);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const onPointerDownMsg = (e) => {
+    if (e.button != null && e.button !== 0) return;
+    // Already selecting: toggle this message (do NOT force single-select)
+    if (selectionMode) {
+      // parent list handles range-drag after movement; here just note anchor via toggle without force
+      return;
+    }
+    longPressMoved.current = false;
+    clearLongPress();
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null;
+      // Enter selection + select this message (Telegram-style)
+      onToggleSelect?.(m, true);
+    }, 420);
+  };
+  const onPointerMoveMsg = (e) => {
+    // Allow slight movement during long-press; only cancel on clear drag
+    if (longPressTimer.current && (Math.abs(e.movementX || 0) > 14 || Math.abs(e.movementY || 0) > 14)) {
+      longPressMoved.current = true;
+      clearLongPress();
+    }
+  };
+  const onPointerUpMsg = () => clearLongPress();
+
   return (
     <Box
+      data-msg-id={m.id}
+      data-msg-mine={mine ? "1" : "0"}
+      data-msg-unread={isUnread ? "1" : "0"}
+      data-msg-system={m.is_system ? "1" : "0"}
       sx={{
         display: "flex",
         justifyContent: mine ? "flex-end" : "flex-start",
         mb: 0.6,
         px: 0.5,
+        alignItems: "center",
+        bgcolor: selected ? (t) => t.palette.mode === "dark" ? "rgba(25,118,210,0.18)" : "rgba(25,118,210,0.1)" : "transparent",
+        borderRadius: 2,
+        transition: "background-color 0.15s",
         "&:hover .msg-actions": { opacity: 1 },
       }}
-      onContextMenu={(e) => onContextOpen(e, m)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        if (selectionMode) {
+          onToggleSelect?.(m);
+          return;
+        }
+        onContextOpen(e, m);
+      }}
+      onPointerDown={onPointerDownMsg}
+      onPointerMove={onPointerMoveMsg}
+      onPointerUp={onPointerUpMsg}
+      onPointerCancel={onPointerUpMsg}
+      onClick={(e) => {
+        if (selectionMode) {
+          e.stopPropagation();
+          onToggleSelect?.(m);
+        }
+      }}
     >
+      {(selectionMode || selected) && (
+        <Box
+          sx={{
+            width: 22, height: 22, borderRadius: "50%", flexShrink: 0, mr: 0.75,
+            border: "2px solid",
+            borderColor: selected ? "primary.main" : "text.disabled",
+            bgcolor: selected ? "primary.main" : "transparent",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontSize: 12, fontWeight: 700,
+          }}
+        >
+          {selected ? "✓" : ""}
+        </Box>
+      )}
       {!mine && (
         <Box sx={{ position: "relative", mr: 0.75, mt: 0.5, flexShrink: 0 }}>
           <Avatar
@@ -538,38 +622,30 @@ export default function MessageBubble({
             <Typography variant="caption">Forwarded from {m.forwarded_from_user.username}</Typography>
           </Stack>
         )}
-        {bodyStr && (
-          <Typography
+        {(m.attachments || []).length > 1 && (
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+            onClick={(e) => {
+              e.stopPropagation();
+              (m.attachments || []).forEach((att) => {
+                const u = withTokenQuery(att.url);
+                if (u) window.open(u, "_blank");
+              });
+            }}
             sx={{
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              fontSize: 14.5,
-              lineHeight: 1.45,
+              alignSelf: "flex-start",
+              textTransform: "none",
+              fontSize: 12,
+              minWidth: 0,
+              px: 0.5,
+              color: mine ? "rgba(255,255,255,0.85)" : "primary.main",
+              mb: 0.25,
             }}
           >
-            {bodySegments.map((seg, i) =>
-              seg.type === "mention" ? (
-                <Box
-                  key={i}
-                  component="span"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMentionClick?.(seg.value);
-                  }}
-                  sx={{
-                    color: mine ? "#cce8ff" : theme.palette.primary.main,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    "&:hover": { textDecoration: "underline" },
-                  }}
-                >
-                  @{seg.value}
-                </Box>
-              ) : (
-                <React.Fragment key={i}>{seg.value}</React.Fragment>
-              )
-            )}
-          </Typography>
+            Download all ({(m.attachments || []).length})
+          </Button>
         )}
         {(m.attachments || []).map((a) => {
           const k = attachmentKind(a);
@@ -584,7 +660,24 @@ export default function MessageBubble({
                   component="img"
                   src={url}
                   alt={a.original_filename}
-                  onClick={() => onOpenPreview({ ...a, url })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenPreview({ ...a, url, message: m });
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onReply?.({
+                      ...m,
+                      body: m.body || "",
+                      _replyAttachment: a,
+                      reply_to_preview: {
+                        id: m.id,
+                        body: a.original_filename || "Photo",
+                        sender: m.sender,
+                      },
+                    });
+                  }}
                   onError={(e) => {
                     if (!e.currentTarget.dataset.fallback) {
                       e.currentTarget.dataset.fallback = "1";
@@ -647,23 +740,74 @@ export default function MessageBubble({
             </Box>
           );
         })}
+        {bodyStr && (
+          <Typography
+            sx={{
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              fontSize: 14.5,
+              lineHeight: 1.45,
+              mt: (m.attachments || []).length ? 0.75 : 0,
+            }}
+          >
+            {bodySegments.map((seg, i) =>
+              seg.type === "mention" ? (
+                <Box
+                  key={i}
+                  component="span"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMentionClick?.(seg.value);
+                  }}
+                  sx={{
+                    color: mine ? "#cce8ff" : theme.palette.primary.main,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    "&:hover": { textDecoration: "underline" },
+                  }}
+                >
+                  @{seg.value}
+                </Box>
+              ) : (
+                <React.Fragment key={i}>{seg.value}</React.Fragment>
+              )
+            )}
+          </Typography>
+        )}
         {(m.reactions || []).length > 0 && (
           <Stack direction="row" spacing={0.35} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
             {[...new Set((m.reactions || []).map((r) => r.emoji))].map((em) => {
-              const count = (m.reactions || []).filter((r) => r.emoji === em).length;
-              const mineReact = (m.reactions || []).some(
-                (r) => r.emoji === em && String(r.user?.id) === String(meId)
-              );
+              const reactors = (m.reactions || []).filter((r) => r.emoji === em);
+              const count = reactors.length;
+              const mineReact = reactors.some((r) => String(r.user?.id) === String(meId));
+              const names = reactors
+                .map((r) => r.user?.username || r.user?.full_name || "User")
+                .filter(Boolean);
+              const tip = names.length ? `${em} ${names.join(", ")}` : `${em} ${count}`;
               return (
-                <Chip key={em} size="small" label={`${em} ${count}`} onClick={() => onReact(m.id, em)}
-                  sx={{
-                    height: 22, fontSize: 11,
-                    bgcolor: mineReact
-                      ? alpha(theme.palette.primary.main, mine ? 0.35 : 0.15)
-                      : (mine ? "rgba(255,255,255,0.12)" : "action.hover"),
-                    color: mine ? "#fff" : "text.primary",
-                  }}
-                />
+                <Tooltip key={em} title={tip} arrow placement="top">
+                  <Chip
+                    size="small"
+                    label={`${em} ${count}`}
+                    onClick={(e) => { e.stopPropagation(); onReact(m.id, em); }}
+                    avatar={
+                      reactors[0]?.user?.avatar ? (
+                        <Avatar
+                          src={withTokenQuery(reactors[0].user.avatar)}
+                          sx={{ width: 16, height: 16 }}
+                        />
+                      ) : undefined
+                    }
+                    sx={{
+                      height: 24, fontSize: 12,
+                      bgcolor: mineReact
+                        ? alpha(theme.palette.primary.main, mine ? 0.35 : 0.15)
+                        : (mine ? "rgba(255,255,255,0.12)" : "action.hover"),
+                      color: mine ? "#fff" : "text.primary",
+                      "& .MuiChip-avatar": { width: 16, height: 16, ml: 0.5 },
+                    }}
+                  />
+                </Tooltip>
               );
             })}
           </Stack>
@@ -691,11 +835,17 @@ export default function MessageBubble({
 /** Reusable message-context menu items (used by the parent's right-click menu). */
 export function MessageContextMenuItems({
   ctxMsg, isMine, onReply, onReact, onForward, onCopy, onPreview, onDownload,
-  onEdit, onDelete, onShowReaders,
+  onEdit, onDelete, onShowReaders, onSelect,
 }) {
   const ctxAtts = ctxMsg?.attachments || [];
+  const hasText = Boolean(typeof ctxMsg?.body === "string" ? ctxMsg.body.trim() : ctxMsg?.body);
   return (
     <>
+      {onSelect && hasText && (
+        <MenuItem onClick={() => onSelect(ctxMsg)}>
+          <ListItemIcon><DoneAllIcon fontSize="small" /></ListItemIcon> Select
+        </MenuItem>
+      )}
       <MenuItem onClick={() => onReply(ctxMsg)}>
         <ListItemIcon><ReplyIcon fontSize="small" /></ListItemIcon> Reply
       </MenuItem>
@@ -719,6 +869,12 @@ export function MessageContextMenuItems({
           Preview {a.original_filename || "file"}
         </MenuItem>
       ))}
+      {ctxAtts.length > 1 && (
+        <MenuItem onClick={() => ctxAtts.forEach((a) => onDownload?.(a))}>
+          <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>
+          Download all ({ctxAtts.length})
+        </MenuItem>
+      )}
       {ctxAtts.map((a) => (
         <MenuItem key={`dl-${a.id}`} onClick={() => onDownload(a)}>
           <ListItemIcon><DownloadIcon fontSize="small" /></ListItemIcon>

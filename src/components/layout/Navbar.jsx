@@ -43,6 +43,7 @@ import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
@@ -61,6 +62,7 @@ const baseNavItems = [
   { path: "/volumes", label: "Volumes", icon: Inventory2OutlinedIcon, guest: false },
   { path: "/networks", label: "Networks", icon: LanOutlinedIcon, guest: false },
   { path: "/tickets", label: "Tickets", icon: ConfirmationNumberOutlinedIcon, guest: false },
+  { path: "/messenger", label: "Messenger", icon: ChatBubbleOutlineIcon, guest: false },
   { path: "/admin", label: "Admin", icon: AdminPanelSettingsOutlinedIcon, guest: false, staffOnly: true },
   { path: "/plans", label: "Plans", icon: PaidOutlinedIcon, guest: true },
   { path: "/aboutUs", label: "About us", icon: InfoOutlinedIcon, guest: true },

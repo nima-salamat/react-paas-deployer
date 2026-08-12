@@ -97,6 +97,7 @@ export default function FloatingNav({
   const [loggedIn, setLoggedIn] = useState(() =>
     typeof loggedInProp === "boolean" ? loggedInProp : readLoggedIn()
   );
+  const [isStaff, setIsStaff] = useState(false);
 
   useEffect(() => {
     if (typeof loggedInProp === "boolean") setLoggedIn(loggedInProp);
@@ -116,6 +117,41 @@ export default function FloatingNav({
       window.removeEventListener("auth", sync);
     };
   }, []);
+
+  // Verify staff/admin for Admin link (do not trust client alone)
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      if (!readLoggedIn()) { if (!cancelled) setIsStaff(false); return; }
+      try {
+        const base = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
+        const token = localStorage.getItem("access");
+        const res = await fetch(`${base}/auth/api/validateToken/`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) throw new Error("auth");
+        const data = await res.json();
+        const u = data?.user || data?.data?.user || data;
+        if (!cancelled) setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
+      } catch {
+        try {
+          const base = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
+          const token = localStorage.getItem("access");
+          const res = await fetch(`${base}/api/users/user/`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
+          const data = await res.json();
+          const u = data?.user || data?.data || data;
+          if (!cancelled) setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
+        } catch {
+          if (!cancelled) setIsStaff(false);
+        }
+      }
+    };
+    check();
+    window.addEventListener("auth-changed", check);
+    return () => { cancelled = true; window.removeEventListener("auth-changed", check); };
+  }, [loggedIn]);
 
   useEffect(() => {
     setOpen(false);
@@ -179,24 +215,14 @@ export default function FloatingNav({
     },
   ];
 
-  // لیست آیتم‌ها برای کاربران لاگین کرده
+  // Quick nav: Home, Messenger, Profile (+ Admin only if verified staff)
   const authItems = [
     { to: "/", label: "Home", icon: <HomeIcon /> },
-    { to: "/services", label: "Services", icon: <StorageIcon /> },
-    { to: "/volumes", label: "Volumes", icon: <Inventory2OutlinedIcon /> },
-    { to: "/networks", label: "Networks", icon: <LanOutlinedIcon /> },
-    { to: "/tickets", label: "Tickets", icon: <ConfirmationNumberOutlinedIcon /> },
     { to: "/messenger", label: "Messenger", icon: <ChatBubbleOutlineIcon /> },
-    { to: "/admin", label: "Admin", icon: <AdminPanelSettingsOutlinedIcon /> },
-    { to: "/plans", label: "Plans", icon: <PriceChangeIcon /> },
     { to: "/profile", label: "Profile", icon: <AccountCircleIcon /> },
-    {
-      to: "#",
-      label: "Logout",
-      icon: <LogoutIcon />,
-      color: "error",
-      onClick: handleLogout,
-    },
+    ...(isStaff
+      ? [{ to: "/admin", label: "Admin", icon: <AdminPanelSettingsOutlinedIcon /> }]
+      : []),
   ];
 
   const items = loggedIn ? authItems : guestItems;

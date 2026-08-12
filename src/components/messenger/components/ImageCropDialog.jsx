@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack,
   Typography, Slider, IconButton, ToggleButton, ToggleButtonGroup, CircularProgress,
-  Tooltip, Divider, alpha,
+  Tooltip, Divider, alpha, Tabs, Tab, useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import CropIcon from "@mui/icons-material/Crop";
 import CloseIcon from "@mui/icons-material/Close";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
@@ -48,7 +49,10 @@ export default function ImageCropDialog({
   circular = false,
   outputSize = 512,
   title = "Edit image",
+  confirmLabel = "Done",
 }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const imgCanvasRef = useRef(null);      // renders image (zoom + rotation)
   const drawCanvasRef = useRef(null);     // captures drawings
   const containerRef = useRef(null);
@@ -68,7 +72,31 @@ export default function ImageCropDialog({
   const [sepia, setSepia] = useState(0);              // %
   // Crop rect in display coords: {x, y, w, h}
   const [crop, setCrop] = useState({ x: 60, y: 60, w: 300, h: 300 });
-  const cropDragRef = useRef(null);  // {mode, startX, startY, origCrop}
+  const [pan, setPan] = useState({ x: 0, y: 0 }); // image pan under crop
+  const cropDragRef = useRef(null);  // {handle, startX, startY, origCrop}
+  const panDragRef = useRef(null);   // {startX, startY, origPan}
+  const pinchRef = useRef(null);     // {dist, zoom}
+  const editHistoryRef = useRef([]); // snapshots for Undo
+  const [histLen, setHistLen] = useState(0);
+  const pushEditHistory = () => {
+    editHistoryRef.current.push({
+      crop: { ...crop },
+      pan: { ...pan },
+      zoom,
+      rotation,
+    });
+    if (editHistoryRef.current.length > 40) editHistoryRef.current.shift();
+    setHistLen(editHistoryRef.current.length);
+  };
+  const undoEdit = () => {
+    const snap = editHistoryRef.current.pop();
+    if (!snap) return;
+    setCrop(snap.crop);
+    setPan(snap.pan);
+    setZoom(snap.zoom);
+    setRotation(snap.rotation);
+    setHistLen(editHistoryRef.current.length);
+  };
   // Drawing state
   const [tool, setTool] = useState("solid");       // solid | highlighter | marker | eraser
   const [color, setColor] = useState(PEN_COLORS[0]);
@@ -86,16 +114,24 @@ export default function ImageCropDialog({
     img.onload = () => {
       imgRef.current = img;
       setImgSrc(url);
-      // Initialize crop to a centered square fitting the shorter dimension
-      const shortSide = Math.min(EDITOR_W, EDITOR_H);
-      const cw = circular ? shortSide * 0.7 : shortSide * 0.8;
-      const ch = circular ? shortSide * 0.7 : shortSide * 0.8;
-      setCrop({
-        x: (EDITOR_W - cw) / 2,
-        y: (EDITOR_H - ch) / 2,
-        w: cw,
-        h: ch,
-      });
+      // Crop defaults to the full "contain"-fitted image area so reopening
+      // an already-edited file always starts from a stable full-frame rect.
+      const scale = Math.min(EDITOR_W / img.width, EDITOR_H / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      const ox = (EDITOR_W - dw) / 2;
+      const oy = (EDITOR_H - dh) / 2;
+      if (circular) {
+        const side = Math.min(dw, dh) * 0.92;
+        setCrop({
+          x: ox + (dw - side) / 2,
+          y: oy + (dh - side) / 2,
+          w: side,
+          h: side,
+        });
+      } else {
+        setCrop({ x: ox, y: oy, w: dw, h: dh });
+      }
     };
     img.src = url;
     return () => URL.revokeObjectURL(url);
@@ -104,9 +140,12 @@ export default function ImageCropDialog({
   // Reset state when dialog opens
   useEffect(() => {
     if (open) {
-      setMode(circular ? "crop" : "crop");
+      setMode("crop");
       setZoom(1);
       setRotation(0);
+      setPan({ x: 0, y: 0 });
+      editHistoryRef.current = [];
+      setHistLen(0);
       setAspect(circular ? 1 : null);
       setStrokes([]);
       setRedoStack([]);
@@ -135,31 +174,28 @@ export default function ImageCropDialog({
     return parts.length ? parts.join(" ") : "none";
   }, [brightness, contrast, saturate, blur, grayscale, sepia]);
 
-  // Render the image canvas (zoom + rotation + filters)
+  // Render the image canvas (zoom + rotation + pan + filters)
   const renderImage = useCallback(() => {
     const c = imgCanvasRef.current;
     if (!c || !imgRef.current) return;
     const ctx = c.getContext("2d");
     ctx.save();
     ctx.clearRect(0, 0, EDITOR_W, EDITOR_H);
-    // Fill dark background
     ctx.fillStyle = "#1a1a1a";
     ctx.fillRect(0, 0, EDITOR_W, EDITOR_H);
-    // Apply CSS-style filter for live preview (brightness/contrast/saturate/blur/grayscale/sepia)
     ctx.filter = filterString();
-    // Translate to center, rotate, scale, draw image centered
-    ctx.translate(EDITOR_W / 2, EDITOR_H / 2);
+    // Center → pan → rotate → zoom → draw contain-fitted image
+    ctx.translate(EDITOR_W / 2 + pan.x, EDITOR_H / 2 + pan.y);
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.scale(zoom, zoom);
     const img = imgRef.current;
-    // Fit image into EDITOR_W×EDITOR_H at zoom=1 (contain)
     const scale = Math.min(EDITOR_W / img.width, EDITOR_H / img.height);
     const dw = img.width * scale;
     const dh = img.height * scale;
     ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
     ctx.filter = "none";
     ctx.restore();
-  }, [zoom, rotation, filterString]);
+  }, [zoom, rotation, pan, filterString]);
 
   // Render drawings on top
   const renderDrawings = useCallback(() => {
@@ -213,6 +249,7 @@ export default function ImageCropDialog({
   const onCropPointerDown = (e, handle) => {
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
+    pushEditHistory();
     cropDragRef.current = {
       handle,
       startX: e.clientX,
@@ -259,9 +296,77 @@ export default function ImageCropDialog({
   };
   const onCropPointerUp = (e) => {
     if (cropDragRef.current) {
-      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* */ }
+      try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* */ }
     }
     cropDragRef.current = null;
+  };
+
+  // Pan image under crop (drag on empty area / image background)
+  const onPanPointerDown = (e) => {
+    if (mode !== "crop") return;
+    if (cropDragRef.current) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    pushEditHistory();
+    panDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origPan: { ...pan },
+      pointerId: e.pointerId,
+    };
+  };
+  const onPanPointerMove = (e) => {
+    if (cropDragRef.current) {
+      onCropPointerMove(e);
+      return;
+    }
+    const drag = panDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const sx = rect ? rect.width / EDITOR_W : 1;
+    const sy = rect ? rect.height / EDITOR_H : 1;
+    const dx = (e.clientX - drag.startX) / sx;
+    const dy = (e.clientY - drag.startY) / sy;
+    setPan({
+      x: drag.origPan.x + dx,
+      y: drag.origPan.y + dy,
+    });
+  };
+  const onPanPointerUp = (e) => {
+    if (panDragRef.current) {
+      try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* */ }
+    }
+    panDragRef.current = null;
+    onCropPointerUp(e);
+  };
+
+  // Mouse wheel zoom toward cursor
+  const onWheelZoom = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? -0.08 : 0.08;
+    setZoom((z) => clamp(Number((z + delta).toFixed(2)), 0.5, 4));
+  };
+
+  // Touch pinch zoom
+  const onTouchStartPinch = (e) => {
+    if (e.touches?.length === 2) {
+      const [a, b] = e.touches;
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      pinchRef.current = { dist, zoom };
+      panDragRef.current = null;
+    }
+  };
+  const onTouchMovePinch = (e) => {
+    if (e.touches?.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const ratio = dist / Math.max(1, pinchRef.current.dist);
+      setZoom(clamp(Number((pinchRef.current.zoom * ratio).toFixed(2)), 0.5, 4));
+    }
+  };
+  const onTouchEndPinch = () => {
+    pinchRef.current = null;
   };
 
   // ============= Drawing interactions =============
@@ -321,55 +426,101 @@ export default function ImageCropDialog({
     setRedoStack([]);
   };
   const reset = () => {
+    editHistoryRef.current = [];
+    setHistLen(0);
     setZoom(1);
     setRotation(0);
+    setPan({ x: 0, y: 0 });
     setStrokes([]);
     setRedoStack([]);
-    const shortSide = Math.min(EDITOR_W, EDITOR_H);
-    const cw = circular ? shortSide * 0.7 : shortSide * 0.8;
-    const ch = circular ? shortSide * 0.7 : shortSide * 0.8;
-    setCrop({ x: (EDITOR_W - cw) / 2, y: (EDITOR_H - ch) / 2, w: cw, h: ch });
+    setBrightness(100);
+    setContrast(100);
+    setSaturate(100);
+    setBlur(0);
+    setGrayscale(0);
+    setSepia(0);
+    setAspect(circular ? 1 : null);
+    const img = imgRef.current;
+    if (img) {
+      const scale = Math.min(EDITOR_W / img.width, EDITOR_H / img.height);
+      const dw = img.width * scale;
+      const dh = img.height * scale;
+      const ox = (EDITOR_W - dw) / 2;
+      const oy = (EDITOR_H - dh) / 2;
+      if (circular) {
+        const side = Math.min(dw, dh) * 0.92;
+        setCrop({ x: ox + (dw - side) / 2, y: oy + (dh - side) / 2, w: side, h: side });
+      } else {
+        // Full image frame — no auto-tight crop
+        setCrop({ x: ox, y: oy, w: dw, h: dh });
+      }
+    }
   };
 
   // ============= Export =============
+  // IMPORTANT: The crop rectangle is expressed in the editor's 420x420
+  // display coordinate space. We first compose the *already edited* image
+  // (zoom, pan, rotation, filters + drawings), then crop that exact display
+  // region. This keeps every other edit and makes crop match what the user
+  // actually sees.
   const onConfirmClick = async () => {
     if (!imgRef.current || !imgCanvasRef.current || !drawCanvasRef.current) return;
     setSending(true);
     try {
-      const off = document.createElement("canvas");
-      off.width = EDITOR_W;
-      off.height = EDITOR_H;
-      const octx = off.getContext("2d");
-      octx.drawImage(imgCanvasRef.current, 0, 0);
-      octx.drawImage(drawCanvasRef.current, 0, 0);
+      const cx = clamp(Math.round(crop.x), 0, EDITOR_W - 1);
+      const cy = clamp(Math.round(crop.y), 0, EDITOR_H - 1);
+      const cw = clamp(Math.round(crop.w), 1, EDITOR_W - cx);
+      const ch = clamp(Math.round(crop.h), 1, EDITOR_H - cy);
 
-      const cx = crop.x;
-      const cy = crop.y;
-      const cw = crop.w;
-      const ch = crop.h;
+      // Compose exactly what is shown in the editor.
+      const composite = document.createElement("canvas");
+      composite.width = EDITOR_W;
+      composite.height = EDITOR_H;
+      const cctx = composite.getContext("2d");
+      if (!cctx) throw new Error("Unable to create image editor canvas");
+      cctx.drawImage(imgCanvasRef.current, 0, 0, EDITOR_W, EDITOR_H);
+      cctx.drawImage(drawCanvasRef.current, 0, 0, EDITOR_W, EDITOR_H);
+
+      // Crop the selected region. Because this uses the same coordinate
+      // system as the overlay, the exported crop is pixel-for-pixel aligned
+      // with the rectangle the user moved/resized.
       const outScale = Math.min(outputSize / cw, outputSize / ch, 1);
       const outW = Math.max(1, Math.round(cw * outScale));
       const outH = Math.max(1, Math.round(ch * outScale));
       const out = document.createElement("canvas");
       out.width = outW;
       out.height = outH;
-      const octx2 = out.getContext("2d");
-      if (circular) {
-        octx2.save();
-        octx2.beginPath();
-        octx2.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
-        octx2.closePath();
-        octx2.clip();
-      }
-      octx2.drawImage(off, cx, cy, cw, ch, 0, 0, outW, outH);
-      if (circular) octx2.restore();
+      const octx = out.getContext("2d");
+      if (!octx) throw new Error("Unable to create crop canvas");
 
-      const blob = await new Promise((resolve) => {
-        out.toBlob((b) => resolve(b), "image/jpeg", 0.92);
+      // JPEG does not support transparency; use white only for the circular
+      // mask edge area while keeping normal rectangular crops unchanged.
+      if (circular) {
+        octx.save();
+        octx.beginPath();
+        octx.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
+        octx.clip();
+      }
+
+      octx.drawImage(
+        composite,
+        cx, cy, cw, ch,
+        0, 0, outW, outH,
+      );
+
+      if (circular) octx.restore();
+
+      const blob = await new Promise((resolve, reject) => {
+        out.toBlob((b) => {
+          if (b) resolve(b);
+          else reject(new Error("Failed to export edited image"));
+        }, "image/jpeg", 0.92);
       });
-      if (!blob) return;
+
       const baseName = (file?.name || "image").replace(/\.[^.]+$/, "");
       onConfirm(blob, `${baseName}_edit.jpg`);
+    } catch (error) {
+      console.error("Image export failed:", error);
     } finally {
       setSending(false);
     }
@@ -397,44 +548,43 @@ export default function ImageCropDialog({
   };
 
   return (
-    <Dialog open={Boolean(open)} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ display: "flex", alignItems: "center", py: 1.5 }}>
-        <CropIcon sx={{ mr: 1 }} />
+    <Dialog
+      open={Boolean(open)}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      fullScreen={isMobile}
+      PaperProps={{ sx: isMobile ? { m: 0, borderRadius: 0, height: "100%" } : { borderRadius: 3 } }}
+    >
+      <DialogTitle sx={{ display: "flex", alignItems: "center", py: 1, px: 1.5 }}>
         <Typography fontWeight={700} sx={{ flex: 1 }}>{title}</Typography>
         <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
       </DialogTitle>
-      <DialogContent dividers sx={{ p: 0 }}>
-        {/* Top toolbar */}
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider", flexWrap: "wrap", gap: 1 }}>
-          <ToggleButtonGroup
-            size="small" exclusive value={mode}
-            onChange={(_, v) => v && setMode(v)}
-          >
-            <ToggleButton value="crop"><CropIcon sx={{ fontSize: 18, mr: 0.5 }} />Crop</ToggleButton>
-            <ToggleButton value="draw"><BrushIcon sx={{ fontSize: 18, mr: 0.5 }} />Draw</ToggleButton>
-            <ToggleButton value="adjust"><TuneIcon sx={{ fontSize: 18, mr: 0.5 }} />Adjust</ToggleButton>
-          </ToggleButtonGroup>
-          <Divider orientation="vertical" flexItem />
-          <Tooltip title="Rotate left 90°">
+      <DialogContent dividers sx={{ p: 0, display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+        {/* Compact tools for active tab — Samsung-style secondary bar */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider", flexWrap: "wrap", gap: 0.75 }}>
+          <Tooltip title="Rotate left">
             <IconButton size="small" onClick={() => setRotation((r) => (r - 90 + 360) % 360)}>
               <RotateLeftIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Rotate right 90°">
+          <Tooltip title="Rotate right">
             <IconButton size="small" onClick={() => setRotation((r) => (r + 90) % 360)}>
               <RotateRightIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Box sx={{ display: "flex", alignItems: "center", minWidth: 140, flex: 1, maxWidth: 200 }}>
+          <Box sx={{ display: "flex", alignItems: "center", flex: 1, minWidth: 120, maxWidth: 220 }}>
             <Typography variant="caption" sx={{ mr: 1 }}>Zoom</Typography>
-            <Slider
-              size="small" min={0.5} max={3} step={0.05}
-              value={zoom} onChange={(_, v) => setZoom(v)}
-            />
-            <Typography variant="caption" sx={{ ml: 1, fontVariantNumeric: "tabular-nums", minWidth: 32 }}>
-              {zoom.toFixed(1)}×
-            </Typography>
+            <Slider size="small" min={0.5} max={4} step={0.05} value={zoom} onChange={(_, v) => setZoom(v)} />
+            <Typography variant="caption" sx={{ ml: 1, minWidth: 32 }}>{zoom.toFixed(1)}×</Typography>
           </Box>
+          <Tooltip title="Undo last crop/pan/zoom">
+            <span>
+              <IconButton size="small" onClick={undoEdit} disabled={histLen === 0}>
+                <UndoIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
           <Tooltip title="Reset all">
             <IconButton size="small" onClick={reset}><RestartAltIcon fontSize="small" /></IconButton>
           </Tooltip>
@@ -613,33 +763,53 @@ export default function ImageCropDialog({
           ref={containerRef}
           sx={{
             position: "relative",
-            width: EDITOR_W,
-            height: EDITOR_H,
+            width: "100%",
+            maxWidth: EDITOR_W,
+            aspectRatio: `${EDITOR_W} / ${EDITOR_H}`,
+            height: "auto",
             mx: "auto",
-            my: 2,
+            my: isMobile ? 0.5 : 2,
             bgcolor: "#1a1a1a",
-            borderRadius: 1,
+            borderRadius: isMobile ? 0 : 1,
             overflow: "hidden",
-            boxShadow: 2,
-            cursor: mode === "draw" ? "crosshair" : "default",
+            boxShadow: isMobile ? 0 : 2,
+            cursor: mode === "draw" ? "crosshair" : mode === "crop" ? "grab" : "default",
             userSelect: "none",
             touchAction: "none",
+            flexShrink: 0,
+          }}
+          onPointerDown={(e) => {
+            if (mode === "crop") onPanPointerDown(e);
           }}
           onPointerMove={(e) => {
-            onCropPointerMove(e);
+            onPanPointerMove(e);
             onDrawPointerMove(e);
           }}
           onPointerUp={(e) => {
-            onCropPointerUp(e);
+            onPanPointerUp(e);
             onDrawPointerUp(e);
           }}
+          onPointerCancel={(e) => {
+            onPanPointerUp(e);
+            onDrawPointerUp(e);
+          }}
+          onWheel={onWheelZoom}
+          onTouchStart={onTouchStartPinch}
+          onTouchMove={onTouchMovePinch}
+          onTouchEnd={onTouchEndPinch}
         >
           {/* Image canvas (bottom) */}
           <canvas
             ref={imgCanvasRef}
             width={EDITOR_W}
             height={EDITOR_H}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              display: "block",
+            }}
           />
           {/* Drawing canvas (top, transparent) — captures pointer events in draw mode */}
           <canvas
@@ -652,6 +822,7 @@ export default function ImageCropDialog({
               inset: 0,
               width: "100%",
               height: "100%",
+              display: "block",
               pointerEvents: mode === "draw" ? "auto" : "none",
             }}
           />
@@ -713,15 +884,29 @@ export default function ImageCropDialog({
             : "Draw freely on the image. Use the toolbar to change pen, color, and size."}
         </Typography>
       </DialogContent>
-      <DialogActions sx={{ px: 2, py: 1.5 }}>
-        <Button onClick={onClose}>Cancel</Button>
+      {/* Samsung-style bottom tabs on mobile / compact mode switcher */}
+      <Box sx={{ borderTop: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
+        <Tabs
+          value={mode}
+          onChange={(_, v) => v && setMode(v)}
+          variant="fullWidth"
+          sx={{ minHeight: 48, "& .MuiTab-root": { minHeight: 48, textTransform: "none", fontWeight: 600 } }}
+        >
+          <Tab value="crop" icon={<CropIcon />} iconPosition="start" label="Crop" />
+          <Tab value="draw" icon={<BrushIcon />} iconPosition="start" label="Draw" />
+          <Tab value="adjust" icon={<TuneIcon />} iconPosition="start" label="Adjust" />
+        </Tabs>
+      </Box>
+      <DialogActions sx={{ px: 2, py: 1.25, gap: 1 }}>
+        <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
         <Button
           variant="contained" color="primary"
-          startIcon={sending ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
+          startIcon={sending ? <CircularProgress size={16} color="inherit" /> : null}
           onClick={onConfirmClick}
           disabled={sending || !imgRef.current}
+          sx={{ textTransform: "none", fontWeight: 700, minWidth: 96 }}
         >
-          Send
+          {confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

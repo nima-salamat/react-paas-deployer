@@ -15,6 +15,23 @@ import {
   Box, Stack, Typography, IconButton, Button, CircularProgress, Avatar,
   FormControl, Select, MenuItem, InputLabel, Chip, alpha, Paper, TextField,
 } from "@mui/material";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
@@ -43,20 +60,80 @@ function resolveUrl(profile) {
   return withTokenQuery(url);
 }
 
-export default function MessengerProfileEditor({ onClose }) {
+
+function SortableMessengerPhoto({ photo, index, onDelete }) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id: String(photo.id) });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+    opacity: isDragging ? 0.55 : 1,
+  };
+  return (
+    <Paper
+      ref={setNodeRef}
+      style={style}
+      elevation={isDragging ? 8 : 1}
+      {...attributes}
+      {...listeners}
+      sx={{
+        position: "relative", width: 96, height: 96, p: 0.5, borderRadius: 2,
+        cursor: isDragging ? "grabbing" : "grab",
+        touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
+        border: "1px solid", borderColor: index === 0 ? "primary.main" : "divider",
+      }}
+    >
+      <Box sx={{
+        position: "absolute", top: 2, left: 2, zIndex: 3, width: 20, height: 20,
+        borderRadius: "50%", bgcolor: "primary.main", color: "#fff",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 800, boxShadow: 1, pointerEvents: "none",
+      }}>{index + 1}</Box>
+      <Avatar
+        src={photo.image_url || undefined}
+        variant="rounded"
+        sx={{ width: "100%", height: "100%", border: "1px solid", borderColor: "divider", pointerEvents: "none" }}
+      />
+      {index === 0 && (
+        <Chip size="small" label="Primary" color="primary"
+          sx={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", height: 18, fontSize: 10, pointerEvents: "none" }}
+        />
+      )}
+      <IconButton
+        size="small"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onDelete(photo.id); }}
+        sx={{
+          position: "absolute", top: -6, right: -6, bgcolor: "error.main", color: "#fff",
+          width: 24, height: 24, "&:hover": { bgcolor: "error.dark" }, zIndex: 4,
+        }}
+      >
+        <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+      </IconButton>
+    </Paper>
+  );
+}
+
+export default function MessengerProfileEditor({ onClose, onPhotosChange }) {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [privacy, setPrivacy] = useState("everyone");
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
-  const [dragIndex, setDragIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
   const [cropFile, setCropFile] = useState(null); // File pending crop
   const [bio, setBio] = useState("");
   const [bioEditing, setBioEditing] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
   const fileRef = useRef(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const flash = (m) => {
     setOk(m);
@@ -87,6 +164,11 @@ export default function MessengerProfileEditor({ onClose }) {
         }))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       setPhotos(normalized);
+      try {
+        const primary = normalized[0];
+        const url = primary?.image_url || null;
+        onPhotosChange?.(normalized, url);
+      } catch { /* */ }
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load photos");
     } finally {
@@ -148,6 +230,7 @@ export default function MessengerProfileEditor({ onClose }) {
   };
 
   const onDelete = async (id) => {
+    if (!window.confirm("Remove this profile photo?")) return;
     try {
       await apiRequest({
         url: `${API_BASE}profile/delete/`,
@@ -215,35 +298,16 @@ export default function MessengerProfileEditor({ onClose }) {
     setBioDraft("");
   };
 
-  // Drag-and-drop reorder
-  const onDragStart = (i) => (e) => {
-    setDragIndex(i);
-    e.dataTransfer.effectAllowed = "move";
-    try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* */ }
-  };
-
-  const onDragOver = (i) => (e) => {
-    e.preventDefault();
-    if (dragOverIndex !== i) setDragOverIndex(i);
-  };
-
-  const onDrop = (i) => async (e) => {
-    e.preventDefault();
-    const from = dragIndex;
-    const to = i;
-    setDragIndex(null);
-    setDragOverIndex(null);
-    if (from == null || from === to) return;
-    // Reorder locally
-    const next = [...photos];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    // Reassign sequential orders
-    const reordered = next.map((p, idx) => ({ ...p, order: idx }));
-    setPhotos(reordered);
-    // Persist on the server: build { id: newOrder } dict
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+    if (!over || String(active.id) === String(over.id)) return;
+    const oldIndex = photos.findIndex((p) => String(p.id) === String(active.id));
+    const newIndex = photos.findIndex((p) => String(p.id) === String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(photos, oldIndex, newIndex).map((p, idx) => ({ ...p, order: idx }));
+    setPhotos(next);
     const orderMap = {};
-    reordered.forEach((p) => { orderMap[String(p.id)] = p.order; });
+    next.forEach((p) => { orderMap[String(p.id)] = p.order; });
     try {
       await apiRequest({
         method: "POST",
@@ -251,21 +315,21 @@ export default function MessengerProfileEditor({ onClose }) {
         data: { order: orderMap },
       });
       flash("Order saved");
-      // Reordering can change which photo is the primary avatar — broadcast
-      // so other chats see the new primary avatar.
       try {
         await apiRequest({ method: "POST", url: `${MSG_API}/me/profile-broadcast/` });
       } catch { /* optional */ }
+      // Update chat-list avatar (primary = first ordered photo)
+      const primary = next[0];
+      const url = primary?.image_url || primary?.imageUrl || primary?.url
+        || (typeof primary?.image === "string" ? primary.image : primary?.image?.url)
+        || null;
+      onPhotosChange?.(next, url);
     } catch (err) {
       setError(err?.response?.data?.message || "Reorder failed");
-      await load(); // rollback
+      await load();
     }
   };
 
-  const onDragEnd = () => {
-    setDragIndex(null);
-    setDragOverIndex(null);
-  };
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2 }, maxWidth: 520, mx: "auto" }}>
@@ -287,79 +351,29 @@ export default function MessengerProfileEditor({ onClose }) {
       {loading ? (
         <Box sx={{ textAlign: "center", py: 4 }}><CircularProgress /></Box>
       ) : (
-        <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-          {photos.map((p, i) => (
-            <Paper
-              key={p.id}
-              elevation={dragOverIndex === i ? 6 : 1}
-              draggable
-              onDragStart={onDragStart(i)}
-              onDragOver={onDragOver(i)}
-              onDrop={onDrop(i)}
-              onDragEnd={onDragEnd}
-              sx={{
-                position: "relative", width: 96, height: 96,
-                p: 0.5, borderRadius: 2,
-                outline: dragOverIndex === i ? "2px solid" : "none",
-                outlineColor: "primary.main",
-                cursor: dragIndex === i ? "grabbing" : "grab",
-                opacity: dragIndex === i ? 0.5 : 1,
-                transition: "opacity 0.15s, outline 0.15s",
-              }}
-            >
-              <DragIndicatorIcon
-                sx={{
-                  position: "absolute", top: 2, left: 2,
-                  fontSize: 16, color: "text.secondary", bgcolor: "background.paper",
-                  borderRadius: "50%", p: 0.2, zIndex: 2,
-                }}
-              />
-              <Avatar
-                src={p.image_url || undefined}
-                variant="rounded"
-                sx={{ width: "100%", height: "100%", border: "1px solid", borderColor: "divider" }}
-              />
-              {i === 0 && (
-                <Chip
-                  size="small"
-                  label="Primary"
-                  color="primary"
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={photos.map((p) => String(p.id))} strategy={rectSortingStrategy}>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+              {photos.map((p, i) => (
+                <SortableMessengerPhoto key={p.id} photo={p} index={i} onDelete={onDelete} />
+              ))}
+              {photos.length < 5 && (
+                <Button
+                  variant="outlined"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading}
                   sx={{
-                    position: "absolute", bottom: 4, left: "50%",
-                    transform: "translateX(-50%)", height: 18, fontSize: 10,
+                    width: 96, height: 96, minWidth: 96, borderStyle: "dashed",
+                    display: "flex", flexDirection: "column", gap: 0.5,
                   }}
-                />
+                >
+                  {uploading ? <CircularProgress size={22} /> : <AddPhotoAlternateIcon />}
+                  <Typography variant="caption">Add</Typography>
+                </Button>
               )}
-              <IconButton
-                size="small"
-                onClick={() => onDelete(p.id)}
-                sx={{
-                  position: "absolute", top: -6, right: -6,
-                  bgcolor: "error.main", color: "#fff",
-                  width: 24, height: 24,
-                  "&:hover": { bgcolor: "error.dark" },
-                  zIndex: 3,
-                }}
-              >
-                <DeleteOutlineIcon sx={{ fontSize: 14 }} />
-              </IconButton>
-            </Paper>
-          ))}
-          {photos.length < 5 && (
-            <Button
-              variant="outlined"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              sx={{
-                width: 96, height: 96, minWidth: 96, borderStyle: "dashed",
-                display: "flex", flexDirection: "column", gap: 0.5,
-              }}
-            >
-              {uploading ? <CircularProgress size={22} /> : <AddPhotoAlternateIcon />}
-              <Typography variant="caption">Add</Typography>
-            </Button>
-          )}
-        </Stack>
+            </Stack>
+          </SortableContext>
+        </DndContext>
       )}
 
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickFile} />

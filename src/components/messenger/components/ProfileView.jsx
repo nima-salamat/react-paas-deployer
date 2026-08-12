@@ -144,7 +144,7 @@ export default function ProfileView({
 
         {/* Bio */}
         {profileData.bio && (
-          <Paper variant="outlined" sx={{ p: 1.25, mt: 1, textAlign: "left", bgcolor: "action.hover" }}>
+          <Paper variant="outlined" sx={{ p: 1.25, mt: 1, textAlign: "left", bgcolor: "action.hover", borderRadius: 1 }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5, fontWeight: 600 }}>
               Bio
             </Typography>
@@ -162,19 +162,20 @@ export default function ProfileView({
         <Button
           fullWidth variant="contained" startIcon={<MessageIcon />}
           onClick={() => onMessage(profileData)}
+          sx={{ borderRadius: 1, textTransform: "none", fontWeight: 600 }}
         >
           Message
         </Button>
         <Tooltip title="Voice call (coming soon)">
           <span>
-            <Button variant="outlined" disabled sx={{ minWidth: 0, px: 1.5 }}>
+            <Button variant="outlined" disabled sx={{ minWidth: 0, px: 1.5, borderRadius: 1 }}>
               <PhoneIcon />
             </Button>
           </span>
         </Tooltip>
         <Tooltip title="Video call (coming soon)">
           <span>
-            <Button variant="outlined" disabled sx={{ minWidth: 0, px: 1.5 }}>
+            <Button variant="outlined" disabled sx={{ minWidth: 0, px: 1.5, borderRadius: 1 }}>
               <VideocamIcon />
             </Button>
           </span>
@@ -187,7 +188,7 @@ export default function ProfileView({
           <Button
             variant="outlined" startIcon={<PersonAddIcon />}
             onClick={() => onAddContact(profileData.id)}
-            sx={{ flex: 1, minWidth: 120 }}
+            sx={{ flex: 1, minWidth: 120, borderRadius: 1, textTransform: "none" }}
           >
             Add contact
           </Button>
@@ -197,13 +198,13 @@ export default function ProfileView({
             variant="outlined"
             onClick={() => setMuted((m) => !m)}
             color={muted ? "primary" : "inherit"}
-            sx={{ minWidth: 0, px: 1.5 }}
+            sx={{ minWidth: 0, px: 1.5, borderRadius: 1 }}
           >
             <NotificationsOffIcon />
           </Button>
         </Tooltip>
         <Tooltip title="Share profile link">
-          <Button variant="outlined" onClick={shareProfile} sx={{ minWidth: 0, px: 1.5 }}>
+          <Button variant="outlined" onClick={shareProfile} sx={{ minWidth: 0, px: 1.5, borderRadius: 1 }}>
             <ShareIcon />
           </Button>
         </Tooltip>
@@ -212,7 +213,7 @@ export default function ProfileView({
             <Button
               variant="outlined" color="error"
               onClick={() => onBlock(profileData.id)}
-              sx={{ minWidth: 0, px: 1.5 }}
+              sx={{ minWidth: 0, px: 1.5, borderRadius: 1 }}
             >
               <BlockIcon />
             </Button>

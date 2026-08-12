@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { flushSync } from "react-dom";
 import {
   Stack, TextField, IconButton, Box, Chip, Tooltip, Typography,
-  Popover, alpha,
+  Popover, alpha, useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import SendIcon from "@mui/icons-material/Send";
 import DoneIcon from "@mui/icons-material/Done";
@@ -27,6 +28,276 @@ const EMOJI_CATEGORIES = {
   Symbols: ["✅", "❌", "❓", "❗", "⚠️", "💯", "🔱", "🔰", "♻️", "🌐", "💤", "💥"],
 };
 
+/** Shortcode search — EN + FA keywords. Only replaces when user picks (Enter/click). */
+const EMOJI_DICT = [
+  { e: "😀", k: ["grinning", "smile", "happy", "خوشحال", "خندان", "لبخند"] },
+  { e: "😃", k: ["smiley", "happy", "خوشحال"] },
+  { e: "😄", k: ["smile", "happy", "grin", "خنده"] },
+  { e: "😁", k: ["grin", "beaming", "خنده"] },
+  { e: "😆", k: ["laughing", "satisfied", "خنده"] },
+  { e: "😅", k: ["sweat_smile", "nervous", "خنده"] },
+  { e: "🤣", k: ["rofl", "rolling", "خنده", "قهقهه"] },
+  { e: "😂", k: ["joy", "laugh", "lol", "lmao", "خنده", "قهقهه", "گریه خنده"] },
+  { e: "🙂", k: ["slight_smile", "smile", "لبخند"] },
+  { e: "😉", k: ["wink", "چشمک"] },
+  { e: "😊", k: ["blush", "happy", "خوشحال"] },
+  { e: "😇", k: ["innocent", "angel", "فرشته"] },
+  { e: "🥰", k: ["love", "smiling_hearts", "عاشق", "عشق"] },
+  { e: "😍", k: ["heart_eyes", "love", "عاشق", "عشق"] },
+  { e: "🤩", k: ["star_struck", "wow", "ستاره‌ای"] },
+  { e: "😘", k: ["kiss", "بوسه", "ماچ"] },
+  { e: "😗", k: ["kissing", "بوسه"] },
+  { e: "😚", k: ["kissing_closed_eyes", "بوسه"] },
+  { e: "😙", k: ["kissing_smiling_eyes", "بوسه"] },
+  { e: "🥲", k: ["smiling_tear", "اشک"] },
+  { e: "😋", k: ["yum", "delicious", "خوشمزه"] },
+  { e: "😛", k: ["tongue", "زبون"] },
+  { e: "😜", k: ["stuck_out_tongue_wink", "زبان"] },
+  { e: "🤪", k: ["zany", "دیوونه"] },
+  { e: "😝", k: ["stuck_out_tongue_closed", "زبان"] },
+  { e: "🤑", k: ["money_mouth", "پول"] },
+  { e: "🤗", k: ["hug", "بغل"] },
+  { e: "🤭", k: ["hand_over_mouth", "خجالت"] },
+  { e: "🤫", k: ["shush", "سکوت", "هیس"] },
+  { e: "🤔", k: ["thinking", "فکر", "فکر کردن"] },
+  { e: "🤐", k: ["zipper_mouth", "سکوت"] },
+  { e: "🤨", k: ["raised_eyebrow", "مشکوک"] },
+  { e: "😐", k: ["neutral", "خنثی"] },
+  { e: "😑", k: ["expressionless", "بی‌حس"] },
+  { e: "😶", k: ["no_mouth", "بی‌صدا"] },
+  { e: "😏", k: ["smirk", "پوزخند"] },
+  { e: "😒", k: ["unamused", "ناراضی"] },
+  { e: "🙄", k: ["eye_roll", "چشم غره"] },
+  { e: "😬", k: ["grimace", "لج"] },
+  { e: "😮‍💨", k: ["exhale", "آه"] },
+  { e: "🤥", k: ["lying", "دروغ"] },
+  { e: "😌", k: ["relieved", "آروم"] },
+  { e: "😔", k: ["pensive", "غمگین", "ناراحت"] },
+  { e: "😪", k: ["sleepy", "خوابالو"] },
+  { e: "🤤", k: ["drooling", "آب دهن"] },
+  { e: "😴", k: ["sleeping", "خواب", "خوابیدن"] },
+  { e: "😷", k: ["mask", "ماسک", "مریض"] },
+  { e: "🤒", k: ["thermometer", "تب", "مریض"] },
+  { e: "🤕", k: ["head_bandage", "زخم"] },
+  { e: "🤢", k: ["nauseated", "تهوع"] },
+  { e: "🤮", k: ["vomit", "استفراغ"] },
+  { e: "🥵", k: ["hot", "داغ"] },
+  { e: "🥶", k: ["cold", "سرد"] },
+  { e: "🥴", k: ["woozy", "گیج"] },
+  { e: "😵", k: ["dizzy", "گیج"] },
+  { e: "🤯", k: ["exploding_head", "منفجر", "شوک"] },
+  { e: "🤠", k: ["cowboy", "کابوی"] },
+  { e: "🥳", k: ["party", "جشن", "تولد"] },
+  { e: "😎", k: ["sunglasses", "cool", "خفن", "باحال"] },
+  { e: "🤓", k: ["nerd", "خرخون"] },
+  { e: "🧐", k: ["monocle", "جاسوس"] },
+  { e: "😕", k: ["confused", "گیج"] },
+  { e: "😟", k: ["worried", "نگران"] },
+  { e: "🙁", k: ["slight_frown", "ناراحت"] },
+  { e: "☹️", k: ["frown", "ناراحت"] },
+  { e: "😮", k: ["open_mouth", "تعجب"] },
+  { e: "😯", k: ["hushed", "تعجب"] },
+  { e: "😲", k: ["astonished", "شوکه"] },
+  { e: "😳", k: ["flushed", "خجالت"] },
+  { e: "🥺", k: ["pleading", "التماس", "نگاه"] },
+  { e: "😦", k: ["frowning", "ناراحت"] },
+  { e: "😧", k: ["anguished", "رنج"] },
+  { e: "😨", k: ["fearful", "ترس"] },
+  { e: "😰", k: ["anxious", "اضطراب"] },
+  { e: "😥", k: ["sad_relieved", "ناراحت"] },
+  { e: "😢", k: ["cry", "گریه", "اشک"] },
+  { e: "😭", k: ["sob", "گریه", "های های"] },
+  { e: "😱", k: ["scream", "جیغ", "ترس"] },
+  { e: "😖", k: ["confounded", "گیج"] },
+  { e: "😣", k: ["persevering", "سخت"] },
+  { e: "😞", k: ["disappointed", "ناامید"] },
+  { e: "😓", k: ["downcast", "خسته"] },
+  { e: "😩", k: ["weary", "خسته"] },
+  { e: "😫", k: ["tired", "خسته"] },
+  { e: "🥱", k: ["yawn", "خمیازه"] },
+  { e: "😤", k: ["triumph", "عصبانی"] },
+  { e: "😡", k: ["rage", "angry", "عصبانی", "خشم"] },
+  { e: "😠", k: ["angry", "عصبانی"] },
+  { e: "🤬", k: ["cursing", "فحش"] },
+  { e: "😈", k: ["smiling_imp", "شیطون"] },
+  { e: "👿", k: ["imp", "شیطان"] },
+  { e: "💀", k: ["skull", "جمجمه", "مرگ"] },
+  { e: "☠️", k: ["skull_crossbones", "مرگ"] },
+  { e: "💩", k: ["poop", "shit", "گوه"] },
+  { e: "🤡", k: ["clown", "دلقک"] },
+  { e: "👹", k: ["ogre", "غول"] },
+  { e: "👺", k: ["goblin"] },
+  { e: "👻", k: ["ghost", "روح", "شبح"] },
+  { e: "👽", k: ["alien", "فضایی"] },
+  { e: "👾", k: ["space_invader", "بازی"] },
+  { e: "🤖", k: ["robot", "ربات"] },
+  { e: "😺", k: ["smiley_cat", "گربه"] },
+  { e: "😸", k: ["smile_cat", "گربه"] },
+  { e: "😹", k: ["joy_cat", "گربه"] },
+  { e: "😻", k: ["heart_eyes_cat", "گربه"] },
+  { e: "😼", k: ["smirk_cat", "گربه"] },
+  { e: "😽", k: ["kissing_cat", "گربه"] },
+  { e: "🙀", k: ["scream_cat", "گربه"] },
+  { e: "😿", k: ["crying_cat", "گربه"] },
+  { e: "😾", k: ["pouting_cat", "گربه"] },
+  { e: "👍", k: ["thumbsup", "+1", "like", "آفرین", "لایک", "خوب"] },
+  { e: "👎", k: ["thumbsdown", "-1", "بد", "دیسلایک"] },
+  { e: "👏", k: ["clap", "applause", "تشویق", "دست زدن"] },
+  { e: "🙌", k: ["raised_hands", "هلهله"] },
+  { e: "👋", k: ["wave", "hello", "سلام", "خداحافظ"] },
+  { e: "🤝", k: ["handshake", "دست دادن", "توافق"] },
+  { e: "🙏", k: ["pray", "please", "thanks", "لطفا", "ممنون", "دعا"] },
+  { e: "💪", k: ["muscle", "strong", "قوی", "بازو"] },
+  { e: "✌️", k: ["v", "peace", "صلح"] },
+  { e: "🤞", k: ["fingers_crossed", "شانس"] },
+  { e: "🤟", k: ["love_you_gesture", "عاشقتم"] },
+  { e: "🤘", k: ["metal", "rock"] },
+  { e: "👌", k: ["ok_hand", "باشه", "اوکی"] },
+  { e: "🤌", k: ["pinched_fingers", "ایتالیایی"] },
+  { e: "🤏", k: ["pinching_hand", "کم"] },
+  { e: "👈", k: ["point_left", "چپ"] },
+  { e: "👉", k: ["point_right", "راست"] },
+  { e: "👆", k: ["point_up", "بالا"] },
+  { e: "👇", k: ["point_down", "پایین"] },
+  { e: "✋", k: ["hand", "stop", "دست", "ایست"] },
+  { e: "🤚", k: ["raised_back_of_hand"] },
+  { e: "🖐️", k: ["raised_hand_fingers"] },
+  { e: "🖖", k: ["vulcan"] },
+  { e: "❤️", k: ["heart", "love", "red_heart", "عشق", "قلب", "قرمز"] },
+  { e: "🧡", k: ["orange_heart", "قلب"] },
+  { e: "💛", k: ["yellow_heart", "قلب"] },
+  { e: "💚", k: ["green_heart", "قلب"] },
+  { e: "💙", k: ["blue_heart", "قلب"] },
+  { e: "💜", k: ["purple_heart", "قلب"] },
+  { e: "🖤", k: ["black_heart", "قلب"] },
+  { e: "🤍", k: ["white_heart", "قلب"] },
+  { e: "🤎", k: ["brown_heart", "قلب"] },
+  { e: "💔", k: ["broken_heart", "شکسته", "قلب شکسته"] },
+  { e: "❣️", k: ["heart_exclamation", "قلب"] },
+  { e: "💕", k: ["two_hearts", "عشق"] },
+  { e: "💞", k: ["revolving_hearts", "عشق"] },
+  { e: "💓", k: ["heartbeat", "ضربان"] },
+  { e: "💗", k: ["growing_heart", "عشق"] },
+  { e: "💖", k: ["sparkling_heart", "عشق"] },
+  { e: "💘", k: ["cupid", "تیر عشق"] },
+  { e: "💝", k: ["gift_heart", "هدیه"] },
+  { e: "🔥", k: ["fire", "lit", "آتش", "داغ", "خفن"] },
+  { e: "⭐", k: ["star", "ستاره"] },
+  { e: "🌟", k: ["glowing_star", "ستاره"] },
+  { e: "✨", k: ["sparkles", "درخشش"] },
+  { e: "⚡", k: ["zap", "lightning", "برق", "رعد"] },
+  { e: "🎉", k: ["tada", "party", "جشن", "تبریک"] },
+  { e: "🎊", k: ["confetti", "جشن"] },
+  { e: "🎈", k: ["balloon", "بادکنک"] },
+  { e: "🏆", k: ["trophy", "جام", "قهرمان"] },
+  { e: "🥇", k: ["first_place", "طلا"] },
+  { e: "🥈", k: ["second_place", "نقره"] },
+  { e: "🥉", k: ["third_place", "برنز"] },
+  { e: "💎", k: ["gem", "الماس"] },
+  { e: "🚀", k: ["rocket", "موشک"] },
+  { e: "💡", k: ["bulb", "idea", "ایده", "لامپ"] },
+  { e: "🎵", k: ["musical_note", "آهنگ", "موسیقی"] },
+  { e: "🎶", k: ["notes", "موسیقی"] },
+  { e: "🎁", k: ["gift", "هدیه"] },
+  { e: "☕", k: ["coffee", "قهوه"] },
+  { e: "🍕", k: ["pizza", "پیتزا"] },
+  { e: "🍔", k: ["burger", "همبرگر"] },
+  { e: "🍺", k: ["beer", "آبجو"] },
+  { e: "🍷", k: ["wine", "شراب"] },
+  { e: "📚", k: ["books", "کتاب"] },
+  { e: "✅", k: ["white_check_mark", "check", "تیک", "درست", "اوکی"] },
+  { e: "❌", k: ["x", "cross", "غلط", "نادرست"] },
+  { e: "❓", k: ["question", "سوال"] },
+  { e: "❗", k: ["exclamation", "تعجب"] },
+  { e: "⚠️", k: ["warning", "هشدار"] },
+  { e: "💯", k: ["100", "hundred", "صد"] },
+  { e: "💤", k: ["zzz", "خواب"] },
+  { e: "💥", k: ["boom", "انفجار"] },
+  { e: "👀", k: ["eyes", "چشم", "نگاه"] },
+  { e: "🧠", k: ["brain", "مغز"] },
+  { e: "🎂", k: ["birthday", "تولد", "کیک"] },
+  { e: "🌹", k: ["rose", "گل", "رز"] },
+  { e: "🌸", k: ["cherry_blossom", "شکوفه"] },
+  { e: "☀️", k: ["sun", "آفتاب", "خورشید"] },
+  { e: "🌙", k: ["moon", "ماه"] },
+  { e: "🌈", k: ["rainbow", "رنگین کمان"] },
+  { e: "☔", k: ["umbrella", "باران", "چتر"] },
+  { e: "🐶", k: ["dog", "سگ"] },
+  { e: "🐱", k: ["cat", "گربه"] },
+  { e: "🐻", k: ["bear", "خرس"] },
+  { e: "🐼", k: ["panda", "پاندا"] },
+  { e: "🦊", k: ["fox", "روباه"] },
+  { e: "🦁", k: ["lion", "شیر"] },
+  { e: "🐸", k: ["frog", "قورباغه"] },
+  { e: "🐵", k: ["monkey", "میمون"] },
+  { e: "🦄", k: ["unicorn", "یونیکورن"] },
+  { e: "🐝", k: ["bee", "زنبور"] },
+  { e: "🐛", k: ["bug", "حشره"] },
+  { e: "🦋", k: ["butterfly", "پروانه"] },
+  { e: "🐢", k: ["turtle", "لاکپشت"] },
+  { e: "🐙", k: ["octopus", "اختاپوس"] },
+  { e: "🐬", k: ["dolphin", "دلفین"] },
+  { e: "🐳", k: ["whale", "نهنگ"] },
+  { e: "🌍", k: ["earth", "جهان", "زمین"] },
+  { e: "✈️", k: ["airplane", "هواپیما"] },
+  { e: "🚗", k: ["car", "ماشین"] },
+  { e: "🏠", k: ["house", "خانه"] },
+  { e: "📱", k: ["iphone", "phone", "موبایل", "تلفن"] },
+  { e: "💻", k: ["laptop", "computer", "لپتاپ", "کامپیوتر"] },
+  { e: "⌚", k: ["watch", "ساعت"] },
+  { e: "📷", k: ["camera", "دوربین"] },
+  { e: "🎥", k: ["movie_camera", "فیلم"] },
+  { e: "🎮", k: ["video_game", "بازی"] },
+  { e: "🪙", k: ["coin", "سکه"] },
+  { e: "💰", k: ["moneybag", "پول"] },
+  { e: "💵", k: ["dollar", "دلار"] },
+];
+
+function normalizeQuery(q) {
+  return String(q || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function matchEmojis(query, limit = 24) {
+  const q = normalizeQuery(query);
+  if (!q || q.length < 1) return [];
+  const scored = [];
+  for (const item of EMOJI_DICT) {
+    let best = 0;
+    for (const key of item.k) {
+      const k = key.toLowerCase();
+      if (k === q) best = Math.max(best, 100);
+      else if (k.startsWith(q)) best = Math.max(best, 80 - (k.length - q.length));
+      else if (k.includes(q)) best = Math.max(best, 40);
+    }
+    if (best > 0) scored.push({ ...item, score: best });
+  }
+  scored.sort((a, b) => b.score - a.score || a.e.localeCompare(b.e));
+  // unique emoji
+  const seen = new Set();
+  const out = [];
+  for (const s of scored) {
+    if (seen.has(s.e)) continue;
+    seen.add(s.e);
+    out.push(s);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function getShortcodeAt(text, cursor) {
+  const pos = cursor == null ? text.length : cursor;
+  const before = text.slice(0, pos);
+  // :query  (no spaces; min 1 char after colon for suggestions)
+  const m = before.match(/:([^\s:]{1,40})$/);
+  if (!m) return null;
+  return {
+    query: m[1],
+    start: before.length - m[0].length,
+    end: pos,
+  };
+}
+
+
 const HOLD_MS = 180; // short press = switch mode; longer = start record
 const LOCK_DY = -56; // drag up this many px → lock
 const CANCEL_DX = -72; // drag left this many px → cancel
@@ -41,11 +312,20 @@ const CANCEL_DX = -72; // drag left this many px → cancel
 export default function MessageComposer({
   text, setText, files, setFiles,
   replyTo, editingMsg, onCancelReplyOrEdit,
-  onSend, onPickImage, onPickVideo, inputRef, onKeyDown,
+  onSend, onPickImage, onPickVideo, onEditAttachment, inputRef, onKeyDown,
+  sendFilesTogether = true, setSendFilesTogether,
 }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const fileRef = useRef(null);
   const emojiBtnRef = useRef(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [scQuery, setScQuery] = useState(null); // { query, start, end }
+  const [scIndex, setScIndex] = useState(0);
+  const scMatches = React.useMemo(
+    () => (scQuery ? matchEmojis(scQuery.query) : []),
+    [scQuery],
+  );
 
   // "voice" | "video" — which mode the primary hold-button uses
   const [mediaMode, setMediaMode] = useState(() => {
@@ -76,6 +356,7 @@ export default function MessageComposer({
   const pointerIdRef = useRef(null);
   const lockedRef = useRef(false);
   const cancelRef = useRef(false);
+  const suppressModeToggleClickRef = useRef(false);
 
   const stopMicMeter = () => {
     if (micRafRef.current) {
@@ -288,6 +569,7 @@ export default function MessageComposer({
     holdTimerRef.current = setTimeout(() => {
       if (!pressStartRef.current) return;
       pressStartRef.current.started = true;
+      suppressModeToggleClickRef.current = true;
       beginRecording(mode);
     }, HOLD_MS);
 
@@ -407,15 +689,116 @@ export default function MessageComposer({
     setMediaMode(mode);
   };
 
-  const handleFileChange = (e) => {
-    const picked = Array.from(e.target.files || []);
-    e.target.value = "";
-    if (!picked.length) return;
-    picked.forEach((f) => {
-      if (f.type?.startsWith("image/")) onPickImage(f);
-      else if (f.type?.startsWith("video/") && onPickVideo) onPickVideo(f);
-      else setFiles((prev) => [...prev, f]);
+
+  const updateShortcodeFromText = (value, cursor) => {
+    const sc = getShortcodeAt(value, cursor);
+    if (!sc) {
+      setScQuery(null);
+      setScIndex(0);
+      return;
+    }
+    setScQuery(sc);
+    setScIndex(0);
+  };
+
+  const applyShortcodeEmoji = (emoji) => {
+    if (!scQuery) return;
+    const { start, end } = scQuery;
+    const next = `${text.slice(0, start)}${emoji}${text.slice(end)}`;
+    setText(next);
+    setScQuery(null);
+    setScIndex(0);
+    // restore caret after emoji
+    requestAnimationFrame(() => {
+      const el = inputRef?.current;
+      if (el && typeof el.setSelectionRange === "function") {
+        const pos = start + emoji.length;
+        try { el.setSelectionRange(pos, pos); } catch { /* */ }
+        el.focus();
+      }
     });
+  };
+
+  const onTextChange = (e) => {
+    const value = e.target.value;
+    const cursor = e.target.selectionStart;
+    setText(value);
+    updateShortcodeFromText(value, cursor);
+  };
+
+  const handleComposerKeyDown = (e) => {
+    if (scMatches.length > 0 && scQuery) {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        e.stopPropagation();
+        setScIndex((i) => (i + 1) % scMatches.length);
+        return;
+      }
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        e.stopPropagation();
+        setScIndex((i) => (i - 1 + scMatches.length) % scMatches.length);
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        const pick = scMatches[scIndex] || scMatches[0];
+        if (pick) applyShortcodeEmoji(pick.e);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setScQuery(null);
+        setScIndex(0);
+        return;
+      }
+    }
+    onKeyDown?.(e);
+  };
+
+  const [fileDragOver, setFileDragOver] = useState(false);
+
+  const addPickedFiles = (list) => {
+    const picked = Array.from(list || []).filter(Boolean);
+    if (!picked.length) return;
+    setFiles((prev) => [...prev, ...picked]);
+    // Open image/video editor for first media file if single image/video
+    // (caller can edit via strip). Keep all in list.
+  };
+
+  const onDragOverFiles = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer?.types?.includes("Files")) setFileDragOver(true);
+  };
+  const onDragLeaveFiles = (e) => {
+    e.preventDefault();
+    // only clear when leaving the composer root
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setFileDragOver(false);
+  };
+  const onDropFiles = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFileDragOver(false);
+    const list = e.dataTransfer?.files;
+    if (list?.length) addPickedFiles(list);
+  };
+
+  const handleFileChange = (e) => {
+    addPickedFiles(e.target.files);
+    e.target.value = "";
+  };
+
+  const thumbUrl = (f) => {
+    try {
+      if (f?.type?.startsWith("image/") || f?.type?.startsWith("video/")) {
+        return URL.createObjectURL(f);
+      }
+    } catch { /* */ }
+    return null;
   };
 
   const formatRecTime = (s) => {
@@ -426,7 +809,6 @@ export default function MessageComposer({
 
   const canSend = Boolean(text.trim() || files.length || editingMsg);
   const primaryMode = mediaMode; // "voice" | "video"
-  const secondaryMode = mediaMode === "voice" ? "video" : "voice";
 
   /* ---------- locked / holding recording UI ---------- */
   if (recPhase === "holding" || recPhase === "locked") {
@@ -523,7 +905,77 @@ export default function MessageComposer({
   }
 
   return (
-    <>
+    <Box
+      sx={{
+        position: "relative",
+        bgcolor: "background.paper",
+        outline: fileDragOver ? "2px dashed" : "none",
+        outlineColor: "primary.main",
+        outlineOffset: -2,
+        transition: "outline-color 0.15s",
+      }}
+      onDragEnter={onDragOverFiles}
+      onDragOver={onDragOverFiles}
+      onDragLeave={onDragLeaveFiles}
+      onDrop={onDropFiles}
+    >
+      {/* Shortcode emoji island (Telegram-style) */}
+      {scMatches.length > 0 && scQuery && (
+        <Box
+          sx={{
+            position: "absolute",
+            left: 8,
+            right: 8,
+            bottom: "100%",
+            mb: 0.75,
+            zIndex: 30,
+            bgcolor: "background.paper",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2.5,
+            boxShadow: 8,
+            px: 1,
+            py: 0.75,
+            overflowX: "auto",
+            overflowY: "hidden",
+            WebkitOverflowScrolling: "touch",
+            touchAction: "pan-x",
+            scrollbarWidth: "thin",
+          }}
+        >
+          <Stack direction="row" spacing={0.75} sx={{ width: "max-content" }}>
+            {scMatches.map((m, i) => (
+              <Box
+                key={`${m.e}-${i}`}
+                onMouseDown={(ev) => {
+                  // prevent input blur before click applies
+                  ev.preventDefault();
+                  applyShortcodeEmoji(m.e);
+                }}
+                sx={{
+                  width: 44,
+                  height: 44,
+                  flexShrink: 0,
+                  borderRadius: 1.5,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 26,
+                  cursor: "pointer",
+                  userSelect: "none",
+                  bgcolor: i === scIndex ? (t) => alpha(t.palette.primary.main, 0.16) : "action.hover",
+                  outline: i === scIndex ? "2px solid" : "1px solid",
+                  outlineColor: i === scIndex ? "primary.main" : "divider",
+                  transition: "background-color 0.12s, outline-color 0.12s",
+                }}
+              >
+                {m.e}
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      )}
+
       {(replyTo || editingMsg) && (
         <Stack direction="row" alignItems="center"
           sx={{ px: 1.5, py: 0.7, bgcolor: "background.paper", borderTop: "1px solid", borderColor: "divider" }}>
@@ -545,8 +997,134 @@ export default function MessageComposer({
         </Stack>
       )}
 
-      <Stack direction="row" alignItems="flex-end" spacing={0.5}
-        sx={{ p: 1, bgcolor: "background.paper", borderTop: "1px solid", borderColor: "divider" }}>
+      {fileDragOver && (
+        <Box sx={{
+          px: 1.5, py: 1,
+          bgcolor: (t) => t.palette.mode === "dark" ? "rgba(25,118,210,0.2)" : "rgba(25,118,210,0.08)",
+          borderBottom: "1px solid",
+          borderColor: "primary.main",
+          textAlign: "center",
+        }}>
+          <Typography variant="caption" color="primary" fontWeight={700}>
+            Drop files to attach
+          </Typography>
+        </Box>
+      )}
+      {files.length > 0 && (
+        <Box sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderColor: "divider" }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.25, pt: 0.75, pb: 0.25 }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={700}>
+              {files.length} {files.length === 1 ? "file" : "files"} selected
+            </Typography>
+            {setSendFilesTogether && files.length > 1 && (
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <input
+                  id="messenger-send-files-together"
+                  type="checkbox"
+                  checked={sendFilesTogether}
+                  onChange={(e) => setSendFilesTogether(e.target.checked)}
+                  style={{ width: 16, height: 16, cursor: "pointer" }}
+                />
+                <Typography
+                  component="label"
+                  htmlFor="messenger-send-files-together"
+                  variant="caption"
+                  sx={{ cursor: "pointer", userSelect: "none" }}
+                >
+                  Send all in one message
+                </Typography>
+              </Stack>
+            )}
+          </Stack>
+          <Box sx={{
+            px: 1, pt: 0.5, pb: 0.75,
+            overflowX: "auto",
+            overflowY: "hidden",
+            WebkitOverflowScrolling: "touch",
+            touchAction: "pan-x",
+            scrollbarWidth: "thin",
+            "&::-webkit-scrollbar": { height: 4 },
+          }}>
+          <Stack direction="row" spacing={1} sx={{ width: "max-content", pr: 1 }}>
+            {files.map((f, i) => {
+              const url = thumbUrl(f);
+              const isImg = f.type?.startsWith("image/");
+              const isVid = f.type?.startsWith("video/");
+              return (
+                <Box
+                  key={`${f.name}-${f.size}-${i}`}
+                  onClick={() => {
+                    if ((isImg || isVid) && onEditAttachment) onEditAttachment(f, i);
+                  }}
+                  sx={{
+                    position: "relative",
+                    width: 72, height: 72, flexShrink: 0,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    bgcolor: "action.hover",
+                    cursor: (isImg || isVid) ? "pointer" : "default",
+                    userSelect: "none",
+                  }}
+                >
+                  {url ? (
+                    isVid ? (
+                      <Box
+                        component="video"
+                        src={url}
+                        muted
+                        playsInline
+                        sx={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+                      />
+                    ) : (
+                      <Box
+                        component="img"
+                        src={url}
+                        alt=""
+                        sx={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+                      />
+                    )
+                  ) : (
+                    <Box sx={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {f.name?.startsWith("voice_") ? <MicIcon /> : f.name?.startsWith("video_message_") ? <VideocamIcon /> : <AttachFileIcon />}
+                    </Box>
+                  )}
+                  {isVid && (
+                    <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(0,0,0,0.25)", pointerEvents: "none" }}>
+                      <VideocamIcon sx={{ color: "#fff", fontSize: 22 }} />
+                    </Box>
+                  )}
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFiles((prev) => prev.filter((_, j) => j !== i));
+                    }}
+                    sx={{
+                      position: "absolute", top: 2, right: 2,
+                      width: 28, height: 28, p: 0,
+                      bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
+                      "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
+                    }}
+                  >
+                    <CloseIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                </Box>
+              );
+            })}
+          </Stack>
+          </Box>
+        </Box>
+      )}
+
+      <Stack direction="row" alignItems="center" spacing={isMobile ? 0.15 : 0.5}
+        sx={{
+          p: isMobile ? 0.75 : 1,
+          bgcolor: "background.paper",
+          borderTop: files.length ? "none" : "1px solid",
+          borderColor: "divider",
+        }}>
         <input
           ref={fileRef} type="file" multiple hidden
           accept="image/*,video/*,audio/*,.gif,.pdf,.txt,.zip,.doc,.docx,.md,.csv"
@@ -554,12 +1132,31 @@ export default function MessageComposer({
         />
         {!editingMsg && (
           <Tooltip title="Attach files">
-            <IconButton onClick={() => fileRef.current?.click()}><AttachFileIcon /></IconButton>
+            <IconButton
+              onClick={() => fileRef.current?.click()}
+              size="small"
+              sx={{
+                p: isMobile ? 0.5 : 1,
+                mr: isMobile ? -0.25 : 0,
+                alignSelf: "center",
+              }}
+            >
+              <AttachFileIcon sx={{ fontSize: isMobile ? 20 : 24 }} />
+            </IconButton>
           </Tooltip>
         )}
         <Tooltip title="Emoji">
-          <IconButton ref={emojiBtnRef} onClick={() => setEmojiOpen(true)}>
-            <EmojiEmotionsIcon />
+          <IconButton
+            ref={emojiBtnRef}
+            onClick={() => setEmojiOpen(true)}
+            size="small"
+            sx={{
+              p: isMobile ? 0.5 : 1,
+              ml: isMobile ? -0.5 : 0,
+              alignSelf: "center",
+            }}
+          >
+            <EmojiEmotionsIcon sx={{ fontSize: isMobile ? 20 : 24 }} />
           </IconButton>
         </Tooltip>
         <Popover
@@ -602,10 +1199,35 @@ export default function MessageComposer({
           </IconButton>
         )}
         <TextField
-          inputRef={inputRef} fullWidth multiline maxRows={6} size="small"
+          inputRef={inputRef}
+          fullWidth
+          multiline
+          maxRows={isMobile ? 5 : 8}
+          minRows={1}
+          size="small"
           placeholder={editingMsg ? "Edit message…" : "Message"}
-          value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 3, bgcolor: "action.hover" } }}
+          value={text}
+          onChange={onTextChange}
+          onKeyDown={handleComposerKeyDown}
+          onSelect={(e) => {
+            const el = e.target;
+            updateShortcodeFromText(el.value, el.selectionStart);
+          }}
+          onClick={(e) => {
+            const el = e.target;
+            updateShortcodeFromText(el.value, el.selectionStart);
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: "action.hover",
+              alignItems: "center",
+              py: isMobile ? 0.35 : 0.5,
+            },
+            "& textarea": {
+              lineHeight: 1.4,
+            },
+          }}
         />
 
         {/* When there is something to send → Send. Otherwise Telegram-style media buttons. */}
@@ -621,76 +1243,38 @@ export default function MessageComposer({
             {editingMsg ? <DoneIcon /> : <SendIcon />}
           </IconButton>
         ) : (
-          <Stack direction="row" spacing={0} alignItems="center">
-            {/* Secondary: tap to switch primary mode */}
-            <Tooltip title={secondaryMode === "voice" ? "Switch to voice" : "Switch to video"}>
-              <IconButton
-                size="small"
-                onClick={() => switchMode(secondaryMode)}
-                sx={{
-                  color: "text.secondary",
-                  opacity: 0.75,
-                }}
-              >
-                {secondaryMode === "voice" ? <MicIcon fontSize="small" /> : <VideocamIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
-
-            {/* Primary: hold to record */}
-            <Tooltip title={primaryMode === "voice" ? "Hold to record voice" : "Hold to record video"}>
-              <IconButton
-                color="primary"
-                onPointerDown={(e) => onMediaPointerDown(e, primaryMode)}
-                onContextMenu={(e) => e.preventDefault()}
-                sx={{
-                  bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
-                  touchAction: "none",
-                  userSelect: "none",
-                  WebkitUserSelect: "none",
-                  WebkitTouchCallout: "none",
-                }}
-              >
-                {primaryMode === "voice" ? <MicIcon /> : <VideocamIcon />}
-              </IconButton>
-            </Tooltip>
-          </Stack>
+          <Tooltip title={primaryMode === "voice" ? "Tap for video · hold to record voice" : "Tap for voice · hold to record video"}>
+            <IconButton
+              color="primary"
+              onPointerDown={(e) => onMediaPointerDown(e, primaryMode)}
+              onClick={() => {
+                if (suppressModeToggleClickRef.current) {
+                  suppressModeToggleClickRef.current = false;
+                  return;
+                }
+                switchMode(primaryMode === "voice" ? "video" : "voice");
+              }}
+              onContextMenu={(e) => e.preventDefault()}
+              sx={{
+                width: 42, height: 42,
+                bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
+                touchAction: "none",
+                userSelect: "none",
+                WebkitUserSelect: "none",
+                WebkitTouchCallout: "none",
+              }}
+            >
+              {primaryMode === "voice" ? <MicIcon /> : <VideocamIcon />}
+            </IconButton>
+          </Tooltip>
         )}
       </Stack>
 
-      {files.length > 0 && (
-        <Stack direction="row" spacing={0.5} sx={{
-          px: 1, pb: 1, bgcolor: "background.paper",
-          flexWrap: "wrap", gap: 0.5, alignItems: "center",
-        }}>
-          {files.map((f, i) => (
-            <Chip
-              key={i}
-              size="small"
-              label={f.name}
-              onDelete={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
-              avatar={f.type?.startsWith("image/")
-                ? (
-                  <Box
-                    component="img"
-                    src={URL.createObjectURL(f)}
-                    alt=""
-                    sx={{ width: 24, height: 24, objectFit: "cover", borderRadius: "50%" }}
-                  />
-                )
-                : f.name?.startsWith("voice_")
-                  ? <MicIcon sx={{ fontSize: 18 }} />
-                  : f.name?.startsWith("video_message_")
-                    ? <VideocamIcon sx={{ fontSize: 18 }} />
-                    : undefined}
-            />
-          ))}
-        </Stack>
-      )}
       {recordError && (
         <Typography variant="caption" color="error.main" sx={{ px: 1, pb: 0.5, display: "block" }}>
           {recordError}
         </Typography>
       )}
-    </>
+    </Box>
   );
 }

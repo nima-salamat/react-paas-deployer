@@ -15,6 +15,13 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import DnsIcon from "@mui/icons-material/Dns";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import StopIcon from "@mui/icons-material/Stop";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
+import CloudUploadIcon from "@mui/icons-material/CloudUpload";
+import StorageIcon from "@mui/icons-material/Storage";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, EMAILS_API, unwrapData } from "../tickets/api";
@@ -22,6 +29,11 @@ import EmailManagement from "../emails/EmailManagement.jsx";
 import MessageBubble from "../tickets/MessageBubble.jsx";
 import { htmlToPlain } from "../tickets/SimpleHtmlEditor.jsx";
 import ChatComposer from "../tickets/ChatComposer.jsx";
+import ServicesPanel from "./ServicesPanel.jsx";
+import TicketsPanel from "./TicketsPanel.jsx";
+import UsersPanel from "./UsersPanel.jsx";
+import InvitesPanel from "./InvitesPanel.jsx";
+import AuthCodesPanel from "./AuthCodesPanel.jsx";
 
 const STATUS_COLOR = {
   open: "info", in_progress: "warning", waiting_user: "secondary",
@@ -119,6 +131,8 @@ export default function AdminDashboard() {
   const [codeSearch, setCodeSearch] = useState("");
   const [codeLoading, setCodeLoading] = useState(false);
 
+  const [detailTab, setDetailTab] = useState("overview"); // overview | deploys | volumes | networks
+
   const API_USERS = useMemo(() => `${hostBase()}/api/users/user/`, []);
   const ADMIN_USERS = useMemo(() => `${hostBase()}/api/users/admin/users/`, []);
   const AUTH = useMemo(() => `${hostBase()}/auth/api`, []);
@@ -188,7 +202,7 @@ export default function AdminDashboard() {
       const data = res.data;
       // DRF pagination at top level
       setUsers(data.results || data.data?.results || []);
-      setUserCount(typeof data.count === 'number' ? data.count : (Array.isArray(results) ? results.length : 0));
+      setUserCount(typeof data.count === 'number' ? data.count : (data.results || []).length);
     } catch (e) {
       setUsers([]);
       setToast(e?.response?.data?.message || "Cannot load users (need users.view)");
@@ -207,6 +221,8 @@ export default function AdminDashboard() {
         "tickets.view", "tickets.manage", "tickets.delete",
         "users.view", "users.manage", "invites.manage",
         "auth_codes.view", "emails.manage", "departments.manage",
+        "services.view", "services.manage", "services.delete",
+        "deploys.manage", "volumes.manage", "networks.manage",
       ]);
     }
   }, []);
@@ -560,7 +576,10 @@ export default function AdminDashboard() {
   const nav = [
     { id: "overview", label: "Overview", icon: <DashboardIcon /> },
     { id: "tickets", label: "Tickets", icon: <ConfirmationNumberIcon /> },
-    ...(isAdmin || isStaff ? [{ id: "users", label: "Users & access", icon: <PeopleIcon /> }] : []),
+    ...(isAdmin || isStaff ? [
+      { id: "users", label: "Users & access", icon: <PeopleIcon /> },
+      { id: "services", label: "Services", icon: <DnsIcon /> },
+    ] : []),
     ...(isAdmin
       ? [
           { id: "invites", label: "Invites", icon: <LinkIcon /> },
@@ -700,278 +719,77 @@ export default function AdminDashboard() {
         )}
 
         {tab === "tickets" && (
-          <>
-            <Typography variant="h5" fontWeight={700} mb={2}>Tickets</Typography>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} gap={2} flexWrap="wrap" useFlexGap>
-                <TextField size="small" label="Search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} sx={{ minWidth: 200, flex: 1 }} />
-                <FormControl size="small" sx={{ minWidth: 130 }}>
-                  <InputLabel>Status</InputLabel>
-                  <Select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-                    <MenuItem value="">All</MenuItem>
-                    <MenuItem value="open,in_progress,waiting_user">Active</MenuItem>
-                    {["open", "in_progress", "waiting_user", "resolved", "closed"].map((s) => (
-                      <MenuItem key={s} value={s}>{s}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Priority</InputLabel>
-                  <Select label="Priority" value={priority} onChange={(e) => { setPriority(e.target.value); setPage(1); }}>
-                    <MenuItem value="">All</MenuItem>
-                    {["low", "normal", "high", "urgent"].map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 130 }}>
-                  <InputLabel>Assigned</InputLabel>
-                  <Select label="Assigned" value={assignedFilter} onChange={(e) => { setAssignedFilter(e.target.value); setPage(1); }}>
-                    <MenuItem value="">All</MenuItem>
-                    <MenuItem value="me">Mine</MenuItem>
-                    <MenuItem value="unassigned">Unassigned</MenuItem>
-                  </Select>
-                </FormControl>
-              </Stack>
-            </Paper>
-            {tLoading ? <CircularProgress /> : (
-              <Paper>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Number</TableCell><TableCell>Subject</TableCell>
-                      <TableCell>User</TableCell><TableCell>Status</TableCell>
-                      <TableCell>Priority</TableCell><TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {tickets.map((t) => (
-                      <TableRow key={t.id} hover>
-                        <TableCell sx={{ cursor: "pointer" }} onClick={() => openDetail(t.id)}>{t.public_id}</TableCell>
-                        <TableCell sx={{ cursor: "pointer" }} onClick={() => openDetail(t.id)}>{t.subject}</TableCell>
-                        <TableCell>{t.user?.username}</TableCell>
-                        <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
-                        <TableCell>{t.priority}</TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="Delete">
-                            <IconButton size="small" color="error" onClick={() => deleteTicket(t.id)}>
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {Math.ceil((count || 0) / 15) > 1 && (
-                  <Box display="flex" justifyContent="center" p={2}>
-                    <Pagination page={page} count={Math.max(1, Math.ceil((count || 0) / 15))} onChange={(_, v) => setPage(v)} showFirstButton showLastButton color="primary" />
-                  </Box>
-                )}
-              </Paper>
-            )}
-          </>
+          <TicketsPanel
+            tickets={tickets}
+            count={count}
+            page={page}
+            setPage={setPage}
+            search={search}
+            setSearch={setSearch}
+            status={status}
+            setStatus={setStatus}
+            priority={priority}
+            setPriority={setPriority}
+            assignedFilter={assignedFilter}
+            setAssignedFilter={setAssignedFilter}
+            tLoading={tLoading}
+            onOpen={openDetail}
+            onDelete={deleteTicket}
+          />
         )}
 
         {tab === "users" && (
-          <>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
-              <Box>
-                <Typography variant="h5" fontWeight={700}>Users & access</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Manage accounts, staff flags, and permission rules in one place
-                </Typography>
-              </Box>
-              {(isAdmin || isStaff) && (
-                <Button variant="contained" onClick={() => setCreateOpen(true)}>New user</Button>
-              )}
-            </Stack>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
-                <TextField size="small" label="Search username / email" value={userSearch}
-                  onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }} fullWidth />
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Staff</InputLabel>
-                  <Select label="Staff" value={userStaffOnly} onChange={(e) => { setUserStaffOnly(e.target.value); setUserPage(1); }}>
-                    <MenuItem value="">All</MenuItem>
-                    <MenuItem value="1">Staff</MenuItem>
-                    <MenuItem value="0">Users</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Active</InputLabel>
-                  <Select label="Active" value={userActive} onChange={(e) => { setUserActive(e.target.value); setUserPage(1); }}>
-                    <MenuItem value="">All</MenuItem>
-                    <MenuItem value="1">Active</MenuItem>
-                    <MenuItem value="0">Inactive</MenuItem>
-                  </Select>
-                </FormControl>
-              </Stack>
-            </Paper>
-            {userLoading ? <CircularProgress /> : (
-              <Paper>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Username</TableCell>
-                      <TableCell>Email</TableCell>
-                      <TableCell>Flags</TableCell>
-                      <TableCell>Rules</TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {users.map((u) => (
-                      <TableRow key={u.id} hover>
-                        <TableCell>{u.username}</TableCell>
-                        <TableCell>{u.email}</TableCell>
-                        <TableCell>
-                          <Stack direction="row" gap={0.5} flexWrap="wrap">
-                            {u.is_superuser && <Chip size="small" color="error" label="super" />}
-                            {u.is_staff && <Chip size="small" color="primary" label="staff" />}
-                            {!u.is_active && <Chip size="small" label="inactive" />}
-                          </Stack>
-                        </TableCell>
-                        <TableCell>
-                          <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
-                            {(u.rules || []).length === 0 ? (
-                              <Typography variant="caption" color="text.secondary">—</Typography>
-                            ) : (
-                              (u.rules || []).slice(0, 4).map((r) => (
-                                <Chip key={r} size="small" variant="outlined" label={r.split(".").pop()} sx={{ height: 22, fontSize: 11 }} />
-                              ))
-                            )}
-                            {(u.rules || []).length > 4 && (
-                              <Chip size="small" label={`+${u.rules.length - 4}`} sx={{ height: 22, fontSize: 11 }} />
-                            )}
-                          </Stack>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Button size="small" onClick={() => { const _u = { ...u, rules: u.rules || [] }; setEditUser(_u); loadUserMemberships(_u.id); }}>Edit</Button>
-                          <IconButton size="small" color="error" onClick={() => deactivateUser(u.id)}>
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {userCount > 20 && (
-                  <Box display="flex" justifyContent="center" p={2}>
-                    {Math.ceil((userCount || 0) / 20) > 1 && (
-                      <Pagination page={userPage} count={Math.max(1, Math.ceil((userCount || 0) / 20))} onChange={(_, v) => setUserPage(v)} showFirstButton showLastButton color="primary" />
-                    )}
-                  </Box>
-                )}
-              </Paper>
-            )}
-          </>
+          <UsersPanel
+            users={users}
+            userCount={userCount}
+            userPage={userPage}
+            setUserPage={setUserPage}
+            userSearch={userSearch}
+            setUserSearch={setUserSearch}
+            userStaffOnly={userStaffOnly}
+            setUserStaffOnly={setUserStaffOnly}
+            userActive={userActive}
+            setUserActive={setUserActive}
+            userLoading={userLoading}
+            isAdmin={isAdmin}
+            isStaff={isStaff}
+            onEdit={(u) => { const _u = { ...u, rules: u.rules || [] }; setEditUser(_u); loadUserMemberships(_u.id); }}
+            onDeactivate={deactivateUser}
+            onCreate={() => setCreateOpen(true)}
+          />
         )}
 
         {tab === "invites" && isAdmin && (
-          <>
-            <Typography variant="h5" fontWeight={700} mb={2}>Invite links</Typography>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
-                <TextField size="small" label="Label" value={newInvite.label}
-                  onChange={(e) => setNewInvite((s) => ({ ...s, label: e.target.value }))} fullWidth />
-                <TextField size="small" label="Max uses (empty=∞)" value={newInvite.max_uses}
-                  onChange={(e) => setNewInvite((s) => ({ ...s, max_uses: e.target.value }))} sx={{ width: 160 }} />
-                <Button variant="contained" onClick={createInvite}>Create</Button>
-              </Stack>
-            </Paper>
-            {invLoading ? <CircularProgress /> : (
-              <Paper>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Label</TableCell>
-                      <TableCell>Token</TableCell>
-                      <TableCell>Uses</TableCell>
-                      <TableCell>Active</TableCell>
-                      <TableCell align="right">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {invites.map((inv) => (
-                      <TableRow key={inv.id}>
-                        <TableCell>{inv.label || "—"}</TableCell>
-                        <TableCell>
-                          <Typography variant="caption" sx={{ fontFamily: "monospace" }}>{inv.token}</Typography>
-                        </TableCell>
-                        <TableCell>{inv.uses_count}{inv.max_uses != null ? ` / ${inv.max_uses}` : " / ∞"}</TableCell>
-                        <TableCell>
-                          <Chip size="small" label={inv.is_active ? "active" : "off"} color={inv.is_active ? "success" : "default"} />
-                        </TableCell>
-                        <TableCell align="right">
-                          {inv.is_active && (
-                            <Button size="small" color="warning" onClick={() => deactivateInvite(inv.token)}>Deactivate</Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Paper>
-            )}
-          </>
+          <InvitesPanel
+            invites={invites}
+            invLoading={invLoading}
+            newInvite={newInvite}
+            setNewInvite={setNewInvite}
+            onCreate={createInvite}
+            onDeactivate={deactivateInvite}
+          />
         )}
 
         {tab === "codes" && isAdmin && (
-          <>
-            <Stack direction="row" justifyContent="space-between" mb={2}>
-              <Typography variant="h5" fontWeight={700}>Auth codes (OTP)</Typography>
-              <Button size="small" color="warning" onClick={purgeCodes}>Purge expired</Button>
-            </Stack>
-            <TextField size="small" fullWidth label="Search user / contact / code" value={codeSearch}
-              onChange={(e) => { setCodeSearch(e.target.value); setCodePage(1); }} sx={{ mb: 2 }} />
-            {codeLoading ? <CircularProgress /> : (
-              <Paper>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>User</TableCell>
-                      <TableCell>Contact</TableCell>
-                      <TableCell>Purpose</TableCell>
-                      <TableCell>Code</TableCell>
-                      <TableCell>Attempts</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell align="right"> </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {codes.map((c) => (
-                      <TableRow key={c.id}>
-                        <TableCell>{c.username || "—"}</TableCell>
-                        <TableCell>{c.contact || "—"}</TableCell>
-                        <TableCell>{c.purpose}</TableCell>
-                        <TableCell><Typography variant="caption" fontFamily="monospace">{c.code}</Typography></TableCell>
-                        <TableCell>{c.attempts}</TableCell>
-                        <TableCell>
-                          {c.is_expired ? <Chip size="small" label="expired" /> :
-                            c.is_locked ? <Chip size="small" color="warning" label="locked" /> :
-                              <Chip size="small" color="success" label="valid" />}
-                        </TableCell>
-                        <TableCell align="right">
-                          <IconButton size="small" color="error" onClick={() => deleteCode(c.id)}>
-                            <DeleteOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {codeCount > 25 && (
-                  <Box display="flex" justifyContent="center" p={2}>
-                    <Pagination page={codePage} count={Math.ceil(codeCount / 25)} onChange={(_, v) => setCodePage(v)} />
-                  </Box>
-                )}
-              </Paper>
-
-
-            )}
-          </>
+          <AuthCodesPanel
+            codes={codes}
+            codeCount={codeCount}
+            codePage={codePage}
+            setCodePage={setCodePage}
+            codeSearch={codeSearch}
+            setCodeSearch={setCodeSearch}
+            codeLoading={codeLoading}
+            onPurge={purgeCodes}
+            onDelete={deleteCode}
+          />
         )}
 
+
         {tab === "emails" && isAdmin && <EmailManagement />}
+
+        {tab === "services" && (isAdmin || isStaff) && (
+          <ServicesPanel setToast={setToast} />
+        )}
       </Box>
 
       {/* Ticket drawer */}
@@ -1165,6 +983,7 @@ export default function AdminDashboard() {
         </DialogActions>
       </Dialog>
 
+      
       <Snackbar open={Boolean(toast)} autoHideDuration={4500} onClose={() => setToast(null)}
         message={toast} anchorOrigin={{ vertical: "bottom", horizontal: "right" }} />
     </Box>

@@ -83,7 +83,9 @@ import { CSS } from "@dnd-kit/utilities";
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
 
 /** Size of the crop canvas inside the editor (px) */
-const EDITOR_SIZE = 360;
+//** Base size of the crop canvas inside the editor (px). On mobile we shrink to fit viewport. */
+const EDITOR_SIZE_DESKTOP = 360;
+const EDITOR_SIZE_MOBILE = 280;
 
 const COLOR_CHOICES = [
   { value: 0, label: "Default" },
@@ -502,8 +504,30 @@ const Profile = () => {
   const theme = useTheme();
   // Desktop only for OS file drag-and-drop (not tablet / phone)
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
+  const isMobileViewport = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
   const prefersFinePointer = useMediaQuery("(pointer: fine)", { noSsr: true });
   const enableFileDrop = isDesktop && prefersFinePointer;
+
+  // Keep crop canvas square and large on mobile (fill nearly full width, never ellipse)
+  const [editorSize, setEditorSize] = useState(
+    typeof window !== "undefined" && window.innerWidth < 600
+      ? Math.min(EDITOR_SIZE_MOBILE, Math.max(220, window.innerWidth - 48))
+      : EDITOR_SIZE_DESKTOP
+  );
+  useEffect(() => {
+    const update = () => {
+      if (typeof window === "undefined") return;
+      const w = window.innerWidth;
+      if (w < 600) {
+        setEditorSize(Math.min(320, Math.max(240, w - 40)));
+      } else {
+        setEditorSize(EDITOR_SIZE_DESKTOP);
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const {
     profiles,
@@ -1045,8 +1069,8 @@ const Profile = () => {
     const newEmoji = {
       id: Date.now().toString(),
       char: emojiChar,
-      x: EDITOR_SIZE / 2,
-      y: EDITOR_SIZE / 2,
+      x: editorSize / 2,
+      y: editorSize / 2,
       size: 48,
     };
     setEmojis((prev) => [...prev, newEmoji]);
@@ -1070,8 +1094,8 @@ const Profile = () => {
     let x = clientX - rect.left;
     let y = clientY - rect.top;
 
-    x = Math.max(0, Math.min(EDITOR_SIZE, x));
-    y = Math.max(0, Math.min(EDITOR_SIZE, y));
+    x = Math.max(0, Math.min(editorSize, x));
+    y = Math.max(0, Math.min(editorSize, y));
 
     setEmojis((prev) =>
       prev.map((em) => (em.id === draggingEmojiId ? { ...em, x, y } : em))
@@ -1092,8 +1116,8 @@ const Profile = () => {
       const canvas = editorRef.current.getImageScaledToCanvas();
       const ctx = canvas.getContext("2d");
 
-      const scaleX = canvas.width / EDITOR_SIZE;
-      const scaleY = canvas.height / EDITOR_SIZE;
+      const scaleX = canvas.width / editorSize;
+      const scaleY = canvas.height / editorSize;
 
       emojis.forEach((emp) => {
         ctx.font = `${emp.size * scaleX}px sans-serif`;
@@ -1637,16 +1661,23 @@ const Profile = () => {
           onClose={handleCancelEditor}
           maxWidth="md"
           fullWidth
-          PaperProps={{ sx: { borderRadius: 3 } }}
+          fullScreen={isMobileViewport}
+          PaperProps={{
+            sx: {
+              borderRadius: isMobileViewport ? 0 : 3,
+              m: isMobileViewport ? 0 : undefined,
+              maxHeight: isMobileViewport ? "100%" : undefined,
+            },
+          }}
         >
-          <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
+          <DialogTitle sx={{ fontWeight: 800, pb: 1, px: { xs: 2, sm: 3 } }}>
             Adjust & Decorate Photo
           </DialogTitle>
           <DialogContent
             onPointerMove={handleEditorPointerMove}
             onPointerUp={handleEditorPointerUp}
             onPointerLeave={handleEditorPointerUp}
-            sx={{ pt: 1 }}
+            sx={{ pt: 1, px: { xs: 1.5, sm: 3 }, overflowX: "hidden" }}
           >
             <Typography
               variant="body2"
@@ -1662,10 +1693,12 @@ const Profile = () => {
               sx={{
                 display: "flex",
                 justifyContent: "center",
+                alignItems: "center",
                 mb: 2.5,
                 position: "relative",
-                width: EDITOR_SIZE,
-                height: EDITOR_SIZE,
+                width: editorSize,
+                height: editorSize,
+                aspectRatio: "1 / 1",
                 maxWidth: "100%",
                 mx: "auto",
                 overflow: "hidden",
@@ -1676,23 +1709,32 @@ const Profile = () => {
                 bgcolor: "grey.900",
                 cursor: "grab",
                 touchAction: "none",
+                WebkitUserSelect: "none",
+                userSelect: "none",
                 "&:active": { cursor: "grabbing" },
+                flexShrink: 0,
               }}
             >
               {originalPreviewUrl && (
                 <ReactAvatarEditor
                   ref={editorRef}
                   image={originalPreviewUrl}
-                  width={EDITOR_SIZE}
-                  height={EDITOR_SIZE}
+                  width={editorSize}
+                  height={editorSize}
                   border={0}
-                  borderRadius={circularCrop ? EDITOR_SIZE / 2 : 0}
+                  borderRadius={circularCrop ? Math.round(editorSize / 2) : 0}
                   color={[0, 0, 0, 0.55]}
                   scale={zoom}
                   rotate={rotation}
                   position={position}
                   onPositionChange={setPosition}
-                  style={{ width: "100%", height: "100%" }}
+                  style={{
+                    width: editorSize,
+                    height: editorSize,
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    touchAction: "none",
+                  }}
                 />
               )}
 

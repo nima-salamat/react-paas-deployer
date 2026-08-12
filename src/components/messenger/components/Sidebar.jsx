@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import {
   Box, Stack, Typography, IconButton, TextField, InputAdornment, Avatar,
   List, ListItemButton, ListItemAvatar, ListItemText, CircularProgress,
-  Tabs, Tab, Badge, MenuItem, ListItemIcon, alpha, Button,
+  Tabs, Tab, Badge, Menu, MenuItem, ListItemIcon, alpha, Button,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
@@ -11,8 +11,9 @@ import ChatIcon from "@mui/icons-material/Chat";
 import CloseIcon from "@mui/icons-material/Close";
 import PublicIcon from "@mui/icons-material/Public";
 import LinkIcon from "@mui/icons-material/Link";
-import MenuIcon from "@mui/icons-material/Menu";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import GroupsIcon from "@mui/icons-material/Groups";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import MarkChatReadIcon from "@mui/icons-material/MarkChatRead";
@@ -69,8 +70,11 @@ export default function Sidebar({
   onlineUsers,
   audioPlayer, onAudioPlayerChange, onAudioStateChange, onGoToAudioTrack,
   showAudioPlayer = false,
+  meAvatar = null,
+  onOpenMyProfile,
 }) {
   const [ctx, setCtx] = useState(null); // { x, y, conv, peer, role }
+  const [listMenuAnchor, setListMenuAnchor] = useState(null);
   const [publicSearchQ, setPublicSearchQ] = useState("");
 
   const onRowContext = (e, conv) => {
@@ -108,20 +112,49 @@ export default function Sidebar({
         if (e.target === e.currentTarget) e.preventDefault();
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ p: 1.25 }}>
-        <IconButton size="small" onClick={onOpenSettings}>
-          <MenuIcon />
+      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ p: 1.25, position: "relative" }}>
+        <IconButton
+          size="small"
+          onClick={() => (onOpenMyProfile ? onOpenMyProfile() : onOpenSettings?.())}
+          title="My profile"
+          sx={{ p: 0.35 }}
+        >
+          <Avatar src={meAvatar || undefined} sx={{ width: 36, height: 36 }} />
         </IconButton>
         <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Messenger</Typography>
-        <IconButton size="small" onClick={onOpenCreateGroup} title="New group">
-          <GroupAddIcon fontSize="small" />
+        <IconButton
+          size="small"
+          onClick={(e) => setListMenuAnchor(e.currentTarget)}
+          title="More"
+        >
+          <MoreVertIcon />
         </IconButton>
-        <IconButton size="small" onClick={onOpenJoin} title="Join invite">
-          <LinkIcon fontSize="small" />
-        </IconButton>
-        <IconButton size="small" color="primary" onClick={onNavigateHome} title="Back to Deployer">
-          <HomeOutlinedIcon fontSize="small" />
-        </IconButton>
+        <Menu
+          anchorEl={listMenuAnchor}
+          open={Boolean(listMenuAnchor)}
+          onClose={() => setListMenuAnchor(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          MenuListProps={{ dense: true }}
+          // Stay inside chat-list panel so it doesn't cover the open conversation
+          disablePortal
+          slotProps={{
+            paper: { sx: { minWidth: 200, borderRadius: 1.5, boxShadow: 3 } },
+          }}
+        >
+          <MenuItem onClick={() => { setListMenuAnchor(null); onOpenCreateGroup?.(); }}>
+            <ListItemIcon><GroupAddIcon fontSize="small" /></ListItemIcon>
+            New group
+          </MenuItem>
+          <MenuItem onClick={() => { setListMenuAnchor(null); onOpenJoin?.(); }}>
+            <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
+            Join invite
+          </MenuItem>
+          <MenuItem onClick={() => { setListMenuAnchor(null); onNavigateHome?.(); }}>
+            <ListItemIcon><HomeOutlinedIcon fontSize="small" /></ListItemIcon>
+            Back to Deployer
+          </MenuItem>
+        </Menu>
       </Stack>
 
       {/* Mini-player above search — mobile chat-list only */}
@@ -361,10 +394,43 @@ export default function Sidebar({
                       },
                     }}
                   >
-                    <Box sx={{ position: "relative" }}>
-                      <Avatar src={convAvatar(c, meId)} sx={{ width: 48, height: 48 }}>
+                    <Box
+                      sx={{ position: "relative" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (c.type === "private" && c.peer?.id) {
+                          onViewUserProfile?.(c.peer.id);
+                        } else if (c.type === "group") {
+                          // open chat info via selecting chat is fine; profile of group = open chat then info
+                          openChat?.(c);
+                        }
+                      }}
+                    >
+                      <Avatar src={convAvatar(c, meId)} sx={{ width: 48, height: 48, cursor: "pointer" }}>
                         {convTitle(c, meId)[0]?.toUpperCase()}
                       </Avatar>
+                      {c.type === "group" && (
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            bottom: -2,
+                            right: -2,
+                            width: 18,
+                            height: 18,
+                            borderRadius: "50%",
+                            bgcolor: "background.paper",
+                            border: "1px solid",
+                            borderColor: "divider",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            zIndex: 1,
+                          }}
+                          title="Group"
+                        >
+                          <GroupsIcon sx={{ fontSize: 12, color: "text.secondary" }} />
+                        </Box>
+                      )}
                       {c.type === "private" && c.peer?.id && onlineUsers?.has(Number(c.peer.id)) && (
                         <OnlineDot />
                       )}

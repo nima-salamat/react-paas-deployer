@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack,
   Typography, Slider, IconButton, CircularProgress, alpha,
-  ToggleButton, ToggleButtonGroup, Paper,
+  ToggleButton, ToggleButtonGroup, Paper, Tabs, Tab, useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import ContentCutIcon from "@mui/icons-material/ContentCut";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -50,7 +51,10 @@ function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
+export default function VideoEditDialog({ open, file, onClose, onConfirm, confirmLabel = "Done" }) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [tab, setTab] = useState("trim"); // trim | crop | quality
   const videoRef = useRef(null);
   const stageRef = useRef(null); // container for video + crop overlay
   const canvasRef = useRef(null);
@@ -451,19 +455,23 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
   const handles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
   return (
-    <Dialog open={open} onClose={processing ? undefined : onClose} maxWidth="md" fullWidth
-      PaperProps={{ sx: { borderRadius: 3 } }}>
-      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pr: 5 }}>
-        <ContentCutIcon color="primary" />
+    <Dialog
+      open={open}
+      onClose={processing ? undefined : onClose}
+      maxWidth="md"
+      fullWidth
+      fullScreen={isMobile}
+      PaperProps={{ sx: isMobile ? { m: 0, borderRadius: 0, height: "100%" } : { borderRadius: 3 } }}
+    >
+      <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, py: 1, px: 1.5 }}>
         <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>Edit video</Typography>
-        <IconButton size="small" onClick={onClose} disabled={processing}
-          sx={{ position: "absolute", right: 12, top: 12 }}>
+        <IconButton size="small" onClick={onClose} disabled={processing}>
           <CloseIcon />
         </IconButton>
       </DialogTitle>
 
-      <DialogContent dividers>
-        <Stack spacing={2.25}>
+      <DialogContent dividers sx={{ p: isMobile ? 1 : 2, display: "flex", flexDirection: "column" }}>
+        <Stack spacing={1.5} sx={{ flex: 1 }}>
           {/* Stage */}
           <Box
             ref={stageRef}
@@ -486,7 +494,7 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onEnded={() => setIsPlaying(false)}
-              style={{ display: "block", width: "100%", maxHeight: 380, objectFit: "contain" }}
+              style={{ display: "block", width: "100%", maxHeight: isMobile ? "42vh" : 380, objectFit: "contain" }}
               playsInline
               controls={false}
             />
@@ -583,6 +591,7 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
           </Stack>
 
           {/* TRIM */}
+          {(tab === "trim" || !isMobile) && (
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}>
               <ContentCutIcon fontSize="small" /> Trim
@@ -658,8 +667,10 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
               </Button>
             </Stack>
           </Box>
+          )}
 
           {/* CROP */}
+          {(tab === "crop" || !isMobile) && (
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}>
               <CropIcon fontSize="small" /> Crop
@@ -701,8 +712,10 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
                 : "Turn on Rectangle to crop like photos. Output is re-encoded as WebM; audio is kept when the browser allows."}
             </Typography>
           </Box>
+          )}
 
           {/* Quality */}
+          {(tab === "quality" || !isMobile) && (
           <Box>
             <Typography variant="subtitle2" sx={{ mb: 1, display: "flex", alignItems: "center", gap: 0.5 }}>
               <VideocamIcon fontSize="small" /> Quality
@@ -718,6 +731,7 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
               ))}
             </ToggleButtonGroup>
           </Box>
+          )}
 
           {error && (
             <Paper variant="outlined" sx={{ p: 1.5, borderColor: "error.main", bgcolor: alpha("#f44336", 0.08) }}>
@@ -739,16 +753,28 @@ export default function VideoEditDialog({ open, file, onClose, onConfirm }) {
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+      <Box sx={{ borderTop: "1px solid", borderColor: "divider" }}>
+        <Tabs
+          value={tab}
+          onChange={(_, v) => v && setTab(v)}
+          variant="fullWidth"
+          sx={{ minHeight: 48, "& .MuiTab-root": { minHeight: 48, textTransform: "none", fontWeight: 600 } }}
+        >
+          <Tab value="trim" icon={<ContentCutIcon />} iconPosition="start" label="Trim" />
+          <Tab value="crop" icon={<CropIcon />} iconPosition="start" label="Crop" />
+          <Tab value="quality" icon={<VideocamIcon />} iconPosition="start" label="Quality" />
+        </Tabs>
+      </Box>
+      <DialogActions sx={{ px: 2, py: 1.25, gap: 1 }}>
         <Button onClick={onClose} disabled={processing} sx={{ textTransform: "none" }}>Cancel</Button>
         <Button
           onClick={handleConfirm}
           variant="contained"
           disabled={processing || !duration}
           startIcon={processing ? <CircularProgress size={16} color="inherit" /> : <CheckIcon />}
-          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, minWidth: 96 }}
         >
-          {processing ? "Processing…" : "Apply & save"}
+          {processing ? "Processing…" : confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

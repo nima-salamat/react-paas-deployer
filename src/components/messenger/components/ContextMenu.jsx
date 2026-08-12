@@ -39,8 +39,15 @@ export default function ContextMenu({ ctx, children, onClose, minWidth = 200 }) 
 
   if (!ctx) return null;
 
-  const top = Math.min(ctx.y, window.innerHeight - 360);
-  const left = Math.min(ctx.x, window.innerWidth - minWidth - 16);
+  // Keep menu fully on-screen on mobile (avoid clipping outside viewport)
+  const menuH = Math.min(360, Math.floor(window.innerHeight * 0.7));
+  const pad = 12;
+  let top = ctx.y;
+  let left = ctx.x;
+  if (top + menuH > window.innerHeight - pad) top = Math.max(pad, window.innerHeight - menuH - pad);
+  if (top < pad) top = pad;
+  if (left + minWidth > window.innerWidth - pad) left = Math.max(pad, window.innerWidth - minWidth - pad);
+  if (left < pad) left = pad;
 
   return createPortal(
     <>
@@ -65,9 +72,10 @@ export default function ContextMenu({ ctx, children, onClose, minWidth = 200 }) 
           left,
           zIndex: 9999,
           minWidth,
+          maxWidth: `min(320px, calc(100vw - ${pad * 2}px))`,
           py: 0.5,
           borderRadius: 2,
-          maxHeight: "80vh",
+          maxHeight: menuH,
           overflowY: "auto",
         }}
       >

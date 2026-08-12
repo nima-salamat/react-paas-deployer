@@ -103,7 +103,7 @@ export default function RightPanel({
         )}
         <Typography fontWeight={700} sx={{ flex: 1, ml: canGoBack ? 1 : 0 }}>{headerTitle}</Typography>
         <IconButton size="small" onClick={onClose} title="Close">
-          <HomeOutlinedIcon fontSize="small" />
+          <CloseIcon fontSize="small" />
         </IconButton>
       </Stack>
       <Divider />
@@ -111,50 +111,90 @@ export default function RightPanel({
   );
 
   if (kind === "settings") {
+    const itemSx = {
+      borderRadius: 1,
+      mx: 1,
+      mb: 0.25,
+      py: 1,
+      "& .MuiListItemIcon-root": { minWidth: 40 },
+    };
+    const sectionTitle = (label) => (
+      <Typography
+        variant="overline"
+        color="text.secondary"
+        sx={{ display: "block", px: 2, pt: 1.5, pb: 0.5, letterSpacing: 0.6, fontWeight: 700 }}
+      >
+        {label}
+      </Typography>
+    );
     return (
-      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.paper" }}>
-        {header}
-        <List>
-          <ListItemButton onClick={onOpenMyProfile}>
-            <ListItemIcon><AccountCircleIcon /></ListItemIcon>
-            <ListItemText primary="My profile photos" secondary="Upload, reorder & privacy" />
-          </ListItemButton>
-          <ListItemButton onClick={onOpenContacts}>
-            <ListItemIcon><ContactsIcon /></ListItemIcon>
-            <ListItemText primary="Contacts" />
-          </ListItemButton>
-          <ListItemButton onClick={onOpenBlocks}>
-            <ListItemIcon><BlockIcon /></ListItemIcon>
-            <ListItemText primary="Blocked users" />
-          </ListItemButton>
-          <ListItemButton onClick={onOpenMyRequests}>
-            <ListItemIcon><HourglassEmptyIcon /></ListItemIcon>
-            <ListItemText
-              primary="My join requests"
-              secondary={myJoinRequests?.length ? `${myJoinRequests.filter((r) => r.status === "pending").length} pending` : "No pending requests"}
-            />
-          </ListItemButton>
-          <ListItemButton onClick={onOpenCreateGroup}>
-            <ListItemIcon><GroupAddIcon /></ListItemIcon>
-            <ListItemText primary="New group" />
-          </ListItemButton>
-          <ListItemButton onClick={onOpenJoin}>
-            <ListItemIcon><LinkIcon /></ListItemIcon>
-            <ListItemText primary="Join with invite" />
-          </ListItemButton>
-          <ListItemButton onClick={onOpenMediaSettings}>
-            <ListItemIcon><VideocamIcon /></ListItemIcon>
-            <ListItemText
-              primary="Media settings"
-              secondary="Choose camera & microphone"
-            />
-          </ListItemButton>
-          <Divider sx={{ my: 1 }} />
-          <ListItemButton onClick={onNavigateHome}>
-            <ListItemIcon><HomeOutlinedIcon /></ListItemIcon>
-            <ListItemText primary="Back to Deployer" />
-          </ListItemButton>
-        </List>
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.default", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}>
+          {header}
+        </Box>
+        <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
+          {sectionTitle("Account")}
+          <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
+            <ListItemButton onClick={onOpenMyProfile} sx={itemSx}>
+              <ListItemIcon><AccountCircleIcon fontSize="small" /></ListItemIcon>
+              <ListItemText
+                primary="My profile"
+                secondary="Photos, bio & privacy"
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+            </ListItemButton>
+            <ListItemButton onClick={onOpenContacts} sx={itemSx}>
+              <ListItemIcon><ContactsIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Contacts" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+            </ListItemButton>
+            <ListItemButton onClick={onOpenBlocks} sx={itemSx}>
+              <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Blocked users" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+            </ListItemButton>
+          </List>
+
+          {sectionTitle("Groups")}
+          <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
+            <ListItemButton onClick={onOpenCreateGroup} sx={itemSx}>
+              <ListItemIcon><GroupAddIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="New group" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+            </ListItemButton>
+            <ListItemButton onClick={onOpenJoin} sx={itemSx}>
+              <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Join with invite" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+            </ListItemButton>
+            <ListItemButton onClick={onOpenMyRequests} sx={itemSx}>
+              <ListItemIcon><HourglassEmptyIcon fontSize="small" /></ListItemIcon>
+              <ListItemText
+                primary="My join requests"
+                secondary={myJoinRequests?.length ? `${myJoinRequests.filter((r) => r.status === "pending").length} pending` : "None pending"}
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+            </ListItemButton>
+          </List>
+
+          {sectionTitle("Preferences")}
+          <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
+            <ListItemButton onClick={onOpenMediaSettings} sx={itemSx}>
+              <ListItemIcon><VideocamIcon fontSize="small" /></ListItemIcon>
+              <ListItemText
+                primary="Camera & microphone"
+                secondary="Devices for voice and video messages"
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+            </ListItemButton>
+          </List>
+
+          <List disablePadding sx={{ mt: 2, bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
+            <ListItemButton onClick={onNavigateHome} sx={{ ...itemSx, color: "text.secondary" }}>
+              <ListItemIcon sx={{ color: "inherit" }}><HomeOutlinedIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Back to Deployer" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+            </ListItemButton>
+          </List>
+        </Box>
       </Box>
     );
   }

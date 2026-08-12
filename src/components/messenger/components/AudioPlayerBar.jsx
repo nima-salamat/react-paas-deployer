@@ -349,7 +349,8 @@ export default function AudioPlayerBar({ player, onChange, onStateChange, onGoTo
     const audio = getSharedAudio();
     const d = audio.duration || duration || 0;
     if (!d || rect.width <= 0) return;
-    const clientX = e.touches ? e.touches[0]?.clientX : e.clientX;
+    const touch = e.touches?.[0] || e.changedTouches?.[0];
+    const clientX = touch ? touch.clientX : e.clientX;
     if (clientX == null) return;
     const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     seekTo(ratio * d);
@@ -358,28 +359,52 @@ export default function AudioPlayerBar({ player, onChange, onStateChange, onGoTo
   const onSeekStart = (e) => {
     const track = e.currentTarget;
     const audio = getSharedAudio();
-    const d = audio.duration || duration || 0;
-    if (!d) return;
+    // Prefer live audio.duration; fall back to state duration from metadata
+    const d = (audio.duration && isFinite(audio.duration) ? audio.duration : 0) || duration || 0;
+    if (!d || !isFinite(d)) return;
     e.preventDefault();
     e.stopPropagation();
     scrubbingRef.current = true;
+    try { track.setPointerCapture?.(e.pointerId); } catch { /* */ }
     seekFromEvent(e, track);
     const move = (ev) => {
       ev.preventDefault?.();
       seekFromEvent(ev, track);
     };
-    const up = () => {
+    const up = (ev) => {
       scrubbingRef.current = false;
+      try { seekFromEvent(ev, track); } catch { /* */ }
+      try { track.releasePointerCapture?.(e.pointerId); } catch { /* */ }
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
       window.removeEventListener("touchmove", move);
       window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
     };
-    window.addEventListener("pointermove", move);
+    window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
     window.addEventListener("touchmove", move, { passive: false });
     window.addEventListener("touchend", up);
+    window.addEventListener("touchcancel", up);
   };
+
+  useEffect(() => {
+    const onStop = () => {
+      try {
+        const audio = getSharedAudio();
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+      } catch { /* */ }
+      pendingPlayRef.current = false;
+      onChange?.(null);
+      onStateChange?.({ isPlaying: false, currentTime: 0, duration: 0, attId: null });
+    };
+    window.addEventListener("messenger:audio-stop", onStop);
+    return () => window.removeEventListener("messenger:audio-stop", onStop);
+  }, [onChange, onStateChange]);
 
   if (!player) return null;
 
@@ -407,27 +432,64 @@ export default function AudioPlayerBar({ player, onChange, onStateChange, onGoTo
         zIndex: 12,
       }}
     >
-      {/* Blue scrub bar on top */}
+      {/* Blue scrub bar on top — taller hit area on mobile for reliable seeking */}
       <Box
         onPointerDown={canSeek ? onSeekStart : undefined}
         sx={{
           position: "relative",
-          height: 2,
+          height: 28,
           width: "100%",
-          bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"),
+          display: "flex",
+          alignItems: "center",
+          bgcolor: "transparent",
           cursor: canSeek ? "pointer" : "default",
           touchAction: "none",
+          WebkitTouchCallout: "none",
+          userSelect: "none",
+          zIndex: 5,
         }}
       >
         <Box
           sx={{
             position: "absolute",
-            left: 0, top: 0, bottom: 0,
-            width: `${progress * 100}%`,
-            bgcolor: "primary.main",
-            transition: scrubbingRef.current ? "none" : "width 0.08s linear",
+            left: 0, right: 0,
+            height: 4,
+            top: "50%",
+            transform: "translateY(-50%)",
+            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"),
+            borderRadius: 2,
           }}
         />
+        <Box
+          sx={{
+            position: "absolute",
+            left: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            height: 4,
+            width: `${progress * 100}%`,
+            bgcolor: "primary.main",
+            borderRadius: 2,
+            transition: scrubbingRef.current ? "none" : "width 0.08s linear",
+            pointerEvents: "none",
+          }}
+        />
+        {canSeek && (
+          <Box
+            sx={{
+              position: "absolute",
+              left: `calc(${progress * 100}% - 7px)`,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              bgcolor: "primary.main",
+              boxShadow: 1,
+              pointerEvents: "none",
+            }}
+          />
+        )}
       </Box>
 
       <Stack

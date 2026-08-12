@@ -222,6 +222,52 @@ export default function VideoPlayer({
     setCurrentTime(value);
   };
 
+  const seekBarRef = useRef(null);
+  const scrubbingVideoRef = useRef(false);
+
+  const seekFromPointer = useCallback((e, el) => {
+    const p = playerRef.current;
+    if (!p) return;
+    const d = p.duration() || duration || 0;
+    if (!d) return;
+    const rect = el.getBoundingClientRect();
+    const touch = e.touches?.[0] || e.changedTouches?.[0];
+    const clientX = touch ? touch.clientX : e.clientX;
+    if (clientX == null || rect.width <= 0) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const t = ratio * d;
+    p.currentTime(t);
+    setCurrentTime(t);
+  }, [duration]);
+
+  const onSeekBarPointerDown = useCallback((e) => {
+    const el = e.currentTarget;
+    e.preventDefault();
+    e.stopPropagation();
+    scrubbingVideoRef.current = true;
+    seekFromPointer(e, el);
+    const move = (ev) => {
+      ev.preventDefault?.();
+      seekFromPointer(ev, el);
+    };
+    const up = (ev) => {
+      scrubbingVideoRef.current = false;
+      try { seekFromPointer(ev, el); } catch { /* */ }
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up);
+      window.removeEventListener("touchcancel", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", up);
+    window.addEventListener("touchcancel", up);
+  }, [seekFromPointer]);
+
   const toggleMute = useCallback(() => {
     const p = playerRef.current;
     if (!p) return;
@@ -350,11 +396,25 @@ export default function VideoPlayer({
           pointerEvents: showControls ? "auto" : "none",
         }}
       >
-        {/* Seek bar with buffered indicator */}
+        {/* Seek bar with buffered indicator — pointer/touch scrubbing for mobile */}
         <Box sx={{ position: "relative", mb: 0.5, px: 0.5 }}>
-          <Box sx={{ position: "relative", height: 14, display: "flex", alignItems: "center" }}>
+          <Box
+            ref={seekBarRef}
+            onPointerDown={onSeekBarPointerDown}
+            onTouchStart={onSeekBarPointerDown}
+            sx={{
+              position: "relative",
+              height: 28,
+              display: "flex",
+              alignItems: "center",
+              touchAction: "none",
+              WebkitTouchCallout: "none",
+              userSelect: "none",
+              cursor: "pointer",
+            }}
+          >
             <Box sx={{
-              position: "absolute", left: 0, right: 0, height: 4,
+              position: "absolute", left: 0, right: 0, height: 5,
               bgcolor: "rgba(255,255,255,0.25)",
               borderRadius: 2,
               overflow: "hidden",
@@ -369,44 +429,23 @@ export default function VideoPlayer({
                 position: "absolute", left: 0, top: 0, bottom: 0,
                 width: `${progress}%`,
                 bgcolor: "#1976d2",
-                transition: "width 0.05s linear",
+                transition: scrubbingVideoRef.current ? "none" : "width 0.05s linear",
               }} />
             </Box>
-            {/* Custom seek slider overlay (transparent so video.js' seek bar doesn't conflict) */}
             <Box
               sx={{
-                position: "absolute", left: 0, right: 0, top: 0, bottom: 0,
+                position: "absolute",
+                left: `calc(${progress}% - 8px)`,
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                bgcolor: "#fff",
+                border: "2px solid #1976d2",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
+                pointerEvents: "none",
                 zIndex: 2,
-                "& input[type=range]": {
-                  position: "absolute", inset: 0, width: "100%", height: "100%",
-                  WebkitAppearance: "none", appearance: "none",
-                  background: "transparent", cursor: "pointer",
-                  margin: 0, padding: 0,
-                },
-                "& input[type=range]::-webkit-slider-thumb": {
-                  WebkitAppearance: "none", appearance: "none",
-                  width: 14, height: 14, borderRadius: "50%",
-                  bgcolor: "#fff", border: "2px solid #1976d2",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
-                  cursor: "pointer",
-                },
-                "& input[type=range]::-moz-range-thumb": {
-                  width: 14, height: 14, borderRadius: "50%",
-                  bgcolor: "#fff", border: "2px solid #1976d2",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.4)",
-                  cursor: "pointer",
-                },
               }}
-            >
-              <input
-                type="range"
-                min={0}
-                max={duration || 1}
-                step={0.1}
-                value={Math.min(currentTime, duration || 1)}
-                onChange={(e) => onSeek(null, parseFloat(e.target.value))}
-              />
-            </Box>
+            />
           </Box>
         </Box>
 
