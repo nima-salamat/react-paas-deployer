@@ -137,6 +137,7 @@ export default function MessengerApp() {
   // typingUsers: { [userId]: { username, until } } for active chat
   const [typingUsers, setTypingUsers] = useState({});
   const seenQueuedRef = useRef(new Set());
+  const flushedSeenRef = useRef(new Set()); // already POSTed to /read/
   const [seenMsgIds, setSeenMsgIds] = useState(() => new Set());
   const seenFlushTimerRef = useRef(null);
   const typingStopTimerRef = useRef(null);
@@ -448,6 +449,13 @@ export default function MessengerApp() {
         setNewBelowCount(0);
       }
       scrollPositionKnownRef.current.add(String(activeId));
+      // Critical: opening a chat without scrolling used to never send seen.
+      setTimeout(() => {
+        try { markVisibleMessagesRead(); } catch { /* */ }
+      }, 120);
+      setTimeout(() => {
+        try { markVisibleMessagesRead(); } catch { /* */ }
+      }, 500);
     });
   }, [activeId, messages]);
 
@@ -740,6 +748,7 @@ export default function MessengerApp() {
     setNewBelowCount(0);
     pendingNewIdsRef.current = [];
     seenQueuedRef.current = new Set();
+    flushedSeenRef.current = new Set();
     setSeenMsgIds(new Set());
     setShowScrollDown(false);
     setScrollDownOpacity(0);
@@ -863,6 +872,19 @@ export default function MessengerApp() {
         requestAnimationFrame(() => { restoringScrollRef.current = false; });
       });
     }
+    // Viewport seen after open. force_all only when landing near the latest messages
+    // so mid-history open does not silently mark everything below as read.
+    setTimeout(() => {
+      if (String(activeIdRef.current) !== String(c.id)) return;
+      try { markVisibleMessagesRead(); } catch { /* */ }
+      if (nearBottomRef.current) {
+        markChatRead(c);
+      }
+    }, 450);
+    setTimeout(() => {
+      if (String(activeIdRef.current) !== String(c.id)) return;
+      try { markVisibleMessagesRead(); } catch { /* */ }
+    }, 900);
   }, [isMobile, loadMessages, loadConversationDetail, loadOlder]);
 
   /* bootstrap + hash restore */
@@ -964,10 +986,44 @@ export default function MessengerApp() {
                 setNewBelowCount(pendingNewIdsRef.current.length);
               }
             } else if (nearBottomRef.current) {
-              setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 40);
+              setTimeout(() => {
+                bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+                // New inbound message while watching → mark seen shortly after it lands
+                setTimeout(() => {
+                  try { markVisibleMessagesRead(); } catch { /* */ }
+                }, 350);
+              }, 40);
             }
           }
-          loadMessages(activeIdRef.current, { silent: true });
+          if (data.type === "message.read") {
+            // Peer (or self on another device) marked messages read → update ticks on my messages
+            const idsRaw = data.message_ids || data.read_ids || data.ids || [];
+            const idSet = new Set(
+              (Array.isArray(idsRaw) ? idsRaw : [data.message_id || data.last_read_id])
+                .filter((x) => x != null)
+                .map((x) => String(x))
+            );
+            const readerId = data.user_id ?? data.reader_id ?? data.read_by;
+            // If server only sends last_read_id, mark all of my earlier msgs as read
+            const lastRead = data.last_read_id != null ? Number(data.last_read_id) : null;
+            setMessages((prev) => prev.map((m) => {
+              if (String(m.sender?.id) !== String(meId)) return m;
+              if (m.read_state === "read") return m;
+              if (idSet.has(String(m.id))) return { ...m, read_state: "read" };
+              if (lastRead != null && Number(m.id) <= lastRead) return { ...m, read_state: "read" };
+              // Some backends only emit conversation-level read without ids
+              if (!idSet.size && lastRead == null && readerId != null && String(readerId) !== String(meId)) {
+                return { ...m, read_state: "read" };
+              }
+              return m;
+            }));
+          }
+          if (data.type !== "message.read") {
+            loadMessages(activeIdRef.current, { silent: true });
+          } else {
+            // Still soft-refresh to stay consistent with server
+            loadMessages(activeIdRef.current, { silent: true });
+          }
         }
         loadConversations({ silent: true });
       }
@@ -2187,18 +2243,33 @@ export default function MessengerApp() {
   };
 
 
-    const flushSeenReceipts = useCallback((cid) => {
-    const ids = Array.from(seenQueuedRef.current);
-    if (!cid || !ids.length) return;
-    const batch = ids.slice(-100).map((x) => Number(x)).filter((n) => !Number.isNaN(n));
+  const flushSeenReceipts = useCallback((cid) => {
+    if (!cid) return;
+    // Only POST ids not yet acknowledged in this session
+    const pending = Array.from(seenQueuedRef.current)
+      .filter((id) => !flushedSeenRef.current.has(String(id)));
+    if (!pending.length) return;
+    const batch = pending
+      .map((x) => Number(x))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .slice(-200);
     if (!batch.length) return;
+    // Optimistic: mark flushed so rapid scroll does not spam identical POSTs
+    batch.forEach((id) => flushedSeenRef.current.add(String(id)));
     apiRequest({
       method: "POST",
       url: `${MSG_API}/conversations/${cid}/read/`,
-      data: { message_ids: batch },
+      data: {
+        message_ids: batch,
+        // Some backends also accept last_read_id
+        last_read_id: batch[batch.length - 1],
+      },
     }).then(() => {
       loadConversations({ silent: true });
-    }).catch(() => {});
+    }).catch(() => {
+      // Allow retry on next visibility pass
+      batch.forEach((id) => flushedSeenRef.current.delete(String(id)));
+    });
   }, []);
 
   const markVisibleMessagesRead = useCallback(() => {
@@ -2207,26 +2278,37 @@ export default function MessengerApp() {
     if (!cid || !root) return;
     const rootRect = root.getBoundingClientRect();
     let found = false;
-    root.querySelectorAll("[data-msg-id]").forEach((node) => {
-      const id = node.getAttribute("data-msg-id");
+    // Prefer data-msg-id nodes (MessageBubble); also accept #msg-<id> wrappers
+    const nodes = root.querySelectorAll("[data-msg-id], [id^='msg-']");
+    nodes.forEach((node) => {
+      let id = node.getAttribute("data-msg-id");
+      if (!id && node.id && node.id.startsWith("msg-")) id = node.id.slice(4);
       if (!id) return;
-      if (node.getAttribute("data-msg-mine") === "1") return;
+      // Skip own messages (read receipts are for inbound)
+      const mineAttr = node.getAttribute("data-msg-mine");
+      if (mineAttr === "1") return;
+      // If wrapper without mine attr, look at inner bubble
+      if (mineAttr == null) {
+        const inner = node.querySelector?.("[data-msg-mine]");
+        if (inner?.getAttribute("data-msg-mine") === "1") return;
+        // system messages
+        if (node.getAttribute("data-msg-system") === "1") return;
+        if (inner?.getAttribute("data-msg-system") === "1") return;
+      }
       const r = node.getBoundingClientRect();
-      const visibleH = Math.min(r.bottom, rootRect.bottom) - Math.max(r.top, rootRect.top);
-      const ratio = visibleH / Math.max(r.height, 1);
-      if (ratio >= 0.45 && r.top < rootRect.bottom - 4 && r.bottom > rootRect.top + 4) {
-        if (!seenQueuedRef.current.has(String(id))) {
-          seenQueuedRef.current.add(String(id));
-          found = true;
-        }
+      // Any intersection with the list viewport counts (was 0.45 ratio — too strict for tall media)
+      const overlap = Math.min(r.bottom, rootRect.bottom) - Math.max(r.top, rootRect.top);
+      if (overlap < 12) return;
+      if (r.bottom <= rootRect.top + 2 || r.top >= rootRect.bottom - 2) return;
+      if (!seenQueuedRef.current.has(String(id))) {
+        seenQueuedRef.current.add(String(id));
+        found = true;
       }
     });
     if (!found) return;
-    if (found) {
-      setSeenMsgIds(new Set(seenQueuedRef.current));
-    }
+    setSeenMsgIds(new Set(seenQueuedRef.current));
     if (seenFlushTimerRef.current) clearTimeout(seenFlushTimerRef.current);
-    seenFlushTimerRef.current = setTimeout(() => flushSeenReceipts(cid), 300);
+    seenFlushTimerRef.current = setTimeout(() => flushSeenReceipts(cid), 250);
   }, [flushSeenReceipts]);
 
   const dismissScrollDownButton = () => {
