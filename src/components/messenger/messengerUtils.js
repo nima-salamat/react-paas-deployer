@@ -176,6 +176,39 @@ export function attachmentKind(a) {
 }
 
 /** Whether an attachment is a voice message (vs. a regular audio file). */
+
+/**
+ * If body is ONLY emoji (1–3 grapheme clusters) with optional whitespace,
+ * return the count; otherwise null. Used for Telegram-style big-emoji bubbles.
+ */
+export function emojiOnlyCount(body) {
+  if (body == null) return null;
+  const s = String(body).trim();
+  if (!s) return null;
+  try {
+    const stripped = s.replace(
+      /(?:\p{Extended_Pictographic}(?:\uFE0F)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F)?)*)|\p{Emoji_Component}|\s/gu,
+      ""
+    );
+    if (stripped.length > 0) return null;
+    const matches = s.match(
+      /\p{Extended_Pictographic}(?:\uFE0F)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F)?)*/gu
+    );
+    if (!matches || matches.length === 0) return null;
+    return matches.length;
+  } catch {
+    return null;
+  }
+}
+
+/** True when attachment is an animated GIF (or named .gif). */
+export function isGifAttachment(a) {
+  const ct = (a?.content_type || "").toLowerCase();
+  const name = (a?.original_filename || a?.name || "").toLowerCase();
+  const kind = (a?.kind || "").toLowerCase();
+  return kind === "gif" || ct === "image/gif" || name.endsWith(".gif");
+}
+
 export function isVoiceAttachment(a) {
   const kind = (a?.kind || "").toLowerCase();
   const name = (a?.original_filename || "").toLowerCase();

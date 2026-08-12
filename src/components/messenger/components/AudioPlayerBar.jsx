@@ -23,10 +23,13 @@ const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
  * Module-level singleton <audio> so the bar can unmount/remount
  * (chat header ↔ mobile list) without stopping playback.
  */
+const MEDIA_DEVICES_KEY = "messenger.mediaDevices";
+
 const shared = {
   audio: null,
   listenersBound: false,
   gen: 0,
+  sinkApplied: "",
 };
 
 function getSharedAudio() {
@@ -36,6 +39,41 @@ function getSharedAudio() {
     shared.audio = a;
   }
   return shared.audio;
+}
+
+function readSavedSpeakerId() {
+  try {
+    return JSON.parse(localStorage.getItem(MEDIA_DEVICES_KEY) || "{}").speakerId || "";
+  } catch { return ""; }
+}
+
+async function applyAudioOutput(forceId) {
+  const audio = getSharedAudio();
+  // Firefox/Safari have no setSinkId — silent no-op (OS default only)
+  if (typeof audio.setSinkId !== "function") return false;
+  const next = (forceId != null ? forceId : readSavedSpeakerId()) || "";
+  if (shared.sinkApplied === next && (audio.sinkId || "") === next) return true;
+  try {
+    await audio.setSinkId(next);
+    shared.sinkApplied = next;
+    return true;
+  } catch (err) {
+    // NotFoundError (unplugged) / NotAllowedError (no user gesture yet)
+    try {
+      await audio.setSinkId("");
+      shared.sinkApplied = "";
+    } catch { /* */ }
+    if (err && (err.name === "NotFoundError" || /not found|device/i.test(String(err.message || "")))) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(MEDIA_DEVICES_KEY) || "{}");
+        if (saved.speakerId) {
+          delete saved.speakerId;
+          localStorage.setItem(MEDIA_DEVICES_KEY, JSON.stringify(saved));
+        }
+      } catch { /* */ }
+    }
+    return false;
+  }
 }
 
 /**
@@ -61,14 +99,26 @@ export default function AudioPlayerBar({ player, onChange, onStateChange, onGoTo
 
   continuousRef.current = continuous;
 
+  useEffect(() => {
+    applyAudioOutput();
+    const onDevices = (e) => applyAudioOutput(e?.detail?.speakerId != null ? e.detail.speakerId : undefined);
+    const onStorage = (ev) => { if (ev.key === MEDIA_DEVICES_KEY) applyAudioOutput(); };
+    window.addEventListener("messenger:media-devices-changed", onDevices);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("messenger:media-devices-changed", onDevices);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
   // Bind singleton audio events once (across remounts)
   useEffect(() => {
     const audio = getSharedAudio();
     if (shared.listenersBound) {
-      // Sync UI from current audio state after remount
       setIsPlaying(!audio.paused && !audio.ended);
       setCurrentTime(audio.currentTime || 0);
       setDuration(audio.duration && isFinite(audio.duration) ? audio.duration : 0);
+      applyAudioOutput();
       return undefined;
     }
     shared.listenersBound = true;
@@ -160,20 +210,23 @@ export default function AudioPlayerBar({ player, onChange, onStateChange, onGoTo
           return;
         }
         pendingPlayRef.current = true;
-        const p = audio.play();
-        if (p && typeof p.then === "function") {
-          p.then(() => {
+        applyAudioOutput().finally(() => {
+          if (gen !== shared.gen) { pendingPlayRef.current = false; return; }
+          const p = audio.play();
+          if (p && typeof p.then === "function") {
+            p.then(() => {
+              pendingPlayRef.current = false;
+              setIsPlaying(true);
+              setLoading(false);
+            }).catch((err) => {
+              pendingPlayRef.current = false;
+              if (err && err.name !== "AbortError") setErrorMsg("Tap play");
+              setLoading(false);
+            });
+          } else {
             pendingPlayRef.current = false;
-            setIsPlaying(true);
-            setLoading(false);
-          }).catch((err) => {
-            pendingPlayRef.current = false;
-            if (err && err.name !== "AbortError") setErrorMsg("Tap play");
-            setLoading(false);
-          });
-        } else {
-          pendingPlayRef.current = false;
-        }
+          }
+        });
       };
       const onCanPlay = () => { tryPlay(); audio.removeEventListener("canplay", onCanPlay); };
       audio.addEventListener("canplay", onCanPlay);
@@ -273,21 +326,24 @@ export default function AudioPlayerBar({ player, onChange, onStateChange, onGoTo
       audio.load();
     }
     pendingPlayRef.current = true;
-    const pr = audio.play();
-    if (pr && typeof pr.then === "function") {
-      pr.then(() => {
+    const start = () => {
+      const pr = audio.play();
+      if (pr && typeof pr.then === "function") {
+        pr.then(() => {
+          pendingPlayRef.current = false;
+          setIsPlaying(true);
+          setErrorMsg("");
+        }).catch((err) => {
+          pendingPlayRef.current = false;
+          setIsPlaying(false);
+          if (err && err.name !== "AbortError") setErrorMsg("Tap play");
+        });
+      } else {
         pendingPlayRef.current = false;
         setIsPlaying(true);
-        setErrorMsg("");
-      }).catch((err) => {
-        pendingPlayRef.current = false;
-        setIsPlaying(false);
-        if (err && err.name !== "AbortError") setErrorMsg("Tap play");
-      });
-    } else {
-      pendingPlayRef.current = false;
-      setIsPlaying(true);
-    }
+      }
+    };
+    applyAudioOutput().finally(start);
   }, []);
 
   useEffect(() => {

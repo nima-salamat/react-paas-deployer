@@ -228,18 +228,28 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
       speakerId: selectedSpeaker,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try {
+      window.dispatchEvent(new CustomEvent("messenger:media-devices-changed", { detail: data }));
+    } catch { /* */ }
     onSaved?.(data);
     onClose();
   };
 
-  // ---- Apply chosen speaker to the audio preview element (if supported) ----
+  const applySpeakerToElement = async (el, sinkId) => {
+    if (!el || typeof el.setSinkId !== "function") return;
+    try { await el.setSinkId(sinkId || ""); } catch { /* */ }
+  };
+
+  // Live-switch output when user picks a speaker (preview + AudioPlayerBar)
   useEffect(() => {
-    if (selectedSpeaker && videoPreviewRef.current && videoPreviewRef.current.setSinkId) {
-      try {
-        videoPreviewRef.current.setSinkId(selectedSpeaker);
-      } catch { /* */ }
-    }
-  }, [selectedSpeaker]);
+    if (!open) return;
+    applySpeakerToElement(videoPreviewRef.current, selectedSpeaker);
+    try {
+      window.dispatchEvent(new CustomEvent("messenger:media-devices-changed", {
+        detail: { speakerId: selectedSpeaker },
+      }));
+    } catch { /* */ }
+  }, [selectedSpeaker, open]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth

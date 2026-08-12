@@ -15,17 +15,21 @@ import CloseIcon from "@mui/icons-material/Close";
 import MicIcon from "@mui/icons-material/Mic";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
 import VideocamIcon from "@mui/icons-material/Videocam";
+import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
 
+import { withTokenQuery } from "../messengerUtils";
+
 const EMOJI_CATEGORIES = {
-  Smileys: ["😀", "😂", "😍", "😎", "🤩", "🥳", "😭", "😡", "🤔", "😴", "🤯", "🥺", "😇", "🤗", "🙄", "😏"],
-  Gestures: ["👍", "👎", "👏", "🙏", "💪", "✌️", "🤞", "🤟", "👌", "🙌", "👋", "✋", "🤙", "👊"],
-  Hearts: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "❣️", "💕", "💞", "💖", "💘"],
-  Objects: ["🔥", "⭐", "✨", "🎉", "🏆", "💎", "🚀", "💡", "🎵", "🎁", "☕", "🍕", "🍺", "📚"],
-  Symbols: ["✅", "❌", "❓", "❗", "⚠️", "💯", "🔱", "🔰", "♻️", "🌐", "💤", "💥"],
+  Smileys: ["😀", "😂", "🤣", "😍", "🥰", "😎", "🤩", "🥳", "😭", "😢", "😡", "🤬", "🤔", "😴", "🤯", "🥺", "😇", "🤗", "🙄", "😏", "😬", "😶", "🫡", "🫠"],
+  Gestures: ["👍", "👎", "👏", "🙏", "💪", "✌️", "🤞", "🤟", "👌", "🙌", "👋", "✋", "🤙", "👊", "🤝", "🫶", "👀", "💀"],
+  Hearts: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💖", "💘", "💝"],
+  Objects: ["🔥", "⭐", "✨", "🎉", "🎊", "🏆", "🥇", "💎", "🚀", "💡", "🎵", "🎁", "🎂", "☕", "🍕", "🍔", "🍺", "📚", "📱", "💻"],
+  Nature: ["☀️", "🌙", "🌈", "☔", "🌸", "🌹", "🌻", "🐶", "🐱", "🐻", "🐼", "🦊", "🦁", "🐸", "🦋"],
+  Symbols: ["✅", "❌", "❓", "❗", "⚠️", "💯", "♻️", "🌐", "💤", "💥", "📌", "🔗"],
 };
 
 /** Shortcode search — EN + FA keywords. Only replaces when user picks (Enter/click). */
@@ -484,7 +488,45 @@ export default function MessageComposer({
     }
   }, [recPhase, recKind]);
 
-  const getSavedDevices = () => {
+  // Selfie by default for video messages; flip switches to environment (rear).
+  const [cameraFacing, setCameraFacing] = useState(() => {
+    try { return localStorage.getItem("messenger.videoFacing") || "user"; } catch { return "user"; }
+  });
+  const cameraFacingRef = useRef(cameraFacing);
+  useEffect(() => { cameraFacingRef.current = cameraFacing; }, [cameraFacing]);
+  const [flippingCam, setFlippingCam] = useState(false);
+
+  const flipCamera = async () => {
+    if (recKind !== "video" || flippingCam || !streamRef.current) return;
+    setFlippingCam(true);
+    const nextFacing = cameraFacingRef.current === "user" ? "environment" : "user";
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: nextFacing }, width: { ideal: 480 }, height: { ideal: 480 } },
+        audio: false,
+      });
+      const newTrack = newStream.getVideoTracks()[0];
+      if (!newTrack) { newStream.getTracks().forEach((t) => t.stop()); return; }
+      const stream = streamRef.current;
+      const oldTrack = stream.getVideoTracks()[0];
+      if (oldTrack) { stream.removeTrack(oldTrack); try { oldTrack.stop(); } catch {} }
+      stream.addTrack(newTrack);
+      newStream.getTracks().forEach((t) => { if (t !== newTrack) try { t.stop(); } catch {} });
+      setCameraFacing(nextFacing);
+      cameraFacingRef.current = nextFacing;
+      try { localStorage.setItem("messenger.videoFacing", nextFacing); } catch {}
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = stream;
+        videoPreviewRef.current.play().catch(() => {});
+      }
+    } catch (e) {
+      setRecordError(e?.message || "Could not switch camera");
+    } finally {
+      setFlippingCam(false);
+    }
+  };
+
+    const getSavedDevices = () => {
     try {
       const saved = JSON.parse(localStorage.getItem("messenger.mediaDevices") || "{}");
       return { cameraId: saved.cameraId || "", micId: saved.micId || "" };
@@ -501,13 +543,15 @@ export default function MessageComposer({
     setHint("Slide up to lock · left to cancel");
     setDragUI({ dx: 0, dy: 0 });
     try {
-      const { cameraId, micId } = getSavedDevices();
+      const { micId } = getSavedDevices();
       const audioConstraint = micId ? { deviceId: { exact: micId } } : true;
+      // Video messages default to selfie (facingMode user). Flip button switches to rear.
+      const facing = (typeof cameraFacingRef !== "undefined" && cameraFacingRef.current) || "user";
       const videoConstraint = mode === "video"
         ? {
-            width: { ideal: 320 },
-            height: { ideal: 320 },
-            ...(cameraId ? { deviceId: { exact: cameraId } } : {}),
+            width: { ideal: 480 },
+            height: { ideal: 480 },
+            facingMode: { ideal: facing },
           }
         : false;
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -665,31 +709,24 @@ export default function MessageComposer({
     const onUp = () => {
       cleanupPointer(onMove, onUp);
       const start = pressStartRef.current;
+      const wasStarted = Boolean(start?.started);
+      const modeAtStart = start?.mode || mode;
       pressStartRef.current = null;
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
         holdTimerRef.current = null;
       }
-
-      // Short tap without starting → switch mode if this was secondary? handled separately
-      if (!start?.started) {
+      // Short press (desktop + mobile): toggle voice ↔ video
+      if (!wasStarted) {
+        suppressModeToggleClickRef.current = true;
+        const next = modeAtStart === "voice" ? "video" : "voice";
+        setMediaMode(next);
+        try { localStorage.setItem("messenger.mediaMode", next); } catch {}
+        setTimeout(() => { suppressModeToggleClickRef.current = false; }, 0);
         return;
       }
-
-      if (lockedRef.current) {
-        // Already locked — release shouldn't stop
-        return;
-      }
-
-      // If dragged far left → cancel
-      if (dragUI.dx <= CANCEL_DX || (start && false)) {
-        // use latest drag from event — check cancel via release position not stored
-      }
-
-      // Default: stop & send
-      // Cancel if still near cancel zone — read from last dragUI state is stale;
-      // rely on cancelRef set during move
-      stopRecording(false);
+      if (lockedRef.current) return;
+      stopRecording(!!cancelRef.current);
     };
 
     const cleanupPointer = (m, u) => {
@@ -716,13 +753,21 @@ export default function MessageComposer({
     const onUpWrap = () => {
       cleanupPointer(onMoveWrap, onUpWrap);
       const start = pressStartRef.current;
-      const wasStarted = start?.started;
+      const wasStarted = Boolean(start?.started);
+      const modeAtStart = start?.mode || mode;
       pressStartRef.current = null;
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
         holdTimerRef.current = null;
       }
-      if (!wasStarted) return;
+      if (!wasStarted) {
+        suppressModeToggleClickRef.current = true;
+        const next = modeAtStart === "voice" ? "video" : "voice";
+        setMediaMode(next);
+        try { localStorage.setItem("messenger.mediaMode", next); } catch {}
+        setTimeout(() => { suppressModeToggleClickRef.current = false; }, 0);
+        return;
+      }
       if (lockedRef.current) return;
       stopRecording(!!cancelRef.current);
     };
@@ -919,17 +964,62 @@ export default function MessageComposer({
     return (
       <Box sx={{ borderTop: "1px solid", borderColor: "divider", bgcolor: "background.paper", p: 1 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
+          {/* Full-screen circular selfie preview for video messages */}
           {recKind === "video" && (
             <Box
-              component="video"
-              ref={videoPreviewRef}
-              muted
-              playsInline
               sx={{
-                width: 52, height: 52, borderRadius: "50%",
-                objectFit: "cover", border: "2px solid", borderColor: "error.main", flexShrink: 0,
+                position: "fixed", inset: 0, zIndex: 1400,
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+                bgcolor: "rgba(0,0,0,0.78)",
+                pointerEvents: "none",
               }}
-            />
+            >
+              <Box sx={{ position: "relative", pointerEvents: "auto" }}>
+                <Box
+                  sx={{
+                    width: { xs: 220, sm: 280 }, height: { xs: 220, sm: 280 },
+                    borderRadius: "50%", overflow: "hidden",
+                    border: "3px solid",
+                    borderColor: (locked || recPhase === "locked") ? "warning.main" : "error.main",
+                    boxShadow: "0 0 0 6px rgba(0,0,0,0.35), 0 16px 48px rgba(0,0,0,0.55)",
+                    bgcolor: "#000",
+                  }}
+                >
+                  <Box
+                    component="video"
+                    ref={videoPreviewRef}
+                    muted playsInline autoPlay
+                    sx={{
+                      width: "100%", height: "100%", objectFit: "cover", display: "block",
+                      transform: cameraFacing === "user" ? "scaleX(-1)" : "none",
+                    }}
+                  />
+                </Box>
+                <IconButton
+                  onClick={flipCamera}
+                  disabled={flippingCam}
+                  title={cameraFacing === "user" ? "Switch to rear camera" : "Switch to selfie"}
+                  sx={{
+                    position: "absolute", right: -8, bottom: 12,
+                    bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
+                    border: "1px solid rgba(255,255,255,0.25)",
+                    "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
+                    width: 44, height: 44,
+                  }}
+                >
+                  <CameraswitchIcon />
+                </IconButton>
+              </Box>
+              <Typography sx={{ color: "#fff", fontWeight: 700, mt: 2, fontVariantNumeric: "tabular-nums" }}>
+                {formatRecTime(recordSeconds)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", mt: 0.5 }}>
+                {(locked || recPhase === "locked")
+                  ? "Locked · tap send when finished"
+                  : (hint || "Slide up to lock · left to cancel")}
+              </Typography>
+            </Box>
           )}
 
           <IconButton onClick={cancelRecording} title="Cancel">
@@ -1035,13 +1125,16 @@ export default function MessageComposer({
             bgcolor: "background.paper",
             border: "1px solid",
             borderColor: "divider",
-            borderRadius: 2.5,
-            boxShadow: 8,
+            borderRadius: 1.25,
+            boxShadow: 6,
             overflow: "hidden",
           }}
         >
-          <List dense disablePadding sx={{ maxHeight: { xs: 280, sm: 320 }, overflowY: "auto" }}>
-            {mentionMatches.map((u, i) => (
+          <List dense disablePadding sx={{ maxHeight: { xs: 260, sm: 300 }, overflowY: "auto" }}>
+            {mentionMatches.map((u, i) => {
+              const rawAvatar = u.avatar || u.avatar_url || u.user?.avatar || u.user?.avatar_url || "";
+              const avatarSrc = rawAvatar ? withTokenQuery(rawAvatar) : undefined;
+              return (
               <ListItemButton
                 key={`${u.id || u.username}-${i}`}
                 selected={i === mentionIndex}
@@ -1049,24 +1142,31 @@ export default function MessageComposer({
                   ev.preventDefault();
                   applyMention(u);
                 }}
-                sx={{ py: 0.7, px: 1 }}
+                sx={{
+                  py: 0.85, px: 1.25, gap: 0.5, borderRadius: 0,
+                  "&.Mui-selected": {
+                    bgcolor: (t) => t.palette.mode === "dark" ? "rgba(25,118,210,0.18)" : "rgba(25,118,210,0.1)",
+                  },
+                }}
               >
-                <ListItemAvatar sx={{ minWidth: 40 }}>
+                <ListItemAvatar sx={{ minWidth: 44, mr: 0.5 }}>
                   <Avatar
-                    src={u.avatar || u.avatar_url || u.user?.avatar || undefined}
-                    sx={{ width: 32, height: 32, fontSize: 14 }}
+                    src={avatarSrc || undefined}
+                    imgProps={{ referrerPolicy: "no-referrer" }}
+                    sx={{ width: 34, height: 34, fontSize: 14, flexShrink: 0 }}
                   >
-                    {u.username?.[0]?.toUpperCase() || "U"}
+                    {(u.username || "U")[0]?.toUpperCase()}
                   </Avatar>
                 </ListItemAvatar>
                 <ListItemText
                   primary={`@${u.username}`}
-                  secondary={u.label && u.label !== u.username ? u.label : undefined}
-                  primaryTypographyProps={{ fontSize: 14, fontWeight: i === mentionIndex ? 600 : 500 }}
-                  secondaryTypographyProps={{ noWrap: true }}
+                  secondary={u.label && u.label !== u.username ? u.label : (u.display_name && u.display_name !== u.username ? u.display_name : undefined)}
+                  primaryTypographyProps={{ fontSize: 14, fontWeight: i === mentionIndex ? 600 : 500, noWrap: true }}
+                  secondaryTypographyProps={{ noWrap: true, fontSize: 12 }}
                 />
               </ListItemButton>
-            ))}
+              );
+            })}
           </List>
         </Box>
       )}
@@ -1279,7 +1379,7 @@ export default function MessageComposer({
         }}>
         <input
           ref={fileRef} type="file" multiple hidden
-          accept="image/*,video/*,audio/*,.gif,.pdf,.txt,.zip,.doc,.docx,.md,.csv"
+          accept="image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv"
           onChange={handleFileChange}
         />
         {!editingMsg && (

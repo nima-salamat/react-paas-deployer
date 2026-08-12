@@ -2259,29 +2259,92 @@ export default function MessengerApp() {
     }, 1800);
   };
 
-  const scrollToNextNew = () => {
-    // Suppress the control while we programmatically move; user gesture re-arms it.
-    dismissScrollDownButton();
+  /**
+   * After a step-scroll settles: mark everything currently in the viewport as
+   * seen, recount remaining "new below", and keep the ↓ button if more remains
+   * so the user can tap again (Telegram-style page-down through unread).
+   */
+  const afterStepScrollSettle = (delay = 420) => {
+    setTimeout(() => {
+      const root = listRef.current;
+      if (!root) return;
+      markVisibleMessagesRead();
+      recountNewBelow();
+      const distBottom = Math.max(0, root.scrollHeight - root.scrollTop - root.clientHeight);
+      nearBottomRef.current = distBottom < 120;
+      if (distBottom > 180 || pendingNewIdsRef.current.length > 0) {
+        // Allow the control to stay usable for the next tap without requiring
+        // a manual wheel/touch first.
+        armScrollDownButton();
+      } else {
+        dismissScrollDownButton();
+        pendingNewIdsRef.current = [];
+        setNewBelowCount(0);
+      }
+    }, delay);
+  };
 
-    // First pending unread, centered — not the absolute bottom
-    let targetId = pendingNewIdsRef.current.length ? pendingNewIdsRef.current[0] : null;
-    if (!targetId) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      pendingNewIdsRef.current = [];
-      setNewBelowCount(0);
-      setTimeout(() => markVisibleMessagesRead(), 400);
-      return;
+  /**
+   * First unseen message that is not yet fully in view (below or only partially
+   * visible near the bottom edge). Prefers WS-tracked pendingNewIds, then falls
+   * back to scanning DOM nodes that are not mine and not yet in seenQueuedRef.
+   */
+  const findNextUnreadBelow = () => {
+    const root = listRef.current;
+    if (!root) return null;
+    const rootRect = root.getBoundingClientRect();
+    const edge = rootRect.bottom - 56; // treat near-bottom partial as "still below"
+
+    // 1) Pending new arrivals while scrolled up (chronological order)
+    for (const id of pendingNewIdsRef.current) {
+      const el = document.getElementById(`msg-${id}`);
+      if (!el) return String(id); // not in DOM yet — load-older path will try
+      const r = el.getBoundingClientRect();
+      // Still below, or only partially visible near the bottom edge
+      if (r.top > edge || r.bottom > rootRect.bottom - 8) {
+        return String(id);
+      }
     }
-    const el = document.getElementById(`msg-${targetId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      setJumpHighlightId(targetId);
-      setTimeout(() => setJumpHighlightId((cur) => (cur === targetId ? null : cur)), 1600);
-      setTimeout(() => {
-        recountNewBelow();
-        markVisibleMessagesRead();
-      }, 450);
-    } else {
+
+    // 2) Any other unread (not mine, not yet queued as seen) below the viewport
+    const nodes = root.querySelectorAll("[data-msg-id]");
+    for (const node of nodes) {
+      const id = node.getAttribute("data-msg-id");
+      if (!id) continue;
+      if (node.getAttribute("data-msg-mine") === "1") continue;
+      if (seenQueuedRef.current.has(String(id))) continue;
+      const r = node.getBoundingClientRect();
+      if (r.top > edge || r.bottom > rootRect.bottom - 8) {
+        return String(id);
+      }
+    }
+    return null;
+  };
+
+  const scrollToNextNew = () => {
+    // Soft-suppress only during the smooth scroll; afterStepScrollSettle will
+    // re-arm the button if there is still content below.
+    scrollDownDismissedRef.current = true;
+    userScrollIntentRef.current = false;
+    if (scrollDownFadeTimerRef.current) {
+      clearTimeout(scrollDownFadeTimerRef.current);
+      scrollDownFadeTimerRef.current = null;
+    }
+
+    const root = listRef.current;
+    const targetId = findNextUnreadBelow();
+
+    if (targetId) {
+      const el = document.getElementById(`msg-${targetId}`);
+      if (el) {
+        // First unseen → center of the viewport so the user can read it
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setJumpHighlightId(targetId);
+        setTimeout(() => setJumpHighlightId((cur) => (cur === targetId ? null : cur)), 1600);
+        afterStepScrollSettle(450);
+        return;
+      }
+      // Not mounted yet — try loading older pages (rare for "below", but safe)
       (async () => {
         for (let i = 0; i < 15; i++) {
           if (!hasMoreMsgsRef.current) break;
@@ -2290,16 +2353,40 @@ export default function MessengerApp() {
           const node = document.getElementById(`msg-${targetId}`);
           if (node) {
             node.scrollIntoView({ behavior: "smooth", block: "center" });
-            setTimeout(() => { recountNewBelow(); markVisibleMessagesRead(); }, 450);
+            setJumpHighlightId(targetId);
+            setTimeout(() => setJumpHighlightId((cur) => (cur === targetId ? null : cur)), 1600);
+            afterStepScrollSettle(450);
             return;
           }
         }
+        // Fallback: one viewport step
+        if (root) {
+          const step = Math.max(120, Math.floor(root.clientHeight * 0.85));
+          root.scrollBy({ top: step, behavior: "smooth" });
+          afterStepScrollSettle(450);
+        }
+      })();
+      return;
+    }
+
+    // No specific unread target: step down by ~one viewport (not jump to end)
+    if (root) {
+      const distBottom = Math.max(0, root.scrollHeight - root.scrollTop - root.clientHeight);
+      if (distBottom <= 180) {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
         pendingNewIdsRef.current = [];
         setNewBelowCount(0);
-        setTimeout(() => markVisibleMessagesRead(), 400);
-      })();
+        afterStepScrollSettle(400);
+        return;
+      }
+      const step = Math.max(120, Math.floor(root.clientHeight * 0.85));
+      root.scrollBy({ top: Math.min(step, distBottom), behavior: "smooth" });
+      afterStepScrollSettle(450);
+      return;
     }
+
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    afterStepScrollSettle(400);
   };
 
   const scrollToBottom = () => {

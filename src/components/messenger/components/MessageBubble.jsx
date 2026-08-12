@@ -22,6 +22,7 @@ import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import {
   attachmentKind, formatTime, formatDuration, withTokenQuery, REACTIONS,
   parseMentions, isVoiceAttachment, isVideoMessageAttachment,
+  emojiOnlyCount, isGifAttachment,
 } from "../messengerUtils";
 
 /**
@@ -460,6 +461,12 @@ export default function MessageBubble({
   );
 
   const bodySegments = parseMentions(bodyStr);
+  const hasAttachments = (m.attachments || []).length > 0;
+  const emojiCount = (!hasAttachments && !m.reply_to_preview && !m.forwarded_from_user)
+    ? emojiOnlyCount(bodyStr)
+    : null;
+  const isBigEmoji = emojiCount != null && emojiCount >= 1 && emojiCount <= 3;
+  const emojiFontSize = emojiCount === 1 ? 72 : emojiCount === 2 ? 56 : emojiCount === 3 ? 44 : 14.5;
 
   const longPressTimer = React.useRef(null);
   const longPressMoved = React.useRef(false);
@@ -574,14 +581,16 @@ export default function MessageBubble({
       <Box
         sx={{
           maxWidth: { xs: "82%", sm: "70%" },
-          px: 1.35,
-          py: 0.85,
-          borderRadius: mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-          bgcolor: mine
-            ? (theme.palette.mode === "dark" ? "#2b5278" : theme.palette.primary.main)
-            : "background.paper",
-          color: mine ? "#fff" : "text.primary",
-          boxShadow: theme.palette.mode === "dark" ? "none" : 1,
+          px: isBigEmoji ? 0.5 : 1.35,
+          py: isBigEmoji ? 0.35 : 0.85,
+          borderRadius: isBigEmoji ? 2 : (mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px"),
+          bgcolor: isBigEmoji
+            ? "transparent"
+            : (mine
+              ? (theme.palette.mode === "dark" ? "#2b5278" : theme.palette.primary.main)
+              : "background.paper"),
+          color: isBigEmoji ? "text.primary" : (mine ? "#fff" : "text.primary"),
+          boxShadow: isBigEmoji ? "none" : (theme.palette.mode === "dark" ? "none" : 1),
         }}
       >
         {!mine && activeConv?.type === "group" && (
@@ -656,41 +665,55 @@ export default function MessageBubble({
           return (
             <Box key={a.id} sx={{ mt: 0.6, minWidth: (k === "audio" || voice) ? 240 : undefined }}>
               {k === "image" ? (
-                <Box
-                  component="img"
-                  src={url}
-                  alt={a.original_filename}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenPreview({ ...a, url, message: m });
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onReply?.({
-                      ...m,
-                      body: m.body || "",
-                      _replyAttachment: a,
-                      reply_to_preview: {
-                        id: m.id,
-                        body: a.original_filename || "Photo",
-                        sender: m.sender,
-                      },
-                    });
-                  }}
-                  onError={(e) => {
-                    if (!e.currentTarget.dataset.fallback) {
-                      e.currentTarget.dataset.fallback = "1";
-                      e.currentTarget.src = a.url;
-                    } else {
-                      e.currentTarget.style.display = "none";
-                    }
-                  }}
-                  sx={{
-                    maxWidth: "100%", borderRadius: 1.5, maxHeight: 320,
-                    display: "block", cursor: "pointer",
-                  }}
-                />
+                <Box sx={{ position: "relative", display: "inline-block", maxWidth: "100%" }}>
+                  <Box
+                    component="img"
+                    src={url}
+                    alt={a.original_filename}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPreview({ ...a, url, message: m });
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onReply?.({
+                        ...m,
+                        body: m.body || "",
+                        _replyAttachment: a,
+                        reply_to_preview: {
+                          id: m.id,
+                          body: isGifAttachment(a) ? "GIF" : (a.original_filename || "Photo"),
+                          sender: m.sender,
+                        },
+                      });
+                    }}
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.fallback) {
+                        e.currentTarget.dataset.fallback = "1";
+                        e.currentTarget.src = a.url;
+                      } else {
+                        e.currentTarget.style.display = "none";
+                      }
+                    }}
+                    sx={{
+                      maxWidth: "100%", borderRadius: 1.5, maxHeight: isGifAttachment(a) ? 360 : 320,
+                      display: "block", cursor: "pointer",
+                    }}
+                  />
+                  {isGifAttachment(a) && (
+                    <Chip
+                      label="GIF"
+                      size="small"
+                      sx={{
+                        position: "absolute", left: 8, bottom: 8,
+                        height: 22, fontWeight: 800, fontSize: 11,
+                        bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
+                        "& .MuiChip-label": { px: 0.75 },
+                      }}
+                    />
+                  )}
+                </Box>
               ) : videoMsg || k === "video" ? (
                 <ChatVideo
                   src={a.url}
@@ -745,9 +768,11 @@ export default function MessageBubble({
             sx={{
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
-              fontSize: 14.5,
-              lineHeight: 1.45,
-              mt: (m.attachments || []).length ? 0.75 : 0,
+              fontSize: isBigEmoji ? emojiFontSize : 14.5,
+              lineHeight: isBigEmoji ? 1.15 : 1.45,
+              mt: hasAttachments ? 0.75 : 0,
+              textAlign: isBigEmoji ? "center" : "inherit",
+              letterSpacing: isBigEmoji ? "0.04em" : undefined,
             }}
           >
             {bodySegments.map((seg, i) =>
@@ -823,8 +848,8 @@ export default function MessageBubble({
             onClick={() => onReply(m)}>
             <ReplyIcon sx={{ fontSize: 15 }} />
           </IconButton>
-          {m.is_edited && <Typography variant="caption" sx={{ opacity: 0.7, fontSize: 10 }}>edited</Typography>}
-          <Typography variant="caption" sx={{ opacity: 0.75, fontSize: 11 }}>{formatTime(m.created_at)}</Typography>
+          {m.is_edited && <Typography variant="caption" sx={{ opacity: 0.7, fontSize: 10, color: isBigEmoji ? "text.secondary" : "inherit" }}>edited</Typography>}
+          <Typography variant="caption" sx={{ opacity: 0.75, fontSize: 11, color: isBigEmoji ? "text.secondary" : "inherit" }}>{formatTime(m.created_at)}</Typography>
           {tickEl}
         </Stack>
       </Box>
