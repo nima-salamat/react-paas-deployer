@@ -1,67 +1,108 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Box, Stack, Typography, IconButton, MenuItem, Select, FormControl, Tooltip, alpha,
+  Box, Stack, Typography, IconButton, Menu, MenuItem, ListItemIcon, Switch, alpha,
 } from "@mui/material";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import PauseIcon from "@mui/icons-material/Pause";
-import CloseIcon from "@mui/icons-material/Close";
-import StopIcon from "@mui/icons-material/Stop";
-import MusicNoteIcon from "@mui/icons-material/MusicNote";
-import GraphicEqIcon from "@mui/icons-material/GraphicEq";
-import VolumeUpIcon from "@mui/icons-material/VolumeUp";
-import VolumeOffIcon from "@mui/icons-material/VolumeOff";
-import Replay10Icon from "@mui/icons-material/Replay10";
-import Forward10Icon from "@mui/icons-material/Forward10";
-import LoopIcon from "@mui/icons-material/Loop";
-import DownloadIcon from "@mui/icons-material/Download";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import SkipNextRoundedIcon from "@mui/icons-material/SkipNextRounded";
+import SkipPreviousRoundedIcon from "@mui/icons-material/SkipPreviousRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import MusicNoteRoundedIcon from "@mui/icons-material/MusicNoteRounded";
+import MicRoundedIcon from "@mui/icons-material/MicRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import ChatRoundedIcon from "@mui/icons-material/ChatRounded";
+import QueueMusicRoundedIcon from "@mui/icons-material/QueueMusicRounded";
+import RepeatRoundedIcon from "@mui/icons-material/RepeatRounded";
 
-import WaveSurfer from "wavesurfer.js";
 import { formatDuration, withTokenQuery } from "../messengerUtils";
 
-/**
- * Premium audio player bar (Telegram-style). Renders a fixed bar at the top
- * of the chat pane when `player` is non-null.
- *
- * Built on top of wavesurfer.js — the de-facto standard for waveform audio
- * players in the web (used by Spotify web, SoundCloud, BBC, etc.).
- *
- * Why wavesurfer.js? The previous hand-rolled version had broken behaviors:
- *  - "Moving the music" (dragging the seek/waveform) didn't work because the
- *    custom canvas seek handler was racing with the <audio> element's
- *    timeupdate event, causing it to snap back to the old position.
- *  - The waveform was computed client-side via AudioContext.decodeAudioData
- *    which fails on cross-origin blobs (CORS) and produces no fallback.
- *  - The play() promise race was tracked with a ref but the seek slider
- *    still fought with the audio element.
- * wavesurfer.js handles all of this internally:
- *  - Drag the waveform to seek (with a smooth scrubbing preview)
- *  - Built-in peak fetching with CORS fallback
- *  - Proper play() promise handling
- *  - Speed / volume / loop all built-in
- *
- * Props:
- *  - player: { att, title } | null  — the currently-loaded audio attachment
- *  - onChange: (player) => void     — update parent state (e.g. to clear)
- *  - onStateChange: ({ isPlaying, currentTime, duration, attId }) => void
- */
-const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
-export default function AudioPlayerBar({ player, onChange, onStateChange }) {
-  const containerRef = useRef(null);       // div that wavesurfer mounts into
-  const wsRef = useRef(null);              // WaveSurfer instance
+/**
+ * Module-level singleton <audio> so the bar can unmount/remount
+ * (chat header ↔ mobile list) without stopping playback.
+ */
+const shared = {
+  audio: null,
+  listenersBound: false,
+  gen: 0,
+};
+
+function getSharedAudio() {
+  if (!shared.audio) {
+    const a = new Audio();
+    a.preload = "metadata";
+    shared.audio = a;
+  }
+  return shared.audio;
+}
+
+/**
+ * Thin Telegram-style mini-player.
+ * Place ABOVE the chat user header, or ABOVE the list search bar on mobile.
+ */
+export default function AudioPlayerBar({ player, onChange, onStateChange, onGoToTrack }) {
   const pendingPlayRef = useRef(false);
+  const scrubbingRef = useRef(false);
+  const continuousRef = useRef(true);
+  const playerRef = useRef(player);
+  playerRef.current = player;
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [speed, setSpeed] = useState(1);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
-  const [loop, setLoop] = useState(false);
-  const [loadingWave, setLoadingWave] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const [continuous, setContinuous] = useState(true);
+  const [loopOne, setLoopOne] = useState(false);
 
-  // Push state up to parent whenever it changes
+  continuousRef.current = continuous;
+
+  // Bind singleton audio events once (across remounts)
+  useEffect(() => {
+    const audio = getSharedAudio();
+    if (shared.listenersBound) {
+      // Sync UI from current audio state after remount
+      setIsPlaying(!audio.paused && !audio.ended);
+      setCurrentTime(audio.currentTime || 0);
+      setDuration(audio.duration && isFinite(audio.duration) ? audio.duration : 0);
+      return undefined;
+    }
+    shared.listenersBound = true;
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onTime = () => {
+      if (scrubbingRef.current) return;
+      setCurrentTime(audio.currentTime || 0);
+    };
+    const onMeta = () => setDuration(audio.duration && isFinite(audio.duration) ? audio.duration : 0);
+    const onDur = () => setDuration(audio.duration && isFinite(audio.duration) ? audio.duration : 0);
+    const onWait = () => setLoading(true);
+    const onCan = () => setLoading(false);
+    const onPlaying = () => { setLoading(false); setIsPlaying(true); };
+    const onError = () => {
+      setErrorMsg("Could not load");
+      setLoading(false);
+      setIsPlaying(false);
+    };
+
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("durationchange", onDur);
+    audio.addEventListener("waiting", onWait);
+    audio.addEventListener("canplay", onCan);
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("error", onError);
+
+    // ended handled below with continuous play (re-bound each mount is fine via separate effect)
+  }, []);
+
   useEffect(() => {
     onStateChange?.({
       isPlaying,
@@ -71,173 +112,194 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
     });
   }, [isPlaying, currentTime, duration, player, onStateChange]);
 
-  // ---- Initialise WaveSurfer once ----
+  const attId = player?.att?.id ?? null;
+  const attUrl = player?.att?.url ?? null;
+  const wantAutoPlay = Boolean(player?.autoPlay);
+
+  // Load source when attachment changes
   useEffect(() => {
-    if (!containerRef.current) return;
-    const ws = WaveSurfer.create({
-      container: containerRef.current,
-      waveColor: "#bdbdbd",
-      progressColor: "#1976d2",
-      cursorColor: "#1976d2",
-      cursorWidth: 2,
-      barWidth: 2,
-      barRadius: 2,
-      barGap: 2,
-      height: 32,
-      normalize: true,
-      interact: true,           // click to seek
-      hideScrollbar: true,
-      fillParent: true,
-      minPxPerSec: 50,
-      // MediaElement backend uses an <audio> element — works with Range + CORS
-      backend: "MediaElement",
-      mediaControls: false,
-      // Help cross-origin protected media (?token=) load without CORS decode errors
-      fetchParams: { mode: "cors", credentials: "omit" },
-    });
-    wsRef.current = ws;
-
-    ws.on("play", () => setIsPlaying(true));
-    ws.on("pause", () => setIsPlaying(false));
-    ws.on("finish", () => {
-      setIsPlaying(false);
-      if (!loop) {
-        try { ws.seekTo(0); } catch { /* */ }
-        setCurrentTime(0);
-      }
-    });
-    ws.on("timeupdate", (t) => setCurrentTime(t || 0));
-    ws.on("ready", (dur) => {
-      // wavesurfer v7 ready event passes the duration
-      setDuration(dur || ws.getDuration() || 0);
-      setLoadingWave(false);
-    });
-    ws.on("loading", () => setLoadingWave(true));
-    ws.on("error", () => {
-      setErrorMsg("Could not load audio");
-      setLoadingWave(false);
-      setIsPlaying(false);
-    });
-    ws.on("decode", (dur) => setDuration(dur || ws.getDuration() || 0));
-
-    return () => {
-      try { ws.destroy(); } catch { /* */ }
-      wsRef.current = null;
-    };
-  }, []);
-
-  // ---- Load new source when `player` changes ----
-  useEffect(() => {
-    const ws = wsRef.current;
-    if (!ws) return;
-    if (!player) {
-      try { ws.pause(); } catch { /* */ }
-      try { ws.setTime(0); } catch { /* */ }
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setDuration(0);
-      setErrorMsg("");
-      // Clear the waveform
-      try { ws.empty(); } catch { /* */ }
+    const audio = getSharedAudio();
+    if (!attUrl) {
+      try { audio.pause(); } catch { /* */ }
+      // keep src if just UI remount with same player — only clear when player null handled by parent
       return;
     }
-    const nextSrc = withTokenQuery(player.att?.url);
+
+    const nextSrc = withTokenQuery(attUrl);
     if (!nextSrc) {
       setErrorMsg("No audio URL");
-      setLoadingWave(false);
       return;
     }
-    setLoadingWave(true);
+
+    const gen = ++shared.gen;
+    setLoading(true);
     setErrorMsg("");
-    setCurrentTime(0);
-    setDuration(0);
-    // wavesurfer v7 — load() accepts a URL or HTMLMediaElement
-    try {
-      // Empty previous peaks so UI doesn't show stale waveform
-      try { ws.empty(); } catch { /* */ }
-      const loadPromise = ws.load(nextSrc);
-      if (loadPromise && typeof loadPromise.catch === "function") {
-        loadPromise.catch((err) => {
-          console.warn("WaveSurfer load failed", err);
-          setErrorMsg("Could not load audio");
-          setLoadingWave(false);
-        });
-      }
-      if (player.autoPlay) {
-        const playWhenReady = () => {
-          const p = ws.play();
-          if (p && typeof p.catch === "function") {
-            p.catch((err) => {
-              if (err && err.name !== "AbortError") {
-                setErrorMsg("Playback blocked. Click again to retry.");
-              }
-            });
-          }
-        };
-        ws.once("ready", playWhenReady);
-      }
-    } catch (e) {
-      console.warn("WaveSurfer load exception", e);
-      setErrorMsg("Could not load audio");
-      setLoadingWave(false);
+
+    const prevId = audio.dataset.attId || "";
+    const already = prevId && String(prevId) === String(attId) && audio.src && !audio.error;
+
+    if (!already) {
+      setCurrentTime(0);
+      setDuration(0);
+      audio.dataset.attId = String(attId ?? "");
+      audio.src = nextSrc;
+      audio.load();
+    } else {
+      setLoading(false);
+      setIsPlaying(!audio.paused && !audio.ended);
+      setCurrentTime(audio.currentTime || 0);
+      setDuration(audio.duration && isFinite(audio.duration) ? audio.duration : 0);
+    }
+
+    if (wantAutoPlay) {
+      const tryPlay = () => {
+        if (gen !== shared.gen) return;
+        if (!audio.paused && !audio.ended) {
+          setIsPlaying(true);
+          setLoading(false);
+          return;
+        }
+        pendingPlayRef.current = true;
+        const p = audio.play();
+        if (p && typeof p.then === "function") {
+          p.then(() => {
+            pendingPlayRef.current = false;
+            setIsPlaying(true);
+            setLoading(false);
+          }).catch((err) => {
+            pendingPlayRef.current = false;
+            if (err && err.name !== "AbortError") setErrorMsg("Tap play");
+            setLoading(false);
+          });
+        } else {
+          pendingPlayRef.current = false;
+        }
+      };
+      const onCanPlay = () => { tryPlay(); audio.removeEventListener("canplay", onCanPlay); };
+      audio.addEventListener("canplay", onCanPlay);
+      const t = setTimeout(tryPlay, already ? 0 : 40);
+      return () => {
+        clearTimeout(t);
+        audio.removeEventListener("canplay", onCanPlay);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player]);
+  }, [attId, attUrl]);
 
-  // Sync speed / volume / loop
   useEffect(() => {
-    try { wsRef.current?.setPlaybackRate(speed); } catch { /* */ }
+    try { getSharedAudio().playbackRate = speed; } catch { /* */ }
   }, [speed]);
 
   useEffect(() => {
-    try {
-      if (wsRef.current) {
-        wsRef.current.setVolume(muted ? 0 : volume);
-      }
-    } catch { /* */ }
-  }, [volume, muted]);
+    getSharedAudio().loop = loopOne;
+  }, [loopOne]);
 
-  // ---- Toggle play/pause ----
-  const togglePlay = useCallback(() => {
-    const ws = wsRef.current;
-    if (!ws || !player) return;
-    if (pendingPlayRef.current) return;
-    if (ws.isPlaying()) {
-      try { ws.pause(); } catch { /* */ }
+  const seekTo = useCallback((t) => {
+    const audio = getSharedAudio();
+    const d = audio.duration || duration || 0;
+    if (!d || !isFinite(d)) return;
+    const clamped = Math.max(0, Math.min(d, t));
+    try { audio.currentTime = clamped; } catch { /* */ }
+    setCurrentTime(clamped);
+  }, [duration]);
+
+  const playNext = useCallback(() => {
+    const p = playerRef.current;
+    if (!p?.queue?.length) return;
+    const idx = typeof p.queueIndex === "number" ? p.queueIndex : 0;
+    const next = p.queue[idx + 1];
+    if (!next) return;
+    onChange?.({
+      ...next,
+      autoPlay: true,
+      queue: p.queue,
+      queueIndex: idx + 1,
+    });
+  }, [onChange]);
+
+  const playPrev = useCallback(() => {
+    const p = playerRef.current;
+    const audio = getSharedAudio();
+    if (!p?.queue?.length) {
+      seekTo(0);
+      return;
+    }
+    const idx = typeof p.queueIndex === "number" ? p.queueIndex : 0;
+    if ((audio.currentTime || 0) > 3) {
+      seekTo(0);
+      return;
+    }
+    const prev = p.queue[idx - 1];
+    if (!prev) {
+      seekTo(0);
+      return;
+    }
+    onChange?.({
+      ...prev,
+      autoPlay: true,
+      queue: p.queue,
+      queueIndex: idx - 1,
+    });
+  }, [onChange, seekTo]);
+
+  useEffect(() => {
+    const audio = getSharedAudio();
+    const onEnded = () => {
       setIsPlaying(false);
-    } else {
-      pendingPlayRef.current = true;
-      const p = ws.play();
-      if (p && typeof p.then === "function") {
-        p.then(() => {
-          pendingPlayRef.current = false;
-          setIsPlaying(true);
-        }).catch((err) => {
-          pendingPlayRef.current = false;
-          setIsPlaying(false);
-          if (err && err.name !== "AbortError") {
-            setErrorMsg("Playback blocked. Click again to retry.");
-          }
-        });
-      } else {
+      if (loopOne) return;
+      if (continuousRef.current) playNext();
+      else {
+        try { audio.currentTime = 0; } catch { /* */ }
+        setCurrentTime(0);
+      }
+    };
+    audio.addEventListener("ended", onEnded);
+    return () => audio.removeEventListener("ended", onEnded);
+  }, [playNext, loopOne]);
+
+  const togglePlay = useCallback(() => {
+    const audio = getSharedAudio();
+    const p = playerRef.current;
+    if (!p) return;
+    if (pendingPlayRef.current) return;
+
+    if (!audio.paused) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+    if (!audio.src && p.att?.url) {
+      audio.src = withTokenQuery(p.att.url);
+      audio.load();
+    }
+    pendingPlayRef.current = true;
+    const pr = audio.play();
+    if (pr && typeof pr.then === "function") {
+      pr.then(() => {
         pendingPlayRef.current = false;
         setIsPlaying(true);
-      }
+        setErrorMsg("");
+      }).catch((err) => {
+        pendingPlayRef.current = false;
+        setIsPlaying(false);
+        if (err && err.name !== "AbortError") setErrorMsg("Tap play");
+      });
+    } else {
+      pendingPlayRef.current = false;
+      setIsPlaying(true);
     }
-  }, [player]);
+  }, []);
 
-  // ---- Listen for external toggle / seek requests (from inline bubble play button) ----
   useEffect(() => {
-    if (!player) return;
+    if (!player) return undefined;
     const onToggle = () => togglePlay();
     const onSeekEv = (e) => {
-      const ws = wsRef.current;
       const ratio = e?.detail?.ratio;
-      if (!ws || typeof ratio !== "number") return;
-      const d = ws.getDuration() || 0;
+      if (typeof ratio !== "number") return;
+      const audio = getSharedAudio();
+      const d = audio.duration || duration || 0;
       if (!d) return;
-      try { ws.seekTo(Math.max(0, Math.min(1, ratio))); } catch { /* */ }
-      setCurrentTime(Math.max(0, Math.min(1, ratio)) * d);
+      seekTo(ratio * d);
     };
     window.addEventListener("messenger:audio-toggle", onToggle);
     window.addEventListener("messenger:audio-seek", onSeekEv);
@@ -245,223 +307,227 @@ export default function AudioPlayerBar({ player, onChange, onStateChange }) {
       window.removeEventListener("messenger:audio-toggle", onToggle);
       window.removeEventListener("messenger:audio-seek", onSeekEv);
     };
-  }, [player, togglePlay]);
-
-  // ---- Stop button — reset to 0 and pause ----
-  const stopAll = useCallback(() => {
-    const ws = wsRef.current;
-    if (!ws) return;
-    try { ws.pause(); } catch { /* */ }
-    try { ws.seekTo(0); } catch { /* */ }
-    setIsPlaying(false);
-    setCurrentTime(0);
-  }, []);
-
-  const skip = (delta) => {
-    const ws = wsRef.current;
-    if (!ws) return;
-    const d = ws.getDuration() || 0;
-    const t = Math.max(0, Math.min(d, (ws.getCurrentTime() || 0) + delta));
-    try { ws.setTime(t); } catch { /* */ }
-    setCurrentTime(t);
-  };
+  }, [player, togglePlay, seekTo, duration]);
 
   const onClosePlayer = () => {
-    const ws = wsRef.current;
-    if (ws) {
-      try { ws.pause(); } catch { /* */ }
-      try { ws.empty(); } catch { /* */ }
-    }
+    const audio = getSharedAudio();
+    try { audio.pause(); } catch { /* */ }
+    audio.removeAttribute("src");
+    try { audio.load(); } catch { /* */ }
+    delete audio.dataset.attId;
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
     setErrorMsg("");
-    onChange(null);
+    onStateChange?.({ isPlaying: false, currentTime: 0, duration: 0, attId: null });
+    onChange?.(null);
   };
 
   const onDownload = () => {
     if (!player?.att?.url) return;
     const a = document.createElement("a");
     a.href = withTokenQuery(player.att.url);
-    a.download = player.att.original_filename || "audio.mp3";
+    a.download = player.att.original_filename || "audio";
     a.target = "_blank";
+    a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
 
-  const isVoice = player?.att?.kind === "voice" || (player?.att?.original_filename || "").startsWith("voice_");
+  const goToMessage = () => {
+    setMenuAnchor(null);
+    if (!player?.conversationId || !player?.messageId) return;
+    onGoToTrack?.({
+      conversationId: player.conversationId,
+      messageId: player.messageId,
+    });
+  };
+
+  const seekFromEvent = (e, trackEl) => {
+    const rect = trackEl.getBoundingClientRect();
+    const audio = getSharedAudio();
+    const d = audio.duration || duration || 0;
+    if (!d || rect.width <= 0) return;
+    const clientX = e.touches ? e.touches[0]?.clientX : e.clientX;
+    if (clientX == null) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    seekTo(ratio * d);
+  };
+
+  const onSeekStart = (e) => {
+    const track = e.currentTarget;
+    const audio = getSharedAudio();
+    const d = audio.duration || duration || 0;
+    if (!d) return;
+    e.preventDefault();
+    e.stopPropagation();
+    scrubbingRef.current = true;
+    seekFromEvent(e, track);
+    const move = (ev) => {
+      ev.preventDefault?.();
+      seekFromEvent(ev, track);
+    };
+    const up = () => {
+      scrubbingRef.current = false;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", up);
+  };
 
   if (!player) return null;
-  const title = player.title || player.att?.original_filename || "Audio";
+
+  const isVoice =
+    player?.att?.kind === "voice" ||
+    (player?.att?.original_filename || "").toLowerCase().startsWith("voice_");
+  const title =
+    player.title ||
+    player.att?.original_filename ||
+    (isVoice ? "Voice message" : "Audio");
+  const d = duration || 0;
+  const progress = d > 0 ? Math.min(1, currentTime / d) : 0;
+  const canSeek = d > 0 && isFinite(d);
+  const queueLen = player.queue?.length || 0;
+  const queueIdx = typeof player.queueIndex === "number" ? player.queueIndex : 0;
 
   return (
     <Box
       sx={{
-        position: "absolute",
-        top: 56,
-        left: 0,
-        right: 0,
-        zIndex: 10,
+        flexShrink: 0,
+        width: "100%",
         bgcolor: "background.paper",
         borderBottom: "1px solid",
         borderColor: "divider",
-        px: 1.5,
-        py: 0.75,
-        boxShadow: 1,
+        zIndex: 12,
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={0.75}>
-        {/* Skip back */}
-        <Tooltip title="Back 10s">
-          <span>
-            <IconButton size="small" onClick={() => skip(-10)} disabled={!duration}>
-              <Replay10Icon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-
-        {/* Play/pause — prominent */}
-        <Tooltip title={isPlaying ? "Pause" : "Play"}>
-          <IconButton
-            onClick={togglePlay}
-            color="primary"
-            size="small"
-            sx={{
-              bgcolor: alpha("#1976d2", 0.15),
-              width: 36, height: 36,
-              "&:hover": { bgcolor: alpha("#1976d2", 0.28) },
-            }}
-          >
-            {isPlaying ? <PauseIcon /> : <PlayArrowIcon />}
-          </IconButton>
-        </Tooltip>
-
-        {/* Stop — reset to 0 */}
-        <Tooltip title="Stop">
-          <span>
-            <IconButton size="small" onClick={stopAll} disabled={!duration && !isPlaying}>
-              <StopIcon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-
-        {/* Skip forward */}
-        <Tooltip title="Forward 10s">
-          <span>
-            <IconButton size="small" onClick={() => skip(10)} disabled={!duration}>
-              <Forward10Icon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-
-        {/* Icon + title */}
-        {isVoice
-          ? <GraphicEqIcon color="action" fontSize="small" />
-          : <MusicNoteIcon color="action" fontSize="small" />}
-        <Typography variant="caption" noWrap sx={{ maxWidth: 140, fontWeight: 600 }}>
-          {title}
-        </Typography>
-
-        {/* Waveform — wavesurfer mounts into this div */}
+      {/* Blue scrub bar on top */}
+      <Box
+        onPointerDown={canSeek ? onSeekStart : undefined}
+        sx={{
+          position: "relative",
+          height: 2,
+          width: "100%",
+          bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)"),
+          cursor: canSeek ? "pointer" : "default",
+          touchAction: "none",
+        }}
+      >
         <Box
           sx={{
-            flex: 1,
-            minWidth: 80,
-            display: "flex",
-            alignItems: "center",
-            minHeight: 32,
-            position: "relative",
-            cursor: "pointer",
-            // Tame the wavesurfer canvas so it fits our bar height
-            "& div": { width: "100% !important" },
+            position: "absolute",
+            left: 0, top: 0, bottom: 0,
+            width: `${progress * 100}%`,
+            bgcolor: "primary.main",
+            transition: scrubbingRef.current ? "none" : "width 0.08s linear",
+          }}
+        />
+      </Box>
+
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.5}
+        sx={{ px: { xs: 0.5, sm: 0.75 }, py: 0.2, minHeight: 34 }}
+      >
+        <IconButton size="small" onClick={playPrev} sx={{ display: { xs: "none", sm: "inline-flex" }, p: 0.5 }}>
+          <SkipPreviousRoundedIcon fontSize="small" />
+        </IconButton>
+
+        <IconButton
+          onClick={togglePlay}
+          size="small"
+          sx={{
+            width: 28, height: 28,
+            bgcolor: "primary.main",
+            color: "#fff",
+            "&:hover": { bgcolor: "primary.dark" },
           }}
         >
-          <div ref={containerRef} style={{ width: "100%" }} />
-          {loadingWave && (
-            <Typography variant="caption" color="text.secondary" sx={{ position: "absolute", left: 8 }}>
-              Loading…
-            </Typography>
-          )}
+          {isPlaying
+            ? <PauseRoundedIcon sx={{ fontSize: 16 }} />
+            : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />}
+        </IconButton>
+
+        <IconButton
+          size="small"
+          onClick={playNext}
+          disabled={!queueLen || queueIdx >= queueLen - 1}
+          sx={{ display: { xs: "none", sm: "inline-flex" }, p: 0.5 }}
+        >
+          <SkipNextRoundedIcon fontSize="small" />
+        </IconButton>
+
+        <Box
+          sx={{
+            width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+            display: { xs: "none", sm: "flex" },
+            alignItems: "center", justifyContent: "center",
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
+            color: "primary.main",
+          }}
+        >
+          {isVoice ? <MicRoundedIcon sx={{ fontSize: 12 }} /> : <MusicNoteRoundedIcon sx={{ fontSize: 12 }} />}
         </Box>
 
-        {/* Time */}
-        <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: "tabular-nums", minWidth: 80, textAlign: "right" }}>
-          {formatDuration(currentTime)} / {formatDuration(duration)}
-        </Typography>
-
-        {/* Speed */}
-        <FormControl size="small" sx={{ minWidth: 56 }}>
-          <Select
-            value={speed}
-            onChange={(e) => setSpeed(parseFloat(e.target.value))}
-            sx={{ height: 28, "& .MuiSelect-select": { py: 0.3, px: 1, fontSize: 12 } }}
-            renderValue={(v) => `${v}×`}
-          >
-            {SPEEDS.map((s) => (
-              <MenuItem key={s} value={s} dense>{`${s}× speed`}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        {/* Volume */}
-        <Box sx={{ display: "flex", alignItems: "center", maxWidth: 100 }}>
-          <IconButton size="small" onClick={() => setMuted((m) => !m)}>
-            {muted || volume === 0 ? <VolumeOffIcon fontSize="small" /> : <VolumeUpIcon fontSize="small" />}
-          </IconButton>
-          <Box
-            sx={{
-              width: 50, ml: 0.5,
-              "& input[type=range]": {
-                width: "100%", height: 4, WebkitAppearance: "none", appearance: "none",
-                bgcolor: "action.hover", borderRadius: 2, outline: "none",
-              },
-              "& input[type=range]::-webkit-slider-thumb": {
-                WebkitAppearance: "none", appearance: "none",
-                width: 10, height: 10, borderRadius: "50%", bgcolor: "primary.main", cursor: "pointer",
-              },
-              "& input[type=range]::-moz-range-thumb": {
-                width: 10, height: 10, borderRadius: "50%", bgcolor: "primary.main", border: "none", cursor: "pointer",
-              },
-            }}
-          >
-            <input
-              type="range"
-              min={0} max={1} step={0.05}
-              value={muted ? 0 : volume}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                setVolume(v);
-                setMuted(v === 0);
-              }}
-            />
-          </Box>
+        <Box
+          sx={{ flex: 1, minWidth: 0, cursor: player.conversationId ? "pointer" : "default" }}
+          onClick={goToMessage}
+        >
+          <Typography noWrap sx={{ fontWeight: 600, fontSize: 12, lineHeight: 1.2 }}>
+            {loading ? "Loading…" : (errorMsg || title)}
+          </Typography>
+          <Typography noWrap sx={{ fontSize: 10, color: "text.secondary", fontVariantNumeric: "tabular-nums", lineHeight: 1.2 }}>
+            {formatDuration(currentTime)} / {formatDuration(d)}
+            {queueLen > 1 ? ` · ${queueIdx + 1}/${queueLen}` : ""}
+          </Typography>
         </Box>
 
-        {/* Loop */}
-        <Tooltip title={loop ? "Loop on" : "Loop off"}>
-          <IconButton size="small" onClick={() => setLoop((l) => !l)} color={loop ? "primary" : "default"}>
-            <LoopIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-
-        {/* Download */}
-        <Tooltip title="Download">
-          <IconButton size="small" onClick={onDownload}>
-            <DownloadIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-
-        {/* Close */}
-        <IconButton onClick={onClosePlayer} size="small" title="Stop & close">
-          <CloseIcon fontSize="small" />
+        <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ p: 0.5 }}>
+          <MoreHorizRoundedIcon fontSize="small" />
+        </IconButton>
+        <IconButton size="small" onClick={onClosePlayer} sx={{ p: 0.5 }}>
+          <CloseRoundedIcon fontSize="small" />
         </IconButton>
       </Stack>
-      {errorMsg && (
-        <Typography variant="caption" color="error" sx={{ display: "block", mt: 0.25, pl: 1 }}>
-          {errorMsg}
-        </Typography>
-      )}
+
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        <MenuItem onClick={goToMessage} disabled={!player.conversationId}>
+          <ListItemIcon><ChatRoundedIcon fontSize="small" /></ListItemIcon>
+          Show in chat
+        </MenuItem>
+        <MenuItem onClick={() => { onDownload(); setMenuAnchor(null); }}>
+          <ListItemIcon><DownloadRoundedIcon fontSize="small" /></ListItemIcon>
+          Download
+        </MenuItem>
+        <MenuItem onClick={() => setContinuous((v) => !v)}>
+          <ListItemIcon><QueueMusicRoundedIcon fontSize="small" /></ListItemIcon>
+          Play all continuously
+          <Switch size="small" checked={continuous} sx={{ ml: 1 }} />
+        </MenuItem>
+        <MenuItem onClick={() => setLoopOne((v) => !v)}>
+          <ListItemIcon><RepeatRoundedIcon fontSize="small" /></ListItemIcon>
+          Loop track
+          <Switch size="small" checked={loopOne} sx={{ ml: 1 }} />
+        </MenuItem>
+        {SPEEDS.map((s) => (
+          <MenuItem key={s} selected={speed === s} onClick={() => { setSpeed(s); setMenuAnchor(null); }}>
+            Speed {s}×
+          </MenuItem>
+        ))}
+      </Menu>
     </Box>
   );
 }

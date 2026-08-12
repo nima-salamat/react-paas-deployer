@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import {
-  Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem,
+  Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem, Dialog,
   alpha, Slider,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -23,7 +23,6 @@ import {
   attachmentKind, formatTime, formatDuration, withTokenQuery, REACTIONS,
   parseMentions, isVoiceAttachment, isVideoMessageAttachment,
 } from "../messengerUtils";
-import VideoPlayer from "./VideoPlayer";
 
 /**
  * Deterministic pseudo-waveform — given an id, produce N peaks in [0..1].
@@ -80,20 +79,53 @@ function InlineAudioPlayer({
   const progress = dur > 0 ? Math.min(1, cur / dur) : 0;
   const playing = active && isPlaying;
 
-  // Use the waveform bars as a seekable progress surface
-  const onWaveClick = (e) => {
-    if (!active || !dur) {
-      onPlay?.(att);
+  // Seek helpers — work while playing OR paused (and when first loading)
+  const ratioFromEvent = (e, el) => {
+    const rect = el.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0]?.clientX : e.clientX;
+    if (clientX == null || rect.width <= 0) return 0;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  };
+
+  const applySeek = (ratio) => {
+    if (active) {
+      onSeek?.(att, ratio);
       return;
     }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    onSeek?.(att, ratio);
+    // Not loaded yet: load this track, then seek (leave paused if user only scrubbed
+    // — AudioPlayerBar autoPlay from onPlay will start; ratio is applied after load)
+    onPlay?.(att);
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("messenger:audio-seek", { detail: { ratio } }));
+    }, 180);
+  };
+
+  const onWavePointerDown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const el = e.currentTarget;
+    const ratio = ratioFromEvent(e, el);
+    applySeek(ratio);
+    const move = (ev) => {
+      applySeek(ratioFromEvent(ev, el));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("touchmove", move, { passive: false });
+    window.addEventListener("touchend", up);
   };
 
   const accent = mine ? "#ffffff" : theme.palette.primary.main;
   const trackBg = mine ? "rgba(255,255,255,0.25)" : alpha(theme.palette.primary.main, 0.18);
   const playedBg = mine ? "rgba(255,255,255,0.95)" : theme.palette.primary.main;
+
+  const isVoice = variant === "voice";
 
   return (
     <Stack
@@ -102,40 +134,59 @@ function InlineAudioPlayer({
       spacing={1}
       onClick={(e) => { e.stopPropagation(); }}
       sx={{
-        bgcolor: mine ? "rgba(0,0,0,0.18)" : "action.hover",
-        borderRadius: 3,
-        px: 1, py: 0.75,
-        minWidth: variant === "voice" ? 220 : 240,
-        maxWidth: 300,
-        "&:hover": { bgcolor: mine ? "rgba(0,0,0,0.25)" : "action.selected" },
+        bgcolor: mine
+          ? (playing ? "rgba(0,0,0,0.28)" : "rgba(0,0,0,0.16)")
+          : (playing ? "action.selected" : "action.hover"),
+        borderRadius: 3.5,
+        px: 1, py: 0.85,
+        minWidth: isVoice ? 230 : 250,
+        maxWidth: 320,
+        border: "1px solid",
+        borderColor: mine ? "rgba(255,255,255,0.08)" : "divider",
+        transition: "background-color 0.2s",
+        "&:hover": {
+          bgcolor: mine ? "rgba(0,0,0,0.28)" : "action.selected",
+        },
       }}
     >
       {/* Play / Pause */}
       <IconButton
         size="small"
-        onClick={() => (active ? onToggle?.(att) : onPlay?.(att))}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (active) onToggle?.(att);
+          else onPlay?.(att);
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
         sx={{
           bgcolor: accent,
           color: mine ? theme.palette.primary.main : "#fff",
-          width: 32, height: 32,
-          "&:hover": { bgcolor: accent, opacity: 0.85 },
+          width: 38, height: 38,
+          flexShrink: 0,
+          boxShadow: playing ? `0 0 0 3px ${alpha(accent, 0.35)}` : "none",
+          "&:hover": { bgcolor: accent, opacity: 0.9 },
+          zIndex: 2,
         }}
       >
         {playing ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
       </IconButton>
 
-      {/* Waveform with progress overlay */}
+      {/* Waveform — scrubbable while paused or playing */}
       <Box
-        onClick={onWaveClick}
+        onPointerDown={onWavePointerDown}
         sx={{
           flex: 1,
-          minWidth: 80,
-          height: 28,
+          minWidth: 90,
+          height: 30,
           position: "relative",
           cursor: "pointer",
           display: "flex",
           alignItems: "center",
-          gap: "1px",
+          gap: "1.5px",
+          touchAction: "none",
+          userSelect: "none",
         }}
       >
         {peaks.map((p, i) => {
@@ -145,29 +196,38 @@ function InlineAudioPlayer({
               key={i}
               sx={{
                 flex: 1,
-                height: `${Math.max(15, Math.min(100, p * 100))}%`,
+                height: `${Math.max(18, Math.min(100, p * 100))}%`,
                 bgcolor: filled ? playedBg : trackBg,
-                borderRadius: 0.5,
-                transition: "background-color 0.15s",
+                borderRadius: 1,
+                transition: "background-color 0.12s",
+                opacity: filled ? 1 : 0.75,
               }}
             />
           );
         })}
       </Box>
 
-      {/* Time / duration */}
-      <Typography
-        variant="caption"
-        sx={{
-          fontVariantNumeric: "tabular-nums",
-          minWidth: 38,
-          fontSize: 11,
-          opacity: 0.85,
-          color: mine ? "inherit" : "text.secondary",
-        }}
-      >
-        {active && cur > 0 ? formatDuration(cur) : (dur ? formatDuration(dur) : "0:00")}
-      </Typography>
+      {/* Time + type hint */}
+      <Stack alignItems="flex-end" spacing={0} sx={{ flexShrink: 0, minWidth: 40 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            fontVariantNumeric: "tabular-nums",
+            fontSize: 11,
+            fontWeight: 600,
+            opacity: 0.9,
+            color: mine ? "inherit" : "text.secondary",
+            lineHeight: 1.2,
+          }}
+        >
+          {active && cur > 0 ? formatDuration(cur) : (dur ? formatDuration(dur) : "0:00")}
+        </Typography>
+        {isVoice ? (
+          <GraphicEqIcon sx={{ fontSize: 12, opacity: 0.55, color: mine ? "inherit" : "text.secondary" }} />
+        ) : (
+          <MusicNoteIcon sx={{ fontSize: 12, opacity: 0.55, color: mine ? "inherit" : "text.secondary" }} />
+        )}
+      </Stack>
     </Stack>
   );
 }
@@ -176,6 +236,174 @@ function InlineAudioPlayer({
  * Single message bubble with attachments, reactions, read-receipt ticks,
  * @mention parsing, voice/video message rendering, and clickable reply preview.
  */
+
+
+
+/**
+ * In-bubble video:
+ *  - circular video messages: small circle + local play; click opens fullscreen gallery via onOpen
+ *  - rectangular: thumbnail with play overlay; click opens fullscreen gallery (Telegram-style)
+ */
+function ChatVideo({ src, filename, contentType, circular = false, attachment, onOpen }) {
+  const videoRef = React.useRef(null);
+  const [playing, setPlaying] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const safeSrc = React.useMemo(() => withTokenQuery(src), [src]);
+
+  React.useEffect(() => {
+    setError("");
+    setPlaying(false);
+  }, [safeSrc]);
+
+  const openFull = (e) => {
+    e?.stopPropagation?.();
+    if (onOpen && attachment) {
+      onOpen(attachment);
+      return;
+    }
+    if (onOpen && src) {
+      onOpen({ url: src, original_filename: filename, kind: "video", content_type: contentType });
+    }
+  };
+
+  const toggleLocal = (e) => {
+    e?.stopPropagation?.();
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => setError("Playback blocked"));
+    } else {
+      v.pause();
+    }
+  };
+
+  if (!safeSrc) {
+    return (
+      <Box sx={{
+        width: circular ? 220 : "100%", height: circular ? 220 : 180, maxWidth: 360,
+        bgcolor: "action.hover", borderRadius: circular ? "50%" : 2,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <Typography variant="caption" color="text.secondary">No video</Typography>
+      </Box>
+    );
+  }
+
+  if (circular) {
+    return (
+      <Box
+        sx={{
+          width: 220, height: 220, position: "relative", display: "inline-block",
+          borderRadius: "50%", overflow: "hidden", bgcolor: "#000", cursor: "pointer",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.4), 0 0 0 4px rgba(0,0,0,0.55)",
+        }}
+        onClick={openFull}
+      >
+        <video
+          ref={videoRef}
+          src={safeSrc}
+          playsInline
+          preload="metadata"
+          muted={false}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+          onError={() => setError("Could not load video")}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", background: "#000" }}
+        />
+        <Box
+          onClick={(e) => { e.stopPropagation(); openFull(e); }}
+          sx={{
+            position: "absolute", inset: 0, display: "flex", alignItems: "center",
+            justifyContent: "center", bgcolor: "rgba(0,0,0,0.22)",
+            "&:hover": { bgcolor: "rgba(0,0,0,0.38)" },
+          }}
+        >
+          <Box sx={{
+            width: 52, height: 52, borderRadius: "50%", bgcolor: "rgba(0,0,0,0.55)",
+            display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+            border: "2px solid rgba(255,255,255,0.35)",
+          }}>
+            <PlayArrowIcon sx={{ fontSize: 28, ml: 0.5 }} />
+          </Box>
+        </Box>
+        {error && (
+          <Typography variant="caption" sx={{
+            position: "absolute", bottom: 8, left: 8, right: 8, color: "#fff",
+            textAlign: "center", fontSize: 11, bgcolor: "rgba(180,30,30,0.85)", borderRadius: 1, px: 0.5,
+          }}>
+            {error}
+          </Typography>
+        )}
+      </Box>
+    );
+  }
+
+  // Rectangular — preview tile; click opens full-screen gallery
+  return (
+    <Box
+      onClick={openFull}
+      sx={{
+        position: "relative",
+        maxWidth: 360,
+        width: "100%",
+        borderRadius: 2,
+        overflow: "hidden",
+        bgcolor: "#000",
+        cursor: "pointer",
+        aspectRatio: "16 / 10",
+        maxHeight: 280,
+        "&:hover .playOverlay": { bgcolor: "rgba(0,0,0,0.4)" },
+      }}
+    >
+      <video
+        ref={videoRef}
+        src={safeSrc}
+        playsInline
+        preload="metadata"
+        muted
+        onError={() => setError("Could not load video")}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: "block",
+          background: "#000",
+          pointerEvents: "none",
+        }}
+      />
+      <Box
+        className="playOverlay"
+        sx={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          bgcolor: "rgba(0,0,0,0.25)",
+          transition: "background-color 0.2s",
+        }}
+      >
+        <Box sx={{
+          width: 56, height: 56, borderRadius: "50%",
+          bgcolor: "rgba(0,0,0,0.55)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          color: "#fff",
+          border: "2px solid rgba(255,255,255,0.4)",
+        }}>
+          <PlayArrowIcon sx={{ fontSize: 32, ml: 0.5 }} />
+        </Box>
+      </Box>
+      {error && (
+        <Typography variant="caption" sx={{
+          position: "absolute", bottom: 8, left: 8, right: 8, color: "#fff",
+          textAlign: "center", bgcolor: "rgba(180,30,30,0.85)", borderRadius: 1, px: 0.5, py: 0.5,
+        }}>
+          {error}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 export default function MessageBubble({
   m, meId, activeConv,
   onContextOpen, onReact, onReactAnchor, onReply,
@@ -370,39 +598,28 @@ export default function MessageBubble({
                     display: "block", cursor: "pointer",
                   }}
                 />
-              ) : videoMsg ? (
-                /* Circular video message — VideoPlayer handles its own
-                   circular styling + theater mode. The black ring around
-                   the circle is part of the player's design. */
-                <VideoPlayer src={url} filename={a.original_filename} contentType={a.content_type} circular />
-              ) : k === "video" ? (
-                <VideoPlayer src={url} filename={a.original_filename} contentType={a.content_type} maxWidth={360} maxHeight={360} />
-              ) : voice ? (
-                <Stack spacing={0.5}>
-                  <InlineAudioPlayer
-                    att={a}
-                    mine={mine}
-                    active={isActiveAudio}
-                    isPlaying={audioIsPlaying}
-                    currentTime={audioCurrentTime}
-                    duration={audioDuration}
-                    onPlay={onPlayAudio}
-                    onToggle={onToggleAudio}
-                    onSeek={onSeekAudio}
-                    variant="voice"
-                  />
-                  <Box component="audio" src={url} controls preload="metadata" crossOrigin="anonymous"
-                    sx={{ width: "100%", maxWidth: 300, height: 34, display: "block" }} />
-                </Stack>
-              ) : k === "audio" ? (
-                /* Regular audio file — inline player (music-style) */
+              ) : videoMsg || k === "video" ? (
+                <ChatVideo
+                  src={a.url}
+                  filename={a.original_filename}
+                  contentType={a.content_type}
+                  circular={!!videoMsg}
+                  attachment={a}
+                  onOpen={onOpenPreview}
+                />
+              ) : voice || k === "audio" ? (
+                /* Single Telegram-style player for voice + music.
+                   Inline bubble controls drive the global top AudioPlayerBar.
+                   Native <audio controls> removed — it caused dual players. */
                 <Stack direction="column" spacing={0.5} sx={{ mt: 0.25 }}>
-                  <Stack direction="row" alignItems="center" spacing={0.75}>
-                    <MusicNoteIcon fontSize="small" sx={{ opacity: 0.85 }} />
-                    <Typography variant="caption" noWrap sx={{ opacity: 0.9, maxWidth: 220 }}>
-                      {a.original_filename || "Audio"}
-                    </Typography>
-                  </Stack>
+                  {!voice && (
+                    <Stack direction="row" alignItems="center" spacing={0.75}>
+                      <MusicNoteIcon fontSize="small" sx={{ opacity: 0.85 }} />
+                      <Typography variant="caption" noWrap sx={{ opacity: 0.9, maxWidth: 220 }}>
+                        {a.original_filename || "Audio"}
+                      </Typography>
+                    </Stack>
+                  )}
                   <InlineAudioPlayer
                     att={a}
                     mine={mine}
@@ -413,10 +630,8 @@ export default function MessageBubble({
                     onPlay={onPlayAudio}
                     onToggle={onToggleAudio}
                     onSeek={onSeekAudio}
-                    variant="audio"
+                    variant={voice ? "voice" : "audio"}
                   />
-                  <Box component="audio" src={url} controls preload="metadata" crossOrigin="anonymous"
-                    sx={{ width: "100%", maxWidth: 300, height: 34, display: "block" }} />
                 </Stack>
               ) : (
                 <Chip

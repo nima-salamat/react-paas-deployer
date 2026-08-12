@@ -27,6 +27,7 @@ import {
 } from "../messengerUtils";
 import ContextMenu from "./ContextMenu";
 import OnlineDot from "./OnlineDot";
+import AudioPlayerBar from "./AudioPlayerBar";
 
 /**
  * Sidebar — chat list, tabs (Chats / Public groups), user search,
@@ -66,6 +67,8 @@ export default function Sidebar({
   onOpenCreateGroup, onOpenJoin, onOpenSettings, onNavigateHome,
   onOpenMyRequests,
   onlineUsers,
+  audioPlayer, onAudioPlayerChange, onAudioStateChange, onGoToAudioTrack,
+  showAudioPlayer = false,
 }) {
   const [ctx, setCtx] = useState(null); // { x, y, conv, peer, role }
   const [publicSearchQ, setPublicSearchQ] = useState("");
@@ -120,6 +123,16 @@ export default function Sidebar({
           <HomeOutlinedIcon fontSize="small" />
         </IconButton>
       </Stack>
+
+      {/* Mini-player above search — mobile chat-list only */}
+      {showAudioPlayer && (
+        <AudioPlayerBar
+          player={audioPlayer}
+          onChange={onAudioPlayerChange}
+          onStateChange={onAudioStateChange}
+          onGoToTrack={onGoToAudioTrack}
+        />
+      )}
 
       <Box sx={{ px: 1.25, pb: 1 }}>
         <TextField

@@ -133,10 +133,43 @@ export function attachmentKind(a) {
   const kind = (a?.kind || "").toLowerCase();
   const ct = (a?.content_type || "").toLowerCase();
   const name = (a?.original_filename || "").toLowerCase();
-  if (kind === "image" || kind === "gif" || ct.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/.test(name)) return "image";
-  if (kind === "video" || ct.startsWith("video/") || /\.(mp4|webm|mov|mkv)$/.test(name)) return "video";
-  // Voice and audio both render in the audio player; UI can distinguish via `kind === "voice"`
-  if (kind === "audio" || kind === "voice" || ct.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|opus|webm)$/.test(name)) return "audio";
+
+  // Images first
+  if (kind === "image" || kind === "gif" || ct.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp)$/.test(name)) {
+    return "image";
+  }
+
+  // Voice MUST be checked before .webm video extension — MediaRecorder voice
+  // messages are typically audio/webm named voice_*.webm. Treating them as
+  // video produced empty black VideoPlayer bubbles.
+  if (
+    kind === "voice" ||
+    name.startsWith("voice_") ||
+    ct === "audio/webm" ||
+    ct === "audio/ogg" ||
+    ct === "audio/opus"
+  ) {
+    return "audio";
+  }
+
+  // Explicit audio kinds / extensions (music files)
+  if (
+    kind === "audio" ||
+    ct.startsWith("audio/") ||
+    /\.(mp3|wav|ogg|m4a|aac|opus)$/.test(name)
+  ) {
+    return "audio";
+  }
+
+  // Video (including circular video messages: video_message_*.webm)
+  if (
+    kind === "video" ||
+    ct.startsWith("video/") ||
+    /\.(mp4|webm|mov|mkv)$/.test(name)
+  ) {
+    return "video";
+  }
+
   if (ct === "application/pdf" || name.endsWith(".pdf")) return "pdf";
   if (ct.startsWith("text/") || /\.(txt|md|csv|log|json)$/.test(name)) return "text";
   return "file";

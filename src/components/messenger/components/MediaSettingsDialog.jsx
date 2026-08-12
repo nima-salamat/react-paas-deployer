@@ -183,19 +183,36 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
       if (!Ctx) return;
       const ctx = new Ctx();
       audioContextRef.current = ctx;
+      // Browsers often start AudioContext suspended until a user gesture
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
+      // Time-domain RMS is far more sensitive to speech volume than averaging
+      // the full frequency spectrum (which dilutes energy across empty bins).
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.3;
       source.connect(analyser);
       analyserRef.current = analyser;
-      const data = new Uint8Array(analyser.frequencyBinCount);
+      const data = new Uint8Array(analyser.fftSize);
+      // Peak-hold so short loud spikes remain visible briefly
+      let peakHold = 0;
       const tick = () => {
         if (!analyserRef.current) return;
-        analyser.getByteFrequencyData(data);
-        let sum = 0;
-        for (let i = 0; i < data.length; i++) sum += data[i];
-        const avg = sum / data.length / 255;
-        setMicLevel(avg);
+        analyser.getByteTimeDomainData(data);
+        // RMS of centered samples (128 = silence)
+        let sumSq = 0;
+        for (let i = 0; i < data.length; i++) {
+          const v = (data[i] - 128) / 128; // -1..1
+          sumSq += v * v;
+        }
+        const rms = Math.sqrt(sumSq / data.length);
+        // Boost sensitivity: quiet speech ~0.02–0.08, loud ~0.2–0.5
+        // Map with a power curve so normal talking fills ~40–70% of the bar
+        const boosted = Math.min(1, Math.pow(rms * 4.5, 0.65));
+        peakHold = Math.max(boosted, peakHold * 0.92);
+        setMicLevel(peakHold);
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();
@@ -340,21 +357,29 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
                 )}
               </Select>
             </FormControl>
-            {/* Mic level meter */}
+            {/* Mic level meter — micLevel is already 0..1 after sensitivity boost */}
             <Box sx={{
-              width: "100%", height: 8, bgcolor: "action.hover", borderRadius: 4,
+              width: "100%", height: 12, bgcolor: "action.hover", borderRadius: 4,
               overflow: "hidden", position: "relative",
             }}>
               <Box sx={{
                 position: "absolute", left: 0, top: 0, bottom: 0,
-                width: `${Math.min(100, micLevel * 200)}%`,
-                bgcolor: micLevel > 0.5 ? "error.main" : micLevel > 0.2 ? "warning.main" : "success.main",
-                transition: "width 0.05s linear",
+                width: `${Math.min(100, Math.round(micLevel * 100))}%`,
+                bgcolor: micLevel > 0.85
+                  ? "error.main"
+                  : micLevel > 0.55
+                    ? "warning.main"
+                    : "success.main",
+                transition: "width 0.04s linear",
               }} />
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
               {testingMic
-                ? "Speak into your mic to see the level"
+                ? (micLevel < 0.05
+                    ? "Speak into your mic — bar should move with your voice"
+                    : micLevel > 0.85
+                      ? "Very loud — good, mic is picking you up"
+                      : "Mic is working")
                 : "Mic preview will start when a mic is selected"}
             </Typography>
           </Box>

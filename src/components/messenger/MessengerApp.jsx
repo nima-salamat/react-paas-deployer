@@ -52,7 +52,7 @@ import apiRequest, { refreshAccessToken } from "../customHooks/apiRequest.jsx";
 import { MSG_API, WS_URL, unwrapData, unwrapList, authHeaders } from "./api";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
-  copyText, parseHash, setHash, attachmentKind, withTokenQuery, REACTIONS, PAGE_SIZE,
+  copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE,
 } from "./messengerUtils";
 import Sidebar from "./components/Sidebar";
 import MessageBubble, { MessageContextMenuItems } from "./components/MessageBubble";
@@ -92,6 +92,7 @@ export default function MessengerApp() {
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
 
   // Composer state
   const [text, setText] = useState("");
@@ -196,6 +197,51 @@ export default function MessengerApp() {
   const onSeekAudio = useCallback((_att, ratio) => {
     window.dispatchEvent(new CustomEvent("messenger:audio-seek", { detail: { ratio } }));
   }, []);
+
+  /** Build playable queue of voice/music from current messages (chronological). */
+  const buildAudioQueue = useCallback((fromAttId) => {
+    const list = [];
+    for (const m of messages || []) {
+      if (m?.type === "day" || m?.is_deleted) continue;
+      for (const a of m.attachments || []) {
+        const k = attachmentKind(a);
+        const voice = isVoiceAttachment(a);
+        if (k === "audio" || voice) {
+          list.push({
+            att: a,
+            title: a.original_filename || (voice ? "Voice message" : "Audio"),
+            conversationId: activeId,
+            messageId: m.id,
+          });
+        }
+      }
+    }
+    let queueIndex = list.findIndex((x) => String(x.att?.id) === String(fromAttId));
+    if (queueIndex < 0) queueIndex = 0;
+    return { queue: list, queueIndex };
+  }, [messages, activeId]);
+
+  const playAudioFromMessage = useCallback((att, message) => {
+    setAudioPlayer((prev) => {
+      if (prev && String(prev.att?.id) === String(att?.id)) {
+        window.dispatchEvent(new CustomEvent("messenger:audio-toggle"));
+        return prev;
+      }
+      const { queue, queueIndex } = buildAudioQueue(att?.id);
+      const item = queue[queueIndex] || {
+        att,
+        title: att.original_filename || "Audio",
+        conversationId: activeId,
+        messageId: message?.id,
+      };
+      return {
+        ...item,
+        autoPlay: true,
+        queue: queue.length ? queue : [item],
+        queueIndex: queue.length ? queueIndex : 0,
+      };
+    });
+  }, [buildAudioQueue, activeId]);
 
   // Media gallery dialog
   const [galleryState, setGalleryState] = useState(null); // { startAttachment }
@@ -320,9 +366,39 @@ export default function MessengerApp() {
       const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const items = data?.results || [];
-      setMessages(items);
-      setHasMoreMsgs(Boolean(data?.has_more));
-      setNextBefore(data?.next_before_id || (items.length ? items[0].id : null));
+
+      // IMPORTANT:
+      // - Full open/refresh (silent=false): replace list with latest page.
+      // - Background refresh (silent=true, e.g. WS events): MERGE into the
+      //   existing list so older messages the user already loaded by scrolling
+      //   up are NOT dropped when they scroll back down.
+      if (silent) {
+        setMessages((prev) => {
+          if (!prev.length) return items;
+          const map = new Map();
+          for (const m of prev) {
+            if (m?.id != null) map.set(String(m.id), m);
+          }
+          for (const m of items) {
+            if (m?.id == null) continue;
+            const key = String(m.id);
+            map.set(key, { ...(map.get(key) || {}), ...m });
+          }
+          return Array.from(map.values()).sort((a, b) => {
+            const ta = new Date(a.created_at || 0).getTime();
+            const tb = new Date(b.created_at || 0).getTime();
+            if (ta !== tb) return ta - tb;
+            return Number(a.id) - Number(b.id);
+          });
+        });
+        // Do NOT reset hasMoreMsgs / nextBefore — user may already have
+        // older pages loaded via loadOlder.
+      } else {
+        setMessages(items);
+        setHasMoreMsgs(Boolean(data?.has_more));
+        setNextBefore(data?.next_before_id || (items.length ? items[0].id : null));
+      }
+
       try {
         wsRef.current?.send(JSON.stringify({ type: "subscribe", conversation_id: Number(cid) }));
       } catch { /* */ }
@@ -338,7 +414,8 @@ export default function MessengerApp() {
   }, []);
 
   const loadOlder = useCallback(async () => {
-    if (!activeIdRef.current || !hasMoreMsgs || loadingMore || !nextBefore) return;
+    if (!activeIdRef.current || !hasMoreMsgs || loadingMoreRef.current || !nextBefore) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
     const el = listRef.current;
     const prevH = el?.scrollHeight || 0;
@@ -356,17 +433,19 @@ export default function MessengerApp() {
         return;
       }
       setMessages((prev) => {
-        const ids = new Set(prev.map((m) => m.id));
-        const merged = [...older.filter((m) => !ids.has(m.id)), ...prev];
-        return merged;
+        const ids = new Set(prev.map((m) => String(m.id)));
+        const uniqueOlder = older.filter((m) => m?.id != null && !ids.has(String(m.id)));
+        // Prepend older messages — never drop existing ones
+        return [...uniqueOlder, ...prev];
       });
       setHasMoreMsgs(Boolean(data?.has_more));
       setNextBefore(data?.next_before_id || older[0]?.id || null);
+      // Keep viewport stable after prepending older messages (smooth, no jump)
       requestAnimationFrame(() => {
-        if (el) {
-          const diff = el.scrollHeight - prevH;
-          el.scrollTop = prevTop + diff;
-        }
+        if (!el) return;
+        const diff = el.scrollHeight - prevH;
+        // Instant correct position (avoids visible jump to top), then optional soft settle
+        el.scrollTop = prevTop + diff;
       });
     } catch { /* */ } finally {
       setLoadingMore(false);
@@ -527,7 +606,8 @@ export default function MessengerApp() {
         loadConversations({ silent: true });
         if (activeIdRef.current) {
           loadConversationDetail(activeIdRef.current);
-          loadMessages(activeIdRef.current, { silent: true });
+          // Do not reload messages on profile updates — that used to wipe
+          // older pages the user had already scrolled in.
         }
         if (profileDataRef.current?.id && String(profileDataRef.current.id) === String(data.user_id)) {
           refreshProfileData(profileDataRef.current.id);
@@ -1338,8 +1418,7 @@ export default function MessengerApp() {
       return;
     }
     if (k === "audio") {
-      // Hand off to top player bar
-      setAudioPlayer({ att, title: att.original_filename || "Audio" });
+      playAudioFromMessage(att, null);
       return;
     }
     if (k === "text") {
@@ -1368,6 +1447,18 @@ export default function MessengerApp() {
     }
   }, []);
 
+  const goToAudioTrack = useCallback(async ({ conversationId, messageId }) => {
+    if (conversationId && String(conversationId) !== String(activeId)) {
+      const conv = conversations.find((c) => String(c.id) === String(conversationId));
+      if (conv) await openChat(conv);
+    }
+    // wait a tick for messages to render
+    setTimeout(() => {
+      if (messageId) onJumpToMessage(messageId);
+    }, 350);
+  }, [activeId, conversations, openChat, onJumpToMessage]);
+
+
   /* -------------------- derived -------------------- */
 
   const activeConv = activeDetail || conversations.find((c) => c.id === activeId);
@@ -1375,7 +1466,11 @@ export default function MessengerApp() {
   const role = myRole(activeConv, meId);
 
   const onScrollMsgs = (e) => {
-    if (e.target.scrollTop < 100 && hasMoreMsgs && !loadingMore) loadOlder();
+    // Prefetch older messages a bit before the user hits the absolute top
+    // so they rarely sit waiting. Threshold ≈ 280px or 30% of visible height.
+    const el = e.target;
+    const threshold = Math.max(280, (el.clientHeight || 0) * 0.3);
+    if (el.scrollTop < threshold && hasMoreMsgs && !loadingMore) loadOlder();
   };
 
   const messagesWithDays = useMemo(() => {
@@ -1534,6 +1629,14 @@ export default function MessengerApp() {
             </Menu>
           </Stack>
 
+          {/* Mini-player sits UNDER the user header (avatar + username) */}
+          <AudioPlayerBar
+            player={audioPlayer}
+            onChange={setAudioPlayer}
+            onStateChange={onAudioStateChange}
+            onGoToTrack={goToAudioTrack}
+          />
+
           {/* "Add to contacts?" banner — Telegram-style.
               Shows when the active chat is private AND the peer is NOT in the
               current user's contacts. The user can dismiss (X) or accept (Add). */}
@@ -1557,23 +1660,33 @@ export default function MessengerApp() {
             />
           )}
 
-          {/* Top audio player bar (Telegram-style) */}
-          <AudioPlayerBar
-            player={audioPlayer}
-            onChange={setAudioPlayer}
-            onStateChange={onAudioStateChange}
-          />
-
           <Box
             ref={listRef} onScroll={onScrollMsgs}
-            sx={{ flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, py: 1 }}
+            sx={{
+              flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, py: 1,
+              // Soften visual jank when older messages prepend
+              scrollBehavior: "auto",
+              "& > *": { transition: "opacity 0.2s ease" },
+            }}
             onContextMenu={(e) => e.preventDefault()}
           >
             {hasMoreMsgs && (
-              <Box sx={{ textAlign: "center", py: 1 }}>
+              <Box
+                sx={{
+                  textAlign: "center",
+                  py: 1.25,
+                  opacity: loadingMore ? 1 : 0.85,
+                  transition: "opacity 0.25s ease",
+                }}
+              >
                 {loadingMore
-                  ? <CircularProgress size={18} />
-                  : <Button size="small" onClick={loadOlder}>Load older messages</Button>}
+                  ? (
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+                      <CircularProgress size={16} thickness={4} />
+                      <Typography variant="caption" color="text.secondary">Loading earlier messages…</Typography>
+                    </Stack>
+                  )
+                  : <Button size="small" onClick={loadOlder} sx={{ textTransform: "none" }}>Load older messages</Button>}
               </Box>
             )}
             {loadingMsgs && !messages.length && (
@@ -1615,7 +1728,7 @@ export default function MessengerApp() {
                   }}
                   onLoadUserProfile={loadUserProfile}
                   onJumpToMessage={onJumpToMessage}
-                  onPlayAudio={(att) => setAudioPlayer({ att, title: att.original_filename || "Audio", autoPlay: true })}
+                  onPlayAudio={(att) => playAudioFromMessage(att, m)}
                   onToggleAudio={onToggleAudio}
                   onSeekAudio={onSeekAudio}
                   activeAudioId={audioState.attId}
@@ -1730,6 +1843,11 @@ export default function MessengerApp() {
       onOpenMyRequests={() => { loadMyJoinRequests(); pushPanel("my-requests"); }}
       onNavigateHome={() => navigate("/")}
       onlineUsers={onlineUsers}
+      audioPlayer={audioPlayer}
+      onAudioPlayerChange={setAudioPlayer}
+      onAudioStateChange={onAudioStateChange}
+      onGoToAudioTrack={goToAudioTrack}
+      showAudioPlayer={isMobile}
     />
   );
 
@@ -1743,12 +1861,16 @@ export default function MessengerApp() {
 
   return (
     <Box
-      sx={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", bgcolor: "background.default" }}
+      sx={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", flexDirection: "column", bgcolor: "background.default" }}
       onClick={() => { if (ctx) setCtx(null); }}
     >
-      {/* Mobile sidebar */}
+      <Box sx={{ flex: 1, minHeight: 0, display: "flex", position: "relative" }}>
+      {/* Mobile sidebar — player is rendered inside Sidebar above the search bar */}
       {isMobile && (!activeId || !mobileShowChat) && (
-        <Box sx={{ width: "100%", height: "100%", position: "absolute", inset: 0, zIndex: 2, bgcolor: "background.paper" }}>
+        <Box sx={{
+          width: "100%", height: "100%", position: "absolute", inset: 0, zIndex: 2,
+          bgcolor: "background.paper",
+        }}>
           {sidebarEl}
         </Box>
       )}
@@ -1772,6 +1894,8 @@ export default function MessengerApp() {
       }}>
         {chatPane}
       </Box>
+
+      </Box>{/* end main flex row under player */}
 
       {/* Centered settings / panel modal (with back-button navigation) */}
       <Dialog
