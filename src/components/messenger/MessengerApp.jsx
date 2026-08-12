@@ -20,7 +20,7 @@
  *   MediaGalleryDialog      — in-chat image gallery with < > navigation
  */
 import React, {
-  useCallback, useEffect, useMemo, useRef, useState,
+  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -117,6 +117,7 @@ export default function MessengerApp() {
   // Per-conversation message cache — switching chats restores instantly, no flicker
   const messagesCacheRef = useRef(new Map()); // cid -> { messages, hasMore, nextBefore, detail, scroll }
   const pendingScrollRestoreRef = useRef(null);
+  const restoringScrollRef = useRef(false);
   const messagesConvIdRef = useRef(null); // which conversation current messages state belongs to
   const hasMoreMsgsRef = useRef(false);
   const nextBeforeRef = useRef(null);
@@ -125,6 +126,12 @@ export default function MessengerApp() {
   const pendingNewIdsRef = useRef([]); // ids arrived while scrolled up
   const [newBelowCount, setNewBelowCount] = useState(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [scrollDownOpacity, setScrollDownOpacity] = useState(0);
+  const scrollDownFadeTimerRef = useRef(null);
+  const scrollDownDismissedRef = useRef(false);
+  const userScrollIntentRef = useRef(false);
+  // Tracks which conversations have a known scroll position (cache restore / user scroll).
+  const scrollPositionKnownRef = useRef(new Set());
   const [chatFileDrag, setChatFileDrag] = useState(false);
   const chatDragDepthRef = useRef(0);
   // typingUsers: { [userId]: { username, until } } for active chat
@@ -360,25 +367,16 @@ export default function MessengerApp() {
   useEffect(() => { profileDataRef.current = profileData; }, [profileData]);
 
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-  // Keep cache warm whenever live messages change for the active chat
+  // Keep message/data cache warm without sampling scrollTop during React renders.
+  // scrollTop is owned by the scroll handler + explicit chat-switch save/restore.
   useEffect(() => {
     if (!activeId) return;
     if (String(messagesConvIdRef.current) !== String(activeId)) return;
     if (!messages?.length) return;
-    const prev = messagesCacheRef.current.get(String(activeId)) || {};
-    const el = listRef.current;
-    let scrollPatch = {};
-    if (el) {
-      const distBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      scrollPatch = {
-        scrollTop: el.scrollTop,
-        distanceBottom: distBottom,
-        nearBottom: distBottom < 140,
-      };
-    }
-    messagesCacheRef.current.set(String(activeId), {
+    const key = String(activeId);
+    const prev = messagesCacheRef.current.get(key) || {};
+    messagesCacheRef.current.set(key, {
       ...prev,
-      ...scrollPatch,
       messages,
       hasMore: hasMoreMsgs,
       nextBefore,
@@ -386,28 +384,70 @@ export default function MessengerApp() {
     });
   }, [activeId, messages, hasMoreMsgs, nextBefore, activeDetail]);
 
-  // Restore cached scroll position after messages paint (once per switch)
-  useEffect(() => {
+  // Restore a cached viewport only after the message DOM has been painted.
+  // Never guess "top": when there is no saved viewport, the only safe default
+  // is the bottom of the conversation.
+  useLayoutEffect(() => {
     const restore = pendingScrollRestoreRef.current;
-    if (!restore || !activeId || !messages?.length) return;
-    if (!listRef.current) return;
-    const apply = (clear) => {
-      const box = listRef.current;
-      if (!box) return;
-      const r = pendingScrollRestoreRef.current || restore;
+    if (!restore || !activeId || !messages?.length || !listRef.current) return;
+
+    const box = listRef.current;
+    restoringScrollRef.current = true;
+    const apply = () => {
+      if (!listRef.current || String(activeIdRef.current) !== String(activeId)) return;
+      const r = pendingScrollRestoreRef.current;
       if (!r) return;
       if (r.nearBottom) {
-        box.scrollTop = box.scrollHeight;
-      } else if (r.distanceBottom != null) {
+        box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
+      } else if (Number.isFinite(r.distanceBottom)) {
         box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - r.distanceBottom);
-      } else if (r.scrollTop != null) {
-        box.scrollTop = r.scrollTop;
+      } else if (Number.isFinite(r.scrollTop)) {
+        box.scrollTop = Math.max(0, Math.min(r.scrollTop, box.scrollHeight - box.clientHeight));
+      } else {
+        // Unknown position: start where useful, not at the oldest message.
+        box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
       }
-      if (clear) pendingScrollRestoreRef.current = null;
     };
+
+    apply();
     requestAnimationFrame(() => {
-      apply(false);
-      requestAnimationFrame(() => apply(true));
+      apply();
+      pendingScrollRestoreRef.current = null;
+      restoringScrollRef.current = false;
+      const restoredDistance = Math.max(0, box.scrollHeight - box.scrollTop - box.clientHeight);
+      const restoredNearBottom = restoredDistance < 140;
+      nearBottomRef.current = restoredDistance < 120;
+      // Re-enable the jump-to-bottom control based on the actual restored
+      // viewport. Do not leave it hidden merely because the chat was just
+      // opened/restored from cache.
+      const restoredShouldShow = restoredDistance > 180;
+      scrollDownDismissedRef.current = false;
+      userScrollIntentRef.current = false;
+      if (scrollDownFadeTimerRef.current) {
+        clearTimeout(scrollDownFadeTimerRef.current);
+        scrollDownFadeTimerRef.current = null;
+      }
+      if (restoredShouldShow) {
+        setShowScrollDown(true);
+        setScrollDownOpacity(1);
+        // Same idle-fade as live scrolling so the control does not stick forever
+        // after opening a chat that was left mid-history.
+        scrollDownFadeTimerRef.current = setTimeout(() => {
+          setScrollDownOpacity(0);
+          scrollDownFadeTimerRef.current = setTimeout(() => {
+            setShowScrollDown(false);
+            scrollDownFadeTimerRef.current = null;
+          }, 250);
+        }, 1800);
+      } else {
+        setShowScrollDown(false);
+        setScrollDownOpacity(0);
+      }
+      if (restoredNearBottom) {
+        pendingNewIdsRef.current = [];
+        setNewBelowCount(0);
+      }
+      scrollPositionKnownRef.current.add(String(activeId));
     });
   }, [activeId, messages]);
 
@@ -566,10 +606,8 @@ export default function MessengerApp() {
       try {
         wsRef.current?.send(JSON.stringify({ type: "subscribe", conversation_id: Number(cid) }));
       } catch { /* */ }
-      // Viewport-only receipts — see markVisibleMessagesRead()
-      if (!silent && !preserveOlder) {
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "auto" }), 30);
-      }
+      // Viewport-only receipts — see markVisibleMessages().
+      // The initial viewport is restored by the chat-open effect below.
     } catch (e) {
       if (isActive()) setError(e?.response?.data?.message || "Failed to load messages");
     } finally {
@@ -676,14 +714,15 @@ export default function MessengerApp() {
       const el = listRef.current;
       const prevKey = String(activeIdRef.current);
       const prev = messagesCacheRef.current.get(prevKey) || {};
-      if (el) {
-        const distBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-        messagesCacheRef.current.set(prevKey, {
-          ...prev,
-          scrollTop: el.scrollTop,
+      if (el && !restoringScrollRef.current) {
+        const distBottom = Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight);
+        const snapshot = {
+          scrollTop: Math.max(0, el.scrollTop),
           distanceBottom: distBottom,
           nearBottom: distBottom < 140,
-        });
+          savedAt: Date.now(),
+        };
+        messagesCacheRef.current.set(prevKey, { ...prev, ...snapshot });
       }
     }
 
@@ -703,6 +742,13 @@ export default function MessengerApp() {
     seenQueuedRef.current = new Set();
     setSeenMsgIds(new Set());
     setShowScrollDown(false);
+    setScrollDownOpacity(0);
+    scrollDownDismissedRef.current = false;
+    userScrollIntentRef.current = false;
+    if (scrollDownFadeTimerRef.current) {
+      clearTimeout(scrollDownFadeTimerRef.current);
+      scrollDownFadeTimerRef.current = null;
+    }
     setTypingUsers({});
     typingSentRef.current = false;
     if (cached?.messages?.length) {
@@ -714,13 +760,16 @@ export default function MessengerApp() {
       nextBeforeRef.current = cached.nextBefore || null;
       if (cached.detail) setActiveDetail(cached.detail);
       setLoadingMsgs(false);
-      // Queue scroll restore (applied after paint)
+      // Queue a single deterministic viewport restore. Unknown/legacy caches
+      // intentionally fall back to bottom rather than jumping to the top.
       if (!jumpToMessageId) {
         pendingScrollRestoreRef.current = {
-          scrollTop: cached.scrollTop,
-          distanceBottom: cached.distanceBottom,
-          nearBottom: cached.nearBottom,
+          scrollTop: Number.isFinite(cached.scrollTop) ? cached.scrollTop : null,
+          distanceBottom: Number.isFinite(cached.distanceBottom) ? cached.distanceBottom : null,
+          nearBottom: cached.nearBottom === true,
         };
+      } else {
+        pendingScrollRestoreRef.current = null;
       }
     } else {
       messagesConvIdRef.current = null;
@@ -758,25 +807,25 @@ export default function MessengerApp() {
 
     // Background merge refresh when cached; full load when cold
     if (cached?.messages?.length) {
+      const keepAtBottomAfterRefresh = cached.nearBottom === true;
       await Promise.all([
         loadMessages(c.id, { silent: true, preserveOlder: true }),
         loadConversationDetail(c.id),
       ]);
-      // Re-apply scroll after silent merge (message list may have grown)
-      const restore = pendingScrollRestoreRef.current;
-      if (restore && listRef.current && !jumpToMessageId) {
-        const el = listRef.current;
+      // If the cached viewport was at the bottom, keep it there when the
+      // background merge appends newer messages. If the user moved meanwhile,
+      // onScroll flips nearBottomRef and we leave their viewport untouched.
+      if (keepAtBottomAfterRefresh) {
         requestAnimationFrame(() => {
-          if (!listRef.current) return;
           const box = listRef.current;
-          if (restore.nearBottom) {
-            box.scrollTop = box.scrollHeight;
-          } else if (restore.distanceBottom != null) {
-            box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - restore.distanceBottom);
-          } else if (restore.scrollTop != null) {
-            box.scrollTop = restore.scrollTop;
+          if (
+            box
+            && String(activeIdRef.current) === String(c.id)
+            && nearBottomRef.current
+            && !restoringScrollRef.current
+          ) {
+            box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
           }
-          pendingScrollRestoreRef.current = null;
         });
       }
     } else {
@@ -805,7 +854,14 @@ export default function MessengerApp() {
       };
       setTimeout(() => { tryJump(); }, 80);
     } else if (!cached?.messages?.length) {
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "auto" }), 40);
+      requestAnimationFrame(() => {
+        const box = listRef.current;
+        if (!box || String(activeIdRef.current) !== String(cid)) return;
+        restoringScrollRef.current = true;
+        box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
+        nearBottomRef.current = true;
+        requestAnimationFrame(() => { restoringScrollRef.current = false; });
+      });
     }
   }, [isMobile, loadMessages, loadConversationDetail, loadOlder]);
 
@@ -2080,6 +2136,40 @@ export default function MessengerApp() {
   const peer = peerUser(activeConv, meId);
   const role = myRole(activeConv, meId);
 
+  // @mention candidates are local to the active conversation so suggestions
+  // stay fast and relevant without a network request for every keystroke.
+  const mentionUsers = useMemo(() => {
+    const out = [];
+    const pushUser = (u) => {
+      if (!u || String(u.id) === String(meId)) return;
+      const username = u.username || u.user?.username;
+      if (!username) return;
+      out.push({
+        id: u.id || u.user?.id,
+        username,
+        display_name: u.display_name || u.full_name || u.name || u.user?.display_name || username,
+        avatar: u.avatar || u.avatar_url || u.user?.avatar || u.user?.avatar_url,
+      });
+    };
+
+    if (activeConv?.type === "group") {
+      for (const participant of activeConv.participants || []) {
+        pushUser(participant?.user || participant);
+      }
+    } else {
+      pushUser(peer);
+      for (const contact of contacts || []) pushUser(contact?.contact || contact);
+    }
+
+    const seen = new Set();
+    return out.filter((u) => {
+      const key = String(u.username).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [activeConv, peer, contacts, meId]);
+
   const recountNewBelow = () => {
     const root = listRef.current;
     if (!root) return;
@@ -2139,12 +2229,46 @@ export default function MessengerApp() {
     seenFlushTimerRef.current = setTimeout(() => flushSeenReceipts(cid), 300);
   }, [flushSeenReceipts]);
 
+  const dismissScrollDownButton = () => {
+    // Hide during programmatic smooth-scroll. Re-armed only by a real user
+    // gesture (wheel / touch / pointer), never by the programmatic scroll events.
+    scrollDownDismissedRef.current = true;
+    userScrollIntentRef.current = false;
+    if (scrollDownFadeTimerRef.current) {
+      clearTimeout(scrollDownFadeTimerRef.current);
+      scrollDownFadeTimerRef.current = null;
+    }
+    setScrollDownOpacity(0);
+    setShowScrollDown(false);
+  };
+
+  const armScrollDownButton = () => {
+    // Show + start idle fade. After fade completes, remove from DOM so it
+    // cannot intercept clicks while invisible.
+    scrollDownDismissedRef.current = false;
+    userScrollIntentRef.current = false;
+    setShowScrollDown(true);
+    setScrollDownOpacity(1);
+    if (scrollDownFadeTimerRef.current) clearTimeout(scrollDownFadeTimerRef.current);
+    scrollDownFadeTimerRef.current = setTimeout(() => {
+      setScrollDownOpacity(0);
+      scrollDownFadeTimerRef.current = setTimeout(() => {
+        setShowScrollDown(false);
+        scrollDownFadeTimerRef.current = null;
+      }, 250);
+    }, 1800);
+  };
+
   const scrollToNextNew = () => {
+    // Suppress the control while we programmatically move; user gesture re-arms it.
+    dismissScrollDownButton();
+
     // First pending unread, centered — not the absolute bottom
     let targetId = pendingNewIdsRef.current.length ? pendingNewIdsRef.current[0] : null;
     if (!targetId) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      setShowScrollDown(false);
+      pendingNewIdsRef.current = [];
+      setNewBelowCount(0);
       setTimeout(() => markVisibleMessagesRead(), 400);
       return;
     }
@@ -2171,32 +2295,73 @@ export default function MessengerApp() {
           }
         }
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        pendingNewIdsRef.current = [];
+        setNewBelowCount(0);
         setTimeout(() => markVisibleMessagesRead(), 400);
       })();
     }
   };
 
-
   const scrollToBottom = () => {
+    dismissScrollDownButton();
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    setShowScrollDown(false);
     pendingNewIdsRef.current = [];
     setNewBelowCount(0);
     setTimeout(() => markVisibleMessagesRead(), 400);
   };
 
+  const rearmScrollDownByUser = () => {
+    // Only a real user gesture clears the programmatic-dismiss flag.
+    userScrollIntentRef.current = true;
+    scrollDownDismissedRef.current = false;
+  };
+
   const onScrollMsgs = (e) => {
     const el = e.target;
     const h = el.clientHeight || 0;
-    const distBottom = el.scrollHeight - el.scrollTop - h;
+    const distBottom = Math.max(0, el.scrollHeight - el.scrollTop - h);
+    const cid = activeIdRef.current;
+    if (cid && !restoringScrollRef.current) {
+      const key = String(cid);
+      const prev = messagesCacheRef.current.get(key) || {};
+      messagesCacheRef.current.set(key, {
+        ...prev,
+        scrollTop: Math.max(0, el.scrollTop),
+        distanceBottom: distBottom,
+        nearBottom: distBottom < 140,
+        savedAt: Date.now(),
+      });
+      scrollPositionKnownRef.current.add(key);
+    }
     nearBottomRef.current = distBottom < 120;
-    setShowScrollDown(distBottom > 180);
-    if (nearBottomRef.current) {
+
+    // Activity-driven jump-to-bottom control:
+    //  - visible while the user is away from the bottom
+    //  - fades after a short idle, then unmounts
+    //  - reaching the bottom hides it until the user scrolls away again
+    //  - a click that programmatically scrolls stays suppressed until a real gesture
+    const shouldShowScrollDown = distBottom > 180;
+    if (!shouldShowScrollDown) {
+      scrollDownDismissedRef.current = false;
+      userScrollIntentRef.current = false;
+      if (scrollDownFadeTimerRef.current) {
+        clearTimeout(scrollDownFadeTimerRef.current);
+        scrollDownFadeTimerRef.current = null;
+      }
+      setScrollDownOpacity(0);
+      setShowScrollDown(false);
       pendingNewIdsRef.current = [];
       setNewBelowCount(0);
+    } else if (scrollDownDismissedRef.current && !userScrollIntentRef.current) {
+      // Programmatic smooth-scroll events — keep hidden until a real user gesture.
+      setShowScrollDown(false);
+      setScrollDownOpacity(0);
     } else {
+      // Real user scroll (or not dismissed): show and (re)start idle fade.
+      armScrollDownButton();
       recountNewBelow();
     }
+
     markVisibleMessagesRead();
     const threshold = isMobile
       ? Math.max(520, h * 0.6)
@@ -2626,8 +2791,20 @@ export default function MessengerApp() {
                 if (msg) openCtx(e, msg);
               }
             }}
-            onPointerDown={onMessagesListPointerDown}
-            onPointerMove={onMessagesListPointerMove}
+            onWheel={rearmScrollDownByUser}
+            onTouchMove={rearmScrollDownByUser}
+            onPointerDown={(e) => {
+              rearmScrollDownByUser();
+              onMessagesListPointerDown(e);
+            }}
+            onPointerMove={(e) => {
+              // Pointer movement can be the scrollbar drag on desktop or a
+              // touch/drag gesture on mobile. Treat it as user intent.
+              if (e.buttons || e.pointerType === "touch" || e.pointerType === "pen") {
+                rearmScrollDownByUser();
+              }
+              onMessagesListPointerMove(e);
+            }}
             onPointerUp={onMessagesListPointerUp}
             onPointerCancel={onMessagesListPointerUp}
             onPointerLeave={onMessagesListPointerUp}
@@ -2786,6 +2963,7 @@ export default function MessengerApp() {
               onPickVideo={(f) => setVideoEditFile(f)}
               inputRef={inputRef}
               onKeyDown={onComposerKeyDown}
+              mentionUsers={mentionUsers}
               onEditAttachment={(file, index) => {
                 if (file?.type?.startsWith("image/")) {
                   setCropEditIndex(index);
@@ -2798,7 +2976,7 @@ export default function MessengerApp() {
             />
           )}
 
-          {(showScrollDown || newBelowCount > 0) && (
+          {showScrollDown && (
             <Box
               sx={{
                 position: "absolute",
@@ -2806,31 +2984,33 @@ export default function MessengerApp() {
                 bottom: { xs: 78, sm: 86 },
                 zIndex: 12,
                 pointerEvents: "none",
+                opacity: scrollDownOpacity,
+                transition: "opacity 220ms ease",
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
                 alignItems: "flex-end",
+                // While fading out, do not accept clicks on an invisible control.
+                visibility: scrollDownOpacity > 0.05 ? "visible" : "hidden",
               }}
             >
-              {(showScrollDown || newBelowCount > 0) && (
-                <Button
-                  variant="contained"
-                  size="small"
-                  onClick={newBelowCount > 0 ? scrollToNextNew : scrollToBottom}
-                  sx={{
-                    pointerEvents: "auto",
-                    borderRadius: 999,
-                    minWidth: 44,
-                    height: 44,
-                    px: newBelowCount > 0 ? 1.5 : 1.25,
-                    boxShadow: 6,
-                    textTransform: "none",
-                    fontWeight: 800,
-                  }}
-                >
-                  {newBelowCount > 0 ? `↓ ${newBelowCount}` : "↓"}
-                </Button>
-              )}
+              <Button
+                variant="contained"
+                size="small"
+                onClick={newBelowCount > 0 ? scrollToNextNew : scrollToBottom}
+                sx={{
+                  pointerEvents: scrollDownOpacity > 0.05 ? "auto" : "none",
+                  borderRadius: 999,
+                  minWidth: 44,
+                  height: 44,
+                  px: newBelowCount > 0 ? 1.5 : 1.25,
+                  boxShadow: 6,
+                  textTransform: "none",
+                  fontWeight: 800,
+                }}
+              >
+                {newBelowCount > 0 ? `↓ ${newBelowCount}` : "↓"}
+              </Button>
             </Box>
           )}
         </>

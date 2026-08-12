@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { flushSync } from "react-dom";
 import {
   Stack, TextField, IconButton, Box, Chip, Tooltip, Typography,
-  Popover, alpha, useMediaQuery,
+  Popover, alpha, useMediaQuery, List, ListItemButton, ListItemAvatar, ListItemText, Avatar,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
@@ -297,6 +297,46 @@ function getShortcodeAt(text, cursor) {
   };
 }
 
+function getMentionAt(text, cursor) {
+  const pos = cursor == null ? text.length : cursor;
+  const before = text.slice(0, pos);
+  // @query at the caret; query may be empty so typing only "@" opens suggestions.
+  const m = before.match(/(?:^|\s)(@([^\s@]{0,40}))$/);
+  if (!m) return null;
+  return {
+    query: m[2] || "",
+    start: before.length - m[1].length,
+    end: pos,
+  };
+}
+
+function matchMentions(users, query, limit = 16) {
+  const q = normalizeQuery(query);
+  const unique = new Map();
+  for (const raw of Array.isArray(users) ? users : []) {
+    const username = String(raw?.username || raw?.user?.username || "").trim().replace(/^@/, "");
+    if (!username) continue;
+    const key = username.toLowerCase();
+    if (unique.has(key)) continue;
+    const label = String(raw?.display_name || raw?.full_name || raw?.name || raw?.user?.display_name || username).trim();
+    let score = 20;
+    if (!q) score = 60;
+    else if (key === q) score = 120;
+    else if (key.startsWith(q)) score = 100 - Math.max(0, key.length - q.length);
+    else if (key.includes(q)) score = 50;
+    else continue;
+    unique.set(key, {
+      ...raw,
+      username,
+      label: label || username,
+      score,
+    });
+  }
+  return Array.from(unique.values())
+    .sort((a, b) => b.score - a.score || a.username.localeCompare(b.username))
+    .slice(0, limit);
+}
+
 
 const HOLD_MS = 180; // short press = switch mode; longer = start record
 const LOCK_DY = -56; // drag up this many px → lock
@@ -314,6 +354,7 @@ export default function MessageComposer({
   replyTo, editingMsg, onCancelReplyOrEdit,
   onSend, onPickImage, onPickVideo, onEditAttachment, inputRef, onKeyDown,
   sendFilesTogether = true, setSendFilesTogether,
+  mentionUsers = [],
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -325,6 +366,12 @@ export default function MessageComposer({
   const scMatches = React.useMemo(
     () => (scQuery ? matchEmojis(scQuery.query) : []),
     [scQuery],
+  );
+  const [mentionQuery, setMentionQuery] = useState(null); // { query, start, end }
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mentionMatches = React.useMemo(
+    () => (mentionQuery ? matchMentions(mentionUsers, mentionQuery.query) : []),
+    [mentionQuery, mentionUsers],
   );
 
   // "voice" | "video" — which mode the primary hold-button uses
@@ -690,15 +737,24 @@ export default function MessageComposer({
   };
 
 
-  const updateShortcodeFromText = (value, cursor) => {
+  const updateSuggestionsFromText = (value, cursor) => {
     const sc = getShortcodeAt(value, cursor);
-    if (!sc) {
+    if (sc) {
+      setScQuery(sc);
+      setScIndex(0);
+    } else {
       setScQuery(null);
       setScIndex(0);
-      return;
     }
-    setScQuery(sc);
-    setScIndex(0);
+
+    const mention = getMentionAt(value, cursor);
+    if (mention) {
+      setMentionQuery(mention);
+      setMentionIndex(0);
+    } else {
+      setMentionQuery(null);
+      setMentionIndex(0);
+    }
   };
 
   const applyShortcodeEmoji = (emoji) => {
@@ -719,14 +775,61 @@ export default function MessageComposer({
     });
   };
 
+  const applyMention = (user) => {
+    if (!mentionQuery || !user?.username) return;
+    const { start, end } = mentionQuery;
+    const mention = `@${String(user.username).replace(/^@/, "")}`;
+    const next = `${text.slice(0, start)}${mention} ${text.slice(end)}`;
+    const nextCursor = start + mention.length + 1;
+    setText(next);
+    setMentionQuery(null);
+    setMentionIndex(0);
+    requestAnimationFrame(() => {
+      const el = inputRef?.current;
+      if (el && typeof el.setSelectionRange === "function") {
+        try { el.setSelectionRange(nextCursor, nextCursor); } catch { /* */ }
+        el.focus();
+      }
+    });
+  };
+
   const onTextChange = (e) => {
     const value = e.target.value;
     const cursor = e.target.selectionStart;
     setText(value);
-    updateShortcodeFromText(value, cursor);
+    updateSuggestionsFromText(value, cursor);
   };
 
   const handleComposerKeyDown = (e) => {
+    if (mentionMatches.length > 0 && mentionQuery) {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        e.stopPropagation();
+        setMentionIndex((i) => (i + 1) % mentionMatches.length);
+        return;
+      }
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        e.stopPropagation();
+        setMentionIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length);
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        const pick = mentionMatches[mentionIndex] || mentionMatches[0];
+        if (pick) applyMention(pick);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setMentionQuery(null);
+        setMentionIndex(0);
+        return;
+      }
+    }
+
     if (scMatches.length > 0 && scQuery) {
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
@@ -919,6 +1022,55 @@ export default function MessageComposer({
       onDragLeave={onDragLeaveFiles}
       onDrop={onDropFiles}
     >
+      {/* @mention island — same interaction model as emoji shortcode suggestions */}
+      {mentionQuery && mentionMatches.length > 0 && (
+        <Box
+          sx={{
+            position: "absolute",
+            left: 8,
+            right: 8,
+            bottom: "100%",
+            mb: 0.75,
+            zIndex: 31,
+            bgcolor: "background.paper",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 2.5,
+            boxShadow: 8,
+            overflow: "hidden",
+          }}
+        >
+          <List dense disablePadding sx={{ maxHeight: { xs: 280, sm: 320 }, overflowY: "auto" }}>
+            {mentionMatches.map((u, i) => (
+              <ListItemButton
+                key={`${u.id || u.username}-${i}`}
+                selected={i === mentionIndex}
+                onMouseDown={(ev) => {
+                  ev.preventDefault();
+                  applyMention(u);
+                }}
+                sx={{ py: 0.7, px: 1 }}
+              >
+                <ListItemAvatar sx={{ minWidth: 40 }}>
+                  <Avatar
+                    src={u.avatar || u.avatar_url || u.user?.avatar || undefined}
+                    sx={{ width: 32, height: 32, fontSize: 14 }}
+                  >
+                    {u.username?.[0]?.toUpperCase() || "U"}
+                  </Avatar>
+                </ListItemAvatar>
+                <ListItemText
+                  primary={`@${u.username}`}
+                  secondary={u.label && u.label !== u.username ? u.label : undefined}
+                  primaryTypographyProps={{ fontSize: 14, fontWeight: i === mentionIndex ? 600 : 500 }}
+                  secondaryTypographyProps={{ noWrap: true }}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+        </Box>
+      )}
+
       {/* Shortcode emoji island (Telegram-style) */}
       {scMatches.length > 0 && scQuery && (
         <Box
@@ -1211,11 +1363,11 @@ export default function MessageComposer({
           onKeyDown={handleComposerKeyDown}
           onSelect={(e) => {
             const el = e.target;
-            updateShortcodeFromText(el.value, el.selectionStart);
+            updateSuggestionsFromText(el.value, el.selectionStart);
           }}
           onClick={(e) => {
             const el = e.target;
-            updateShortcodeFromText(el.value, el.selectionStart);
+            updateSuggestionsFromText(el.value, el.selectionStart);
           }}
           sx={{
             "& .MuiOutlinedInput-root": {
