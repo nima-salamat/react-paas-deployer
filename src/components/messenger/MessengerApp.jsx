@@ -1945,7 +1945,7 @@ export default function MessengerApp() {
     try {
       const res = await apiRequest({ method: "GET", url: `${MSG_API}/conversations/${convId}/pinned-messages/` });
       const data = unwrapData(res);
-      const pins = Array.isArray(data) ? data : [];
+      const pins = Array.isArray(data) ? [...data].reverse() : [];
       setPinnedMessages(pins);
       // Reset index if it's out of range
       setCurrentPinIndex((prev) => (prev >= pins.length ? 0 : prev));
