@@ -1124,6 +1124,8 @@ export default function MessengerApp() {
               messages: cached.messages.filter((m) => String(m.id) !== String(mid)),
             });
           }
+          // Refresh pinned messages list — the deleted message may have been pinned
+          loadPinnedMessages(Number(cid));
         }
         loadConversations({ silent: true });
       }
@@ -1792,6 +1794,10 @@ export default function MessengerApp() {
     try {
       await apiRequest({ method: "DELETE", url: `${MSG_API}/messages/${m.id}/` });
       setMessages((prev) => prev.filter((x) => x.id !== m.id));
+      // If the deleted message was pinned, refresh the pinned bar
+      if (isMessagePinned(m.id) && activeIdRef.current) {
+        loadPinnedMessages(activeIdRef.current);
+      }
       flash("Deleted");
     } catch (e) {
       setError(e?.response?.data?.message || "Delete failed");
@@ -3057,6 +3063,8 @@ export default function MessengerApp() {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
     if (!window.confirm(`Delete ${ids.length} message(s)?`)) return;
+    // Check if any of the deleted messages are pinned
+    const hadPin = ids.some((id) => isMessagePinned(id));
     try {
       for (const id of ids) {
         try {
@@ -3065,6 +3073,10 @@ export default function MessengerApp() {
       }
       setMessages((prev) => prev.filter((m) => !selectedIds.has(String(m.id))));
       clearSelection();
+      // Refresh pinned bar if any deleted message was pinned
+      if (hadPin && activeIdRef.current) {
+        loadPinnedMessages(activeIdRef.current);
+      }
       flash("Deleted");
     } catch {
       setError("Failed to delete some messages");
