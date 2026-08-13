@@ -15,6 +15,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import DownloadIcon from "@mui/icons-material/Download";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DoneIcon from "@mui/icons-material/Done";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
@@ -611,9 +612,10 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
   if (!safeSrc) {
     return (
       <Box sx={{
-        width: circular ? 220 : "100%", height: circular ? 220 : 180, maxWidth: 360,
+        width: circular ? 300 : "100%", height: circular ? 300 : 180, maxWidth: 360,
         bgcolor: "action.hover", borderRadius: circular ? "50%" : 2,
         display: "flex", alignItems: "center", justifyContent: "center",
+        mx: circular ? "auto" : undefined,
       }}>
         <Typography variant="caption" color="text.secondary">No video</Typography>
       </Box>
@@ -624,9 +626,10 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
     return (
       <Box
         sx={{
-          width: 220, height: 220, position: "relative", display: "inline-block",
+          width: 300, height: 300, position: "relative", display: "block",
           borderRadius: "50%", overflow: "hidden", bgcolor: "#000", cursor: "pointer",
           boxShadow: "0 8px 24px rgba(0,0,0,0.4), 0 0 0 4px rgba(0,0,0,0.55)",
+          mx: "auto",
         }}
         onClick={openFull}
       >
@@ -651,11 +654,11 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
           }}
         >
           <Box sx={{
-            width: 52, height: 52, borderRadius: "50%", bgcolor: "rgba(0,0,0,0.55)",
+            width: 64, height: 64, borderRadius: "50%", bgcolor: "rgba(0,0,0,0.55)",
             display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
             border: "2px solid rgba(255,255,255,0.35)",
           }}>
-            <PlayArrowIcon sx={{ fontSize: 28, ml: 0.5 }} />
+            <PlayArrowIcon sx={{ fontSize: 34, ml: 0.5 }} />
           </Box>
         </Box>
         {error && (
@@ -941,20 +944,32 @@ export default function MessageBubble({
 
   // Read-receipt ticks (only for own messages)
   const readState = m.read_state || (mine ? "sent" : "read");
+  const isPending = Boolean(m._pending) || readState === "pending" || readState === "sending";
   const tickEl = mine && (
     <Box
-      sx={{ display: "inline-flex", alignItems: "center", cursor: "pointer" }}
-      onClick={(e) => { e.stopPropagation(); onShowReaders(m); }}
-      title="Seen by"
+      sx={{ display: "inline-flex", alignItems: "center", cursor: isPending ? "default" : "pointer" }}
+      onClick={(e) => {
+        if (isPending) return;
+        e.stopPropagation();
+        onShowReaders(m);
+      }}
+      title={isPending ? "Sending…" : "Seen by"}
     >
-      {readState === "read"
-        ? <DoneAllIcon sx={{ fontSize: 14, color: theme.palette.info.light }} />
-        : <DoneIcon sx={{ fontSize: 14, opacity: 0.75 }} />}
+      {isPending
+        ? <AccessTimeIcon sx={{ fontSize: 13, opacity: 0.7 }} />
+        : readState === "read"
+          ? <DoneAllIcon sx={{ fontSize: 14, color: theme.palette.info.light }} />
+          : <DoneIcon sx={{ fontSize: 14, opacity: 0.75 }} />}
     </Box>
   );
 
   const bodySegments = parseFormattedBody(bodyStr);
   const hasAttachments = (m.attachments || []).length > 0;
+  const isCircularVideoMsg = hasAttachments
+    && (m.attachments || []).every((a) => isVideoMessageAttachment(a))
+    && !(bodyStr || "").trim()
+    && !m.reply_to_preview
+    && !m.forwarded_from_user;
   const emojiCount = (!hasAttachments && !m.reply_to_preview && !m.forwarded_from_user)
     ? emojiOnlyCount(bodyStr)
     : null;
@@ -1088,17 +1103,22 @@ export default function MessageBubble({
       )}
       <Box
         sx={{
-          maxWidth: bodySegments.some((s) => s.type === "codeblock") ? { xs: "96%", sm: "85%" } : { xs: "82%", sm: "70%" },
-          px: isBigEmoji ? 0.5 : 1.35,
-          py: isBigEmoji ? 0.35 : 0.85,
-          borderRadius: isBigEmoji ? 2 : (mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px"),
-          bgcolor: isBigEmoji
+          maxWidth: isCircularVideoMsg
+            ? 320
+            : (bodySegments.some((s) => s.type === "codeblock") ? { xs: "96%", sm: "85%" } : { xs: "82%", sm: "70%" }),
+          px: isBigEmoji || isCircularVideoMsg ? 0.5 : 1.35,
+          py: isBigEmoji || isCircularVideoMsg ? 0.35 : 0.85,
+          borderRadius: isBigEmoji || isCircularVideoMsg ? 2 : (mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px"),
+          bgcolor: isBigEmoji || isCircularVideoMsg
             ? "transparent"
             : (mine
               ? (theme.palette.mode === "dark" ? "#2b5278" : theme.palette.primary.main)
               : "background.paper"),
-          color: isBigEmoji ? "text.primary" : (mine ? "#fff" : "text.primary"),
-          boxShadow: isBigEmoji ? "none" : (theme.palette.mode === "dark" ? "none" : 1),
+          color: isBigEmoji || isCircularVideoMsg ? "text.primary" : (mine ? "#fff" : "text.primary"),
+          boxShadow: isBigEmoji || isCircularVideoMsg ? "none" : (theme.palette.mode === "dark" ? "none" : 1),
+          display: isCircularVideoMsg ? "flex" : undefined,
+          flexDirection: isCircularVideoMsg ? "column" : undefined,
+          alignItems: isCircularVideoMsg ? "center" : undefined,
         }}
       >
         {!mine && activeConv?.type === "group" && (

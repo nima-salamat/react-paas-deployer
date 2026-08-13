@@ -688,11 +688,34 @@ export default function MessengerApp() {
           const k = String(m.id);
           map.set(k, { ...(map.get(k) || {}), ...m });
         }
+        // Drop optimistic temps that match a confirmed server message
+        // (same sender + body, within ~2 minutes) so order stays clean.
+        const confirmed = Array.from(map.values()).filter((m) => !String(m.id).startsWith("temp-"));
+        for (const [k, m] of [...map.entries()]) {
+          if (!String(k).startsWith("temp-")) continue;
+          const tBody = String(m.body || "").trim();
+          const tSender = String(m.sender?.id ?? "");
+          const tTime = new Date(m.created_at || 0).getTime();
+          const matched = confirmed.some((c) => {
+            if (String(c.sender?.id ?? "") !== tSender) return false;
+            if (String(c.body || "").trim() !== tBody) return false;
+            const ct = new Date(c.created_at || 0).getTime();
+            return Math.abs(ct - tTime) < 120000;
+          });
+          if (matched) map.delete(k);
+        }
         return Array.from(map.values()).sort((a, b) => {
           const ta = new Date(a.created_at || 0).getTime();
           const tb = new Date(b.created_at || 0).getTime();
           if (ta !== tb) return ta - tb;
-          return Number(a.id) - Number(b.id);
+          // Prefer real numeric ids after temps with same timestamp
+          const aTemp = String(a.id).startsWith("temp-");
+          const bTemp = String(b.id).startsWith("temp-");
+          if (aTemp !== bTemp) return aTemp ? 1 : -1;
+          const na = Number(a.id);
+          const nb = Number(b.id);
+          if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+          return String(a.id).localeCompare(String(b.id));
         });
       };
 
@@ -1570,6 +1593,42 @@ export default function MessengerApp() {
       if (replyTo) form.append("reply_to", replyTo.id);
       filesToSend.forEach((f) => form.append("files", f));
       const pendingId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const tempMsgId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const localCreatedAt = new Date().toISOString();
+      const rep = replyTo;
+      // Optimistic bubble for text (and for file sends that complete quickly)
+      if (!filesToSend.length) {
+        const optimistic = {
+          id: tempMsgId,
+          body,
+          created_at: localCreatedAt,
+          sender: {
+            id: meId,
+            username: profileDataRef.current?.username || "You",
+            avatar: meAvatar || profileDataRef.current?.avatar || null,
+          },
+          attachments: [],
+          reply_to_preview: rep
+            ? {
+                id: rep.id,
+                body: typeof rep.body === "string" ? rep.body : String(rep.body || ""),
+                sender: rep.sender,
+              }
+            : null,
+          read_state: "pending",
+          _pending: true,
+        };
+        setMessages((prev) => {
+          const next = [...prev, optimistic].sort((a, b) => {
+            const ta = new Date(a.created_at || 0).getTime();
+            const tb = new Date(b.created_at || 0).getTime();
+            if (ta !== tb) return ta - tb;
+            return String(a.id).localeCompare(String(b.id));
+          });
+          return next;
+        });
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 20);
+      }
       if (filesToSend.length) {
         const totalBytes = filesToSend.reduce((sum, f) => sum + Number(f.size || 0), 0);
         setPendingUploads((prev) => [...prev, {
@@ -1579,7 +1638,7 @@ export default function MessengerApp() {
         }]);
       }
       setText(""); setFiles([]);
-      const rep = replyTo; setReplyTo(null);
+      setReplyTo(null);
       try {
         const res = await apiRequest({
           method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`, data: form,
@@ -1596,7 +1655,31 @@ export default function MessengerApp() {
           if (filesToSend.length) {
             setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, progress: 100, status: "sent" } : u));
           }
-          await loadMessages(activeId, { silent: true });
+          // Replace optimistic temp with confirmed message (server time + id)
+          if (!filesToSend.length) {
+            setMessages((prev) => {
+              const withoutTemp = prev.filter((m) => String(m.id) !== tempMsgId);
+              const map = new Map();
+              for (const m of withoutTemp) {
+                if (m?.id != null) map.set(String(m.id), m);
+              }
+              map.set(String(created.id), { ...created, _pending: false, read_state: created.read_state || "sent" });
+              return Array.from(map.values()).sort((a, b) => {
+                const ta = new Date(a.created_at || 0).getTime();
+                const tb = new Date(b.created_at || 0).getTime();
+                if (ta !== tb) return ta - tb;
+                const aTemp = String(a.id).startsWith("temp-");
+                const bTemp = String(b.id).startsWith("temp-");
+                if (aTemp !== bTemp) return aTemp ? 1 : -1;
+                const na = Number(a.id);
+                const nb = Number(b.id);
+                if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+                return String(a.id).localeCompare(String(b.id));
+              });
+            });
+          } else {
+            await loadMessages(activeId, { silent: true });
+          }
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
           loadConversations({ silent: true });
           if (filesToSend.length) setTimeout(() => setPendingUploads((prev) => prev.filter((u) => u.id !== pendingId)), 600);
@@ -1605,6 +1688,10 @@ export default function MessengerApp() {
         if (rep) setReplyTo(rep);
         const msg = e?.response?.data?.message || "Send failed";
         setError(msg);
+        // Remove optimistic bubble on failure
+        if (!filesToSend.length) {
+          setMessages((prev) => prev.filter((m) => String(m.id) !== tempMsgId));
+        }
         if (filesToSend.length) setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, status: "failed", error: msg } : u));
       }
       return;
