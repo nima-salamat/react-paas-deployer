@@ -55,6 +55,7 @@ import { MSG_API, WS_URL, unwrapData, unwrapList, authHeaders } from "./api";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
   copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE,
+  downloadAttachmentToCache, getCachedAttachment, getIsMobileDevice,
 } from "./messengerUtils";
 import Sidebar from "./components/Sidebar";
 import MessageBubble, { MessageContextMenuItems } from "./components/MessageBubble";
@@ -92,6 +93,41 @@ function messengerOriginalOf(file) {
 export default function MessengerApp() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  // Real phone/tablet (UA/OS/pointer) — independent of window width.
+  // Narrow desktop windows must NOT be treated as mobile for Enter / keyboard.
+  const isMobileDevice = getIsMobileDevice();
+
+  // Mobile virtual keyboard: pin the shell to the visual viewport so the chat
+  // header stays visible at the top and the composer stays above the keyboard.
+  const [kbLayout, setKbLayout] = useState({ top: 0, height: typeof window !== "undefined" ? window.innerHeight : 0 });
+  useEffect(() => {
+    // Only real mobile devices have a soft keyboard that shrinks visualViewport.
+    if (!isMobileDevice) {
+      setKbLayout({ top: 0, height: window.innerHeight });
+      return undefined;
+    }
+    const vv = window.visualViewport;
+    const update = () => {
+      if (!vv) {
+        setKbLayout({ top: 0, height: window.innerHeight });
+        return;
+      }
+      setKbLayout({
+        top: Math.max(0, vv.offsetTop || 0),
+        height: Math.max(0, vv.height || window.innerHeight),
+      });
+    };
+    update();
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [isMobileDevice]);
+
   const navigate = useNavigate();
   const meId = useAuthUserId();
 
@@ -1550,7 +1586,12 @@ export default function MessengerApp() {
       if (lastMine) { e.preventDefault(); startEdit(lastMine); }
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendOrEdit(); }
+    // Real mobile device: Enter = new line (Send button only).
+    // Desktop (even if the window is narrow): Enter sends, Shift+Enter = new line.
+    if (e.key === "Enter" && !e.shiftKey && !isMobileDevice) {
+      e.preventDefault();
+      sendOrEdit();
+    }
   };
 
   const react = async (msgId, emoji) => {
@@ -2125,6 +2166,27 @@ export default function MessengerApp() {
   };
 
   const openPreview = async (att) => {
+    // If already a cached blob URL from FileAttachmentCard, open directly
+    if (att?._fromCache && att?._blobUrl) {
+      const k = attachmentKind(att);
+      if (k === "pdf") {
+        setPreview({ att, kind: "pdf", blobUrl: att._blobUrl });
+        return;
+      }
+      if (k === "text") {
+        try {
+          const r = await fetch(att._blobUrl);
+          const textContent = await r.text();
+          setPreview({ att, kind: "text", textContent: textContent.slice(0, 200000), blobUrl: att._blobUrl });
+        } catch {
+          setPreview({ att, kind: "text", textContent: "(Could not load text)", blobUrl: att._blobUrl });
+        }
+        return;
+      }
+      setPreview({ att, kind: k || "file", blobUrl: att._blobUrl });
+      return;
+    }
+
     const k = attachmentKind(att);
     // Images & videos open the in-chat gallery dialog (with < > navigation)
     if (k === "image" || k === "video") {
@@ -2135,13 +2197,31 @@ export default function MessengerApp() {
       playAudioFromMessage(att, null);
       return;
     }
-    if (k === "text") {
+
+    // PDF / text / generic files: download into blob cache first (Telegram-style).
+    // iframe of the API URL fails when the API sends X-Frame-Options: deny.
+    if (k === "pdf" || k === "text" || k === "file") {
       try {
-        const r = await fetch(withTokenQuery(att.url), { headers: authHeaders() });
-        const textContent = await r.text();
-        setPreview({ att, kind: k, textContent: textContent.slice(0, 200000) });
-      } catch {
-        setPreview({ att, kind: k, textContent: "(Could not load text)" });
+        const entry = await downloadAttachmentToCache(att, authHeaders());
+        if (k === "text") {
+          const textContent = await entry.blob.text();
+          setPreview({
+            att,
+            kind: "text",
+            textContent: textContent.slice(0, 200000),
+            blobUrl: entry.blobUrl,
+          });
+        } else if (k === "pdf") {
+          setPreview({ att, kind: "pdf", blobUrl: entry.blobUrl });
+        } else {
+          setPreview({ att, kind: "file", blobUrl: entry.blobUrl });
+        }
+      } catch (e) {
+        setPreview({
+          att,
+          kind: k,
+          error: e?.message || "Download failed",
+        });
       }
       return;
     }
@@ -3232,7 +3312,21 @@ export default function MessengerApp() {
 
   return (
     <Box
-      sx={{ position: "fixed", inset: 0, zIndex: 1300, display: "flex", flexDirection: "column", bgcolor: "background.default" }}
+      sx={{
+        position: "fixed",
+        zIndex: 1300,
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "background.default",
+        // On mobile, bind to visualViewport so the header stays on screen when
+        // the soft keyboard opens (instead of staying glued to the layout viewport).
+        top: isMobileDevice ? kbLayout.top : 0,
+        left: 0,
+        right: 0,
+        height: isMobileDevice ? kbLayout.height : "100%",
+        bottom: isMobileDevice ? "auto" : 0,
+        overflow: "hidden",
+      }}
       onClick={() => { if (ctx) setCtx(null); }}
     >
       <Box sx={{ flex: 1, minHeight: 0, display: "flex", position: "relative" }}>
@@ -3455,9 +3549,16 @@ export default function MessengerApp() {
           <IconButton onClick={() => setPreview(null)}><ArrowBackIcon /></IconButton>
         </DialogTitle>
         <DialogContent dividers sx={{ minHeight: 240, display: "flex", justifyContent: "center", alignItems: "center" }}>
-          {preview?.kind === "pdf" && (
-            <Box component="iframe" src={withTokenQuery(preview.att.url)} title="pdf"
-              sx={{ width: "100%", height: "70vh", border: 0, borderRadius: 1 }} />
+          {preview?.kind === "pdf" && (preview?.blobUrl || preview?.att?.url) && (
+            <Box
+              component="iframe"
+              src={preview.blobUrl || withTokenQuery(preview.att.url)}
+              title="pdf"
+              sx={{ width: "100%", height: "70vh", border: 0, borderRadius: 1 }}
+            />
+          )}
+          {preview?.error && (
+            <Typography color="error.main" sx={{ p: 2 }}>{preview.error}</Typography>
           )}
           {preview?.kind === "text" && (
             <Box component="pre" sx={{
@@ -3472,7 +3573,7 @@ export default function MessengerApp() {
             <Stack alignItems="center" spacing={2}>
               <Typography>No inline preview for this file type.</Typography>
               <Button variant="contained" startIcon={<DownloadIcon />}
-                onClick={() => window.open(withTokenQuery(preview.att.url), "_blank")}>
+                onClick={() => window.open(preview.blobUrl || withTokenQuery(preview.att.url), "_blank")}>
                 Download
               </Button>
             </Stack>

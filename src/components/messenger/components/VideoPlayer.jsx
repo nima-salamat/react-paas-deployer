@@ -51,6 +51,26 @@ import { withTokenQuery, formatDuration } from "../messengerUtils";
  * writes and shows a "scrubbing" state.
  */
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+const MEDIA_DEVICES_KEY = "messenger.mediaDevices";
+
+async function applySinkToEl(el, forceId) {
+  if (!el || typeof el.setSinkId !== "function") return false;
+  let next = forceId;
+  if (next == null) {
+    try {
+      next = JSON.parse(localStorage.getItem(MEDIA_DEVICES_KEY) || "{}").speakerId || "";
+    } catch {
+      next = "";
+    }
+  }
+  try {
+    await el.setSinkId(next || "");
+    return true;
+  } catch {
+    try { await el.setSinkId(""); } catch { /* */ }
+    return false;
+  }
+}
 
 export default function VideoPlayer({
   src,
@@ -136,7 +156,29 @@ export default function VideoPlayer({
       setIsPlaying(false);
     });
 
+    // Route video audio to the speaker selected in Media settings (Chrome/Edge)
+    const applySpeaker = () => {
+      try {
+        const tech = player.tech?.(true);
+        const el = tech?.el?.() || videoRef.current;
+        applySinkToEl(el);
+      } catch { /* */ }
+    };
+    applySpeaker();
+    player.on("play", applySpeaker);
+    const onDevices = (e) => applySinkToEl(
+      (() => {
+        try { return player.tech?.(true)?.el?.() || videoRef.current; } catch { return videoRef.current; }
+      })(),
+      e?.detail?.speakerId != null ? e.detail.speakerId : undefined
+    );
+    const onStorage = (ev) => { if (ev.key === MEDIA_DEVICES_KEY) applySpeaker(); };
+    window.addEventListener("messenger:media-devices-changed", onDevices);
+    window.addEventListener("storage", onStorage);
+
     return () => {
+      window.removeEventListener("messenger:media-devices-changed", onDevices);
+      window.removeEventListener("storage", onStorage);
       try { player.dispose(); } catch { /* */ }
       playerRef.current = null;
     };

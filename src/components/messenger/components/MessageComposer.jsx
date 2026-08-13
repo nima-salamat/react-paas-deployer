@@ -6,6 +6,11 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
+import ImageIcon from "@mui/icons-material/Image";
+import MovieIcon from "@mui/icons-material/Movie";
+import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import AudioFileIcon from "@mui/icons-material/AudioFile";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import SendIcon from "@mui/icons-material/Send";
 import DoneIcon from "@mui/icons-material/Done";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -16,6 +21,24 @@ import MicIcon from "@mui/icons-material/Mic";
 import StopCircleIcon from "@mui/icons-material/StopCircle";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import DescriptionIcon from "@mui/icons-material/Description";
+import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
+import CodeIcon from "@mui/icons-material/Code";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import ComposeCodeWorkspace, {
+  ComposeQuoteEditor,
+  filesToMarkdown,
+  markdownToFiles,
+} from "./ComposeCodeWorkspace";
+import Button from "@mui/material/Button";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
@@ -343,7 +366,7 @@ function matchMentions(users, query, limit = 16) {
 
 
 const HOLD_MS = 180; // short press = switch mode; longer = start record
-const LOCK_DY = -56; // drag up this many px → lock
+const LOCK_DY = -40; // drag up this many px → lock
 const CANCEL_DX = -72; // drag left this many px → cancel
 
 /**
@@ -351,9 +374,102 @@ const CANCEL_DX = -72; // drag left this many px → cancel
  *  - Hold mic/cam to record, slide up to lock, slide left to cancel
  *  - Tap the secondary media button to swap voice ↔ video
  *  - Send button only when there is text/files/edit; otherwise media button
- *  - Enter still sends (desktop + mobile keyboard)
+ *  - Desktop: Enter sends · Mobile: Enter = new line (Send button only)
  */
+
+/** Extract fenced code blocks and quote runs from composer text for live preview. */
+function extractComposeBlocks(raw) {
+  const s = raw || "";
+  const blocks = [];
+  const fenceRe = /```([\w+-]*)(?::([^\n`]*))?\n?([\s\S]*?)```/g;
+  let m;
+  let i = 0;
+  while ((m = fenceRe.exec(s)) !== null) {
+    blocks.push({
+      type: "codeblock",
+      index: i++,
+      lang: (m[1] || "").trim(),
+      name: (m[2] || "").trim(),
+      code: m[3].replace(/^\n/, "").replace(/\n$/, ""),
+      full: m[0],
+      start: m.index,
+      end: m.index + m[0].length,
+    });
+  }
+  const lines = s.split("\n");
+  let qStart = null;
+  let qLines = [];
+  let offset = 0;
+  const lineStarts = [];
+  for (let li = 0; li < lines.length; li++) {
+    lineStarts.push(offset);
+    offset += lines[li].length + 1;
+  }
+  const flushQ = () => {
+    if (!qLines.length) return;
+    const start = lineStarts[qStart];
+    const last = qStart + qLines.length - 1;
+    const end = lineStarts[last] + lines[last].length;
+    blocks.push({
+      type: "quote",
+      index: i++,
+      text: qLines.join("\n"),
+      start,
+      end,
+    });
+    qLines = [];
+    qStart = null;
+  };
+  for (let li = 0; li < lines.length; li++) {
+    if (/^>\s?/.test(lines[li])) {
+      if (qStart == null) qStart = li;
+      qLines.push(lines[li].replace(/^>\s?/, ""));
+    } else {
+      flushQ();
+    }
+  }
+  flushQ();
+  blocks.sort((a, b) => a.start - b.start);
+  return blocks;
+}
+
+
+function replaceQuoteBlock(raw, start, end, quoteText) {
+  const block = String(quoteText || "")
+    .split("\n")
+    .map((l) => (l.startsWith("> ") ? l : `> ${l}`))
+    .join("\n");
+  return (raw || "").slice(0, start) + block + (raw || "").slice(end);
+}
+
+/** Split message into prefix / code files / suffix for the multi-file workspace. */
+function splitMarkdownCode(raw) {
+  const s = raw || "";
+  const re = /```[\w+-]*(?::[^\n`]*)?\n?[\s\S]*?```/g;
+  const files = markdownToFiles(s);
+  if (!files.length) return { prefix: s, files: [], suffix: "" };
+  let first = -1;
+  let lastEnd = 0;
+  let m;
+  const re2 = /```[\w+-]*(?::[^\n`]*)?\n?[\s\S]*?```/g;
+  while ((m = re2.exec(s)) !== null) {
+    if (first < 0) first = m.index;
+    lastEnd = m.index + m[0].length;
+  }
+  return {
+    prefix: s.slice(0, first).replace(/\s+$/, ""),
+    suffix: s.slice(lastEnd).replace(/^\s+/, ""),
+    files,
+  };
+}
+
+function joinMarkdownCode(prefix, files, suffix) {
+  const mid = filesToMarkdown(files);
+  return [prefix, mid, suffix].filter((x) => x && String(x).length).join("\n\n");
+}
+
 export default function MessageComposer({
+
   text, setText, files, setFiles,
   replyTo, editingMsg, onCancelReplyOrEdit,
   onSend, onPickImage, onPickVideo, onEditAttachment, inputRef, onKeyDown,
@@ -496,42 +612,207 @@ export default function MessageComposer({
   useEffect(() => { cameraFacingRef.current = cameraFacing; }, [cameraFacing]);
   const [flippingCam, setFlippingCam] = useState(false);
 
-  const flipCamera = async () => {
-    if (recKind !== "video" || flippingCam || !streamRef.current) return;
-    setFlippingCam(true);
-    const nextFacing = cameraFacingRef.current === "user" ? "environment" : "user";
+  // Right-click format menu on the text field
+  const [fmtMenu, setFmtMenu] = useState(null);
+  const selectionRef = useRef({ start: 0, end: 0 });
+  const [attachMenuAnchor, setAttachMenuAnchor] = useState(null);
+  const [attachAccept, setAttachAccept] = useState("image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv");
+  const [attachCapture, setAttachCapture] = useState(undefined); // { mouseX, mouseY, start, end }
+  // PDF / TXT preview dialog for pending attachments
+  const [filePreview, setFilePreview] = useState(null); // { name, kind: 'pdf'|'txt', url?, text? }
+
+
+  const getSavedDevices = () => {
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: nextFacing }, width: { ideal: 480 }, height: { ideal: 480 } },
-        audio: false,
-      });
-      const newTrack = newStream.getVideoTracks()[0];
-      if (!newTrack) { newStream.getTracks().forEach((t) => t.stop()); return; }
-      const stream = streamRef.current;
-      const oldTrack = stream.getVideoTracks()[0];
-      if (oldTrack) { stream.removeTrack(oldTrack); try { oldTrack.stop(); } catch {} }
-      stream.addTrack(newTrack);
-      newStream.getTracks().forEach((t) => { if (t !== newTrack) try { t.stop(); } catch {} });
-      setCameraFacing(nextFacing);
-      cameraFacingRef.current = nextFacing;
-      try { localStorage.setItem("messenger.videoFacing", nextFacing); } catch {}
-      if (videoPreviewRef.current) {
-        videoPreviewRef.current.srcObject = stream;
-        videoPreviewRef.current.play().catch(() => {});
-      }
-    } catch (e) {
-      setRecordError(e?.message || "Could not switch camera");
-    } finally {
-      setFlippingCam(false);
+      const saved = JSON.parse(localStorage.getItem("messenger.mediaDevices") || "{}");
+      return {
+        cameraId: saved.cameraId || "",
+        micId: saved.micId || "",
+        speakerId: saved.speakerId || "",
+      };
+    } catch {
+      return { cameraId: "", micId: "", speakerId: "" };
     }
   };
 
-    const getSavedDevices = () => {
+  /**
+   * Build getUserMedia constraints. Prefer saved deviceId; always fall back to
+   * facingMode so a missing/unplugged device does not block recording.
+   * Video messages ALWAYS start as selfie (facingMode: user) unless the user
+   * has already flipped during this session (cameraFacingRef).
+   */
+  const buildMediaConstraints = (mode, facingOverride) => {
+    const { cameraId, micId } = getSavedDevices();
+    const audioConstraint = micId
+      ? { deviceId: { ideal: micId } }
+      : true;
+
+    if (mode !== "video") {
+      return { video: false, audio: audioConstraint };
+    }
+
+    const facing = facingOverride || cameraFacingRef.current || "user";
+    const videoConstraint = {
+      width: { ideal: 480 },
+      height: { ideal: 480 },
+      facingMode: { ideal: facing },
+    };
+    if (cameraId) {
+      // Prefer exact so desktop actually opens the camera chosen in settings.
+      // beginRecording falls back if this fails.
+      videoConstraint.deviceId = { exact: cameraId };
+    }
+    return { video: videoConstraint, audio: audioConstraint };
+  };
+
+  /**
+   * Start (or restart after camera flip) a MediaRecorder on the given stream.
+   * Chunks accumulate in chunksRef so a mid-recording camera flip does not lose data.
+   */
+  const startMediaRecorderOnStream = (stream, mode) => {
+    const mimeType = mode === "video" ? "video/webm" : "audio/webm";
+    const options = MediaRecorder.isTypeSupported(mimeType) ? { mimeType } : {};
+    // If an old recorder is still alive (e.g. during flip), flush remaining data then
+    // stop it without running finalization so chunks stay in chunksRef.
+    const prev = mediaRecorderRef.current;
+    if (prev && prev.state !== "inactive") {
+      try {
+        prev.onstop = null;
+        try { prev.requestData(); } catch { /* */ }
+        prev.stop();
+      } catch { /* */ }
+    }
+
+    const mr = new MediaRecorder(stream, options);
+    mr.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunksRef.current.push(e.data);
+    };
+    mr.onstop = () => {
+      // Ignore intermediate stops from camera-flip restarts
+      if (mediaRecorderRef.current !== mr) return;
+      mediaRecorderRef.current = null;
+
+      const wasCancel = cancelRef.current;
+      const recordedType = mr.mimeType || mimeType;
+      const blob = new Blob(chunksRef.current, { type: recordedType });
+      chunksRef.current = [];
+      stopAllTracks();
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      setRecPhase("idle");
+      setLocked(false);
+      lockedRef.current = false;
+      setHint("");
+      setDragUI({ dx: 0, dy: 0 });
+      setRecordSeconds(0);
+
+      if (wasCancel || !blob.size) {
+        if (!wasCancel && !blob.size) setRecordError("Recording was empty");
+        return;
+      }
+      const ts = Date.now();
+      const filename = mode === "video" ? `video_message_${ts}.webm` : `voice_${ts}.webm`;
+      const file = new File([blob], filename, { type: recordedType });
+      flushSync(() => {
+        setFiles((prev) => [...prev, file]);
+      });
+      try { onSend?.(); } catch { /* */ }
+    };
+    mediaRecorderRef.current = mr;
+    mr.start(100);
+    return mr;
+  };
+
+  /**
+   * Flip front/rear camera WITHOUT stopping the voice track or discarding
+   * already-recorded chunks. Stopping the old video track used to end the
+   * MediaRecorder (browser fires track-ended → recorder stop). We now:
+   *  1) acquire the opposite camera
+   *  2) build a fresh MediaStream (new video + existing audio tracks)
+   *  3) restart MediaRecorder on that stream while keeping chunksRef
+   *  4) only then stop the previous video track
+   */
+  const flipCamera = async () => {
+    if (recKind !== "video" || flippingCam || !streamRef.current) return;
+    setFlippingCam(true);
+    setRecordError("");
+    const nextFacing = cameraFacingRef.current === "user" ? "environment" : "user";
+    const oldStream = streamRef.current;
+    let newVideoStream = null;
     try {
-      const saved = JSON.parse(localStorage.getItem("messenger.mediaDevices") || "{}");
-      return { cameraId: saved.cameraId || "", micId: saved.micId || "" };
-    } catch {
-      return { cameraId: "", micId: "" };
+      let videoConstraints = {
+        facingMode: { ideal: nextFacing },
+        width: { ideal: 480 },
+        height: { ideal: 480 },
+      };
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cams = devices.filter((d) => d.kind === "videoinput");
+        if (cams.length > 1) {
+          const currentId = oldStream.getVideoTracks()[0]?.getSettings?.()?.deviceId;
+          const other = cams.find((c) => c.deviceId && c.deviceId !== currentId);
+          const byLabel = cams.find((c) => {
+            const lab = (c.label || "").toLowerCase();
+            if (nextFacing === "user") {
+              return /front|user|face|selfie|\u062c\u0644\u0648/.test(lab);
+            }
+            return /back|rear|environment|world|\u0639\u0642\u0628|\u067e\u0634\u062a/.test(lab);
+          });
+          const pick = byLabel || other;
+          if (pick?.deviceId) {
+            videoConstraints = {
+              deviceId: { ideal: pick.deviceId },
+              facingMode: { ideal: nextFacing },
+              width: { ideal: 480 },
+              height: { ideal: 480 },
+            };
+          }
+        }
+      } catch { /* enumerate optional */ }
+
+      newVideoStream = await navigator.mediaDevices.getUserMedia({
+        video: videoConstraints,
+        audio: false,
+      });
+      const newTrack = newVideoStream.getVideoTracks()[0];
+      if (!newTrack) {
+        newVideoStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+        throw new Error("No video track from new camera");
+      }
+
+      // Keep existing live audio tracks
+      const audioTracks = oldStream.getAudioTracks().filter((t) => t.readyState === "live");
+      const combined = new MediaStream([newTrack, ...audioTracks]);
+
+      // Restart recorder on the new stream BEFORE stopping the old video track
+      startMediaRecorderOnStream(combined, "video");
+      streamRef.current = combined;
+
+      // Release previous camera
+      oldStream.getVideoTracks().forEach((t) => {
+        try { oldStream.removeTrack(t); } catch { /* */ }
+        try { t.stop(); } catch { /* */ }
+      });
+      newVideoStream.getTracks().forEach((t) => {
+        if (t !== newTrack) {
+          try { t.stop(); } catch { /* */ }
+        }
+      });
+
+      setCameraFacing(nextFacing);
+      cameraFacingRef.current = nextFacing;
+      try { localStorage.setItem("messenger.videoFacing", nextFacing); } catch { /* */ }
+
+      if (videoPreviewRef.current) {
+        videoPreviewRef.current.srcObject = combined;
+        videoPreviewRef.current.play().catch(() => {});
+      }
+    } catch (e) {
+      if (newVideoStream) {
+        newVideoStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
+      }
+      setRecordError(e?.message || "Could not switch camera");
+    } finally {
+      setFlippingCam(false);
     }
   };
 
@@ -542,22 +823,35 @@ export default function MessageComposer({
     cancelRef.current = false;
     setHint("Slide up to lock · left to cancel");
     setDragUI({ dx: 0, dy: 0 });
+    // Video messages always open on the selfie (front) camera
+    if (mode === "video") {
+      setCameraFacing("user");
+      cameraFacingRef.current = "user";
+      try { localStorage.setItem("messenger.videoFacing", "user"); } catch { /* */ }
+    }
     try {
-      const { micId } = getSavedDevices();
-      const audioConstraint = micId ? { deviceId: { exact: micId } } : true;
-      // Video messages default to selfie (facingMode user). Flip button switches to rear.
-      const facing = (typeof cameraFacingRef !== "undefined" && cameraFacingRef.current) || "user";
-      const videoConstraint = mode === "video"
-        ? {
-            width: { ideal: 480 },
-            height: { ideal: 480 },
-            facingMode: { ideal: facing },
-          }
-        : false;
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraint,
-        audio: audioConstraint,
-      });
+      const constraints = buildMediaConstraints(mode, mode === "video" ? "user" : undefined);
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (firstErr) {
+        // Stale deviceId / constraint failure → retry without deviceId
+        if (mode === "video" || constraints.audio?.deviceId) {
+          const fallback = {
+            video: mode === "video"
+              ? {
+                  width: { ideal: 480 },
+                  height: { ideal: 480 },
+                  facingMode: { ideal: "user" },
+                }
+              : false,
+            audio: true,
+          };
+          stream = await navigator.mediaDevices.getUserMedia(fallback);
+        } else {
+          throw firstErr;
+        }
+      }
       // User may have cancelled during permission prompt
       if (cancelRef.current) {
         stream.getTracks().forEach((t) => t.stop());
@@ -571,39 +865,8 @@ export default function MessageComposer({
         videoPreviewRef.current.play().catch(() => {});
       }
 
-      const mimeType = mode === "video" ? "video/webm" : "audio/webm";
-      const options = MediaRecorder.isTypeSupported(mimeType) ? { mimeType } : {};
-      const mr = new MediaRecorder(stream, options);
       chunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
-      mr.onstop = () => {
-        const wasCancel = cancelRef.current;
-        const recordedType = mr.mimeType || mimeType;
-        const blob = new Blob(chunksRef.current, { type: recordedType });
-        stopAllTracks();
-        if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
-        setRecPhase("idle");
-        setLocked(false);
-        lockedRef.current = false;
-        setHint("");
-        setDragUI({ dx: 0, dy: 0 });
-        setRecordSeconds(0);
-
-        if (wasCancel || !blob.size) {
-          if (!wasCancel && !blob.size) setRecordError("Recording was empty");
-          return;
-        }
-        const ts = Date.now();
-        const filename = mode === "video" ? `video_message_${ts}.webm` : `voice_${ts}.webm`;
-        const file = new File([blob], filename, { type: recordedType });
-        // flushSync so parent onSend sees the new file in state immediately
-        flushSync(() => {
-          setFiles((prev) => [...prev, file]);
-        });
-        try { onSend?.(); } catch { /* */ }
-      };
-      mediaRecorderRef.current = mr;
-      mr.start(100);
+      startMediaRecorderOnStream(stream, mode);
       setRecKind(mode);
       setRecPhase("holding");
       setRecordSeconds(0);
@@ -629,9 +892,13 @@ export default function MessageComposer({
 
   const stopRecording = useCallback((cancel = false) => {
     cancelRef.current = !!cancel;
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      try { mediaRecorderRef.current.stop(); } catch { /* */ }
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== "inactive") {
+      // Do NOT null mediaRecorderRef here — onstop checks identity against
+      // mediaRecorderRef to ignore intermediate stops from camera flips.
+      try { mr.stop(); } catch { /* */ }
     } else {
+      mediaRecorderRef.current = null;
       stopAllTracks();
       setRecPhase("idle");
       setLocked(false);
@@ -639,12 +906,21 @@ export default function MessageComposer({
       setHint("");
       setRecordSeconds(0);
     }
-    mediaRecorderRef.current = null;
   }, []);
 
   const cancelRecording = useCallback(() => {
     stopRecording(true);
   }, [stopRecording]);
+
+  /** Unlock recording: go back to holding so user can cancel by sliding or release. */
+  const unlockRecording = useCallback(() => {
+    if (recPhase !== "locked") return;
+    lockedRef.current = false;
+    setLocked(false);
+    setRecPhase("holding");
+    setHint("Slide left to cancel · tap lock to re-lock");
+    setDragUI({ dx: 0, dy: 0 });
+  }, [recPhase]);
 
   /* ---------- pointer handlers for hold-to-record ---------- */
   const onMediaPointerDown = (e, mode) => {
@@ -903,6 +1179,38 @@ export default function MessageComposer({
         return;
       }
     }
+
+    // Formatting shortcuts (desktop + external keyboard on mobile)
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.altKey) {
+      const key = e.key.toLowerCase();
+      if (key === "e" && e.shiftKey) {
+        e.preventDefault();
+        applyTextFormat("codeblock");
+        return;
+      }
+      if (key === "e") {
+        e.preventDefault();
+        applyTextFormat("code");
+        return;
+      }
+      if (key === "s" && e.shiftKey) {
+        e.preventDefault();
+        applyTextFormat("spoiler");
+        return;
+      }
+      if (key === "q" && e.shiftKey) {
+        e.preventDefault();
+        applyTextFormat("quote");
+        return;
+      }
+      if (e.key === "`" || e.code === "Backquote") {
+        e.preventDefault();
+        applyTextFormat("code");
+        return;
+      }
+    }
+
     onKeyDown?.(e);
   };
 
@@ -935,6 +1243,135 @@ export default function MessageComposer({
     if (list?.length) addPickedFiles(list);
   };
 
+
+  const openFilePreview = async (f) => {
+    if (!f) return;
+    const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || "");
+    const isTxt = f.type === "text/plain" || /\.(txt|md|csv|log)$/i.test(f.name || "");
+    try {
+      if (isPdf) {
+        const url = URL.createObjectURL(f);
+        setFilePreview({ name: f.name || "document.pdf", kind: "pdf", url });
+      } else if (isTxt) {
+        const textContent = await f.text();
+        setFilePreview({
+          name: f.name || "file.txt",
+          kind: "txt",
+          text: textContent.slice(0, 200000),
+        });
+      }
+    } catch (e) {
+      setRecordError(e?.message || "Could not preview file");
+    }
+  };
+
+  const closeFilePreview = () => {
+    setFilePreview((prev) => {
+      if (prev?.url) {
+        try { URL.revokeObjectURL(prev.url); } catch { /* */ }
+      }
+      return null;
+    });
+  };
+
+  const getComposerTextarea = () => {
+    const el = inputRef?.current;
+    if (!el) return null;
+    if (typeof el.selectionStart === "number") return el;
+    return el.querySelector?.("textarea") || el;
+  };
+
+  const rememberSelection = (ta) => {
+    if (!ta || typeof ta.selectionStart !== "number") return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    selectionRef.current = {
+      start: Math.min(start, end),
+      end: Math.max(start, end),
+    };
+  };
+
+  /** Wrap current selection (or insert at cursor) with formatting markers. */
+  const applyTextFormat = (kind) => {
+    const ta = getComposerTextarea();
+    const value = text || "";
+    let start = selectionRef.current?.start ?? 0;
+    let end = selectionRef.current?.end ?? 0;
+    if (ta && typeof ta.selectionStart === "number") {
+      // Live selection wins when focused; otherwise keep remembered range
+      if (document.activeElement === ta || (ta.selectionStart !== ta.selectionEnd)) {
+        start = Math.min(ta.selectionStart, ta.selectionEnd);
+        end = Math.max(ta.selectionStart, ta.selectionEnd);
+      }
+    }
+    if (fmtMenu && typeof fmtMenu.start === "number" && start === end && fmtMenu.start !== fmtMenu.end) {
+      start = fmtMenu.start;
+      end = fmtMenu.end ?? fmtMenu.start;
+    }
+    start = Math.max(0, Math.min(start, value.length));
+    end = Math.max(start, Math.min(end, value.length));
+
+    const selected = value.slice(start, end);
+    let next;
+    let selFrom;
+    let selTo;
+    if (kind === "spoiler") {
+      const inner = selected || "text";
+      next = value.slice(0, start) + "||" + inner + "||" + value.slice(end);
+      selFrom = start + 2;
+      selTo = selFrom + inner.length;
+    } else if (kind === "code") {
+      const inner = selected || "code";
+      next = value.slice(0, start) + "`" + inner + "`" + value.slice(end);
+      selFrom = start + 1;
+      selTo = selFrom + inner.length;
+    } else if (kind === "codeblock") {
+      const inner = selected || "code";
+      // Language sits right after opening fence; preview lets user edit it.
+      next = value.slice(0, start) + "```\n" + inner + "\n```" + value.slice(end);
+      // Place caret after ``` so user can type language (js, python, …)
+      selFrom = start + 3;
+      selTo = start + 3;
+    } else if (kind === "quote") {
+      const block = (selected || "quote").split("\n").map((l) => (l.startsWith("> ") ? l : ("> " + l))).join("\n");
+      next = value.slice(0, start) + block + value.slice(end);
+      selFrom = start;
+      selTo = start + block.length;
+    } else {
+      setFmtMenu(null);
+      return;
+    }
+    setText(next);
+    setFmtMenu(null);
+    selectionRef.current = { start: selFrom, end: selTo };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try {
+          const node = getComposerTextarea();
+          if (node) {
+            node.focus();
+            node.setSelectionRange(selFrom, selTo);
+            rememberSelection(node);
+          }
+        } catch { /* */ }
+      });
+    });
+  };
+
+  const onTextContextMenu = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const ta = getComposerTextarea() || e.currentTarget?.querySelector?.("textarea") || e.currentTarget;
+    rememberSelection(ta);
+    const { start, end } = selectionRef.current;
+    setFmtMenu({
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      start,
+      end,
+    });
+  };
+
   const handleFileChange = (e) => {
     addPickedFiles(e.target.files);
     e.target.value = "";
@@ -962,87 +1399,113 @@ export default function MessageComposer({
   if (recPhase === "holding" || recPhase === "locked") {
     const showLock = locked || recPhase === "locked";
     return (
-      <Box sx={{ borderTop: "1px solid", borderColor: "divider", bgcolor: "background.paper", p: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          {/* Full-screen circular selfie preview for video messages */}
-          {recKind === "video" && (
-            <Box
-              sx={{
-                position: "fixed", inset: 0, zIndex: 1400,
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center",
-                bgcolor: "rgba(0,0,0,0.78)",
-                pointerEvents: "none",
-              }}
-            >
-              <Box sx={{ position: "relative", pointerEvents: "auto" }}>
+      <Box
+        sx={{
+          position: "relative",
+          borderTop: "1px solid",
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          p: 1.25,
+          zIndex: 20,
+        }}
+      >
+        {/* Video preview sits ABOVE the composer only (chat pane), not fullscreen */}
+        {recKind === "video" && (
+          <Box
+            sx={{
+              position: "absolute",
+              left: "50%",
+              bottom: "100%",
+              transform: "translateX(-50%)",
+              mb: 1.5,
+              zIndex: 25,
+              pointerEvents: "auto",
+            }}
+          >
+            <Box sx={{ position: "relative" }}>
+              <Box
+                sx={{
+                  width: { xs: 168, sm: 200 },
+                  height: { xs: 168, sm: 200 },
+                  borderRadius: "50%",
+                  overflow: "hidden",
+                  border: "3px solid",
+                  borderColor: showLock ? "warning.main" : "error.main",
+                  boxShadow: "0 12px 40px rgba(0,0,0,0.45), 0 0 0 4px rgba(0,0,0,0.25)",
+                  bgcolor: "#000",
+                }}
+              >
                 <Box
+                  component="video"
+                  ref={videoPreviewRef}
+                  muted
+                  playsInline
+                  autoPlay
                   sx={{
-                    width: { xs: 220, sm: 280 }, height: { xs: 220, sm: 280 },
-                    borderRadius: "50%", overflow: "hidden",
-                    border: "3px solid",
-                    borderColor: (locked || recPhase === "locked") ? "warning.main" : "error.main",
-                    boxShadow: "0 0 0 6px rgba(0,0,0,0.35), 0 16px 48px rgba(0,0,0,0.55)",
-                    bgcolor: "#000",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                    transform: cameraFacing === "user" ? "scaleX(-1)" : "none",
                   }}
-                >
-                  <Box
-                    component="video"
-                    ref={videoPreviewRef}
-                    muted playsInline autoPlay
-                    sx={{
-                      width: "100%", height: "100%", objectFit: "cover", display: "block",
-                      transform: cameraFacing === "user" ? "scaleX(-1)" : "none",
-                    }}
-                  />
-                </Box>
-                <IconButton
-                  onClick={flipCamera}
-                  disabled={flippingCam}
-                  title={cameraFacing === "user" ? "Switch to rear camera" : "Switch to selfie"}
-                  sx={{
-                    position: "absolute", right: -8, bottom: 12,
-                    bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
-                    border: "1px solid rgba(255,255,255,0.25)",
-                    "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
-                    width: 44, height: 44,
-                  }}
-                >
-                  <CameraswitchIcon />
-                </IconButton>
+                />
               </Box>
-              <Typography sx={{ color: "#fff", fontWeight: 700, mt: 2, fontVariantNumeric: "tabular-nums" }}>
-                {formatRecTime(recordSeconds)}
-              </Typography>
-              <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.75)", mt: 0.5 }}>
-                {(locked || recPhase === "locked")
-                  ? "Locked · tap send when finished"
-                  : (hint || "Slide up to lock · left to cancel")}
-              </Typography>
+              <IconButton
+                onClick={flipCamera}
+                disabled={flippingCam}
+                title={cameraFacing === "user" ? "Switch to rear camera" : "Switch to selfie"}
+                sx={{
+                  position: "absolute",
+                  right: -4,
+                  bottom: 8,
+                  bgcolor: "rgba(0,0,0,0.6)",
+                  color: "#fff",
+                  border: "1px solid rgba(255,255,255,0.25)",
+                  "&:hover": { bgcolor: "rgba(0,0,0,0.8)" },
+                  width: 36,
+                  height: 36,
+                }}
+              >
+                <CameraswitchIcon sx={{ fontSize: 20 }} />
+              </IconButton>
             </Box>
-          )}
+          </Box>
+        )}
 
-          <IconButton onClick={cancelRecording} title="Cancel">
-            <DeleteOutlineIcon color="error" />
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <IconButton onClick={cancelRecording} title="Cancel" sx={{ color: "error.main" }}>
+            <DeleteOutlineIcon />
           </IconButton>
 
-          <Box sx={{
-            flex: 1, minWidth: 0,
-            bgcolor: "action.hover", borderRadius: 3, px: 1.5, py: 0.75,
-            transform: !showLock ? `translateX(${Math.min(0, dragUI.dx * 0.35)}px)` : "none",
-            transition: showLock ? "transform 0.15s" : "none",
-          }}>
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              bgcolor: "action.hover",
+              borderRadius: 3,
+              px: 1.5,
+              py: 0.85,
+              transform: !showLock ? `translateX(${Math.min(0, dragUI.dx * 0.35)}px)` : "none",
+              transition: showLock ? "transform 0.15s" : "none",
+            }}
+          >
             <Stack direction="row" alignItems="center" spacing={1}>
-              <Box sx={{
-                width: 10, height: 10, borderRadius: "50%", bgcolor: "error.main", flexShrink: 0,
-                animation: "pulse 1.2s infinite",
-                "@keyframes pulse": {
-                  "0%": { opacity: 1 },
-                  "50%": { opacity: 0.35 },
-                  "100%": { opacity: 1 },
-                },
-              }} />
-              <Typography variant="body2" fontWeight={700} noWrap>
+              <Box
+                sx={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
+                  bgcolor: "error.main",
+                  flexShrink: 0,
+                  animation: "pulse 1.2s infinite",
+                  "@keyframes pulse": {
+                    "0%": { opacity: 1 },
+                    "50%": { opacity: 0.35 },
+                    "100%": { opacity: 1 },
+                  },
+                }}
+              />
+              <Typography variant="body2" fontWeight={700} noWrap sx={{ fontVariantNumeric: "tabular-nums" }}>
                 {formatRecTime(recordSeconds)}
               </Typography>
               {showLock ? (
@@ -1051,47 +1514,91 @@ export default function MessageComposer({
                 <LockOpenOutlinedIcon sx={{ fontSize: 16, color: "text.secondary", opacity: 0.7 }} />
               )}
               <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1 }}>
-                {hint}
+                {showLock
+                  ? "Locked · finish when ready"
+                  : (hint || (recKind === "video" ? "Slide up / lock · left cancel" : "Slide up to lock · left cancel"))}
               </Typography>
             </Stack>
-            <Box sx={{
-              mt: 0.5, width: "100%", height: 5, borderRadius: 3,
-              bgcolor: "action.selected", overflow: "hidden", position: "relative",
-            }}>
-              <Box sx={{
-                position: "absolute", left: 0, top: 0, bottom: 0,
-                width: `${Math.min(100, Math.round(micLevel * 100))}%`,
-                bgcolor: micLevel > 0.85 ? "error.main" : micLevel > 0.55 ? "warning.main" : "success.main",
-                transition: "width 0.04s linear",
-              }} />
+            <Box
+              sx={{
+                mt: 0.6,
+                width: "100%",
+                height: 5,
+                borderRadius: 3,
+                bgcolor: "action.selected",
+                overflow: "hidden",
+                position: "relative",
+              }}
+            >
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: `${Math.min(100, Math.round(micLevel * 100))}%`,
+                  bgcolor: micLevel > 0.85 ? "error.main" : micLevel > 0.55 ? "warning.main" : "success.main",
+                  transition: "width 0.04s linear",
+                }}
+              />
             </Box>
           </Box>
 
-          {/* Lock affordance (visual) while holding */}
           {!showLock && (
-            <Box sx={{
-              display: "flex", flexDirection: "column", alignItems: "center",
-              opacity: 0.55 + Math.min(0.45, Math.max(0, -dragUI.dy) / 56),
-              transform: `translateY(${Math.max(LOCK_DY, Math.min(0, dragUI.dy)) * 0.3}px)`,
-            }}>
+            <IconButton
+              onClick={() => {
+                lockedRef.current = true;
+                setLocked(true);
+                setRecPhase("locked");
+                setHint("Locked · finish when ready");
+                setDragUI({ dx: 0, dy: 0 });
+              }}
+              title="Lock recording"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                opacity: 0.55 + Math.min(0.45, Math.max(0, -dragUI.dy) / 40),
+                transform: `translateY(${Math.max(LOCK_DY, Math.min(0, dragUI.dy)) * 0.3}px)`,
+                borderRadius: 2,
+                px: 0.75,
+              }}
+            >
               <KeyboardArrowUpIcon fontSize="small" color="action" />
-              <LockOutlinedIcon sx={{ fontSize: 18 }} color="action" />
-            </Box>
+              <LockOutlinedIcon sx={{ fontSize: 20 }} color="action" />
+            </IconButton>
           )}
 
           {showLock && (
             <IconButton
-              color="primary"
-              onClick={() => stopRecording(false)}
+              onClick={unlockRecording}
+              title="Unlock"
               sx={{
-                bgcolor: "primary.main", color: "#fff",
-                "&:hover": { bgcolor: "primary.dark" },
+                bgcolor: "action.hover",
+                border: "1px solid",
+                borderColor: "divider",
               }}
-              title="Send"
             >
-              <SendIcon />
+              <LockOpenOutlinedIcon />
             </IconButton>
           )}
+
+          {/* Red finish / stop recording — always visible while recording */}
+          <IconButton
+            onClick={() => stopRecording(false)}
+            title="Finish & send"
+            sx={{
+              width: 48,
+              height: 48,
+              bgcolor: "error.main",
+              color: "#fff",
+              boxShadow: "0 4px 14px rgba(211,47,47,0.45)",
+              "&:hover": { bgcolor: "error.dark" },
+              flexShrink: 0,
+            }}
+          >
+            <StopCircleIcon sx={{ fontSize: 28 }} />
+          </IconButton>
         </Stack>
       </Box>
     );
@@ -1297,56 +1804,79 @@ export default function MessageComposer({
             scrollbarWidth: "thin",
             "&::-webkit-scrollbar": { height: 4 },
           }}>
-          <Stack direction="row" spacing={1} sx={{ width: "max-content", pr: 1 }}>
+          <Stack direction="row" spacing={1.25} sx={{ width: "max-content", pr: 1, pt: 0.75, pb: 0.25 }}>
             {files.map((f, i) => {
               const url = thumbUrl(f);
               const isImg = f.type?.startsWith("image/");
               const isVid = f.type?.startsWith("video/");
+              const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || "");
+              const isTxt = f.type === "text/plain" || /\.(txt|md|csv|log)$/i.test(f.name || "");
+              const canPreview = isImg || isVid || isPdf || isTxt;
               return (
                 <Box
                   key={`${f.name}-${f.size}-${i}`}
-                  onClick={() => {
-                    if ((isImg || isVid) && onEditAttachment) onEditAttachment(f, i);
-                  }}
                   sx={{
                     position: "relative",
                     width: 72, height: 72, flexShrink: 0,
-                    borderRadius: 2,
-                    overflow: "hidden",
-                    border: "1px solid",
-                    borderColor: "divider",
-                    bgcolor: "action.hover",
-                    cursor: (isImg || isVid) ? "pointer" : "default",
+                    // overflow visible so the close button is not clipped
+                    overflow: "visible",
                     userSelect: "none",
                   }}
                 >
-                  {url ? (
-                    isVid ? (
-                      <Box
-                        component="video"
-                        src={url}
-                        muted
-                        playsInline
-                        sx={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
-                      />
+                  <Box
+                    onClick={() => {
+                      if ((isImg || isVid) && onEditAttachment) onEditAttachment(f, i);
+                      else if (isPdf || isTxt) openFilePreview(f);
+                    }}
+                    sx={{
+                      width: "100%", height: "100%",
+                      borderRadius: 2,
+                      overflow: "hidden",
+                      border: "1px solid",
+                      borderColor: "divider",
+                      bgcolor: "action.hover",
+                      cursor: canPreview ? "pointer" : "default",
+                    }}
+                  >
+                    {url ? (
+                      isVid ? (
+                        <Box
+                          component="video"
+                          src={url}
+                          muted
+                          playsInline
+                          sx={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+                        />
+                      ) : (
+                        <Box
+                          component="img"
+                          src={url}
+                          alt=""
+                          sx={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
+                        />
+                      )
                     ) : (
-                      <Box
-                        component="img"
-                        src={url}
-                        alt=""
-                        sx={{ width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }}
-                      />
-                    )
-                  ) : (
-                    <Box sx={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {f.name?.startsWith("voice_") ? <MicIcon /> : f.name?.startsWith("video_message_") ? <VideocamIcon /> : <AttachFileIcon />}
-                    </Box>
-                  )}
-                  {isVid && (
-                    <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(0,0,0,0.25)", pointerEvents: "none" }}>
-                      <VideocamIcon sx={{ color: "#fff", fontSize: 22 }} />
-                    </Box>
-                  )}
+                      <Box sx={{
+                        width: "100%", height: "100%", display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center", gap: 0.25, px: 0.5,
+                      }}>
+                        {f.name?.startsWith("voice_") ? <MicIcon />
+                          : f.name?.startsWith("video_message_") ? <VideocamIcon />
+                          : isPdf ? <PictureAsPdfIcon color="error" />
+                          : isTxt ? <DescriptionIcon color="primary" />
+                          : <AttachFileIcon />}
+                        <Typography variant="caption" noWrap sx={{ maxWidth: "100%", fontSize: 9, lineHeight: 1.1, opacity: 0.8 }}>
+                          {(f.name || "file").length > 10 ? `${(f.name || "").slice(0, 8)}…` : (f.name || "file")}
+                        </Typography>
+                      </Box>
+                    )}
+                    {isVid && (
+                      <Box sx={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "rgba(0,0,0,0.25)", pointerEvents: "none", borderRadius: 2 }}>
+                        <VideocamIcon sx={{ color: "#fff", fontSize: 22 }} />
+                      </Box>
+                    )}
+                  </Box>
+                  {/* Close sits ABOVE the tile, not clipped by overflow */}
                   <IconButton
                     size="small"
                     onClick={(e) => {
@@ -1354,13 +1884,22 @@ export default function MessageComposer({
                       setFiles((prev) => prev.filter((_, j) => j !== i));
                     }}
                     sx={{
-                      position: "absolute", top: 2, right: 2,
-                      width: 28, height: 28, p: 0,
-                      bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
-                      "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
+                      position: "absolute",
+                      top: -8,
+                      right: -8,
+                      width: 24,
+                      height: 24,
+                      p: 0,
+                      zIndex: 2,
+                      bgcolor: "error.main",
+                      color: "#fff",
+                      boxShadow: 2,
+                      border: "2px solid",
+                      borderColor: "background.paper",
+                      "&:hover": { bgcolor: "error.dark" },
                     }}
                   >
-                    <CloseIcon sx={{ fontSize: 17 }} />
+                    <CloseIcon sx={{ fontSize: 14 }} />
                   </IconButton>
                 </Box>
               );
@@ -1370,6 +1909,58 @@ export default function MessageComposer({
         </Box>
       )}
 
+
+
+
+      {/* Multi-file code workspace + quote editors */}
+      {(() => {
+        const blocks = extractComposeBlocks(text);
+        const codeBlocks = blocks.filter((b) => b.type === "codeblock");
+        const quoteBlocks = blocks.filter((b) => b.type === "quote");
+        if (!codeBlocks.length && !quoteBlocks.length) return null;
+        const split = splitMarkdownCode(text);
+        return (
+          <Box
+            sx={{
+              px: 1.25,
+              pt: 1,
+              pb: 0.75,
+              borderTop: files.length ? "none" : "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.paper",
+            }}
+          >
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.85, fontWeight: 700 }}>
+              Editors
+            </Typography>
+            <Stack spacing={1.25}>
+              {codeBlocks.length > 0 && (
+                <ComposeCodeWorkspace
+                  files={split.files}
+                  onChangeFiles={(nextFiles) => {
+                    setText(joinMarkdownCode(split.prefix, nextFiles, split.suffix));
+                  }}
+                  onAttachFile={(file) => {
+                    setFiles((prev) => [...prev, file]);
+                  }}
+                  onRemoveAll={() => {
+                    setText([split.prefix, split.suffix].filter(Boolean).join("\n\n"));
+                  }}
+                />
+              )}
+              {quoteBlocks.map((b) => (
+                <ComposeQuoteEditor
+                  key={`q-${b.start}`}
+                  text={b.text}
+                  onChange={(q) => setText(replaceQuoteBlock(text, b.start, b.end, q))}
+                  onRemove={() => setText((text || "").slice(0, b.start) + (text || "").slice(b.end))}
+                />
+              ))}
+            </Stack>
+          </Box>
+        );
+      })()}
+
       <Stack direction="row" alignItems="center" spacing={isMobile ? 0.15 : 0.5}
         sx={{
           p: isMobile ? 0.75 : 1,
@@ -1378,25 +1969,167 @@ export default function MessageComposer({
           borderColor: "divider",
         }}>
         <input
-          ref={fileRef} type="file" multiple hidden
-          accept="image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv"
-          onChange={handleFileChange}
+          ref={fileRef}
+          type="file"
+          multiple
+          hidden
+          accept={attachAccept}
+          {...(attachCapture ? { capture: attachCapture } : {})}
+          onChange={(e) => {
+            handleFileChange(e);
+            setAttachCapture(undefined);
+          }}
         />
         {!editingMsg && (
-          <Tooltip title="Attach files">
-            <IconButton
-              onClick={() => fileRef.current?.click()}
-              size="small"
-              sx={{
-                p: isMobile ? 0.5 : 1,
-                mr: isMobile ? -0.25 : 0,
-                alignSelf: "center",
-              }}
-            >
-              <AttachFileIcon sx={{ fontSize: isMobile ? 20 : 24 }} />
-            </IconButton>
-          </Tooltip>
+          <>
+            <Tooltip title="Attach">
+              <IconButton
+                onClick={() => setAttachMenuAnchor((v) => (v ? null : true))}
+                size="small"
+                sx={{
+                  p: isMobile ? 0.5 : 1,
+                  mr: isMobile ? -0.25 : 0,
+                  alignSelf: "center",
+                  bgcolor: attachMenuAnchor ? (t) => alpha(t.palette.primary.main, 0.15) : "transparent",
+                }}
+              >
+                <AttachFileIcon sx={{ fontSize: isMobile ? 20 : 24 }} />
+              </IconButton>
+            </Tooltip>
+
+            {/* Curved attach island — circular action buttons */}
+            {Boolean(attachMenuAnchor) && (
+              <Box
+                onClick={() => setAttachMenuAnchor(null)}
+                sx={{ position: "fixed", inset: 0, zIndex: 35, bgcolor: "transparent" }}
+              />
+            )}
+            {Boolean(attachMenuAnchor) && (
+              <Box
+                onClick={(e) => e.stopPropagation()}
+                sx={{
+                  position: "absolute",
+                  left: 8,
+                  right: 8,
+                  bottom: "100%",
+                  mb: 1,
+                  zIndex: 40,
+                  display: "flex",
+                  justifyContent: "center",
+                  pointerEvents: "auto",
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: { xs: 1, sm: 1.5 },
+                    px: { xs: 1.5, sm: 2.25 },
+                    py: 1.25,
+                    borderRadius: 999,
+                    bgcolor: (t) => alpha(t.palette.background.paper, 0.92),
+                    backdropFilter: "blur(16px)",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    boxShadow: "0 10px 40px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.08)",
+                  }}
+                >
+                  {[
+                    {
+                      key: "photo",
+                      label: "Photos",
+                      icon: <ImageIcon />,
+                      color: "#42a5f5",
+                      accept: "image/*,image/gif,.gif,.jpg,.jpeg,.png,.webp,.heic",
+                      capture: undefined,
+                    },
+                    {
+                      key: "video",
+                      label: "Videos",
+                      icon: <MovieIcon />,
+                      color: "#ab47bc",
+                      accept: "video/*,.mp4,.webm,.mov,.mkv",
+                      capture: undefined,
+                    },
+                    {
+                      key: "audio",
+                      label: "Audio",
+                      icon: <AudioFileIcon />,
+                      color: "#26a69a",
+                      accept: "audio/*,.mp3,.ogg,.wav,.m4a,.aac,.flac",
+                      capture: undefined,
+                    },
+                    {
+                      key: "doc",
+                      label: "Files",
+                      icon: <InsertDriveFileIcon />,
+                      color: "#78909c",
+                      accept: ".pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.csv,.md,.json",
+                      capture: undefined,
+                    },
+                    {
+                      key: "all",
+                      label: "All",
+                      icon: <AttachFileIcon />,
+                      color: "#5c6bc0",
+                      accept: "image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv,*/*",
+                      capture: undefined,
+                    },
+                    ...(isMobile
+                      ? [
+                          {
+                            key: "cam",
+                            label: "Camera",
+                            icon: <PhotoCameraIcon />,
+                            color: "#ef5350",
+                            accept: "image/*",
+                            capture: "environment",
+                          },
+                        ]
+                      : []),
+                  ].map((item) => (
+                    <Tooltip key={item.key} title={item.label} arrow>
+                      <Box
+                        component="button"
+                        type="button"
+                        onClick={() => {
+                          setAttachMenuAnchor(null);
+                          setAttachAccept(item.accept);
+                          setAttachCapture(item.capture);
+                          requestAnimationFrame(() => fileRef.current?.click());
+                        }}
+                        sx={{
+                          width: { xs: 48, sm: 54 },
+                          height: { xs: 48, sm: 54 },
+                          borderRadius: "50%",
+                          border: "none",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          bgcolor: alpha(item.color, 0.16),
+                          color: item.color,
+                          transition: "transform 0.15s, background 0.15s, box-shadow 0.15s",
+                          boxShadow: `0 4px 14px ${alpha(item.color, 0.25)}`,
+                          "&:hover": {
+                            transform: "translateY(-3px) scale(1.05)",
+                            bgcolor: alpha(item.color, 0.28),
+                            boxShadow: `0 8px 20px ${alpha(item.color, 0.35)}`,
+                          },
+                          "&:active": { transform: "scale(0.96)" },
+                          "& .MuiSvgIcon-root": { fontSize: { xs: 22, sm: 24 } },
+                        }}
+                      >
+                        {item.icon}
+                      </Box>
+                    </Tooltip>
+                  ))}
+                </Box>
+              </Box>
+            )}
+          </>
         )}
+
         <Tooltip title="Emoji">
           <IconButton
             ref={emojiBtnRef}
@@ -1458,26 +2191,41 @@ export default function MessageComposer({
           minRows={1}
           size="small"
           placeholder={editingMsg ? "Edit message…" : "Message"}
+          onContextMenu={onTextContextMenu}
           value={text}
-          onChange={onTextChange}
+          onChange={(e) => {
+            onTextChange(e);
+            rememberSelection(e.target);
+          }}
           onKeyDown={handleComposerKeyDown}
+          onKeyUp={(e) => rememberSelection(e.target)}
           onSelect={(e) => {
+            // Single selection tracker only (avoid double-handling with onClick)
             const el = e.target;
+            rememberSelection(el);
             updateSuggestionsFromText(el.value, el.selectionStart);
           }}
-          onClick={(e) => {
+          onMouseUp={(e) => rememberSelection(e.target)}
+          onTouchEnd={(e) => {
+            // mobile: selection often finalizes after touchend
             const el = e.target;
-            updateSuggestionsFromText(el.value, el.selectionStart);
+            setTimeout(() => rememberSelection(el), 0);
+          }}
+          onBlur={(e) => {
+            // Keep last range so format buttons still wrap the right text
+            rememberSelection(e.target);
           }}
           sx={{
             "& .MuiOutlinedInput-root": {
-              borderRadius: 2.5,
+              borderRadius: "8px",
               bgcolor: "action.hover",
               alignItems: "center",
               py: isMobile ? 0.35 : 0.5,
             },
             "& textarea": {
               lineHeight: 1.4,
+              userSelect: "text",
+              WebkitUserSelect: "text",
             },
           }}
         />
@@ -1527,6 +2275,75 @@ export default function MessageComposer({
           {recordError}
         </Typography>
       )}
+
+      {/* Text formatting context menu */}
+      <Menu
+        open={Boolean(fmtMenu)}
+        onClose={() => setFmtMenu(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={fmtMenu ? { top: fmtMenu.mouseY, left: fmtMenu.mouseX } : undefined}
+        slotProps={{ paper: { sx: { minWidth: 180 } } }}
+      >
+        <MenuItem onClick={() => applyTextFormat("spoiler")}>
+          <ListItemIcon><VisibilityOffIcon fontSize="small" /></ListItemIcon>
+          Spoiler
+          <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+Shift+S</Typography>
+        </MenuItem>
+        <MenuItem onClick={() => applyTextFormat("code")}>
+          <ListItemIcon><CodeIcon fontSize="small" /></ListItemIcon>
+          Inline code
+          <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+E</Typography>
+        </MenuItem>
+        <MenuItem onClick={() => applyTextFormat("codeblock")}>
+          <ListItemIcon><CodeIcon fontSize="small" /></ListItemIcon>
+          Code block
+          <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+Shift+E</Typography>
+        </MenuItem>
+        <MenuItem onClick={() => applyTextFormat("quote")}>
+          <ListItemIcon><FormatQuoteIcon fontSize="small" /></ListItemIcon>
+          Quote
+          <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+Shift+Q</Typography>
+        </MenuItem>
+      </Menu>
+
+      {/* PDF / TXT preview for pending files */}
+      <Dialog open={Boolean(filePreview)} onClose={closeFilePreview} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ pr: 6 }}>
+          {filePreview?.name || "Preview"}
+          <IconButton onClick={closeFilePreview} size="small" sx={{ position: "absolute", right: 12, top: 12 }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0, minHeight: 320, bgcolor: "background.default" }}>
+          {filePreview?.kind === "pdf" && filePreview.url && (
+            <Box
+              component="iframe"
+              src={filePreview.url}
+              title={filePreview.name}
+              sx={{ width: "100%", height: { xs: 360, sm: 520 }, border: 0, display: "block" }}
+            />
+          )}
+          {filePreview?.kind === "txt" && (
+            <Box
+              component="pre"
+              sx={{
+                m: 0, p: 2,
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                fontSize: 13,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                maxHeight: { xs: 360, sm: 520 },
+                overflow: "auto",
+              }}
+            >
+              {filePreview.text}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeFilePreview} sx={{ textTransform: "none" }}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

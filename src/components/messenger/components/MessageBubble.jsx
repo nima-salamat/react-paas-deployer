@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
+import CheckIcon from "@mui/icons-material/Check";
 import {
-  Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem, Dialog,
+  Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem, Dialog, CircularProgress,
   alpha, Slider, Tooltip, Button,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
@@ -21,8 +22,9 @@ import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import {
   attachmentKind, formatTime, formatDuration, withTokenQuery, REACTIONS,
-  parseMentions, isVoiceAttachment, isVideoMessageAttachment,
+  parseFormattedBody, isVoiceAttachment, isVideoMessageAttachment,
   emojiOnlyCount, isGifAttachment,
+  downloadAttachmentToCache, getCachedAttachment,
 } from "../messengerUtils";
 
 /**
@@ -252,16 +254,302 @@ function InlineAudioPlayer({
  *  - circular video messages: small circle + local play; click opens fullscreen gallery via onOpen
  *  - rectangular: thumbnail with play overlay; click opens fullscreen gallery (Telegram-style)
  */
+
+function SpoilerText({ children, mine }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Box
+      component="span"
+      onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+      title={open ? "Hide spoiler" : "Reveal spoiler"}
+      sx={{
+        display: "inline",
+        cursor: "pointer",
+        borderRadius: 1,
+        px: 0.5,
+        py: 0.15,
+        mx: 0.15,
+        bgcolor: open
+          ? (mine ? "rgba(255,255,255,0.14)" : "action.selected")
+          : (mine ? "rgba(255,255,255,0.28)" : "rgba(30,30,30,0.85)"),
+        color: open ? "inherit" : "transparent",
+        filter: open ? "none" : "blur(5px)",
+        userSelect: open ? "text" : "none",
+        transition: "filter 0.2s, background-color 0.15s, color 0.15s",
+        "&:hover": {
+          filter: open ? "none" : "blur(3px)",
+          bgcolor: open
+            ? (mine ? "rgba(255,255,255,0.2)" : "action.hover")
+            : (mine ? "rgba(255,255,255,0.35)" : "rgba(50,50,50,0.9)"),
+        },
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+const LANG_ALIASES = {
+  js: "JavaScript", javascript: "JavaScript", ts: "TypeScript", typescript: "TypeScript",
+  py: "Python", python: "Python", rb: "Ruby", go: "Go", rs: "Rust", rust: "Rust",
+  java: "Java", kt: "Kotlin", kotlin: "Kotlin", cs: "C#", csharp: "C#",
+  cpp: "C++", "c++": "C++", c: "C", php: "PHP", swift: "Swift",
+  sql: "SQL", html: "HTML", css: "CSS", scss: "SCSS", json: "JSON",
+  yaml: "YAML", yml: "YAML", xml: "XML", bash: "Bash", sh: "Shell",
+  shell: "Shell", zsh: "Shell", powershell: "PowerShell", ps1: "PowerShell",
+  dockerfile: "Dockerfile", docker: "Dockerfile", md: "Markdown", markdown: "Markdown",
+  jsx: "JSX", tsx: "TSX", vue: "Vue", react: "JavaScript", plaintext: "Text", text: "Text",
+};
+
+function CodeBlock({ code, lang, mine }) {
+  const [copied, setCopied] = React.useState(false);
+  const [hljsMod, setHljsMod] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const mod = await import("highlight.js");
+        try { await import("highlight.js/styles/github-dark.css"); } catch { /* style optional */ }
+        if (!cancelled) setHljsMod(mod.default || mod);
+      } catch {
+        if (!cancelled) setHljsMod(false); // not installed — plain text fallback
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const detected = React.useMemo(() => {
+    const raw = (code || "").replace(/\n$/, "");
+    let language = (lang || "").toLowerCase().trim();
+    let html = "";
+    const escape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    try {
+      const hljs = hljsMod && hljsMod !== false ? hljsMod : null;
+      if (hljs) {
+        if (language && hljs.getLanguage(language)) {
+          html = hljs.highlight(raw, { language, ignoreIllegals: true }).value;
+        } else {
+          const auto = hljs.highlightAuto(raw);
+          language = auto.language || language || "";
+          html = auto.value;
+        }
+      } else {
+        html = escape(raw);
+      }
+    } catch {
+      html = escape(raw);
+    }
+    const label = LANG_ALIASES[language] || (language ? language.toUpperCase() : "Code");
+    return { html, label, language, raw };
+  }, [code, lang, hljsMod]);
+
+  const onCopy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(detected.raw);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = detected.raw;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      } catch { /* */ }
+    }
+  };
+
+  return (
+    <Box
+      sx={{
+        display: "block",
+        my: 0.6,
+        // slight corner only — not a big pill
+        borderRadius: "6px",
+        overflow: "hidden",
+        border: "1px solid",
+        borderColor: mine ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)",
+        bgcolor: "#0d1117",
+        // preserve code layout: fixed min width + horizontal scroll
+        width: "100%",
+        minWidth: { xs: 220, sm: 280 },
+        maxWidth: "100%",
+        boxSizing: "border-box",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          px: 1.25,
+          py: 0.6,
+          bgcolor: "rgba(255,255,255,0.04)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <Typography
+          component="span"
+          sx={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            letterSpacing: 0.04,
+            color: "rgba(255,255,255,0.55)",
+            textTransform: "none",
+            fontFamily: "ui-sans-serif, system-ui, sans-serif",
+          }}
+        >
+          {detected.label}
+        </Typography>
+        <Box
+          component="button"
+          type="button"
+          onClick={onCopy}
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            border: "none",
+            cursor: "pointer",
+            bgcolor: copied ? "rgba(46,160,67,0.2)" : "rgba(255,255,255,0.06)",
+            color: copied ? "#3fb950" : "rgba(255,255,255,0.7)",
+            borderRadius: "4px",
+            px: 1,
+            py: 0.35,
+            fontSize: 11.5,
+            fontWeight: 600,
+            fontFamily: "inherit",
+            transition: "background 0.15s, color 0.15s",
+            "&:hover": {
+              bgcolor: copied ? "rgba(46,160,67,0.28)" : "rgba(255,255,255,0.12)",
+              color: copied ? "#3fb950" : "#fff",
+            },
+          }}
+        >
+          {copied ? <CheckIcon sx={{ fontSize: 14 }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
+          {copied ? "Copied" : "Copy"}
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "stretch",
+          overflowX: "auto",
+          maxWidth: "100%",
+        }}
+      >
+        {/* Line numbers */}
+        <Box
+          aria-hidden
+          component="pre"
+          sx={{
+            m: 0,
+            py: 1.25,
+            pl: 1,
+            pr: 1.25,
+            flexShrink: 0,
+            userSelect: "none",
+            textAlign: "right",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: 12.5,
+            lineHeight: 1.55,
+            color: "rgba(255,255,255,0.28)",
+            bgcolor: "rgba(255,255,255,0.03)",
+            borderRight: "1px solid rgba(255,255,255,0.08)",
+            minWidth: 28,
+          }}
+        >
+          {detected.raw.split("\n").map((_, i) => (
+            <Box key={i} component="span" sx={{ display: "block" }}>
+              {i + 1}
+            </Box>
+          ))}
+        </Box>
+        <Box
+          component="pre"
+          sx={{
+            m: 0,
+            py: 1.25,
+            px: 1.5,
+            flex: 1,
+            overflowX: "auto",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: 12.5,
+            lineHeight: 1.55,
+            color: "#e6edf3",
+            whiteSpace: "pre",
+            tabSize: 2,
+            minWidth: 0,
+            "& code": {
+              fontFamily: "inherit",
+              background: "none",
+              p: 0,
+              whiteSpace: "pre",
+              display: "block",
+              minWidth: "max-content",
+            },
+            "& .hljs-comment, & .hljs-quote": { color: "#8b949e", fontStyle: "italic" },
+            "& .hljs-keyword, & .hljs-selector-tag": { color: "#ff7b72" },
+            "& .hljs-string, & .hljs-attr": { color: "#a5d6ff" },
+            "& .hljs-number, & .hljs-literal": { color: "#79c0ff" },
+            "& .hljs-title, & .hljs-section": { color: "#d2a8ff" },
+            "& .hljs-built_in, & .hljs-type": { color: "#ffa657" },
+            "& .hljs-meta": { color: "#79c0ff" },
+            "& .hljs-variable, & .hljs-template-variable": { color: "#ffa198" },
+          }}
+        >
+          <code dangerouslySetInnerHTML={{ __html: detected.html }} />
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+
+
 function ChatVideo({ src, filename, contentType, circular = false, attachment, onOpen }) {
   const videoRef = React.useRef(null);
   const [playing, setPlaying] = React.useState(false);
   const [error, setError] = React.useState("");
   const safeSrc = React.useMemo(() => withTokenQuery(src), [src]);
 
+  const applySpeakerSink = React.useCallback(async (forceId) => {
+    const el = videoRef.current;
+    if (!el || typeof el.setSinkId !== "function") return;
+    let next = forceId;
+    if (next == null) {
+      try {
+        next = JSON.parse(localStorage.getItem("messenger.mediaDevices") || "{}").speakerId || "";
+      } catch { next = ""; }
+    }
+    try {
+      await el.setSinkId(next || "");
+    } catch {
+      try { await el.setSinkId(""); } catch { /* */ }
+    }
+  }, []);
+
   React.useEffect(() => {
     setError("");
     setPlaying(false);
   }, [safeSrc]);
+
+  React.useEffect(() => {
+    applySpeakerSink();
+    const onDevices = (e) => applySpeakerSink(e?.detail?.speakerId != null ? e.detail.speakerId : undefined);
+    const onStorage = (ev) => { if (ev.key === "messenger.mediaDevices") applySpeakerSink(); };
+    window.addEventListener("messenger:media-devices-changed", onDevices);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("messenger:media-devices-changed", onDevices);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [applySpeakerSink, safeSrc]);
 
   const openFull = (e) => {
     e?.stopPropagation?.();
@@ -279,8 +567,10 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
-      const p = v.play();
-      if (p && typeof p.catch === "function") p.catch(() => setError("Playback blocked"));
+      applySpeakerSink().finally(() => {
+        const p = v.play();
+        if (p && typeof p.catch === "function") p.catch(() => setError("Playback blocked"));
+      });
     } else {
       v.pause();
     }
@@ -412,6 +702,177 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
   );
 }
 
+
+/**
+ * Telegram-style file row: circular progress while downloading into blob cache,
+ * then open from local blob (avoids X-Frame-Options iframe blocks on API host).
+ */
+function FileAttachmentCard({ att, url, mine, onOpen, authHeaders }) {
+  const key = String(att?.id || att?.url || url || "");
+  const cached0 = getCachedAttachment(key);
+  const [status, setStatus] = React.useState(cached0?.status || "idle"); // idle|downloading|ready|error
+  const [progress, setProgress] = React.useState(cached0?.progress || 0);
+  const [error, setError] = React.useState(cached0?.error || "");
+
+  React.useEffect(() => {
+    const c = getCachedAttachment(key);
+    if (c?.status === "ready") {
+      setStatus("ready");
+      setProgress(1);
+    }
+  }, [key]);
+
+  const startDownload = async () => {
+    if (status === "downloading") return;
+    setStatus("downloading");
+    setError("");
+    try {
+      const entry = await downloadAttachmentToCache(
+        { ...att, url: url || att?.url },
+        authHeaders || {},
+        (p, st) => {
+          setProgress(p);
+          if (st === "ready") setStatus("ready");
+          if (st === "error") setStatus("error");
+        }
+      );
+      setStatus("ready");
+      setProgress(1);
+      return entry;
+    } catch (e) {
+      setStatus("error");
+      setError(e?.message || "Download failed");
+      return null;
+    }
+  };
+
+  const open = async () => {
+    let entry = getCachedAttachment(key);
+    if (!entry || entry.status !== "ready") {
+      entry = await startDownload();
+    }
+    if (!entry?.blobUrl) return;
+    onOpen?.({
+      ...att,
+      url: entry.blobUrl,
+      _blobUrl: entry.blobUrl,
+      _fromCache: true,
+      content_type: entry.contentType || att.content_type,
+      original_filename: att.original_filename || entry.filename,
+    });
+  };
+
+  const name = att.original_filename || "file";
+  const sizeLabel = att.size
+    ? (att.size < 1024 * 1024
+        ? `${Math.max(1, Math.round(att.size / 1024))} KB`
+        : `${(att.size / (1024 * 1024)).toFixed(1)} MB`)
+    : "";
+
+  const isPdf = (att.content_type || "").includes("pdf") || /\.pdf$/i.test(name);
+
+  return (
+    <Box
+      onClick={(e) => {
+        e.stopPropagation();
+        if (status === "ready") open();
+        else if (status !== "downloading") startDownload().then((entry) => {
+          // auto-open after first successful download
+          if (entry?.blobUrl) {
+            onOpen?.({
+              ...att,
+              url: entry.blobUrl,
+              _blobUrl: entry.blobUrl,
+              _fromCache: true,
+              content_type: entry.contentType || att.content_type,
+              original_filename: name,
+            });
+          }
+        });
+      }}
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1.25,
+        maxWidth: 280,
+        px: 1,
+        py: 0.85,
+        borderRadius: 2,
+        cursor: "pointer",
+        bgcolor: mine ? "rgba(255,255,255,0.12)" : "action.hover",
+        border: "1px solid",
+        borderColor: mine ? "rgba(255,255,255,0.1)" : "divider",
+        "&:hover": { bgcolor: mine ? "rgba(255,255,255,0.18)" : "action.selected" },
+      }}
+    >
+      <Box sx={{ position: "relative", width: 42, height: 42, flexShrink: 0 }}>
+        <Box
+          sx={{
+            width: 42,
+            height: 42,
+            borderRadius: "50%",
+            bgcolor: isPdf ? "rgba(244,67,54,0.18)" : (mine ? "rgba(255,255,255,0.15)" : "primary.main"),
+            color: isPdf ? "#ef5350" : (mine ? "#fff" : "#fff"),
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: status === "downloading" ? 0.45 : 1,
+          }}
+        >
+          {status === "ready" ? (
+            <VisibilityIcon sx={{ fontSize: 20 }} />
+          ) : (
+            <DownloadIcon sx={{ fontSize: 20 }} />
+          )}
+        </Box>
+        {status === "downloading" && (
+          <CircularProgress
+            variant="determinate"
+            value={Math.max(4, Math.round(progress * 100))}
+            size={42}
+            thickness={3.2}
+            sx={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              color: mine ? "#fff" : "primary.main",
+            }}
+          />
+        )}
+        {status === "ready" && (
+          <Box
+            sx={{
+              position: "absolute",
+              right: -2,
+              bottom: -2,
+              width: 16,
+              height: 16,
+              borderRadius: "50%",
+              bgcolor: "success.main",
+              border: "2px solid",
+              borderColor: mine ? "primary.dark" : "background.paper",
+            }}
+          />
+        )}
+      </Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography noWrap fontWeight={600} fontSize={13.5}>
+          {name}
+        </Typography>
+        <Typography variant="caption" sx={{ opacity: 0.75 }} noWrap>
+          {status === "downloading"
+            ? `Downloading ${Math.round(progress * 100)}%`
+            : status === "ready"
+              ? (sizeLabel ? `${sizeLabel} · Tap to open` : "Tap to open")
+              : status === "error"
+                ? (error || "Failed · tap to retry")
+                : (sizeLabel ? `${sizeLabel} · Tap to download` : "Tap to download")}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
 export default function MessageBubble({
   m, meId, activeConv,
   onContextOpen, onReact, onReactAnchor, onReply,
@@ -460,7 +921,7 @@ export default function MessageBubble({
     </Box>
   );
 
-  const bodySegments = parseMentions(bodyStr);
+  const bodySegments = parseFormattedBody(bodyStr);
   const hasAttachments = (m.attachments || []).length > 0;
   const emojiCount = (!hasAttachments && !m.reply_to_preview && !m.forwarded_from_user)
     ? emojiOnlyCount(bodyStr)
@@ -750,14 +1211,11 @@ export default function MessageBubble({
                   />
                 </Stack>
               ) : (
-                <Chip
-                  icon={<VisibilityIcon />}
-                  label={a.original_filename || "file"}
-                  size="small"
-                  onClick={() => onOpenPreview({ ...a, url })}
-                  onDelete={() => window.open(withTokenQuery(a.url), "_blank")}
-                  deleteIcon={<DownloadIcon />}
-                  sx={{ maxWidth: "100%", cursor: "pointer" }}
+                <FileAttachmentCard
+                  att={a}
+                  url={url}
+                  mine={mine}
+                  onOpen={(payload) => onOpenPreview(payload)}
                 />
               )}
             </Box>
@@ -773,30 +1231,76 @@ export default function MessageBubble({
               mt: hasAttachments ? 0.75 : 0,
               textAlign: isBigEmoji ? "center" : "inherit",
               letterSpacing: isBigEmoji ? "0.04em" : undefined,
+              userSelect: "text",
+              WebkitUserSelect: "text",
             }}
           >
-            {bodySegments.map((seg, i) =>
-              seg.type === "mention" ? (
-                <Box
-                  key={i}
-                  component="span"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMentionClick?.(seg.value);
-                  }}
-                  sx={{
-                    color: mine ? "#cce8ff" : theme.palette.primary.main,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    "&:hover": { textDecoration: "underline" },
-                  }}
-                >
-                  @{seg.value}
-                </Box>
-              ) : (
-                <React.Fragment key={i}>{seg.value}</React.Fragment>
-              )
-            )}
+            {bodySegments.map((seg, i) => {
+              if (seg.type === "mention") {
+                return (
+                  <Box
+                    key={i}
+                    component="span"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMentionClick?.(seg.value);
+                    }}
+                    sx={{
+                      color: mine ? "#cce8ff" : theme.palette.primary.main,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      "&:hover": { textDecoration: "underline" },
+                    }}
+                  >
+                    @{seg.value}
+                  </Box>
+                );
+              }
+              if (seg.type === "spoiler") {
+                return <SpoilerText key={i} mine={mine}>{seg.value}</SpoilerText>;
+              }
+              if (seg.type === "code") {
+                return (
+                  <Box
+                    key={i}
+                    component="code"
+                    sx={{
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      fontSize: "0.9em",
+                      px: 0.6, py: 0.15, borderRadius: 0.75,
+                      bgcolor: mine ? "rgba(0,0,0,0.25)" : "action.hover",
+                      border: "1px solid",
+                      borderColor: mine ? "rgba(255,255,255,0.12)" : "divider",
+                    }}
+                  >
+                    {seg.value}
+                  </Box>
+                );
+              }
+              if (seg.type === "codeblock") {
+                return <CodeBlock key={i} code={seg.value} lang={seg.lang || ""} mine={mine} />;
+              }
+              if (seg.type === "quote") {
+                return (
+                  <Box
+                    key={i}
+                    sx={{
+                      display: "block",
+                      my: 0.5,
+                      pl: 1.25,
+                      borderLeft: "3px solid",
+                      borderColor: mine ? "rgba(255,255,255,0.45)" : "primary.main",
+                      opacity: 0.92,
+                      fontStyle: "italic",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {seg.value}
+                  </Box>
+                );
+              }
+              return <React.Fragment key={i}>{seg.value}</React.Fragment>;
+            })}
           </Typography>
         )}
         {(m.reactions || []).length > 0 && (

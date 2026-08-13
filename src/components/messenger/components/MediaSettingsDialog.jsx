@@ -70,30 +70,65 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
     setPermissionError("");
     try {
       // Ask for permission first so device labels become visible
-      // (without permission, labels are blank).
+      // (without permission, labels are blank). Request separately so a
+      // missing camera does not block mic labels and vice versa.
       let permStream = null;
       try {
         permStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
       } catch (e) {
-        // If permission denied, we still get device IDs but no labels
-        if (e?.name === "NotAllowedError") {
-          setPermissionError("Permission denied. Allow camera & microphone access in your browser to see device names.");
+        try {
+          permStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } catch (e2) {
+          try {
+            permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          } catch (e3) {
+            if (e?.name === "NotAllowedError" || e2?.name === "NotAllowedError") {
+              setPermissionError("Permission denied. Allow camera & microphone access in your browser to see device names.");
+            }
+          }
         }
       }
+      // Release the permission stream fully before we open a specific device
+      // for preview — otherwise desktop browsers often keep the first camera
+      // locked and ignore subsequent deviceId switches.
+      if (permStream) {
+        permStream.getTracks().forEach((t) => {
+          try { t.stop(); } catch { /* */ }
+        });
+        permStream = null;
+        // Brief yield so the OS releases the device before enumerate + preview
+        await new Promise((r) => setTimeout(r, 120));
+      }
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter((d) => d.kind === "videoinput");
-      const mics = devices.filter((d) => d.kind === "audioinput");
-      const spkrs = devices.filter((d) => d.kind === "audiooutput");
+      // Deduplicate by deviceId (some drivers report the same cam twice)
+      const uniq = (list) => {
+        const seen = new Set();
+        return list.filter((d) => {
+          const id = d.deviceId || "";
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+      };
+      const cams = uniq(devices.filter((d) => d.kind === "videoinput"));
+      const mics = uniq(devices.filter((d) => d.kind === "audioinput"));
+      const spkrs = uniq(devices.filter((d) => d.kind === "audiooutput"));
       setCameras(cams);
       setMics(mics);
       setSpeakers(spkrs);
-      // If no selection yet, pick the first one
-      setSelectedCamera((cur) => cur || cams[0]?.deviceId || "");
-      setSelectedMic((cur) => cur || mics[0]?.deviceId || "");
-      setSelectedSpeaker((cur) => cur || spkrs[0]?.deviceId || "");
-      if (permStream) {
-        permStream.getTracks().forEach((t) => t.stop());
-      }
+      // Keep saved selection only if it still exists; otherwise first device
+      setSelectedCamera((cur) => {
+        if (cur && cams.some((c) => c.deviceId === cur)) return cur;
+        return cams[0]?.deviceId || "";
+      });
+      setSelectedMic((cur) => {
+        if (cur && mics.some((m) => m.deviceId === cur)) return cur;
+        return mics[0]?.deviceId || "";
+      });
+      setSelectedSpeaker((cur) => {
+        if (cur && spkrs.some((s) => s.deviceId === cur)) return cur;
+        return spkrs[0]?.deviceId || "";
+      });
     } catch (e) {
       setPermissionError(e?.message || "Could not list devices");
     } finally {
@@ -113,39 +148,114 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
 
     let cancelled = false;
     const startPreview = async () => {
-      // Stop any existing preview
+      // Fully stop previous stream and wait — desktop browsers keep the first
+      // camera open if we request the next one too quickly with only "ideal".
       stopPreview();
-      const constraints = {
-        video: selectedCamera ? { deviceId: { exact: selectedCamera } } : false,
-        audio: selectedMic ? { deviceId: { exact: selectedMic } } : false,
+      await new Promise((r) => setTimeout(r, 80));
+      if (cancelled) return;
+
+      const tryGet = async (videoConstraint, audioConstraint) => {
+        const constraints = {
+          video: videoConstraint,
+          audio: audioConstraint,
+        };
+        if (!constraints.video && !constraints.audio) return null;
+        return navigator.mediaDevices.getUserMedia(constraints);
       };
-      if (!constraints.video && !constraints.audio) return;
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+
+      // Prefer EXACT deviceId so switching cameras on desktop actually works.
+      // Fall back to ideal, then any device, if the specific one is busy/gone.
+      let stream = null;
+      let lastErr = null;
+      const videoAttempts = selectedCamera
+        ? [
+            { deviceId: { exact: selectedCamera } },
+            { deviceId: { ideal: selectedCamera } },
+            true,
+          ]
+        : [false];
+      const audioAttempts = selectedMic
+        ? [
+            { deviceId: { exact: selectedMic } },
+            { deviceId: { ideal: selectedMic } },
+            true,
+          ]
+        : [false];
+
+      // Try matching camera first (exact), keep mic best-effort
+      outer: for (const v of videoAttempts) {
+        for (const a of audioAttempts) {
+          if (v === false && a === false) continue;
+          try {
+            stream = await tryGet(v, a);
+            if (stream) break outer;
+          } catch (err) {
+            lastErr = err;
+            stream = null;
+          }
         }
-        streamRef.current = stream;
-        setPreviewStream(stream);
-        // Attach to <video>
-        if (videoPreviewRef.current && constraints.video) {
-          videoPreviewRef.current.srcObject = stream;
-          videoPreviewRef.current.play().catch(() => {});
-        }
-        // Mic level meter
-        if (constraints.audio) {
-          startMicMeter(stream);
-        }
-      } catch (e) {
-        // Could not start preview — likely permission denied or device gone
-        if (e?.name === "NotAllowedError") {
+      }
+
+      if (cancelled) {
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      if (!stream) {
+        if (lastErr?.name === "NotAllowedError") {
           setPermissionError("Camera/microphone permission denied.");
-        } else if (e?.name === "NotFoundError") {
-          setPermissionError("Selected device not found.");
+        } else if (lastErr?.name === "NotFoundError" || lastErr?.name === "OverconstrainedError") {
+          setPermissionError("Selected device not available. Try another camera or click Refresh.");
         } else {
-          setPermissionError(e?.message || "Could not start preview");
+          setPermissionError(lastErr?.message || "Could not start preview");
         }
+        return;
+      }
+
+      // Verify the browser actually opened the requested camera (desktop bug:
+      // some builds ignore ideal and stick to index 0).
+      const openedId = stream.getVideoTracks()[0]?.getSettings?.()?.deviceId || "";
+      if (selectedCamera && openedId && openedId !== selectedCamera) {
+        // Force a second attempt with exact-only video, no audio
+        try {
+          stream.getTracks().forEach((t) => t.stop());
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: selectedCamera } },
+            audio: false,
+          });
+          // Re-add mic if needed
+          if (selectedMic) {
+            try {
+              const micStream = await navigator.mediaDevices.getUserMedia({
+                audio: { deviceId: { exact: selectedMic } },
+                video: false,
+              });
+              micStream.getAudioTracks().forEach((t) => stream.addTrack(t));
+            } catch {
+              try {
+                const micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                micStream.getAudioTracks().forEach((t) => stream.addTrack(t));
+              } catch { /* */ }
+            }
+          }
+        } catch {
+          // keep whatever stream we had
+        }
+      }
+
+      if (cancelled) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      streamRef.current = stream;
+      setPreviewStream(stream);
+      setPermissionError("");
+      if (videoPreviewRef.current && stream.getVideoTracks().length) {
+        videoPreviewRef.current.srcObject = stream;
+        videoPreviewRef.current.play().catch(() => {});
+      }
+      if (stream.getAudioTracks().length) {
+        startMicMeter(stream);
       }
     };
     startPreview();
@@ -338,6 +448,12 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
                 <MenuItem disabled>No cameras found</MenuItem>
               )}
             </Select>
+            {cameras.length > 1 && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                {cameras.length} cameras detected — pick one and confirm the preview switches.
+                On desktop the exact device is requested (not just the first index).
+              </Typography>
+            )}
           </FormControl>
 
           {/* Microphone picker + level meter */}
@@ -394,7 +510,7 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
             </Typography>
           </Box>
 
-          {/* Speaker picker (Chrome/Edge only) */}
+          {/* Speaker picker (Chrome/Edge — setSinkId). Firefox/Safari ignore this. */}
           {speakers.length > 0 && (
             <FormControl fullWidth size="small">
               <InputLabel>Speaker (output)</InputLabel>
@@ -403,10 +519,14 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
                 value={selectedSpeaker}
                 onChange={(e) => setSelectedSpeaker(e.target.value)}
                 renderValue={(v) => {
+                  if (!v) return "System default";
                   const spk = speakers.find((s) => s.deviceId === v);
-                  return spk?.label || (v ? "Selected speaker" : "Default");
+                  return spk?.label || "Selected speaker";
                 }}
               >
+                <MenuItem value="">
+                  <em>System default</em>
+                </MenuItem>
                 {speakers.map((s, i) => (
                   <MenuItem key={s.deviceId || i} value={s.deviceId}>
                     {s.label || `Speaker ${i + 1}`}
@@ -414,6 +534,11 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
                 ))}
               </Select>
             </FormControl>
+          )}
+          {speakers.length > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              Speaker selection works in Chrome/Edge. On Firefox and Safari the system default is used.
+            </Typography>
           )}
         </Stack>
       </DialogContent>

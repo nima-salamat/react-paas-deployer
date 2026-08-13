@@ -324,5 +324,246 @@ export function parseMentions(body) {
   return out;
 }
 
+
+/**
+ * Parse message body into rich segments for rendering.
+ * Supports (Telegram-style markers stored as plain text):
+ *   ||spoiler||   — hidden until clicked
+ *   `inline code`
+ *   ``` ... ```   — multiline code block
+ *   > quote        — lines starting with "> "
+ *   @mention
+ * Returns array of { type, value } where type is one of:
+ *   text | mention | spoiler | code | codeblock | quote
+ */
+/**
+ * Parse message body into rich segments for rendering.
+ * Supports (Telegram-style markers stored as plain text):
+ *   ||spoiler||   — hidden until clicked
+ *   `inline code`
+ *   ``` ... ```   — multiline code block
+ *   > quote        — lines starting with "> "
+ *   @mention
+ * Returns [{ type, value }] type ∈ text|mention|spoiler|code|codeblock|quote
+ */
+export function parseFormattedBody(body) {
+  if (!body || typeof body !== "string") return [];
+
+  // Extract fenced code blocks first so inner markers stay literal
+  const parts = [];
+  const fenceRe = /```([\w+-]*)\n?([\s\S]*?)```/g;
+  let last = 0;
+  let m;
+  while ((m = fenceRe.exec(body)) !== null) {
+    if (m.index > last) parts.push({ kind: "raw", value: body.slice(last, m.index) });
+    const lang = (m[1] || "").trim().toLowerCase();
+    const code = m[2].replace(/^\n/, "").replace(/\n$/, "");
+    parts.push({ kind: "codeblock", value: code, lang });
+    last = m.index + m[0].length;
+  }
+  if (last < body.length) parts.push({ kind: "raw", value: body.slice(last) });
+  if (!parts.length) parts.push({ kind: "raw", value: body });
+
+  const out = [];
+  const inlineRe = /(\|\|[\s\S]+?\|\||`[^`\n]+`|@[A-Za-z][A-Za-z0-9_]{2,31})/g;
+
+  const parseInline = (chunk) => {
+    if (!chunk) return;
+    let iLast = 0;
+    let im;
+    inlineRe.lastIndex = 0;
+    while ((im = inlineRe.exec(chunk)) !== null) {
+      if (im.index > iLast) out.push({ type: "text", value: chunk.slice(iLast, im.index) });
+      const tok = im[1];
+      if (tok.startsWith("||") && tok.endsWith("||") && tok.length >= 4) {
+        out.push({ type: "spoiler", value: tok.slice(2, -2) });
+      } else if (tok.startsWith("`") && tok.endsWith("`") && tok.length >= 2) {
+        out.push({ type: "code", value: tok.slice(1, -1) });
+      } else if (tok.startsWith("@")) {
+        out.push({ type: "mention", value: tok.slice(1) });
+      } else {
+        out.push({ type: "text", value: tok });
+      }
+      iLast = im.index + tok.length;
+    }
+    if (iLast < chunk.length) out.push({ type: "text", value: chunk.slice(iLast) });
+  };
+
+  const parseRaw = (raw) => {
+    const lines = raw.split("\n");
+    let quoteLines = [];
+    const flushQuote = () => {
+      if (!quoteLines.length) return;
+      out.push({ type: "quote", value: quoteLines.join("\n") });
+      quoteLines = [];
+    };
+    lines.forEach((line, idx) => {
+      if (/^>\s?/.test(line)) {
+        quoteLines.push(line.replace(/^>\s?/, ""));
+        return;
+      }
+      flushQuote();
+      if (idx > 0) out.push({ type: "text", value: "\n" });
+      parseInline(line);
+    });
+    flushQuote();
+  };
+
+  for (const part of parts) {
+    if (part.kind === "codeblock") out.push({ type: "codeblock", value: part.value, lang: part.lang || "" });
+    else parseRaw(part.value);
+  }
+
+  const merged = [];
+  for (const seg of out) {
+    if (seg.type === "text" && merged.length && merged[merged.length - 1].type === "text") {
+      merged[merged.length - 1].value += seg.value;
+    } else if (!(seg.type === "text" && seg.value === "")) {
+      merged.push({ ...seg });
+    }
+  }
+  return merged;
+}
+
+
+/** In-memory blob cache for messenger attachments (Telegram-style offline-ready preview). */
+const _attCache = new Map(); // key -> { status, progress, blobUrl, blob, error, contentType }
+
+export function getCachedAttachment(key) {
+  return _attCache.get(String(key)) || null;
+}
+
+export function clearAttachmentCache(key) {
+  const k = String(key);
+  const cur = _attCache.get(k);
+  if (cur?.blobUrl) {
+    try { URL.revokeObjectURL(cur.blobUrl); } catch { /* */ }
+  }
+  _attCache.delete(k);
+}
+
+/**
+ * Download an attachment into a blob URL with progress (0..1).
+ * Reuses cache if already ready. onProgress(progress, status) optional.
+ */
+export async function downloadAttachmentToCache(att, authHeaders = {}, onProgress) {
+  const key = String(att?.id || att?.url || "");
+  if (!key || !att?.url) throw new Error("No attachment url");
+
+  const existing = _attCache.get(key);
+  if (existing?.status === "ready" && existing.blobUrl) {
+    onProgress?.(1, "ready");
+    return existing;
+  }
+  if (existing?.status === "downloading" && existing._promise) {
+    return existing._promise;
+  }
+
+  const entry = {
+    status: "downloading",
+    progress: 0,
+    blobUrl: null,
+    blob: null,
+    error: null,
+    contentType: att.content_type || "",
+    filename: att.original_filename || "file",
+    _promise: null,
+  };
+  _attCache.set(key, entry);
+
+  const promise = (async () => {
+    try {
+      const url = withTokenQuery(att.url);
+      const headers = { ...(authHeaders || {}) };
+      // browser sets content-type for FormData; for fetch of media Authorization is enough
+      const res = await fetch(url, { headers, credentials: "include" });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+
+      const total = Number(res.headers.get("Content-Length")) || 0;
+      const ctype = res.headers.get("Content-Type") || entry.contentType || "application/octet-stream";
+      entry.contentType = ctype;
+
+      let blob;
+      if (res.body && typeof res.body.getReader === "function" && total > 0) {
+        const reader = res.body.getReader();
+        const chunks = [];
+        let received = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.byteLength || value.length || 0;
+          entry.progress = Math.min(0.99, received / total);
+          onProgress?.(entry.progress, "downloading");
+        }
+        blob = new Blob(chunks, { type: ctype });
+      } else {
+        blob = await res.blob();
+        entry.progress = 0.99;
+        onProgress?.(0.99, "downloading");
+      }
+
+      const blobUrl = URL.createObjectURL(blob);
+      entry.blob = blob;
+      entry.blobUrl = blobUrl;
+      entry.progress = 1;
+      entry.status = "ready";
+      entry._promise = null;
+      onProgress?.(1, "ready");
+      return entry;
+    } catch (e) {
+      entry.status = "error";
+      entry.error = e?.message || "Download failed";
+      entry._promise = null;
+      onProgress?.(entry.progress || 0, "error");
+      throw e;
+    }
+  })();
+
+  entry._promise = promise;
+  return promise;
+}
+
+
+
+/**
+ * True mobile/tablet device (OS / UA / pointer), NOT "narrow browser window".
+ * Use this for Enter-key behavior and soft-keyboard layout. Keep CSS breakpoints
+ * (useMediaQuery) for responsive chrome (sidebar, padding, etc.).
+ */
+export function isMobileDevice() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || navigator.vendor || "";
+  const platform = navigator.platform || "";
+  const maxTouch = navigator.maxTouchPoints || 0;
+
+  // Phones
+  if (/iPhone|iPod/i.test(ua)) return true;
+  // iPad (including iPadOS 13+ desktop UA)
+  if (/iPad/i.test(ua) || (platform === "MacIntel" && maxTouch > 1)) return true;
+  // Android
+  if (/Android/i.test(ua)) return true;
+  // Other mobile UAs
+  if (/webOS|BlackBerry|IEMobile|Opera Mini|Mobile|Windows Phone/i.test(ua)) return true;
+
+  // Touch-primary devices without fine hover (phones/tablets, not resized desktop)
+  try {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const fine = window.matchMedia("(pointer: fine)").matches;
+    const canHover = window.matchMedia("(hover: hover)").matches;
+    // Desktop with a touch screen usually still has fine pointer + hover
+    if (coarse && !fine && !canHover && maxTouch > 0) return true;
+  } catch { /* */ }
+
+  return false;
+}
+
+/** Cached at first call; UA/device class does not change mid-session. */
+let _mobileDeviceCached = null;
+export function getIsMobileDevice() {
+  if (_mobileDeviceCached == null) _mobileDeviceCached = isMobileDevice();
+  return _mobileDeviceCached;
+}
+
 export const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉", "🤔", "👎"];
 export const PAGE_SIZE = 30;
