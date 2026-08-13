@@ -616,7 +616,7 @@ export default function MessageComposer({
   const [fmtMenu, setFmtMenu] = useState(null);
   const selectionRef = useRef({ start: 0, end: 0 });
   const [attachMenuAnchor, setAttachMenuAnchor] = useState(null);
-  const [attachAccept, setAttachAccept] = useState("image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv");
+  const [attachAccept, setAttachAccept] = useState("image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv,.py,.js,.jsx,.ts,.tsx,.json,.html,.css,.scss,.java,.c,.cpp,.h,.cs,.go,.rs,.rb,.php,.swift,.sh,.sql,.yml,.yaml,.toml,.xml,.md,.vue,.dart,.lua,.ipynb");
   const [attachCapture, setAttachCapture] = useState(undefined); // { mouseX, mouseY, start, end }
   // PDF / TXT preview dialog for pending attachments
   const [filePreview, setFilePreview] = useState(null); // { name, kind: 'pdf'|'txt', url?, text? }
@@ -2064,7 +2064,7 @@ export default function MessageComposer({
                       label: "Files",
                       icon: <InsertDriveFileIcon />,
                       color: "#78909c",
-                      accept: ".pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.csv,.md,.json",
+                      accept: ".pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.csv,.md,.json,.py,.js,.jsx,.ts,.tsx,.json,.html,.css,.scss,.java,.c,.cpp,.h,.cs,.go,.rs,.rb,.php,.swift,.sh,.sql,.yml,.yaml,.toml,.xml,.md,.vue,.dart,.lua,.ipynb",
                       capture: undefined,
                     },
                     {
@@ -2072,7 +2072,7 @@ export default function MessageComposer({
                       label: "All",
                       icon: <AttachFileIcon />,
                       color: "#5c6bc0",
-                      accept: "image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv,*/*",
+                      accept: "image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv,.py,.js,.jsx,.ts,.tsx,.json,.html,.css,.scss,.java,.c,.cpp,.h,.cs,.go,.rs,.rb,.php,.swift,.sh,.sql,.yml,.yaml,.toml,.xml,.md,.vue,.dart,.lua,.ipynb,*/*",
                       capture: undefined,
                     },
                     ...(isMobile
