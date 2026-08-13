@@ -615,6 +615,8 @@ export default function MessageComposer({
   // Right-click format menu on the text field
   const [fmtMenu, setFmtMenu] = useState(null);
   const selectionRef = useRef({ start: 0, end: 0 });
+  const fmtLongPressTimer = useRef(null);
+
   const [attachMenuAnchor, setAttachMenuAnchor] = useState(null);
   const [attachAccept, setAttachAccept] = useState("image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv,.py,.js,.jsx,.ts,.tsx,.json,.html,.css,.scss,.java,.c,.cpp,.h,.cs,.go,.rs,.rb,.php,.swift,.sh,.sql,.yml,.yaml,.toml,.xml,.md,.vue,.dart,.lua,.ipynb");
   const [attachCapture, setAttachCapture] = useState(undefined); // { mouseX, mouseY, start, end }
@@ -1369,6 +1371,13 @@ export default function MessageComposer({
       mouseY: e.clientY,
       start,
       end,
+    });
+    // Keep soft-keyboard open on mobile after long-press / context menu
+    requestAnimationFrame(() => {
+      try {
+        ta?.focus?.();
+        if (typeof start === "number") ta?.setSelectionRange?.(start, end);
+      } catch { /* */ }
     });
   };
 
@@ -2211,6 +2220,31 @@ export default function MessageComposer({
             const el = e.target;
             setTimeout(() => rememberSelection(el), 0);
           }}
+
+          onTouchStart={(e) => {
+            if (!isMobile) return;
+            const t = e.touches?.[0];
+            if (!t) return;
+            clearTimeout(fmtLongPressTimer.current);
+            const ta = e.target;
+            fmtLongPressTimer.current = setTimeout(() => {
+              rememberSelection(ta);
+              const { start, end } = selectionRef.current;
+              setFmtMenu({
+                mouseX: t.clientX,
+                mouseY: t.clientY,
+                start,
+                end,
+              });
+              try {
+                ta.focus();
+                if (typeof start === "number") ta.setSelectionRange?.(start, end);
+              } catch { /* */ }
+            }, 480);
+          }}
+          onTouchMove={() => { clearTimeout(fmtLongPressTimer.current); }}
+          onTouchEnd={() => { clearTimeout(fmtLongPressTimer.current); }}
+          onTouchCancel={() => { clearTimeout(fmtLongPressTimer.current); }}
           onBlur={(e) => {
             // Keep last range so format buttons still wrap the right text
             rememberSelection(e.target);
@@ -2220,10 +2254,14 @@ export default function MessageComposer({
               borderRadius: "8px",
               bgcolor: "action.hover",
               alignItems: "center",
-              py: isMobile ? 0.35 : 0.5,
+              // Tighter vertical padding so text sits closer to the box edges
+              // without growing the field to two lines.
+              py: 0.25,
+              px: 1,
             },
             "& textarea": {
               lineHeight: 1.4,
+              py: 0.35,
               userSelect: "text",
               WebkitUserSelect: "text",
             },
@@ -2279,9 +2317,18 @@ export default function MessageComposer({
       {/* Text formatting context menu */}
       <Menu
         open={Boolean(fmtMenu)}
-        onClose={() => setFmtMenu(null)}
+        onClose={() => {
+          setFmtMenu(null);
+          // Restore focus so mobile keyboard stays open
+          requestAnimationFrame(() => {
+            try { getComposerTextarea()?.focus(); } catch { /* */ }
+          });
+        }}
         anchorReference="anchorPosition"
         anchorPosition={fmtMenu ? { top: fmtMenu.mouseY, left: fmtMenu.mouseX } : undefined}
+        disableAutoFocus
+        disableEnforceFocus
+        disableRestoreFocus
         slotProps={{ paper: { sx: { minWidth: 180 } } }}
       >
         <MenuItem onClick={() => applyTextFormat("spoiler")}>

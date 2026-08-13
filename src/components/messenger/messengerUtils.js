@@ -171,7 +171,14 @@ export function attachmentKind(a) {
   }
 
   if (ct === "application/pdf" || name.endsWith(".pdf")) return "pdf";
-  if (ct.startsWith("text/") || /\.(txt|md|csv|log|json)$/.test(name)) return "text";
+  // Source / text-like files → text preview with syntax highlighting in UI
+  if (
+    ct.startsWith("text/")
+    || ct === "application/json"
+    || ct === "application/javascript"
+    || ct === "application/typescript"
+    || /\.(txt|md|csv|log|json|py|js|jsx|ts|tsx|html|htm|css|scss|sass|less|java|c|h|cpp|hpp|cs|go|rs|rb|php|swift|sh|bash|zsh|sql|yml|yaml|toml|xml|vue|svelte|dart|lua|r|pl|ipynb|graphql|gql|proto|env|ini|cfg|dockerfile|makefile)$/.test(name)
+  ) return "text";
   return "file";
 }
 

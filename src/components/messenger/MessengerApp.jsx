@@ -90,6 +90,76 @@ function messengerOriginalOf(file) {
   return file?.__messengerOriginal || file;
 }
 
+
+function guessLangFromName(name = "") {
+  const n = String(name).toLowerCase();
+  const map = {
+    py: "python", js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
+    java: "java", c: "c", h: "c", cpp: "cpp", hpp: "cpp", cs: "csharp", go: "go", rs: "rust",
+    rb: "ruby", php: "php", swift: "swift", sh: "bash", bash: "bash", sql: "sql",
+    html: "html", htm: "html", css: "css", scss: "scss", json: "json", md: "markdown",
+    yml: "yaml", yaml: "yaml", xml: "xml", toml: "ini",
+  };
+  const m = n.match(/\.([a-z0-9]+)$/);
+  return (m && map[m[1]]) || "";
+}
+
+function PreviewTextBody({ text, filename }) {
+  const [html, setHtml] = React.useState(null);
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const raw = text || "";
+      const lang = guessLangFromName(filename);
+      try {
+        const mod = await import("highlight.js");
+        try { await import("highlight.js/styles/github-dark.css"); } catch { /* */ }
+        const hljs = mod.default || mod;
+        let out;
+        if (lang && hljs.getLanguage(lang)) {
+          out = hljs.highlight(raw, { language: lang, ignoreIllegals: true }).value;
+        } else {
+          out = hljs.highlightAuto(raw).value;
+        }
+        if (!cancelled) setHtml(out);
+      } catch {
+        if (!cancelled) setHtml(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [text, filename]);
+
+  return (
+    <Box
+      component="pre"
+      sx={{
+        m: 0,
+        p: { xs: 1, sm: 2 },
+        width: "100%",
+        maxHeight: "70vh",
+        overflow: "auto",
+        bgcolor: "#0d1117",
+        borderRadius: 1,
+        fontSize: { xs: 12, sm: 13 },
+        lineHeight: 1.55,
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+        color: "#e6edf3",
+        whiteSpace: "pre",
+        wordBreak: "normal",
+        "& .hljs-comment": { color: "#8b949e", fontStyle: "italic" },
+        "& .hljs-keyword": { color: "#ff7b72" },
+        "& .hljs-string": { color: "#a5d6ff" },
+        "& .hljs-number": { color: "#79c0ff" },
+        "& .hljs-title": { color: "#d2a8ff" },
+        "& .hljs-built_in": { color: "#ffa657" },
+      }}
+      {...(html
+        ? { dangerouslySetInnerHTML: { __html: html } }
+        : { children: text })}
+    />
+  );
+}
+
 export default function MessengerApp() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -187,6 +257,18 @@ export default function MessengerApp() {
     try { return localStorage.getItem("messenger.sendFilesTogether") !== "false"; } catch { return true; }
   });
   const [pendingUploads, setPendingUploads] = useState([]);
+  // Auto-dismiss failed upload bubbles after a few seconds
+  useEffect(() => {
+    const failed = pendingUploads.filter((u) => u.status === "failed");
+    if (!failed.length) return undefined;
+    const timers = failed.map((u) =>
+      setTimeout(() => {
+        setPendingUploads((prev) => prev.filter((x) => x.id !== u.id));
+      }, 4000)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [pendingUploads]);
+
   const [replyTo, setReplyTo] = useState(null);
   const [editingMsg, setEditingMsg] = useState(null);
   useEffect(() => {
@@ -2165,6 +2247,65 @@ export default function MessengerApp() {
     }
   };
 
+  const downloadAttachmentFile = async (att) => {
+    if (!att) return;
+    const name = (att.original_filename || att.name || "download").replace(/[/\\?%*:|"<>]/g, "_");
+    try {
+      let blob = null;
+      if (att._blobUrl) {
+        const r = await fetch(att._blobUrl);
+        blob = await r.blob();
+      } else if (att.url) {
+        const r = await fetch(withTokenQuery(att.url), {
+          headers: authHeaders(),
+          credentials: "include",
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        blob = await r.blob();
+      } else {
+        return;
+      }
+
+      // Chrome/Edge: real save dialog when available
+      if (typeof window.showSaveFilePicker === "function") {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: name,
+            types: [{
+              description: "File",
+              accept: { "application/octet-stream": ["." + ((name.split(".").pop() || "bin"))] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          flash?.("Saved");
+          return;
+        } catch (err) {
+          if (err && (err.name === "AbortError" || err.name === "NotAllowedError")) return;
+        }
+      }
+
+      // Force disk download: browsers open text/pdf blob: URLs as a tab.
+      // octet-stream + download attribute saves into the Downloads folder.
+      const forced = new Blob([await blob.arrayBuffer()], { type: "application/octet-stream" });
+      const obj = URL.createObjectURL(forced);
+      const a = document.createElement("a");
+      a.href = obj;
+      a.setAttribute("download", name);
+      a.style.display = "none";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try { a.remove(); } catch { /* */ }
+        try { URL.revokeObjectURL(obj); } catch { /* */ }
+      }, 2000);
+    } catch (e) {
+      flash?.(e?.message || "Download failed");
+    }
+  };
+
   const openPreview = async (att) => {
     // If already a cached blob URL from FileAttachmentCard, open directly
     if (att?._fromCache && att?._blobUrl) {
@@ -2404,21 +2545,35 @@ export default function MessengerApp() {
     setShowScrollDown(false);
   };
 
-  const armScrollDownButton = () => {
-    // Show + start idle fade. After fade completes, remove from DOM so it
-    // cannot intercept clicks while invisible.
-    scrollDownDismissedRef.current = false;
-    userScrollIntentRef.current = false;
-    setShowScrollDown(true);
-    setScrollDownOpacity(1);
-    if (scrollDownFadeTimerRef.current) clearTimeout(scrollDownFadeTimerRef.current);
+  const scrollDownHoverRef = useRef(false);
+
+  const clearScrollDownFadeTimers = () => {
+    if (scrollDownFadeTimerRef.current) {
+      clearTimeout(scrollDownFadeTimerRef.current);
+      scrollDownFadeTimerRef.current = null;
+    }
+  };
+
+  const scheduleScrollDownFade = () => {
+    clearScrollDownFadeTimers();
+    if (scrollDownHoverRef.current) return;
     scrollDownFadeTimerRef.current = setTimeout(() => {
+      if (scrollDownHoverRef.current) return;
       setScrollDownOpacity(0);
       scrollDownFadeTimerRef.current = setTimeout(() => {
+        if (scrollDownHoverRef.current) return;
         setShowScrollDown(false);
         scrollDownFadeTimerRef.current = null;
       }, 250);
     }, 1800);
+  };
+
+  const armScrollDownButton = () => {
+    scrollDownDismissedRef.current = false;
+    userScrollIntentRef.current = false;
+    setShowScrollDown(true);
+    setScrollDownOpacity(1);
+    scheduleScrollDownFade();
   };
 
   /**
@@ -3116,6 +3271,13 @@ export default function MessengerApp() {
                   onDelete={deleteMsg}
                   onForward={(message) => setForwardOpen(message)}
                   onOpenPreview={openPreview}
+                  onEditCode={(fence) => {
+                    setText((prev) => {
+                      const p = (prev || "").trim();
+                      return p ? `${p}\n\n${fence}` : fence;
+                    });
+                    setTimeout(() => inputRef.current?.focus?.(), 50);
+                  }}
                   onShowReaders={(message) => setReadersMessage(message)}
                   onCopyText={async (msg) => {
                     await copyText(typeof msg?.body === "string" ? msg.body : "");
@@ -3227,19 +3389,27 @@ export default function MessengerApp() {
 
           {showScrollDown && (
             <Box
+              onMouseEnter={() => {
+                scrollDownHoverRef.current = true;
+                clearScrollDownFadeTimers();
+                setScrollDownOpacity(1);
+              }}
+              onMouseLeave={() => {
+                scrollDownHoverRef.current = false;
+                scheduleScrollDownFade();
+              }}
               sx={{
                 position: "absolute",
                 right: { xs: 12, sm: 16 },
                 bottom: { xs: 78, sm: 86 },
                 zIndex: 12,
-                pointerEvents: "none",
+                pointerEvents: "auto",
                 opacity: scrollDownOpacity,
                 transition: "opacity 220ms ease",
                 display: "flex",
                 flexDirection: "column",
                 gap: 1,
                 alignItems: "flex-end",
-                // While fading out, do not accept clicks on an invisible control.
                 visibility: scrollDownOpacity > 0.05 ? "visible" : "hidden",
               }}
             >
@@ -3446,7 +3616,7 @@ export default function MessengerApp() {
           onSelect={(m) => { toggleSelectMessage(m, true); setCtx(null); }}
           onCopy={async (m) => { await copyText(typeof m?.body === "string" ? m.body : ""); flash("Copied"); setCtx(null); }}
           onPreview={(a) => { openPreview(a); setCtx(null); }}
-          onDownload={(a) => { window.open(withTokenQuery(a.url), "_blank"); setCtx(null); }}
+          onDownload={(a) => { downloadAttachmentFile(a); setCtx(null); }}
           onEdit={(m) => startEdit(m)}
           onDelete={(m) => deleteMsg(m)}
           onShowReaders={(m) => { setReadersMessage(m); setCtx(null); }}
@@ -3541,8 +3711,12 @@ export default function MessengerApp() {
           <Typography noWrap sx={{ flex: 1 }} fontWeight={600}>
             {preview?.att?.original_filename || "Preview"}
           </Typography>
-          {preview?.att?.url && (
-            <IconButton onClick={() => window.open(withTokenQuery(preview.att.url), "_blank")}>
+          {(preview?.att?.url || preview?.blobUrl) && (
+            <IconButton onClick={() => downloadAttachmentFile({
+              ...preview.att,
+              _blobUrl: preview.blobUrl,
+              original_filename: preview.att?.original_filename,
+            })}>
               <DownloadIcon />
             </IconButton>
           )}
@@ -3561,19 +3735,19 @@ export default function MessengerApp() {
             <Typography color="error.main" sx={{ p: 2 }}>{preview.error}</Typography>
           )}
           {preview?.kind === "text" && (
-            <Box component="pre" sx={{
-              m: 0, p: 2, width: "100%", maxHeight: "70vh", overflow: "auto",
-              bgcolor: "action.hover", borderRadius: 1, fontSize: 13,
-              whiteSpace: "pre-wrap", wordBreak: "break-word",
-            }}>
-              {preview.textContent}
-            </Box>
+            <PreviewTextBody
+              text={preview.textContent}
+              filename={preview?.att?.original_filename || ""}
+            />
           )}
           {preview?.kind === "file" && (
             <Stack alignItems="center" spacing={2}>
               <Typography>No inline preview for this file type.</Typography>
               <Button variant="contained" startIcon={<DownloadIcon />}
-                onClick={() => window.open(preview.blobUrl || withTokenQuery(preview.att.url), "_blank")}>
+                onClick={() => downloadAttachmentFile({
+                  ...preview.att,
+                  _blobUrl: preview.blobUrl,
+                })}>
                 Download
               </Button>
             </Stack>

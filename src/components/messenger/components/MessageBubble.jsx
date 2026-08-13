@@ -301,7 +301,7 @@ const LANG_ALIASES = {
   jsx: "JSX", tsx: "TSX", vue: "Vue", react: "JavaScript", plaintext: "Text", text: "Text",
 };
 
-function CodeBlock({ code, lang, mine }) {
+function CodeBlock({ code, lang, mine, onEditCode }) {
   const [copied, setCopied] = React.useState(false);
   const [hljsMod, setHljsMod] = React.useState(null);
   React.useEffect(() => {
@@ -374,10 +374,9 @@ function CodeBlock({ code, lang, mine }) {
         border: "1px solid",
         borderColor: mine ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.12)",
         bgcolor: "#0d1117",
-        // preserve code layout: fixed min width + horizontal scroll
         width: "100%",
-        minWidth: { xs: 220, sm: 280 },
         maxWidth: "100%",
+        minWidth: 0,
         boxSizing: "border-box",
       }}
       onClick={(e) => e.stopPropagation()}
@@ -387,8 +386,9 @@ function CodeBlock({ code, lang, mine }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          px: 1.25,
-          py: 0.6,
+          gap: 0.5,
+          px: { xs: 0.75, sm: 1.25 },
+          py: 0.5,
           bgcolor: "rgba(255,255,255,0.04)",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
         }}
@@ -406,6 +406,7 @@ function CodeBlock({ code, lang, mine }) {
         >
           {detected.label}
         </Typography>
+        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
         <Box
           component="button"
           type="button"
@@ -434,6 +435,37 @@ function CodeBlock({ code, lang, mine }) {
           {copied ? <CheckIcon sx={{ fontSize: 14 }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
           {copied ? "Copied" : "Copy"}
         </Box>
+        {typeof onEditCode === "function" && (
+          <Box
+            component="button"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              const fence = "```" + (lang || "") + "\n" + (code || "") + "\n```";
+              onEditCode(fence, { code, lang });
+            }}
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.4,
+              border: "none",
+              cursor: "pointer",
+              bgcolor: "rgba(255,255,255,0.06)",
+              color: "rgba(255,255,255,0.75)",
+              borderRadius: "4px",
+              px: 1,
+              py: 0.35,
+              fontSize: 11.5,
+              fontWeight: 600,
+              fontFamily: "inherit",
+              ml: 0.5,
+              "&:hover": { bgcolor: "rgba(255,255,255,0.12)", color: "#fff" },
+            }}
+          >
+            Edit
+          </Box>
+        )}
+        </Box>
       </Box>
       <Box
         sx={{
@@ -449,9 +481,9 @@ function CodeBlock({ code, lang, mine }) {
           component="pre"
           sx={{
             m: 0,
-            py: 1.25,
-            pl: 1,
-            pr: 1.25,
+            py: 1,
+            pl: 0.5,
+            pr: 0.75,
             flexShrink: 0,
             userSelect: "none",
             textAlign: "right",
@@ -474,8 +506,8 @@ function CodeBlock({ code, lang, mine }) {
           component="pre"
           sx={{
             m: 0,
-            py: 1.25,
-            px: 1.5,
+            py: 1,
+            px: { xs: 0.75, sm: 1.25 },
             flex: 1,
             overflowX: "auto",
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
@@ -875,7 +907,7 @@ function FileAttachmentCard({ att, url, mine, onOpen, authHeaders }) {
 
 export default function MessageBubble({
   m, meId, activeConv,
-  onContextOpen, onReact, onReactAnchor, onReply,
+  onContextOpen, onReact, onReactAnchor, onReply, onEditCode,
   onOpenPreview, onShowReaders, onLoadUserProfile,
   onJumpToMessage, onPlayAudio, onToggleAudio, onSeekAudio,
   onMentionClick,
@@ -950,8 +982,19 @@ export default function MessageBubble({
     clearLongPress();
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
-      // Enter selection + select this message (Telegram-style)
-      onToggleSelect?.(m, true);
+      // Mobile long-press → context menu (right-click equivalent), not selection
+      try {
+        if (navigator.vibrate) navigator.vibrate(12);
+      } catch { /* */ }
+      onContextOpen?.(
+        {
+          preventDefault() {},
+          stopPropagation() {},
+          clientX: e.clientX || (e.touches?.[0]?.clientX) || window.innerWidth / 2,
+          clientY: e.clientY || (e.touches?.[0]?.clientY) || window.innerHeight / 2,
+        },
+        m,
+      );
     }, 420);
   };
   const onPointerMoveMsg = (e) => {
@@ -974,11 +1017,15 @@ export default function MessageBubble({
         justifyContent: mine ? "flex-end" : "flex-start",
         mb: 0.6,
         px: 0.5,
+        py: 0.15,
+        // Full row is the hit-target (side gutter counts as the message zone)
+        width: "100%",
         alignItems: "center",
         bgcolor: selected ? (t) => t.palette.mode === "dark" ? "rgba(25,118,210,0.18)" : "rgba(25,118,210,0.1)" : "transparent",
         borderRadius: 2,
         transition: "background-color 0.15s",
         "&:hover .msg-actions": { opacity: 1 },
+        WebkitTouchCallout: "none",
       }}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -1041,7 +1088,7 @@ export default function MessageBubble({
       )}
       <Box
         sx={{
-          maxWidth: { xs: "82%", sm: "70%" },
+          maxWidth: bodySegments.some((s) => s.type === "codeblock") ? { xs: "96%", sm: "85%" } : { xs: "82%", sm: "70%" },
           px: isBigEmoji ? 0.5 : 1.35,
           py: isBigEmoji ? 0.35 : 0.85,
           borderRadius: isBigEmoji ? 2 : (mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px"),
@@ -1278,7 +1325,7 @@ export default function MessageBubble({
                 );
               }
               if (seg.type === "codeblock") {
-                return <CodeBlock key={i} code={seg.value} lang={seg.lang || ""} mine={mine} />;
+                return <CodeBlock key={i} code={seg.value} lang={seg.lang || ""} mine={mine} onEditCode={onEditCode} />;
               }
               if (seg.type === "quote") {
                 return (
