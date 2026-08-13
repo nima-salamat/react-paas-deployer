@@ -543,7 +543,7 @@ export default function MessageBubble({
           minWidth: 100,
           px: 1.4,
           py: 0.95,
-          borderRadius: mine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+          borderRadius: mine ? "10px 10px 2px 10px" : "10px 10px 10px 2px",
           bgcolor: mine ? "primary.main" : "background.paper",
           color: mine ? "primary.contrastText" : "text.primary",
           boxShadow: mine ? "none" : 1,

@@ -97,7 +97,7 @@ export default function SimpleHtmlEditor({
         opacity: disabled ? 0.6 : 1,
         flex: 1,
         minWidth: 0,
-        borderRadius: compact ? 3 : 1,
+        borderRadius: compact ? 2 : 1,
         overflow: "hidden",
       }}
     >

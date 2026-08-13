@@ -171,6 +171,9 @@ function App() {
         <Routes>
           <Route path="/messenger" element={<MessengerApp />} />
           <Route path="/messenger/*" element={<MessengerApp />} />
+          {/* Standalone admin console — no main Navbar / Footer (messenger-style) */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/*" element={<AdminDashboard />} />
           <Route path="/" element={<Layout themeMode={themeMode} setThemeMode={setThemeMode} />}>
             <Route index element={<Home />} />
             <Route path="services" element={<Services />} />
@@ -185,7 +188,6 @@ function App() {
             <Route path="tickets/:id" element={<TicketDetail />} />
             <Route path="staff" element={<StaffConsole />} />
             <Route path="staff/tickets" element={<StaffConsole />} />
-            <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/emails" element={<EmailManagement />} />
             <Route path="service/:id" element={<ServiceDetail />} />
           </Route>

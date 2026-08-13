@@ -1,991 +1,466 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, Divider, Drawer, FormControl, FormControlLabel, Grid, IconButton,
-  InputLabel, List, ListItemButton, ListItemIcon, ListItemText, MenuItem, Paper,
-  Select, Snackbar, Stack, Switch, Table, TableBody, TableCell, TableHead, TableRow,
-  TextField, Toolbar, Typography, Pagination, Tooltip,
+  Box, CircularProgress, Drawer, Stack, Typography,
+  useMediaQuery, useTheme,
 } from "@mui/material";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
-import EmailIcon from "@mui/icons-material/Email";
-import PeopleIcon from "@mui/icons-material/People";
-import LinkIcon from "@mui/icons-material/Link";
-import VpnKeyIcon from "@mui/icons-material/VpnKey";
-import CloseIcon from "@mui/icons-material/Close";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
-import DnsIcon from "@mui/icons-material/Dns";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import StopIcon from "@mui/icons-material/Stop";
-import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
-import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import StorageIcon from "@mui/icons-material/Storage";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { ToastProvider } from "./components/ToastContext.jsx";
+import ConfirmDialog from "./components/ConfirmDialog.jsx";
+import { clearSessionPermissions, canSeeNav, adminMeUrl } from "./adminUtils";
 import apiRequest from "../customHooks/apiRequest";
-import { TICKETS_API, EMAILS_API, unwrapData } from "../tickets/api";
-import EmailManagement from "../emails/EmailManagement.jsx";
-import MessageBubble from "../tickets/MessageBubble.jsx";
-import { htmlToPlain } from "../tickets/SimpleHtmlEditor.jsx";
-import ChatComposer from "../tickets/ChatComposer.jsx";
-import ServicesPanel from "./ServicesPanel.jsx";
-import TicketsPanel from "./TicketsPanel.jsx";
-import UsersPanel from "./UsersPanel.jsx";
-import InvitesPanel from "./InvitesPanel.jsx";
-import AuthCodesPanel from "./AuthCodesPanel.jsx";
+import { useAdminIdentity } from "./hooks/useAdminIdentity.js";
+import { useTicketsData } from "./hooks/useTicketsData.js";
+import { useInvitesAndCodes } from "./hooks/useInvitesAndCodes.js";
+import { useTicketWebSocket } from "./hooks/useTicketWebSocket.js";
 
-const STATUS_COLOR = {
-  open: "info", in_progress: "warning", waiting_user: "secondary",
-  resolved: "success", closed: "default",
+import AdminSidebar from "./layout/AdminSidebar.jsx";
+import AdminTopBar from "./layout/AdminTopBar.jsx";
+import TicketDetailDrawer from "./components/TicketDetailDrawer.jsx";
+
+import OverviewPanel from "./panels/OverviewPanel.jsx";
+import TicketsPanel from "./panels/TicketsPanel.jsx";
+import UsersPanel from "./panels/UsersPanel.jsx";
+import ServicesPanel from "./panels/ServicesPanel.jsx";
+import PlansPanel from "./panels/PlansPanel.jsx";
+import TablesPanel from "./panels/TablesPanel.jsx";
+import LoginSettingsPanel from "./panels/LoginSettingsPanel.jsx";
+import InvitesPanel from "./panels/InvitesPanel.jsx";
+import AuthCodesPanel from "./panels/AuthCodesPanel.jsx";
+import EmailsPanel from "./panels/EmailsPanel.jsx";
+import ProfilePanel from "./panels/ProfilePanel.jsx";
+
+const PAGE_TITLES = {
+  overview: "Overview",
+  tickets: "Tickets",
+  users: "Users & access",
+  services: "Services",
+  plans: "Plans",
+  tables: "Database tables",
+  login: "Login system",
+  invites: "Invites",
+  codes: "Auth codes",
+  emails: "Email",
+  profile: "My profile",
 };
 
-function hostBase() {
-  return `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
-}
+/** Alt+key → tab id */
+const SHORTCUT_MAP = {
+  "1": "overview",
+  "2": "tickets",
+  "3": "users",
+  "4": "services",
+  "5": "plans",
+  "6": "tables",
+  "7": "login",
+  "8": "invites",
+  "9": "codes",
+  "0": "emails",
+  p: "profile",
+  P: "profile",
+  "[": "__collapse__",
+};
 
-function wsUrl() {
-  const token = localStorage.getItem("access");
-  if (!token) return null;
-  try {
-    const backendUrl = new URL(hostBase());
-    const protocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${backendUrl.host}/ws/tickets/?token=${encodeURIComponent(token)}`;
-  } catch {
-    return null;
-  }
-}
-
-function StatCard({ label, value, color }) {
-  return (
-    <Paper sx={{ p: 2, height: "100%" }}>
-      <Typography variant="body2" color="text.secondary">{label}</Typography>
-      <Typography variant="h4" fontWeight={700} color={color || "text.primary"}>
-        {value ?? "—"}
-      </Typography>
-    </Paper>
-  );
-}
-
-export default function AdminDashboard() {
+function AdminDashboardInner() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "overview";
   const [tab, setTab] = useState(initialTab === "permissions" ? "users" : initialTab);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
-  const [meLoading, setMeLoading] = useState(true);
-  const [toast, setToast] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("admin_sidebar_collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
-  // tickets
-  const [stats, setStats] = useState(null);
-  const [liveConnected, setLiveConnected] = useState(false);
-  const [liveEvents, setLiveEvents] = useState([]);
-  const wsRef = useRef(null);
-  const selectedIdRef = useRef(null);
-  const loadTicketsRef = useRef(() => {});
-  const openDetailRef = useRef(async () => {});
-  const loadStatsRef = useRef(() => {});
-  const reconnectRef = useRef(0);
-  const [tickets, setTickets] = useState([]);
-  const [page, setPage] = useState(1);
-  const [count, setCount] = useState(0);
-  const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
-  const [priority, setPriority] = useState("");
-  const [assignedFilter, setAssignedFilter] = useState("");
-  const [tLoading, setTLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
-  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
-  const [detail, setDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [reply, setReply] = useState("");
-  const [files, setFiles] = useState([]);
-  const [sending, setSending] = useState(false);
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
-  // users
-  const [users, setUsers] = useState([]);
-  const [userPage, setUserPage] = useState(1);
-  const [userCount, setUserCount] = useState(0);
-  const [userSearch, setUserSearch] = useState("");
-  const [userStaffOnly, setUserStaffOnly] = useState("");
-  const [userActive, setUserActive] = useState("");
-  const [userLoading, setUserLoading] = useState(false);
-  const [editUser, setEditUser] = useState(null);
-  const [deptCatalog, setDeptCatalog] = useState([]); // [{id,name}]
-  const [userMemberships, setUserMemberships] = useState([]); // [{department_id, is_manager}]
-  const [membershipLoading, setMembershipLoading] = useState(false);
-  const [permCatalog, setPermCatalog] = useState([]);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ username: "", email: "", password: "", is_staff: false });
-
-  // invites
-  const [invites, setInvites] = useState([]);
-  const [invLoading, setInvLoading] = useState(false);
-  const [newInvite, setNewInvite] = useState({ label: "", max_uses: "1" });
-
-  // auth codes
-  const [codes, setCodes] = useState([]);
-  const [codeCount, setCodeCount] = useState(0);
-  const [codePage, setCodePage] = useState(1);
-  const [codeSearch, setCodeSearch] = useState("");
-  const [codeLoading, setCodeLoading] = useState(false);
-
-  const [detailTab, setDetailTab] = useState("overview"); // overview | deploys | volumes | networks
-
-  const API_USERS = useMemo(() => `${hostBase()}/api/users/user/`, []);
-  const ADMIN_USERS = useMemo(() => `${hostBase()}/api/users/admin/users/`, []);
-  const AUTH = useMemo(() => `${hostBase()}/auth/api`, []);
-
-  useEffect(() => {
-    (async () => {
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
       try {
-        let u = null;
-        try {
-          const res = await apiRequest({ method: "GET", url: `${AUTH}/validateToken/` });
-          u = res.data?.user || res.data;
-        } catch { /* */ }
-        if (!u || u.is_staff === undefined) {
-          const res = await apiRequest({ method: "GET", url: API_USERS });
-          u = res.data?.user || res.data;
-        }
-        const staff = Boolean(u?.is_staff || u?.is_superuser);
-        setIsStaff(staff);
-        setIsAdmin(Boolean(u?.is_superuser));
-        if (!staff) navigate("/tickets");
-      } catch {
-        navigate("/");
-      } finally {
-        setMeLoading(false);
-      }
-    })();
-  }, [API_USERS, AUTH, navigate]);
-
-  const loadStats = useCallback(async () => {
-    try {
-      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/staff/stats/` });
-      setStats(unwrapData(res));
-    } catch { /* */ }
-  }, []);
-  loadStatsRef.current = loadStats;
-
-  const loadTickets = useCallback(async (opts = {}) => {
-    const silent = Boolean(opts && opts.silent);
-    if (!silent) setTLoading(true);
-    try {
-      const params = { page };
-      if (search) params.search = search;
-      if (status) params.status = status;
-      if (priority) params.priority = priority;
-      if (assignedFilter) params.assigned_to = assignedFilter;
-      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/staff/`, params });
-      const data = res.data;
-      const results = data.results || data.data || [];
-      setTickets(Array.isArray(results) ? results : []);
-      setCount(typeof data.count === 'number' ? data.count : (Array.isArray(results) ? results.length : 0));
-    } catch {
-      setTickets([]);
-    } finally {
-      setTLoading(false);
-    }
-  }, [page, search, status, priority, assignedFilter]);
-  loadTicketsRef.current = loadTickets;
-
-  const loadUsers = useCallback(async () => {
-    setUserLoading(true);
-    try {
-      const params = { page: userPage, page_size: 20 };
-      if (userSearch) params.search = userSearch;
-      if (userStaffOnly !== "") params.is_staff = userStaffOnly;
-      if (userActive !== "") params.is_active = userActive;
-      const res = await apiRequest({ method: "GET", url: ADMIN_USERS, params });
-      const data = res.data;
-      // DRF pagination at top level
-      setUsers(data.results || data.data?.results || []);
-      setUserCount(typeof data.count === 'number' ? data.count : (data.results || []).length);
-    } catch (e) {
-      setUsers([]);
-      setToast(e?.response?.data?.message || "Cannot load users (need users.view)");
-    } finally {
-      setUserLoading(false);
-    }
-  }, [ADMIN_USERS, userPage, userSearch, userStaffOnly, userActive]);
-
-  const loadPerms = useCallback(async () => {
-    try {
-      const res = await apiRequest({ method: "GET", url: `${hostBase()}/api/users/admin/permissions/` });
-      const d = unwrapData(res) || res.data?.data || res.data;
-      setPermCatalog(d?.permissions || []);
-    } catch {
-      setPermCatalog([
-        "tickets.view", "tickets.manage", "tickets.delete",
-        "users.view", "users.manage", "invites.manage",
-        "auth_codes.view", "emails.manage", "departments.manage",
-        "services.view", "services.manage", "services.delete",
-        "deploys.manage", "volumes.manage", "networks.manage",
-      ]);
-    }
+        localStorage.setItem("admin_sidebar_collapsed", next ? "1" : "0");
+      } catch { /* */ }
+      return next;
+    });
   }, []);
 
-  const loadInvites = useCallback(async () => {
-    setInvLoading(true);
-    try {
-      const res = await apiRequest({ method: "GET", url: `${AUTH}/invite/list/` });
-      const body = res.data || {};
-      // ok() merges: { success, message, invites: [...] }
-      const list = body.invites || body.data?.invites || body.results || body.data || [];
-      setInvites(Array.isArray(list) ? list : []);
-    } catch (e) {
-      console.error("invite list", e);
-      setInvites([]);
-      setToast(e?.response?.data?.message || "Failed to load invites");
-    } finally {
-      setInvLoading(false);
-    }
-  }, [AUTH]);
+  const DRAWER_W = sidebarCollapsed ? 72 : 248;
 
-  const loadCodes = useCallback(async () => {
-    setCodeLoading(true);
-    try {
-      const params = { page: codePage };
-      if (codeSearch) params.search = codeSearch;
-      const res = await apiRequest({ method: "GET", url: `${AUTH}/admin/auth-codes/`, params });
-      const d = res.data?.data || res.data;
-      setCodes(d?.results || []);
-      setCodeCount(d?.count || 0);
-    } catch {
-      setCodes([]);
-    } finally {
-      setCodeLoading(false);
-    }
-  }, [AUTH, codePage, codeSearch]);
+  const { me, loading: meLoading } = useAdminIdentity({
+    onNotStaff: () => navigate("/tickets"),
+  });
+  const [localMe, setLocalMe] = useState(null);
+  const effectiveMe = localMe || me;
 
   useEffect(() => {
-    if (meLoading) return;
-    loadStats();
-  }, [meLoading, loadStats]);
+    if (me) setLocalMe(me);
+  }, [me]);
+
+  // When profile images of current user change anywhere in admin, refresh "me"
+  useEffect(() => {
+    const handler = async (ev) => {
+      const uid = ev?.detail?.userId;
+      // Always refresh me — cheap and keeps topbar/sidebar in sync
+      try {
+        const res = await apiRequest({ method: "GET", url: adminMeUrl() });
+        const d = res.data?.data || res.data || {};
+        if (d && (d.id || d.username)) setLocalMe(d);
+      } catch { /* */ }
+    };
+    window.addEventListener("admin-profile-changed", handler);
+    return () => window.removeEventListener("admin-profile-changed", handler);
+  }, []);
+
+
+  const ticketsApi = useTicketsData();
+  const {
+    stats, tickets, page, setPage, count, search, setSearch,
+    status, setStatus, priority, setPriority,
+    assignedFilter, setAssignedFilter, tLoading,
+    selectedId, detail, detailLoading, reply, setReply,
+    files, setFiles, sending,
+    loadTickets, openDetail, changeStatus,
+    sendReply, deleteTicket, closeDetail,
+    selectedIdRef, loadTicketsRef, openDetailRef, loadStatsRef,
+  } = ticketsApi;
+
+  const {
+    invites, invLoading, newInvite, setNewInvite,
+    createInvite, deactivateInvite, loadInvites,
+    codes, codeCount, codePage, setCodePage, codeSearch, setCodeSearch,
+    codeLoading, deleteCode, purgeCodes, loadCodes,
+  } = useInvitesAndCodes();
+
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const pushNotification = useCallback((notif) => {
+    const id = notif.id || `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setNotifications((prev) => [
+      { ...notif, id, unread: true, ts: notif.ts || new Date().toISOString() },
+      ...prev,
+    ].slice(0, 50));
+    setUnreadCount((c) => c + 1);
+  }, []);
+
+  const handleWsEvent = (data) => {
+    if (data.type === "ticket.created") {
+      loadStatsRef.current?.();
+      loadTicketsRef.current?.({ silent: true });
+      pushNotification({
+        title: `New ticket #${data.ticket_id ?? "?"}`,
+        body: data.subject || "A new ticket was created",
+        kind: "ticket.created",
+      });
+    } else if (data.type === "ticket.message") {
+      const sid = selectedIdRef.current;
+      if (sid != null && String(sid) === String(data.ticket_id)) {
+        openDetailRef.current?.(sid);
+      }
+      loadTicketsRef.current?.({ silent: true });
+      pushNotification({
+        title: `Reply on ticket #${data.ticket_id ?? "?"}`,
+        body: data.body?.slice(0, 120) || "New message received",
+        kind: "ticket.message",
+      });
+    } else if (data.type === "ticket.updated") {
+      loadStatsRef.current?.();
+      loadTicketsRef.current?.({ silent: true });
+    } else if (data.type === "ticket.seen") {
+      // Customer (or peer) marked messages as read — update ticks live (messenger-style)
+      const sid = selectedIdRef.current;
+      if (sid != null && String(sid) === String(data.ticket_id)) {
+        const idsRaw = data.message_ids || data.ids || [];
+        const idSet = new Set(
+          (Array.isArray(idsRaw) ? idsRaw : [data.message_id || data.last_read_id])
+            .filter((x) => x != null)
+            .map(String)
+        );
+        const lastRead =
+          data.last_read_id != null
+            ? Number(data.last_read_id)
+            : data.last_read_at
+              ? null
+              : null;
+        // Patch open detail optimistically so ✓✓ appears without waiting for GET
+        // openDetail also runs to stay authoritative with server
+        openDetailRef.current?.(sid);
+      } else {
+        loadTicketsRef.current?.({ silent: true });
+      }
+      loadStatsRef.current?.();
+    }
+  };
+
+  const { connected: liveConnected, events: liveEvents } = useTicketWebSocket({
+    enabled: !meLoading,
+    onEvent: handleWsEvent,
+  });
+
+  const markAllRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+    setUnreadCount(0);
+  }, []);
 
   useEffect(() => {
     if (tab === "tickets" || tab === "overview") {
-      const t = setTimeout(loadTickets, search ? 300 : 0);
-      return () => clearTimeout(t);
-    }
-  }, [tab, loadTickets, search]);
-
-  useEffect(() => {
-    if (tab === "users") {
-      loadUsers();
-      loadPerms();
-    }
-    if (tab === "invites") loadInvites();
-    if (tab === "codes") loadCodes();
-  }, [tab, loadUsers, loadPerms, loadInvites, loadCodes]);
-
-  // WebSocket
-  useEffect(() => {
-    if (meLoading) return;
-    let closed = false;
-    let timer;
-    const connect = () => {
-      const url = wsUrl();
-      if (!url) return;
-      const socket = new WebSocket(url);
-      wsRef.current = socket;
-      socket.onopen = () => {
-        reconnectRef.current = 0;
-        setLiveConnected(true);
-        try { socket.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
-      };
-      socket.onclose = () => {
-        setLiveConnected(false);
-        if (closed) return;
-        const attempt = Math.min(reconnectRef.current + 1, 8);
-        reconnectRef.current = attempt;
-        timer = setTimeout(connect, Math.min(1000 * 2 ** attempt, 15000));
-      };
-      socket.onerror = () => { try { socket.close(); } catch { /* */ } };
-      socket.onmessage = (ev) => {
-        let data;
-        try { data = JSON.parse(ev.data); } catch { return; }
-        if (data.type === "connected" || data.type === "pong") return;
-        setLiveEvents((prev) => [data, ...prev].slice(0, 30));
-        if (data.type === "ticket.created") {
-          setToast(`New ticket ${data.public_id}: ${data.subject}`);
-          loadStatsRef.current?.();
-          loadTicketsRef.current?.({ silent: true });
-        } else if (data.type === "ticket.message") {
-          setToast(`New reply on ${data.public_id || data.ticket_id}`);
-          const sid = selectedIdRef.current;
-          if (sid != null && String(sid) === String(data.ticket_id)) {
-            openDetailRef.current?.(sid);
-          }
-          loadTicketsRef.current?.({ silent: true });
-        } else if (data.type === "ticket.updated" || data.type === "ticket.seen") {
-          loadStatsRef.current?.();
-          loadTicketsRef.current?.({ silent: true });
-          const sid = selectedIdRef.current;
-          if (data.type === "ticket.seen" && sid != null && String(sid) === String(data.ticket_id)) {
-            openDetailRef.current?.(sid);
-          }
-        }
-      };
-    };
-    connect();
-    return () => {
-      closed = true;
-      clearTimeout(timer);
-      try { wsRef.current?.close(); } catch { /* */ }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meLoading]);
-
-  const openDetail = async (id, opts = {}) => {
-    const silent = Boolean(opts.silent);
-    setSelectedId(id);
-    selectedIdRef.current = id;
-    if (!silent) {
-      setDetailLoading(true);
-      setReply("");
-      setFiles([]);
-    }
-    try {
-      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/${id}/` });
-      setDetail(unwrapData(res));
-      if (typeof document === "undefined" || document.visibilityState !== "hidden") {
-        try {
-          const rr = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/read/` });
-          const rd = rr.data?.data || rr.data || {};
-          const ids = new Set((rd.message_ids || []).map(String));
-          if (ids.size) {
-            setDetail((prev) => {
-              if (!prev) return prev;
-              return {
-                ...prev,
-                messages: (prev.messages || []).map((m) =>
-                  ids.has(String(m.id))
-                    ? { ...m, seen_at: rd.last_read_at || new Date().toISOString(), is_seen: true }
-                    : m
-                ),
-              };
-            });
-          }
-        } catch { /* */ }
-      }
-    } catch {
-      if (!silent) setDetail(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  };
-  openDetailRef.current = (id) => openDetail(id, { silent: true });
-
-  const changeStatus = async (v) => {
-    await apiRequest({ method: "POST", url: `${TICKETS_API}/staff/${selectedId}/status/`, data: { status: v } });
-    openDetail(selectedId);
-    loadTickets();
-    loadStats();
-  };
-
-  const sendReply = async (bodyOverride) => {
-    const body = bodyOverride != null ? bodyOverride : reply;
-    if (!htmlToPlain(body) && !files.length) return;
-    setSending(true);
-    try {
-      const form = new FormData();
-      form.append("body", htmlToPlain(body) ? body : "<p></p>");
-      files.forEach((f) => form.append("attachments", f));
-      const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
-      const created = res.data?.data || res.data;
-      setReply("");
-      setFiles([]);
-      if (created && created.id) {
-        setDetail((prev) => {
-          if (!prev) return prev;
-          const msgs = prev.messages || [];
-          const exists = msgs.some((m) => String(m.id) === String(created.id));
-          return {
-            ...prev,
-            messages: exists
-              ? msgs.map((m) => (String(m.id) === String(created.id) ? { ...m, ...created } : m))
-              : [...msgs, created],
-          };
-        });
-      }
-      await openDetail(selectedId, { silent: true });
       loadTickets({ silent: true });
-    } finally {
-      setSending(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
-  const deleteTicket = async (id) => {
-    if (!window.confirm("Delete this ticket permanently?")) return;
+  useEffect(() => {
+    if (tab === "invites" && canSeeNav("invites")) loadInvites();
+    if (tab === "codes" && canSeeNav("codes")) loadCodes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const doLogout = useCallback(() => {
     try {
-      await apiRequest({ method: "DELETE", url: `${TICKETS_API}/staff/${id}/delete/` });
-      setToast("Ticket deleted");
-      setSelectedId(null);
-      setDetail(null);
-      loadTickets();
-      loadStats();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Delete failed");
-    }
-  };
+      localStorage.removeItem("access");
+      localStorage.removeItem("refresh");
+    } catch { /* */ }
+    clearSessionPermissions();
+    window.dispatchEvent(new Event("auth-changed"));
+    navigate("/signin_or_signup");
+  }, [navigate]);
 
-  const loadUserMemberships = async (userId) => {
-    setMembershipLoading(true);
-    try {
-      const res = await apiRequest({ method: "GET", url: `${TICKETS_API}/admin/users/${userId}/memberships/` });
-      const data = res.data?.data || res.data || {};
-      setDeptCatalog(Array.isArray(data.departments) ? data.departments : []);
-      setUserMemberships(
-        (data.memberships || []).map((m) => ({
-          department_id: m.department_id,
-          is_manager: Boolean(m.is_manager),
-        }))
-      );
-    } catch {
-      setDeptCatalog([]);
-      setUserMemberships([]);
-    } finally {
-      setMembershipLoading(false);
-    }
-  };
+  const requestLogout = useCallback(() => {
+    setConfirmLogout(true);
+  }, []);
 
-  const toggleDeptMembership = (deptId, checked) => {
-    setUserMemberships((prev) => {
-      if (checked) {
-        if (prev.some((m) => String(m.department_id) === String(deptId))) return prev;
-        return [...prev, { department_id: deptId, is_manager: false }];
-      }
-      return prev.filter((m) => String(m.department_id) !== String(deptId));
-    });
-  };
+  const backToDeployer = () => navigate("/");
 
-  const toggleDeptManager = (deptId, isManager) => {
-    setUserMemberships((prev) =>
-      prev.map((m) =>
-        String(m.department_id) === String(deptId) ? { ...m, is_manager: isManager } : m
-      )
-    );
-  };
-
-  const saveUser = async () => {
-    if (!editUser) return;
-    try {
-      await apiRequest({
-        method: "PATCH",
-        url: `${ADMIN_USERS}${editUser.id}/`,
-        data: {
-          is_staff: editUser.is_staff,
-          is_active: editUser.is_active,
-          is_superuser: editUser.is_superuser,
-          email: editUser.email,
-          rules: editUser.rules || [],
-        },
-      });
-      try {
-        await apiRequest({
-          method: "PUT",
-          url: `${TICKETS_API}/admin/users/${editUser.id}/memberships/`,
-          data: { memberships: userMemberships },
-        });
-      } catch (me) {
-        console.warn("memberships", me);
-      }
-      setToast("User updated");
-      setEditUser(null);
-      loadUsers();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Update failed");
-    }
-  };
-
-  const createUser = async () => {
-    try {
-      await apiRequest({ method: "POST", url: ADMIN_USERS, data: newUser });
-      setToast("User created");
-      setCreateOpen(false);
-      setNewUser({ username: "", email: "", password: "", is_staff: false });
-      loadUsers();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Create failed");
-    }
-  };
-
-  const deactivateUser = async (id) => {
-    if (!window.confirm("Deactivate this user?")) return;
-    try {
-      await apiRequest({ method: "DELETE", url: `${ADMIN_USERS}${id}/` });
-      setToast("User deactivated");
-      loadUsers();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Failed");
-    }
-  };
-
-  const createInvite = async () => {
-    try {
-      const body = {
-        label: newInvite.label,
-        max_uses: newInvite.max_uses === "" ? null : Number(newInvite.max_uses),
-      };
-      await apiRequest({ method: "POST", url: `${AUTH}/invite/create/`, data: body });
-      setToast("Invite created");
-      setNewInvite({ label: "", max_uses: "1" });
-      loadInvites();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Failed");
-    }
-  };
-
-  const deactivateInvite = async (token) => {
-    try {
-      await apiRequest({ method: "POST", url: `${AUTH}/invite/deactivate/`, data: { token } });
-      setToast("Invite deactivated");
-      loadInvites();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Failed");
-    }
-  };
-
-  const deleteCode = async (id) => {
-    try {
-      await apiRequest({ method: "DELETE", url: `${AUTH}/admin/auth-codes/${id}/` });
-      loadCodes();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Failed");
-    }
-  };
-
-  const purgeCodes = async () => {
-    try {
-      const res = await apiRequest({ method: "POST", url: `${AUTH}/admin/auth-codes/purge/` });
-      setToast(`Purged ${res.data?.data?.deleted ?? res.data?.deleted ?? 0} codes`);
-      loadCodes();
-    } catch (e) {
-      setToast(e?.response?.data?.message || "Failed");
-    }
-  };
-
-  const setTabAndUrl = (id) => {
+  const setTabAndUrl = useCallback((id) => {
     setTab(id);
     setSearchParams(id === "overview" ? {} : { tab: id });
-  };
+    setMobileNavOpen(false);
+  }, [setSearchParams]);
 
-  const nav = [
-    { id: "overview", label: "Overview", icon: <DashboardIcon /> },
-    { id: "tickets", label: "Tickets", icon: <ConfirmationNumberIcon /> },
-    ...(isAdmin || isStaff ? [
-      { id: "users", label: "Users & access", icon: <PeopleIcon /> },
-      { id: "services", label: "Services", icon: <DnsIcon /> },
-    ] : []),
-    ...(isAdmin
-      ? [
-          { id: "invites", label: "Invites", icon: <LinkIcon /> },
-          { id: "codes", label: "Auth codes", icon: <VpnKeyIcon /> },
-          { id: "emails", label: "Email", icon: <EmailIcon /> },
-        ]
-      : []),
-  ];
+  // Keyboard shortcuts: Alt+1..0, Alt+P, Alt+[
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey) return;
+      const target = e.target;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+
+      const key = e.key;
+      const mapped = SHORTCUT_MAP[key];
+      if (!mapped) return;
+
+      e.preventDefault();
+      if (mapped === "__collapse__") {
+        toggleSidebar();
+        return;
+      }
+      if (mapped === "profile" || canSeeNav(mapped)) {
+        setTabAndUrl(mapped);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setTabAndUrl, toggleSidebar]);
+
+  const handleDeleteTicket = async (id) => {
+    await deleteTicket(id);
+  };
 
   if (meLoading) {
     return (
-      <Box p={6} display="flex" justifyContent="center"><CircularProgress /></Box>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          bgcolor: "background.default",
+        }}
+      >
+        <Stack alignItems="center" gap={2}>
+          <CircularProgress />
+          <Typography color="text.secondary">Loading admin…</Typography>
+        </Stack>
+      </Box>
     );
   }
 
+  const sidebar = (
+    <AdminSidebar
+      me={effectiveMe}
+      tab={tab}
+      onTabChange={setTabAndUrl}
+      liveConnected={liveConnected}
+      onLogout={requestLogout}
+      onBackToDeployer={backToDeployer}
+      collapsed={sidebarCollapsed}
+      onToggleCollapse={toggleSidebar}
+    />
+  );
+
   return (
-    <Box sx={{ display: "flex", minHeight: "75vh" }}>
-      <Paper
-        elevation={0}
-        variant="outlined"
-        sx={{
-          width: 240,
-          flexShrink: 0,
-          borderRadius: 0,
-          display: { xs: "none", md: "flex" },
-          flexDirection: "column",
-          bgcolor: "background.paper",
-          borderRight: 1,
-          borderColor: "divider",
-        }}
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+      {isDesktop && (
+        <Box
+          component="nav"
+          sx={{
+            width: DRAWER_W,
+            flexShrink: 0,
+            position: "sticky",
+            top: 0,
+            height: "100vh",
+            transition: "width 0.2s ease",
+            overflow: "hidden",
+            zIndex: 10,
+          }}
+        >
+          {sidebar}
+        </Box>
+      )}
+
+      <Drawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        ModalProps={{ keepMounted: true }}
+        PaperProps={{ sx: { width: DRAWER_W } }}
       >
-        <Box sx={{ p: 2.5, pb: 1.5 }}>
-          <Typography variant="overline" color="text.secondary" letterSpacing={1.2}>
-            Control center
-          </Typography>
-          <Typography fontWeight={800} fontSize={18} lineHeight={1.2}>Admin</Typography>
-          <Stack direction="row" alignItems="center" gap={0.75} mt={1.25}>
-            <FiberManualRecordIcon sx={{ fontSize: 11, color: liveConnected ? "success.main" : "text.disabled" }} />
-            <Typography variant="caption" color="text.secondary">
-              {liveConnected ? "Realtime connected" : "Realtime offline"}
-            </Typography>
-          </Stack>
-        </Box>
-        <List dense sx={{ px: 1, flex: 1 }}>
-          {nav.map((n) => (
-            <ListItemButton
-              key={n.id}
-              selected={tab === n.id}
-              onClick={() => setTabAndUrl(n.id)}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                "&.Mui-selected": {
-                  bgcolor: "action.selected",
-                  "& .MuiListItemIcon-root": { color: "primary.main" },
-                },
-              }}
-            >
-              <ListItemIcon sx={{ minWidth: 40 }}>{n.icon}</ListItemIcon>
-              <ListItemText primary={n.label} primaryTypographyProps={{ fontWeight: tab === n.id ? 700 : 500, fontSize: 14 }} />
-            </ListItemButton>
-          ))}
-        </List>
-      </Paper>
-
-      <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, minWidth: 0, bgcolor: "action.hover" }}>
-        <FormControl size="small" fullWidth sx={{ mb: 2, display: { md: "none" } }}>
-          <InputLabel>Section</InputLabel>
-          <Select label="Section" value={tab} onChange={(e) => setTabAndUrl(e.target.value)}>
-            {nav.map((n) => <MenuItem key={n.id} value={n.id}>{n.label}</MenuItem>)}
-          </Select>
-        </FormControl>
-
-        {tab === "overview" && (
-          <>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h5" fontWeight={700}>Overview</Typography>
-              <Chip size="small" icon={<FiberManualRecordIcon />} label={liveConnected ? "WebSocket connected" : "Connecting…"} color={liveConnected ? "success" : "default"} variant="outlined" />
-            </Stack>
-            {stats && (
-              <Grid container spacing={2} mb={3}>
-                {[
-                  ["Total", stats.total], ["Open", stats.open, "info.main"],
-                  ["In Progress", stats.in_progress, "warning.main"], ["Waiting", stats.waiting_user],
-                  ["Urgent", stats.urgent, "error.main"], ["Unassigned", stats.unassigned],
-                ].map(([label, val, color]) => (
-                  <Grid key={label} item xs={6} sm={4} md={2}><StatCard label={label} value={val} color={color} /></Grid>
-                ))}
-              </Grid>
-            )}
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={7}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography fontWeight={600} mb={1}>Recent tickets</Typography>
-                  {tLoading ? <CircularProgress size={24} /> : (
-                    <Table size="small">
-                      <TableHead><TableRow>
-                        <TableCell>ID</TableCell><TableCell>Subject</TableCell>
-                        <TableCell>Status</TableCell><TableCell>User</TableCell>
-                      </TableRow></TableHead>
-                      <TableBody>
-                        {tickets.slice(0, 8).map((t) => (
-                          <TableRow key={t.id} hover sx={{ cursor: "pointer" }} onClick={() => openDetail(t.id)}>
-                            <TableCell>{t.public_id}</TableCell>
-                            <TableCell>{t.subject}</TableCell>
-                            <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
-                            <TableCell>{t.user?.username}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={5}>
-                <Paper sx={{ p: 2, maxHeight: 360, overflow: "auto" }}>
-                  <Typography fontWeight={600} mb={1}>Live activity</Typography>
-                  {liveEvents.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">Waiting for events…</Typography>
-                  ) : (
-                    <Stack spacing={1}>
-                      {liveEvents.map((ev, i) => (
-                        <Paper key={i} variant="outlined" sx={{ p: 1.2 }}>
-                          <Stack direction="row" justifyContent="space-between">
-                            <Chip size="small" label={ev.type} />
-                            <Typography variant="caption">{ev.public_id}</Typography>
-                          </Stack>
-                          <Typography variant="body2" mt={0.5}>{ev.subject}</Typography>
-                        </Paper>
-                      ))}
-                    </Stack>
-                  )}
-                </Paper>
-              </Grid>
-            </Grid>
-          </>
-        )}
-
-        {tab === "tickets" && (
-          <TicketsPanel
-            tickets={tickets}
-            count={count}
-            page={page}
-            setPage={setPage}
-            search={search}
-            setSearch={setSearch}
-            status={status}
-            setStatus={setStatus}
-            priority={priority}
-            setPriority={setPriority}
-            assignedFilter={assignedFilter}
-            setAssignedFilter={setAssignedFilter}
-            tLoading={tLoading}
-            onOpen={openDetail}
-            onDelete={deleteTicket}
-          />
-        )}
-
-        {tab === "users" && (
-          <UsersPanel
-            users={users}
-            userCount={userCount}
-            userPage={userPage}
-            setUserPage={setUserPage}
-            userSearch={userSearch}
-            setUserSearch={setUserSearch}
-            userStaffOnly={userStaffOnly}
-            setUserStaffOnly={setUserStaffOnly}
-            userActive={userActive}
-            setUserActive={setUserActive}
-            userLoading={userLoading}
-            isAdmin={isAdmin}
-            isStaff={isStaff}
-            onEdit={(u) => { const _u = { ...u, rules: u.rules || [] }; setEditUser(_u); loadUserMemberships(_u.id); }}
-            onDeactivate={deactivateUser}
-            onCreate={() => setCreateOpen(true)}
-          />
-        )}
-
-        {tab === "invites" && isAdmin && (
-          <InvitesPanel
-            invites={invites}
-            invLoading={invLoading}
-            newInvite={newInvite}
-            setNewInvite={setNewInvite}
-            onCreate={createInvite}
-            onDeactivate={deactivateInvite}
-          />
-        )}
-
-        {tab === "codes" && isAdmin && (
-          <AuthCodesPanel
-            codes={codes}
-            codeCount={codeCount}
-            codePage={codePage}
-            setCodePage={setCodePage}
-            codeSearch={codeSearch}
-            setCodeSearch={setCodeSearch}
-            codeLoading={codeLoading}
-            onPurge={purgeCodes}
-            onDelete={deleteCode}
-          />
-        )}
-
-
-        {tab === "emails" && isAdmin && <EmailManagement />}
-
-        {tab === "services" && (isAdmin || isStaff) && (
-          <ServicesPanel setToast={setToast} />
-        )}
-      </Box>
-
-      {/* Ticket drawer */}
-      <Drawer anchor="right" open={Boolean(selectedId)} onClose={() => { setSelectedId(null); setDetail(null); }}
-        PaperProps={{ sx: { width: { xs: "100%", sm: "min(560px, 100vw)" }, maxWidth: 640, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" } }}>
-        <Toolbar sx={{ justifyContent: "space-between" }}>
-          <Typography fontWeight={700}>{detail?.public_id || "Ticket"}</Typography>
-          <Stack direction="row">
-            {selectedId && (
-              <IconButton color="error" onClick={() => deleteTicket(selectedId)}><DeleteOutlineIcon /></IconButton>
-            )}
-            <IconButton onClick={() => { setSelectedId(null); setDetail(null); }}><CloseIcon /></IconButton>
-          </Stack>
-        </Toolbar>
-        <Divider />
-        <Box sx={{ p: 0, display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
-          {detailLoading && !detail && <Box display="flex" justifyContent="center" py={4} flex={1}><CircularProgress /></Box>}
-          {detail && (
-            <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
-              <Box sx={{ px: 2, pt: 1.5, pb: 1.25, flexShrink: 0, borderBottom: 1, borderColor: "divider" }}>
-                <Typography variant="h6" fontWeight={700} noWrap>{detail.subject}</Typography>
-                <Typography variant="body2" color="text.secondary" noWrap>
-                  {detail.user?.username} · {detail.user?.email}
-                </Typography>
-                <FormControl size="small" fullWidth sx={{ mt: 1 }}>
-                  <InputLabel>Status</InputLabel>
-                  <Select label="Status" value={detail.status} onChange={(e) => changeStatus(e.target.value)}>
-                    {["open", "in_progress", "waiting_user", "resolved", "closed"].map((s) => (
-                      <MenuItem key={s} value={s}>{s}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-              <Box
-                sx={{
-                  flex: 1,
-                  minHeight: 0,
-                  overflow: "auto",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 1,
-                  p: 1,
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
-                }}
-              >
-                {(detail.messages || []).map((msg) => (
-                  <MessageBubble key={msg.id} message={msg} mine={Boolean(msg.is_staff_reply)} showHtmlToggle />
-                ))}
-              </Box>
-              {detail.status !== "closed" && (
-                <Box sx={{ flexShrink: 0 }}>
-                  <ChatComposer
-                    value={reply}
-                    onChange={setReply}
-                    files={files}
-                    onFilesChange={setFiles}
-                    onSend={sendReply}
-                    sending={sending}
-                  />
-                </Box>
-              )}
-            </Box>
-          )}
-        </Box>
+        {sidebar}
       </Drawer>
 
-      {/* Edit user dialog */}
-      <Dialog open={Boolean(editUser)} onClose={() => setEditUser(null)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Edit user
-          <Typography component="span" color="text.secondary" fontWeight={400}> — {editUser?.username}</Typography>
-        </DialogTitle>
-        <DialogContent>
-          {editUser && (
-            <Stack gap={2} mt={1}>
-              <TextField label="Email" size="small" value={editUser.email || ""}
-                onChange={(e) => setEditUser((s) => ({ ...s, email: e.target.value }))} fullWidth />
-              <FormControlLabel control={<Switch checked={!!editUser.is_active}
-                onChange={(e) => setEditUser((s) => ({ ...s, is_active: e.target.checked }))} />} label="Active" />
-              <FormControlLabel control={<Switch checked={!!editUser.is_staff}
-                onChange={(e) => setEditUser((s) => ({ ...s, is_staff: e.target.checked }))} />} label="Staff" />
-              {isAdmin && (
-                <FormControlLabel control={<Switch checked={!!editUser.is_superuser}
-                  onChange={(e) => setEditUser((s) => ({ ...s, is_superuser: e.target.checked }))} />} label="Superuser" />
-              )}
-              <Box>
-                <Typography variant="subtitle2" gutterBottom>Access rules</Typography>
-                <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                  Staff need explicit rules. Superuser bypasses all checks.
-                </Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, maxHeight: 220, overflow: "auto" }}>
-                  <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.5 }}>
-                    {(permCatalog.length ? permCatalog : []).map((code) => (
-                      <FormControlLabel
-                        key={code}
-                        sx={{ m: 0, alignItems: "center" }}
-                        control={
-                          <Checkbox
-                            size="small"
-                            checked={(editUser.rules || []).includes(code)}
-                            onChange={(e) => {
-                              setEditUser((s) => {
-                                const set = new Set(s.rules || []);
-                                if (e.target.checked) set.add(code);
-                                else set.delete(code);
-                                return { ...s, rules: Array.from(set) };
-                              });
-                            }}
-                          />
-                        }
-                        label={<Typography variant="caption" fontFamily="monospace">{code}</Typography>}
-                      />
-                    ))}
-                  </Box>
-                </Paper>
+      <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <AdminTopBar
+          me={effectiveMe}
+          title={PAGE_TITLES[tab] || "Admin"}
+          liveConnected={liveConnected}
+          onMenuClick={() => setMobileNavOpen(true)}
+          showMenuButton={!isDesktop}
+          onBackToDeployer={backToDeployer}
+          onLogout={requestLogout}
+          onNavigate={setTabAndUrl}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onMarkAllRead={markAllRead}
+        />
 
-                <Paper variant="outlined" sx={{ p: 1.5, mt: 2 }}>
-                  <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-                    Department memberships
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                    A user can belong to multiple departments. Managers can reassign tickets in that department.
-                  </Typography>
-                  {membershipLoading ? (
-                    <CircularProgress size={22} />
-                  ) : (
-                    <Stack gap={0.5}>
-                      {(deptCatalog || []).map((d) => {
-                        const mem = (userMemberships || []).find((m) => String(m.department_id) === String(d.id));
-                        const checked = Boolean(mem);
-                        return (
-                          <Stack key={d.id} direction="row" alignItems="center" justifyContent="space-between" sx={{ py: 0.25 }}>
-                            <FormControlLabel
-                              control={
-                                <Checkbox
-                                  size="small"
-                                  checked={checked}
-                                  onChange={(e) => toggleDeptMembership(d.id, e.target.checked)}
-                                />
-                              }
-                              label={<Typography variant="body2">{d.name}</Typography>}
-                            />
-                            <FormControlLabel
-                              disabled={!checked}
-                              control={
-                                <Switch
-                                  size="small"
-                                  checked={Boolean(mem?.is_manager)}
-                                  onChange={(e) => toggleDeptManager(d.id, e.target.checked)}
-                                />
-                              }
-                              label={<Typography variant="caption">Manager</Typography>}
-                            />
-                          </Stack>
-                        );
-                      })}
-                      {!deptCatalog?.length && (
-                        <Typography variant="caption" color="text.secondary">No departments defined.</Typography>
-                      )}
-                    </Stack>
-                  )}
-                </Paper>
-
-              </Box>
-            </Stack>
+        <Box
+          component="main"
+          sx={{ flex: 1, p: { xs: 1.5, sm: 2.5, md: 3 }, minWidth: 0 }}
+        >
+          {tab === "overview" && (
+            <OverviewPanel
+              me={effectiveMe}
+              stats={stats}
+              liveConnected={liveConnected}
+              liveEvents={liveEvents}
+              tickets={tickets}
+              tLoading={tLoading}
+              onOpenTicket={openDetail}
+            />
           )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditUser(null)}>Cancel</Button>
-          <Button variant="contained" onClick={saveUser}>Save</Button>
-        </DialogActions>
-      </Dialog>
 
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Create user</DialogTitle>
-        <DialogContent>
-          <Stack gap={2} mt={1}>
-            <TextField size="small" label="Username" value={newUser.username}
-              onChange={(e) => setNewUser((s) => ({ ...s, username: e.target.value }))} required />
-            <TextField size="small" label="Email" value={newUser.email}
-              onChange={(e) => setNewUser((s) => ({ ...s, email: e.target.value }))} />
-            <TextField size="small" type="password" label="Password" value={newUser.password}
-              onChange={(e) => setNewUser((s) => ({ ...s, password: e.target.value }))} />
-            <FormControlLabel control={<Switch checked={newUser.is_staff}
-              onChange={(e) => setNewUser((s) => ({ ...s, is_staff: e.target.checked }))} />} label="Staff" />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={createUser}>Create</Button>
-        </DialogActions>
-      </Dialog>
+          {tab === "tickets" && (
+            <TicketsPanel
+              tickets={tickets}
+              count={count}
+              page={page}
+              setPage={setPage}
+              search={search}
+              setSearch={setSearch}
+              status={status}
+              setStatus={setStatus}
+              priority={priority}
+              setPriority={setPriority}
+              assignedFilter={assignedFilter}
+              setAssignedFilter={setAssignedFilter}
+              tLoading={tLoading}
+              onOpen={openDetail}
+              onDelete={handleDeleteTicket}
+              onRefresh={() => loadTickets()}
+            />
+          )}
 
-      
-      <Snackbar open={Boolean(toast)} autoHideDuration={4500} onClose={() => setToast(null)}
-        message={toast} anchorOrigin={{ vertical: "bottom", horizontal: "right" }} />
+          {tab === "users" && <UsersPanel />}
+
+          {tab === "profile" && (
+            <ProfilePanel
+              me={effectiveMe}
+              onMeUpdated={(updated) => setLocalMe(updated)}
+            />
+          )}
+
+          {tab === "invites" && canSeeNav("invites") && (
+            <InvitesPanel
+              invites={invites}
+              invLoading={invLoading}
+              newInvite={newInvite}
+              setNewInvite={setNewInvite}
+              onCreate={createInvite}
+              onDeactivate={deactivateInvite}
+              onRefresh={loadInvites}
+            />
+          )}
+
+          {tab === "codes" && canSeeNav("codes") && (
+            <AuthCodesPanel
+              codes={codes}
+              codeCount={codeCount}
+              codePage={codePage}
+              setCodePage={setCodePage}
+              codeSearch={codeSearch}
+              setCodeSearch={setCodeSearch}
+              codeLoading={codeLoading}
+              onPurge={purgeCodes}
+              onDelete={deleteCode}
+              onRefresh={loadCodes}
+            />
+          )}
+
+          {tab === "emails" && canSeeNav("emails") && <EmailsPanel />}
+          {tab === "services" && canSeeNav("services") && <ServicesPanel />}
+          {tab === "plans" && canSeeNav("plans") && <PlansPanel />}
+          {tab === "login" && canSeeNav("login") && <LoginSettingsPanel />}
+          {tab === "tables" && canSeeNav("tables") && <TablesPanel />}
+        </Box>
+      </Box>
+
+      <TicketDetailDrawer
+        open={Boolean(selectedId)}
+        detail={detail}
+        detailLoading={detailLoading}
+        reply={reply}
+        setReply={setReply}
+        files={files}
+        setFiles={setFiles}
+        sending={sending}
+        onClose={closeDetail}
+        onSend={sendReply}
+        onChangeStatus={changeStatus}
+        onDelete={selectedId ? () => handleDeleteTicket(selectedId) : undefined}
+      />
+
+      <ConfirmDialog
+        open={confirmLogout}
+        title="Sign out?"
+        message="You will be signed out of the admin console and redirected to the login page."
+        confirmLabel="Sign out"
+        confirmColor="error"
+        onCancel={() => setConfirmLogout(false)}
+        onConfirm={() => {
+          setConfirmLogout(false);
+          doLogout();
+        }}
+      />
     </Box>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <ToastProvider>
+      <AdminDashboardInner />
+    </ToastProvider>
   );
 }
