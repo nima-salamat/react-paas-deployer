@@ -258,6 +258,22 @@ export default function ComposeCodeWorkspace({
     }
   };
 
+  /** Prefer clipboardData from paste event (works without extra permission). */
+  const insertAtCursor = (text) => {
+    if (!text) return;
+    const { start, end } = getSel();
+    const next = code.slice(0, start) + text + code.slice(end);
+    applyEdit(next, start + text.length, start + text.length);
+  };
+
+  const handlePaste = (e) => {
+    const text = e.clipboardData?.getData("text/plain");
+    if (text == null) return; // let browser try if somehow unavailable
+    e.preventDefault();
+    e.stopPropagation();
+    insertAtCursor(text);
+  };
+
   const indentSelection = (outdent = false) => {
     const { start, end } = getSel();
     const value = code;
@@ -348,11 +364,10 @@ export default function ComposeCodeWorkspace({
   };
 
   const pasteAtCursor = async () => {
+    // Used by context menu / toolbar. Clipboard API may need permission;
+    // keyboard paste goes through onPaste which is more reliable.
     const clip = await readClipboard();
-    if (!clip) return;
-    const { start, end } = getSel();
-    const next = code.slice(0, start) + clip + code.slice(end);
-    applyEdit(next, start + clip.length, start + clip.length);
+    insertAtCursor(clip);
   };
 
   const handleKeyDown = (e) => {
@@ -418,10 +433,10 @@ export default function ComposeCodeWorkspace({
         return;
       }
       if (k === "v") {
-        // allow native paste too; still handle for consistency
-        e.preventDefault();
-        e.stopPropagation();
-        pasteAtCursor();
+        // Do NOT preventDefault — let the native paste event fire.
+        // handlePaste reads e.clipboardData (works for external clipboard
+        // without Clipboard API permission). Context-menu paste still uses
+        // pasteAtCursor() which goes through navigator.clipboard.
         return;
       }
       if (k === "d") {
@@ -724,6 +739,7 @@ export default function ComposeCodeWorkspace({
             onScroll={syncScroll}
             onChange={(e) => setCode(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={"// Tab indent · Ctrl+C/X line · Ctrl+D duplicate · Ctrl+/ comment\n"}
             sx={{
               position: "relative",
