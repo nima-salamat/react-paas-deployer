@@ -14,6 +14,8 @@ import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import DownloadIcon from "@mui/icons-material/Download";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
+import PushPinIcon from "@mui/icons-material/PushPin";
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import DoneIcon from "@mui/icons-material/Done";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -920,6 +922,7 @@ export default function MessageBubble({
   selected = false,
   isUnread = false,
   onToggleSelect,
+  isPinnedMessage = false,
 }) {
   const theme = useTheme();
   if (m.type === "day") {
@@ -1420,6 +1423,7 @@ export default function MessageBubble({
             <ReplyIcon sx={{ fontSize: 15 }} />
           </IconButton>
           {m.is_edited && <Typography variant="caption" sx={{ opacity: 0.7, fontSize: 10, color: isBigEmoji ? "text.secondary" : "inherit" }}>edited</Typography>}
+          {isPinnedMessage && <PushPinIcon sx={{ fontSize: 10, color: "primary.main", transform: "rotate(-30deg)", opacity: 0.7 }} />}
           <Typography variant="caption" sx={{ opacity: 0.75, fontSize: 11, color: isBigEmoji ? "text.secondary" : "inherit" }}>{formatTime(m.created_at)}</Typography>
           {tickEl}
         </Stack>
@@ -1431,7 +1435,7 @@ export default function MessageBubble({
 /** Reusable message-context menu items (used by the parent's right-click menu). */
 export function MessageContextMenuItems({
   ctxMsg, isMine, onReply, onReact, onForward, onCopy, onPreview, onDownload,
-  onEdit, onDelete, onShowReaders, onSelect,
+  onEdit, onDelete, onShowReaders, onSelect, onPinMessage, isPinned,
 }) {
   const ctxAtts = ctxMsg?.attachments || [];
   const hasText = Boolean(typeof ctxMsg?.body === "string" ? ctxMsg.body.trim() : ctxMsg?.body);
@@ -1451,6 +1455,16 @@ export function MessageContextMenuItems({
       <MenuItem onClick={() => onForward(ctxMsg)}>
         <ListItemIcon><ForwardIcon fontSize="small" /></ListItemIcon> Forward
       </MenuItem>
+      {onPinMessage && (
+        <MenuItem onClick={() => onPinMessage(ctxMsg)}>
+          <ListItemIcon>
+            {isPinned
+              ? <PushPinOutlinedIcon fontSize="small" />
+              : <PushPinIcon fontSize="small" />}
+          </ListItemIcon>
+          {isPinned ? "Unpin message" : "Pin message"}
+        </MenuItem>
+      )}
       <MenuItem onClick={async () => { await onCopy(ctxMsg); }}>
         <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon> Copy text
       </MenuItem>

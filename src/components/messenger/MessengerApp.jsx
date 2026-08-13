@@ -70,6 +70,7 @@ import AudioPlayerBar from "./components/AudioPlayerBar";
 import MediaGalleryDialog from "./components/MediaGalleryDialog";
 import MediaSettingsDialog from "./components/MediaSettingsDialog";
 import VideoEditDialog from "./components/VideoEditDialog";
+import PinnedMessageBar from "./components/PinnedMessageBar";
 
 /** Keep the pre-edit source so re-opening the editor never stacks crops. */
 function attachMessengerOriginal(file, source) {
@@ -249,6 +250,10 @@ export default function MessengerApp() {
   const typingStopTimerRef = useRef(null);
   const typingSentRef = useRef(false);
   const selectionAutoScrollRef = useRef(null);
+
+  // Pinned messages for the active conversation
+  const [pinnedMessages, setPinnedMessages] = useState([]); // [{ id, message, pinned_at }]
+  const [currentPinIndex, setCurrentPinIndex] = useState(0); // which pin is shown in the bar
 
   // Composer state
   const [text, setText] = useState("");
@@ -849,6 +854,8 @@ export default function MessengerApp() {
     setReplyTo(null);
     setEditingMsg(null);
     setText("");
+    setPinnedMessages([]);
+    setCurrentPinIndex(0);
     closePanel();
     setHashReady(true);
     setHash(null);
@@ -901,6 +908,9 @@ export default function MessengerApp() {
     }
     setTypingUsers({});
     typingSentRef.current = false;
+    // Reset pinned messages state for the new chat
+    setPinnedMessages([]);
+    setCurrentPinIndex(0);
     if (cached?.messages?.length) {
       messagesConvIdRef.current = c.id;
       setMessages(cached.messages);
@@ -961,6 +971,7 @@ export default function MessengerApp() {
       await Promise.all([
         loadMessages(c.id, { silent: true, preserveOlder: true }),
         loadConversationDetail(c.id),
+        loadPinnedMessages(c.id),
       ]);
       // If the cached viewport was at the bottom, keep it there when the
       // background merge appends newer messages. If the user moved meanwhile,
@@ -979,7 +990,7 @@ export default function MessengerApp() {
         });
       }
     } else {
-      await Promise.all([loadMessages(c.id), loadConversationDetail(c.id)]);
+      await Promise.all([loadMessages(c.id), loadConversationDetail(c.id), loadPinnedMessages(c.id)]);
     }
 
     // After load, jump if requested
@@ -1265,6 +1276,12 @@ export default function MessengerApp() {
         if (data.type === "join_request.rejected" && String(data.user_id) === String(meId)) {
           flash("Your join request was rejected");
           loadMyJoinRequests();
+        }
+      }
+      // Pin/unpin message events — refresh the pinned bar in real-time
+      if (data.type === "message.pinned" || data.type === "message.unpinned") {
+        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
+          loadPinnedMessages(data.conversation_id);
         }
       }
     };
@@ -1920,6 +1937,58 @@ export default function MessengerApp() {
       setError(e?.response?.data?.message || "Pin failed");
     }
   };
+
+  /* ---- Pinned Messages (per-message pin) ---- */
+
+  const loadPinnedMessages = useCallback(async (convId) => {
+    if (!convId) return;
+    try {
+      const res = await apiRequest({ method: "GET", url: `${MSG_API}/conversations/${convId}/pinned-messages/` });
+      const data = unwrapData(res);
+      const pins = Array.isArray(data) ? data : [];
+      setPinnedMessages(pins);
+      // Reset index if it's out of range
+      setCurrentPinIndex((prev) => (prev >= pins.length ? 0 : prev));
+    } catch {
+      setPinnedMessages([]);
+      setCurrentPinIndex(0);
+    }
+  }, []);
+
+  const pinMessage = useCallback(async (msg) => {
+    if (!msg?.id) return;
+    try {
+      const res = await apiRequest({ method: "POST", url: `${MSG_API}/messages/${msg.id}/pin/` });
+      const data = unwrapData(res);
+      // Refresh pinned messages for the active conversation
+      if (activeIdRef.current) {
+        await loadPinnedMessages(activeIdRef.current);
+      }
+      // Also reload conversation detail to keep pins in sync
+      if (activeIdRef.current) {
+        loadConversationDetail(activeIdRef.current);
+      }
+      flash(data?.pinned ? "Message pinned" : "Message unpinned");
+    } catch (e) {
+      setError(e?.response?.data?.message || "Pin message failed");
+    }
+  }, [loadPinnedMessages, loadConversationDetail]);
+
+  // Cycle through pinned messages: up = older pin (next index, wraps), down = newer pin (prev index, wraps)
+  const cyclePinnedUp = useCallback(() => {
+    if (pinnedMessages.length <= 1) return;
+    setCurrentPinIndex((prev) => (prev + 1) % pinnedMessages.length);
+  }, [pinnedMessages.length]);
+
+  const cyclePinnedDown = useCallback(() => {
+    if (pinnedMessages.length <= 1) return;
+    setCurrentPinIndex((prev) => (prev - 1 + pinnedMessages.length) % pinnedMessages.length);
+  }, [pinnedMessages.length]);
+
+  // Check if a specific message is currently pinned (for context menu icon)
+  const isMessagePinned = useCallback((msgId) => {
+    return pinnedMessages.some((p) => String(p.message?.id) === String(msgId));
+  }, [pinnedMessages]);
 
   const sendTypingSignal = useCallback((isTyping) => {
     const cid = activeIdRef.current;
@@ -3238,6 +3307,16 @@ export default function MessengerApp() {
             </Box>
           )}
 
+          {/* Pinned message bar — floating island below header + audio + selection bar */}
+          <PinnedMessageBar
+            pinnedMessages={pinnedMessages}
+            currentIndex={currentPinIndex}
+            onCycleUp={cyclePinnedUp}
+            onCycleDown={cyclePinnedDown}
+            onJumpToMessage={onJumpToMessage}
+            headerHeight={56}
+          />
+
           {/* "Add to contacts?" banner — Telegram-style.
               Shows when the active chat is private AND the peer is NOT in the
               current user's contacts. The user can dismiss (X) or accept (Add). */}
@@ -3350,6 +3429,7 @@ export default function MessengerApp() {
                     && !m.is_system
                     && !seenMsgIds.has(String(m.id))
                   }
+                  isPinnedMessage={isMessagePinned(m.id)}
                   onToggleSelect={toggleSelectMessage}
                   onReact={react}
                   onReactAnchor={(e, message) => setReactAnchor({ anchorPosition: { top: e.clientY, left: e.clientX }, message })}
@@ -3701,6 +3781,8 @@ export default function MessengerApp() {
           onReact={(e, m) => { setReactAnchor({ anchorPosition: { top: e.clientY, left: e.clientX }, message: m }); setCtx(null); }}
           onForward={(m) => { setForwardOpen(m); setCtx(null); }}
           onSelect={(m) => { toggleSelectMessage(m, true); setCtx(null); }}
+          onPinMessage={(m) => { pinMessage(m); setCtx(null); }}
+          isPinned={ctxMsg ? isMessagePinned(ctxMsg.id) : false}
           onCopy={async (m) => { await copyText(typeof m?.body === "string" ? m.body : ""); flash("Copied"); setCtx(null); }}
           onPreview={(a) => { openPreview(a); setCtx(null); }}
           onDownload={(a) => { downloadAttachmentFile(a); setCtx(null); }}
