@@ -741,102 +741,12 @@ export default function MessengerApp() {
     setTimeout(() => setToast(""), 2200);
   };
 
-  /* -------------------- calls -------------------- */
-
-  /**
-   * Start a new call in the ACTIVE conversation.
-   * Refuses to start if the user is already in another call (busy).
-   */
-  const startCall = useCallback(async ({ video, audio = true } = {}) => {
-    if (!activeId) return;
-    if (callConfigRef.current) {
-      flash("You're already in a call — end it first");
-      return;
-    }
-    try {
-      const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/${activeId}/call/`,
-        data: { video, audio },
-      });
-      const cfg = unwrapData(res);
-      if (cfg?.room) {
-        setCallConfig({
-          ...cfg,
-          peer_title: convTitle(activeConv, meId) || "Call",
-          peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
-        });
-        setActiveCallInfo({
-          call_id: cfg.call_id,
-          status: "ringing",
-          is_video: !!video,
-          initiator: { id: meId, username: "You" },
-          conversation_id: activeId,
-        });
-      }
-    } catch (e) {
-      flash(e?.response?.data?.message || "Could not start call");
-    }
-  }, [activeId, activeConv, meId, flash]);
-
-  /**
-   * Start a call with a specific user (used by ProfileView call buttons).
-   * Opens (or reuses) the DM with that user, then starts the call.
-   */
-  const startCallWithUser = useCallback(async (user, opts = {}) => {
-    if (!user?.id) return;
-    if (callConfigRef.current) {
-      flash("You're already in a call — end it first");
-      return;
-    }
-    try {
-      // Ensure a DM exists
-      const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/`,
-        data: { type: "private", user_id: user.id },
-      });
-      const conv = unwrapData(res) || res?.data;
-      const convId = conv?.id;
-      if (!convId) {
-        flash("Could not open conversation");
-        return;
-      }
-      // Open the chat (does nothing if already open)
-      openChat(conv);
-      // Small delay so activeId propagates before we fire the call
-      setTimeout(() => {
-        (async () => {
-          try {
-            const r = await apiRequest({
-              method: "POST",
-              url: `${MSG_API}/conversations/${convId}/call/`,
-              data: { video: !!opts.video, audio: true },
-            });
-            const cfg = unwrapData(r);
-            if (cfg?.room) {
-              setCallConfig({
-                ...cfg,
-                peer_title: user.username || "Call",
-                peer_avatar: withTokenQuery(user.avatar) || null,
-              });
-              setActiveCallInfo({
-                call_id: cfg.call_id,
-                status: "ringing",
-                is_video: !!opts.video,
-                initiator: { id: meId, username: "You" },
-                conversation_id: convId,
-              });
-            }
-          } catch (e) {
-            flash(e?.response?.data?.message || "Could not start call");
-          }
-        })();
-      }, 250);
-    } catch (e) {
-      flash(e?.response?.data?.message || "Could not start call");
-    }
-  }, [flash, meId, openChat]);
+  /* -------------------- calls (helpers defined later, after openChat) -------------------- */
+  // Note: startCall / startCallWithUser are declared *after* openChat to
+  // avoid a temporal-dead-zone reference (openChat is a `const` defined
+  // further down). They are referenced by the chat header call buttons
+  // and by ProfileView, which only run after the component has mounted,
+  // so the late definition is safe.
 
   /* -------------------- panel navigation -------------------- */
 
@@ -1266,6 +1176,107 @@ export default function MessengerApp() {
       try { markVisibleMessagesRead(); } catch { /* */ }
     }, 900);
   }, [isMobile, loadMessages, loadConversationDetail, loadOlder]);
+
+  /* -------------------- calls -------------------- */
+
+  /**
+   * Start a new call in the ACTIVE conversation.
+   * Refuses to start if the user is already in another call (busy).
+   *
+   * Defined here (after openChat) because startCallWithUser depends on
+   * openChat — declaring it earlier would hit a TDZ violation under
+   * strict-mode bundlers (Vite production build).
+   */
+  const startCall = useCallback(async ({ video, audio = true } = {}) => {
+    if (!activeId) return;
+    if (callConfigRef.current) {
+      flash("You're already in a call — end it first");
+      return;
+    }
+    try {
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${activeId}/call/`,
+        data: { video, audio },
+      });
+      const cfg = unwrapData(res);
+      if (cfg?.room) {
+        setCallConfig({
+          ...cfg,
+          peer_title: convTitle(activeConv, meId) || "Call",
+          peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
+        });
+        setActiveCallInfo({
+          call_id: cfg.call_id,
+          status: "ringing",
+          is_video: !!video,
+          initiator: { id: meId, username: "You" },
+          conversation_id: activeId,
+        });
+      }
+    } catch (e) {
+      flash(e?.response?.data?.message || "Could not start call");
+    }
+  }, [activeId, activeConv, meId, flash]);
+
+  /**
+   * Start a call with a specific user (used by ProfileView call buttons).
+   * Opens (or reuses) the DM with that user, then starts the call.
+   */
+  const startCallWithUser = useCallback(async (user, opts = {}) => {
+    if (!user?.id) return;
+    if (callConfigRef.current) {
+      flash("You're already in a call — end it first");
+      return;
+    }
+    try {
+      // Ensure a DM exists
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/`,
+        data: { type: "private", user_id: user.id },
+      });
+      const conv = unwrapData(res) || res?.data;
+      const convId = conv?.id;
+      if (!convId) {
+        flash("Could not open conversation");
+        return;
+      }
+      // Open the chat (does nothing if already open)
+      openChat(conv);
+      // Small delay so activeId propagates before we fire the call
+      setTimeout(() => {
+        (async () => {
+          try {
+            const r = await apiRequest({
+              method: "POST",
+              url: `${MSG_API}/conversations/${convId}/call/`,
+              data: { video: !!opts.video, audio: true },
+            });
+            const cfg = unwrapData(r);
+            if (cfg?.room) {
+              setCallConfig({
+                ...cfg,
+                peer_title: user.username || "Call",
+                peer_avatar: withTokenQuery(user.avatar) || null,
+              });
+              setActiveCallInfo({
+                call_id: cfg.call_id,
+                status: "ringing",
+                is_video: !!opts.video,
+                initiator: { id: meId, username: "You" },
+                conversation_id: convId,
+              });
+            }
+          } catch (e) {
+            flash(e?.response?.data?.message || "Could not start call");
+          }
+        })();
+      }, 250);
+    } catch (e) {
+      flash(e?.response?.data?.message || "Could not start call");
+    }
+  }, [flash, meId, openChat]);
 
   /* bootstrap + hash restore */
   useEffect(() => {
