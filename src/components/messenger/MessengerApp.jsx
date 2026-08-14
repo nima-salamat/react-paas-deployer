@@ -358,6 +358,7 @@ export default function MessengerApp() {
   useEffect(() => { callConfigRef.current = callConfig; }, [callConfig]);
   const [incomingCall, setIncomingCall] = useState(null); // { conversation_id, initiator, media, ... }
   const [activeCallInfo, setActiveCallInfo] = useState(null); // ongoing/ringing in current chat
+  const [callMode, setCallMode] = useState("inline"); // "full" | "inline" | "mini" — from JitsiCallModal
   const seenRingIdsRef = useRef(new Set());
   const incomingCallRef = useRef(null);
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
@@ -3410,10 +3411,12 @@ export default function MessengerApp() {
       callConfig={callConfig}
       title={callConfig.peer_title || convTitle(activeConv, meId) || "Call"}
       peerAvatar={callConfig.peer_avatar || withTokenQuery(convAvatar(activeConv, meId))}
+      onModeChange={setCallMode}
       onClose={async () => {
         const cid = callConfig?.conversation_id || activeId;
         const callId = callConfig?.call_id;
         setCallConfig(null);
+        setCallMode("inline");
         if (cid) {
           try {
             await apiRequest({
@@ -3426,6 +3429,8 @@ export default function MessengerApp() {
       }}
     />
   ) : null;
+  const callIsMini = Boolean(callConfig && callMode === "mini");
+  const callIsExpanded = Boolean(callConfig && callMode !== "mini");
 
   const chatPane = (
     <Box
@@ -3633,17 +3638,33 @@ export default function MessengerApp() {
             </Menu>
           </Stack>
 
-          {/* Call surface — rendered UNDER the chat header (above audio
-              player + messages list) on BOTH desktop and mobile. The
-              JitsiCallModal itself supports a "minimise" button that
-              collapses it into a floating mini card so the user can keep
-              chatting. */}
+          {/* Call surface:
+              - expanded (inline/full): fills chat stage (desktop) or is a
+                fixed fullscreen overlay (mobile — handled inside modal).
+              - mini: thin bar under header so messages remain visible
+                (Telegram / WhatsApp ongoing-call strip). */}
           {callModalElement && (
-            <Box sx={{
-              flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
-              position: "relative",
-              bgcolor: "#0b0e11",
-            }}>
+            <Box sx={
+              callIsMini
+                ? {
+                    flexShrink: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                    zIndex: 6,
+                  }
+                : {
+                    flex: 1,
+                    minHeight: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    position: "relative",
+                    bgcolor: "#0b0e11",
+                    // Mobile full mode is position:fixed inside the modal;
+                    // keep a zero-height placeholder so layout doesn't collapse oddly.
+                    ...(callMode === "full" ? { flex: "0 0 0", minHeight: 0, height: 0, overflow: "visible" } : {}),
+                  }
+            }>
               {callModalElement}
             </Box>
           )}
@@ -3783,10 +3804,10 @@ export default function MessengerApp() {
               "& > *": { transition: "opacity 0.2s ease" },
               touchAction: selectionMode ? "none" : "pan-y",
               userSelect: selectionMode ? "none" : "auto",
-              // When an inline call is active, the call surface takes over
-              // the chat pane. Messages stay mounted (so scroll position is
-              // preserved when the user minimises the call) but hidden.
-              display: callModalElement ? "none" : "flex",
+              // Expanded call takes the stage; mini bar keeps messages visible
+              // (Telegram / WhatsApp style). Messages stay mounted so scroll
+              // position is preserved across minimise/expand.
+              display: callIsExpanded ? "none" : "flex",
             }}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -3950,9 +3971,9 @@ export default function MessengerApp() {
           {/* Channel mode: if only_admins_send is on and the current user is not
               an admin, show a notice instead of the composer.
               When a call is active (inline), the composer is hidden because
-              the call surface takes over the chat pane. The user can
-              minimise the call to chat. */}
-          {callModalElement ? null : (
+              the call surface takes over the chat pane. When the call is
+              minimised to the thin bar, the composer stays available. */}
+          {callIsExpanded ? null : (
             activeConv?.type === "group"
               && Boolean(activeConv.only_admins_send)
               && role !== "owner" && role !== "admin" ? (

@@ -1,15 +1,12 @@
 /**
- * JitsiCallModal — embedded call surface (IEC 61508 defensive style)
+ * JitsiCallModal — embedded call surface (Telegram / Meet style)
  *
  * Layout contract:
- *  - Inline mode (default): the call surface is rendered INSIDE the chat pane
- *    (or settings pane on mobile) so it sits under the chat header and above
- *    the audio player. It honours the parent's flex sizing — no fixed overlay,
- *    so resizing the window keeps it inside the viewport.
- *  - Mini mode (floating): when the user clicks "Minimise", the surface
- *    collapses into a small floating card. Its position is clamped to the
- *    viewport on every render and on window resize, so it can NEVER escape
- *    the visible area.
+ *  - Full / inline mode: fills the chat stage (desktop) or goes true fullscreen
+ *    overlay on mobile so the call is the primary surface.
+ *  - Mini mode: collapses into a thin bar (like the audio player / WhatsApp /
+ *    Telegram ongoing-call strip) under the chat header — NOT a floating card —
+ *    so the user can keep chatting. Desktop keeps a compact floating PiP card.
  *
  * OS / platform handling:
  *  - Reads `navigator.userAgent` + `navigator.platform` + `maxTouchPoints`
@@ -323,6 +320,7 @@ export default function JitsiCallModal({
   onClose,
   title = "Call",
   peerAvatar,
+  onModeChange,
 }) {
   const theme = useTheme();
   const isMobileView = useMediaQuery(theme.breakpoints.down("md"));
@@ -347,6 +345,12 @@ export default function JitsiCallModal({
 
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
+  // Keep parent in sync so MessengerApp can show/hide the message list
+  // and place the mini bar under the chat header.
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
+
   /* ── State ────────────────────────────────────────────────────────── */
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -356,7 +360,9 @@ export default function JitsiCallModal({
   const [sharing, setSharing] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [mode, setMode] = useState("inline"); // "inline" | "mini"
+  // Mobile starts fullscreen so the call is the primary surface (Meet / Telegram).
+  // Desktop starts inline inside the chat pane.
+  const [mode, setMode] = useState(() => (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches ? "full" : "inline")); // "full" | "inline" | "mini"
   const [railOpen, setRailOpen] = useState(!isMobileView);
   const [deviceSheetOpen, setDeviceSheetOpen] = useState(false);
   const [devices, setDevices] = useState({ audioInputs: [], videoInputs: [], audioOutputs: [] });
@@ -922,17 +928,21 @@ export default function JitsiCallModal({
     if (document.fullscreenElement) {
       try { document.exitFullscreen?.(); } catch { /* */ }
     }
-    // Re-clamp immediately on transition to mini
-    const w = typeof window !== "undefined" ? window.innerWidth : 1000;
-    const h = typeof window !== "undefined" ? window.innerHeight : 800;
-    setMiniPos((prev) => ({
-      x: clamp(prev.x, 8, Math.max(8, w - MINI_W - 8)),
-      y: clamp(prev.y, 8, Math.max(8, h - MINI_H - 90)),
-    }));
+    // Desktop: floating PiP card. Mobile: thin strip under header (parent layout).
+    if (!isMobileView) {
+      const w = typeof window !== "undefined" ? window.innerWidth : 1000;
+      const h = typeof window !== "undefined" ? window.innerHeight : 800;
+      setMiniPos((prev) => ({
+        x: clamp(prev.x, 8, Math.max(8, w - MINI_W - 8)),
+        y: clamp(prev.y, 8, Math.max(8, h - MINI_H - 90)),
+      }));
+    }
     setMode("mini");
     setFullscreen(false);
-  }, []);
-  const goFull = useCallback(() => setMode("inline"), []);
+  }, [isMobileView]);
+  const goFull = useCallback(() => {
+    setMode(isMobileView ? "full" : "inline");
+  }, [isMobileView]);
 
   /* ── Derived participant list ─────────────────────────────────────── */
   const list = useMemo(
@@ -1383,50 +1393,156 @@ export default function JitsiCallModal({
 
   /* ── Render ───────────────────────────────────────────────────────── */
   /**
-   * INLINE mode: rendered inside the chat pane's flex column. No `position:
-   * fixed; inset: 0` overlay — it just fills whatever space its parent gives
-   * it. Resizing the window keeps it inside the viewport.
-   *
-   * MINI mode: floating card with position:fixed, but the position is
-   * clamped on every move and on every window resize/orientationchange.
+   * FULL (mobile): true fullscreen overlay — primary call surface.
+   * INLINE (desktop): fills parent flex column inside chat pane.
+   * MINI (mobile): thin horizontal strip (Telegram/WhatsApp style) that the
+   *   parent places under the chat header — NOT a floating card.
+   * MINI (desktop): small floating PiP card, clamped to viewport.
    */
+  const isFull = mode === "full";
+  const isMobileMini = isMini && isMobileView;
+  const isDesktopMini = isMini && !isMobileView;
+
+  let rootSx;
+  if (isMobileMini) {
+    // Thin bar under header — parent owns placement; we just size ourselves.
+    rootSx = {
+      flexShrink: 0,
+      width: "100%",
+      bgcolor: "#0f1419",
+      color: "#fff",
+      borderBottom: "1px solid rgba(255,255,255,0.08)",
+      display: "flex",
+      flexDirection: "column",
+      userSelect: "none",
+      zIndex: 6,
+    };
+  } else if (isDesktopMini) {
+    rootSx = {
+      position: "fixed",
+      left: miniPos.x, top: miniPos.y,
+      width: MINI_W,
+      zIndex: 1450,
+      borderRadius: 2, overflow: "hidden",
+      bgcolor: "#0b0e11", color: "#fff",
+      border: "1px solid rgba(255,255,255,0.12)",
+      boxShadow: "0 16px 48px rgba(0,0,0,0.65)",
+      display: "flex", flexDirection: "column",
+      userSelect: "none",
+    };
+  } else if (isFull) {
+    // Mobile full-screen call surface
+    rootSx = {
+      position: "fixed",
+      inset: 0,
+      zIndex: 1400,
+      bgcolor: "#0b0e11", color: "#fff",
+      display: "flex", flexDirection: "column",
+      background: "radial-gradient(ellipse at top, #161b22 0%, #0b0e11 70%)",
+      minWidth: 0,
+    };
+  } else {
+    // Desktop inline
+    rootSx = {
+      flex: 1, minHeight: 0, height: "100%",
+      bgcolor: "#0b0e11", color: "#fff",
+      display: "flex", flexDirection: "column",
+      background: "radial-gradient(ellipse at top, #161b22 0%, #0b0e11 70%)",
+      minWidth: 0,
+    };
+  }
+
   return (
     <Box
       ref={rootRef}
-      sx={
-        isMini
-          ? {
-              position: "fixed",
-              left: miniPos.x, top: miniPos.y,
-              width: MINI_W,
-              zIndex: 1450,
-              borderRadius: 2, overflow: "hidden",
-              bgcolor: "#0b0e11", color: "#fff",
-              border: "1px solid rgba(255,255,255,0.12)",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.65)",
-              display: "flex", flexDirection: "column",
-              userSelect: "none",
-            }
-          : {
-              // Inline — fills parent. Parent MUST be a flex column.
-              flex: 1, minHeight: 0, height: "100%",
-              bgcolor: "#0b0e11", color: "#fff",
-              display: "flex", flexDirection: "column",
-              background: "radial-gradient(ellipse at top, #161b22 0%, #0b0e11 70%)",
-              minWidth: 0,
-            }
-      }
+      sx={rootSx}
     >
+      {/* ── Mobile mini: thin ongoing-call strip (Telegram / WhatsApp) ── */}
+      {isMobileMini ? (
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{
+            px: 1.25,
+            py: 0.75,
+            minHeight: 52,
+            width: "100%",
+            bgcolor: "rgba(15, 20, 25, 0.98)",
+          }}
+        >
+          {peerAvatar ? (
+            <Avatar src={peerAvatar} sx={{ width: 32, height: 32 }} />
+          ) : (
+            <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.main", fontSize: 14 }}>
+              {(title || "C")[0]}
+            </Avatar>
+          )}
+          <Box
+            sx={{ flex: 1, minWidth: 0, cursor: "pointer" }}
+            onClick={goFull}
+          >
+            <Typography variant="body2" fontWeight={600} noWrap>
+              {title}
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>
+              {loading ? "Connecting…" : formatElapsed(elapsed)}
+              {audioMuted ? " · muted" : ""}
+            </Typography>
+          </Box>
+          <IconButton
+            size="small"
+            onClick={toggleAudio}
+            sx={{
+              color: "#fff",
+              bgcolor: audioMuted ? "error.main" : "rgba(255,255,255,0.12)",
+              width: 36, height: 36,
+              "&:hover": { bgcolor: audioMuted ? "error.dark" : "rgba(255,255,255,0.2)" },
+            }}
+            aria-label={audioMuted ? "Unmute" : "Mute"}
+          >
+            {audioMuted ? <MicOffIcon fontSize="small" /> : <MicIcon fontSize="small" />}
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={goFull}
+            sx={{
+              color: "#fff",
+              bgcolor: "rgba(255,255,255,0.12)",
+              width: 36, height: 36,
+              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+            }}
+            aria-label="Expand call"
+          >
+            <OpenInFullIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={hangup}
+            sx={{
+              color: "#fff",
+              bgcolor: "error.main",
+              width: 36, height: 36,
+              borderRadius: 2,
+              "&:hover": { bgcolor: "error.dark" },
+            }}
+            aria-label="Hang up"
+          >
+            <CallEndIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      ) : (
+      <>
       {/* Header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between"
-        onMouseDown={isMini ? onDragStart : undefined}
-        onTouchStart={isMini ? onDragStart : undefined}
+        onMouseDown={isDesktopMini ? onDragStart : undefined}
+        onTouchStart={isDesktopMini ? onDragStart : undefined}
         sx={{
-          px: isMini ? 1 : (isSmallView ? 1.25 : 2),
-          py: isMini ? 0.5 : 1,
+          px: isDesktopMini ? 1 : (isSmallView ? 1.25 : 2),
+          py: isDesktopMini ? 0.5 : 1,
           bgcolor: "rgba(0,0,0,0.55)", backdropFilter: "blur(12px)",
           borderBottom: "1px solid rgba(255,255,255,0.06)",
-          cursor: isMini ? "grab" : "default",
+          cursor: isDesktopMini ? "grab" : "default",
           minHeight: 52, flexShrink: 0,
         }}>
         <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flex: 1 }}>
@@ -1612,6 +1728,8 @@ export default function JitsiCallModal({
         }}>
           {toast}
         </Box>
+      )}
+      </>
       )}
     </Box>
   );

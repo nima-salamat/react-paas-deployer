@@ -1163,6 +1163,8 @@ export default function MessageBubble({
           maxWidth: isCircularVideoMsg
             ? 320
             : (bodySegments.some((s) => s.type === "codeblock") ? { xs: "96%", sm: "85%" } : { xs: "82%", sm: "70%" }),
+          minWidth: 0,
+          overflow: "hidden",
           px: isBigEmoji || isCircularVideoMsg ? 0.5 : 1.35,
           py: isBigEmoji || isCircularVideoMsg ? 0.35 : 0.85,
           borderRadius: isBigEmoji || isCircularVideoMsg ? 2 : (mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px"),
