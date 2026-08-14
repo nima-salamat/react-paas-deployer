@@ -1,10 +1,16 @@
 /**
- * Incoming call banner with Web-Audio ringtone (max ~30s).
+ * IncomingCallBanner — modern, mobile-friendly incoming-call overlay
+ * with Web-Audio ringtone (max ~30s).
  */
 import React, { useEffect, useRef } from "react";
-import { Paper, Avatar, Box, Typography, IconButton } from "@mui/material";
+import {
+  Box, Avatar, Typography, IconButton, Stack,
+} from "@mui/material";
 import CallIcon from "@mui/icons-material/Call";
 import CallEndIcon from "@mui/icons-material/CallEnd";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import PersonIcon from "@mui/icons-material/Person";
+import { alpha } from "@mui/material/styles";
 
 const DEFAULT_RING_MS = 30000;
 
@@ -33,7 +39,6 @@ function startRingtone() {
   const cycle = () => {
     if (stopped) return;
     const t0 = ctx.currentTime + 0.02;
-    // two short rings
     beep(880, t0, 0.18);
     beep(988, t0 + 0.2, 0.18);
     beep(880, t0 + 0.55, 0.18);
@@ -41,18 +46,14 @@ function startRingtone() {
     timer = setTimeout(cycle, 2200);
   };
 
-  try {
-    ctx.resume?.();
-  } catch { /* */ }
+  try { ctx.resume?.(); } catch { /* */ }
   cycle();
 
   return {
     stop() {
       stopped = true;
       if (timer) clearTimeout(timer);
-      try {
-        ctx.close();
-      } catch { /* */ }
+      try { ctx.close(); } catch { /* */ }
     },
   };
 }
@@ -95,71 +96,145 @@ export default function IncomingCallBanner({
 
   const isVideo = !!(incomingCall.media?.video || incomingCall.is_video);
   const name = incomingCall.initiator?.username || "Incoming call";
+  const initial = (name || "C")[0]?.toUpperCase();
 
   return (
-    <Paper
-      elevation={8}
-      sx={{
-        position: "fixed",
-        top: 16,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 1500,
-        px: 2.5,
-        py: 1.5,
-        borderRadius: 3,
-        display: "flex",
-        alignItems: "center",
-        gap: 2,
-        bgcolor: "background.paper",
-        border: "1px solid",
-        borderColor: "divider",
-        minWidth: 300,
-        maxWidth: "92vw",
-        animation: "callPulse 1.6s ease-in-out infinite",
-        "@keyframes callPulse": {
-          "0%, 100%": { boxShadow: "0 8px 28px rgba(0,0,0,0.18)" },
-          "50%": { boxShadow: "0 8px 36px rgba(25,118,210,0.35)" },
-        },
-      }}
-    >
-      <Avatar sx={{ bgcolor: "primary.main", width: 48, height: 48 }}>
-        {(name || "C")[0]?.toUpperCase()}
-      </Avatar>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography fontWeight={700} noWrap>
+    <>
+      {/* Dimmed backdrop so the user notices the call (no full block — chat stays usable) */}
+      <Box
+        sx={{
+          position: "fixed", inset: 0, zIndex: 1490,
+          bgcolor: "rgba(0,0,0,0.45)",
+          backdropFilter: "blur(2px)",
+          pointerEvents: "auto",
+        }}
+        onClick={onDecline}
+      />
+
+      {/* Floating call card */}
+      <Box
+        sx={{
+          position: "fixed",
+          top: "50%", left: "50%",
+          transform: "translate(-50%, -50%)",
+          zIndex: 1500,
+          width: { xs: "calc(100vw - 32px)", sm: 380 },
+          maxWidth: 380,
+          p: 3,
+          borderRadius: 4,
+          bgcolor: "background.paper",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.45)",
+          border: "1px solid", borderColor: "divider",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          textAlign: "center",
+          animation: "callPulse 1.6s ease-in-out infinite",
+          "@keyframes callPulse": {
+            "0%, 100%": { boxShadow: "0 24px 64px rgba(0,0,0,0.45)" },
+            "50%": { boxShadow: "0 24px 80px rgba(25,118,210,0.45)" },
+          },
+        }}
+      >
+        {/* Avatar with pulsing ring */}
+        <Box sx={{ position: "relative", mb: 2 }}>
+          <Box
+            sx={{
+              position: "absolute", inset: -8,
+              borderRadius: "50%",
+              bgcolor: alpha("#22c55e", 0.18),
+              animation: "callRing 1.8s ease-out infinite",
+              "@keyframes callRing": {
+                "0%": { transform: "scale(0.8)", opacity: 0.7 },
+                "100%": { transform: "scale(1.4)", opacity: 0 },
+              },
+            }}
+          />
+          <Avatar
+            src={incomingCall.initiator?.avatar || undefined}
+            sx={{
+              width: 96, height: 96, fontSize: 40,
+              bgcolor: isVideo ? "primary.main" : "success.main",
+              border: "3px solid", borderColor: "background.paper",
+              position: "relative",
+            }}
+          >
+            {initial}
+          </Avatar>
+          {/* small badge: voice/video */}
+          <Box
+            sx={{
+              position: "absolute",
+              bottom: 0, right: 0,
+              width: 32, height: 32,
+              borderRadius: "50%",
+              bgcolor: isVideo ? "primary.main" : "success.main",
+              color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              border: "2px solid", borderColor: "background.paper",
+            }}
+          >
+            {isVideo ? <VideocamIcon sx={{ fontSize: 16 }} /> : <CallIcon sx={{ fontSize: 16 }} />}
+          </Box>
+        </Box>
+
+        <Typography variant="h6" fontWeight={700} noWrap sx={{ maxWidth: "100%" }}>
           {name}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           Incoming {isVideo ? "video" : "voice"} call…
         </Typography>
+
+        {/* Action buttons */}
+        <Stack
+          direction="row"
+          spacing={3}
+          justifyContent="center"
+          sx={{ mt: 3, width: "100%" }}
+        >
+          <Stack alignItems="center" spacing={0.75}>
+            <IconButton
+              onClick={onDecline}
+              sx={{
+                bgcolor: "error.main",
+                color: "#fff",
+                width: { xs: 56, sm: 64 },
+                height: { xs: 56, sm: 64 },
+                "&:hover": { bgcolor: "error.dark", transform: "scale(1.05)" },
+                transition: "all 0.15s ease",
+              }}
+            >
+              <CallEndIcon sx={{ fontSize: 28 }} />
+            </IconButton>
+            <Typography variant="caption" color="text.secondary">Decline</Typography>
+          </Stack>
+
+          <Stack alignItems="center" spacing={0.75}>
+            <IconButton
+              onClick={onAccept}
+              sx={{
+                bgcolor: "success.main",
+                color: "#fff",
+                width: { xs: 56, sm: 64 },
+                height: { xs: 56, sm: 64 },
+                animation: "callBtnPulse 1.2s ease-in-out infinite",
+                "&:hover": { bgcolor: "success.dark", transform: "scale(1.05)" },
+                transition: "transform 0.15s ease, background-color 0.15s ease",
+                "@keyframes callBtnPulse": {
+                  "0%, 100%": { boxShadow: "0 0 0 0 rgba(34,197,94,0.5)" },
+                  "50%": { boxShadow: "0 0 0 12px rgba(34,197,94,0)" },
+                },
+              }}
+            >
+              {isVideo ? <VideocamIcon sx={{ fontSize: 28 }} /> : <CallIcon sx={{ fontSize: 28 }} />}
+            </IconButton>
+            <Typography variant="caption" color="text.secondary">Accept</Typography>
+          </Stack>
+        </Stack>
+
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 2, opacity: 0.7, display: "flex", alignItems: "center", gap: 0.5 }}>
+          <PersonIcon sx={{ fontSize: 12 }} />
+          Tap anywhere outside to decline
+        </Typography>
       </Box>
-      <IconButton
-        color="success"
-        onClick={onAccept}
-        sx={{
-          bgcolor: "success.main",
-          color: "#fff",
-          "&:hover": { bgcolor: "success.dark" },
-          width: 48,
-          height: 48,
-        }}
-      >
-        <CallIcon />
-      </IconButton>
-      <IconButton
-        color="error"
-        onClick={onDecline}
-        sx={{
-          bgcolor: "error.main",
-          color: "#fff",
-          "&:hover": { bgcolor: "error.dark" },
-          width: 48,
-          height: 48,
-        }}
-      >
-        <CallEndIcon />
-      </IconButton>
-    </Paper>
+    </>
   );
 }

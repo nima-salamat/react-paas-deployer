@@ -66,7 +66,8 @@ export default function RightPanel({
   onOpenCreateGroup, onOpenJoin, onNavigateHome, onOpenMediaSettings,
   onStartDm, onRemoveContact, onUnblock,
   onPatchGroup, onCreateInvite, onRevokeInvite,
-  onOpenAddMembers, onAddContact, onBlockUser, onMessage, onOpenPhoto, onViewProfile,
+  onOpenAddMembers, onAddContact, onBlockUser, onMessage, onViewProfile,
+  onVoiceCall, onVideoCall,
   onDeleteChat, onDeleteGroup, onCleanupChat,
   onRemoveMember, onChangeMemberRole, onTransferOwnership,
   onUploadGroupAvatar, onClearGroupAvatar,
@@ -361,7 +362,8 @@ export default function RightPanel({
           onMessage={onMessage}
           onAddContact={onAddContact}
           onBlock={onBlockUser}
-          onOpenPhoto={onOpenPhoto}
+          onVoiceCall={onVoiceCall}
+          onVideoCall={onVideoCall}
         />
       </Box>
     );

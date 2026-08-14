@@ -31,6 +31,7 @@ import {
   Snackbar, Paper,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
@@ -358,6 +359,11 @@ export default function MessengerApp() {
   const [incomingCall, setIncomingCall] = useState(null); // { conversation_id, initiator, media, ... }
   const [activeCallInfo, setActiveCallInfo] = useState(null); // ongoing/ringing in current chat
   const seenRingIdsRef = useRef(new Set());
+  const incomingCallRef = useRef(null);
+  useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
+  const conversationsRef = useRef([]);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+
 
   // When chat changes, check live/ringing call (also covers offline→online within ring window)
   useEffect(() => {
@@ -551,6 +557,71 @@ export default function MessengerApp() {
   useEffect(() => { profileDataRef.current = profileData; }, [profileData]);
 
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+
+  /**
+   * Cross-chat incoming-call poller.
+   *
+   * When the user is sitting in chat A, they should still be alerted if
+   * someone rings them in chat B. We poll each conversation (except the
+   * active one) every ~12s, looking for ringing sessions we haven't seen
+   * yet. If found, we surface the incoming-call banner so the user can
+   * accept or decline.
+   *
+   * We bail out entirely if the user is already in a call (callConfig set)
+   * or already showing an incoming-call banner.
+   */
+  useEffect(() => {
+    if (callConfig) return undefined;
+    let cancelled = false;
+
+    const checkConversations = async () => {
+      if (cancelled) return;
+      if (incomingCallRef.current) return;
+      const convs = conversationsRef.current || [];
+      const candidates = convs
+        .filter((c) => String(c.id) !== String(activeIdRef.current))
+        .slice(0, 25);
+      for (const c of candidates) {
+        if (cancelled || incomingCallRef.current) return;
+        try {
+          const res = await apiRequest({
+            method: "GET",
+            url: `${MSG_API}/conversations/${c.id}/call/active/`,
+          });
+          if (cancelled) return;
+          const data = unwrapData(res);
+          if (!data?.active) continue;
+          if (data.status !== "ringing") continue;
+          if (String(data.initiator?.id) === String(meId)) continue;
+          const rid = data.call_id;
+          if (!rid || seenRingIdsRef.current.has(String(rid))) continue;
+          seenRingIdsRef.current.add(String(rid));
+          const remaining = data.ring_remaining ?? 30;
+          setIncomingCall({
+            conversation_id: data.conversation_id || c.id,
+            call_id: data.call_id,
+            media: data.media,
+            is_video: data.is_video,
+            initiator: data.initiator,
+            ring_timeout: remaining,
+            _receivedAt: Date.now() - (30 - remaining) * 1000,
+            replay: true,
+          });
+          return;
+        } catch { /* ignore — likely 404 */ }
+      }
+    };
+
+    const initial = setTimeout(checkConversations, 2000);
+    const interval = setInterval(checkConversations, 12000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
+  }, [callConfig, meId]);
+
   // Keep message/data cache warm without sampling scrollTop during React renders.
   // scrollTop is owned by the scroll handler + explicit chat-switch save/restore.
   useEffect(() => {
@@ -669,6 +740,103 @@ export default function MessengerApp() {
     setToast(msg);
     setTimeout(() => setToast(""), 2200);
   };
+
+  /* -------------------- calls -------------------- */
+
+  /**
+   * Start a new call in the ACTIVE conversation.
+   * Refuses to start if the user is already in another call (busy).
+   */
+  const startCall = useCallback(async ({ video, audio = true } = {}) => {
+    if (!activeId) return;
+    if (callConfigRef.current) {
+      flash("You're already in a call — end it first");
+      return;
+    }
+    try {
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${activeId}/call/`,
+        data: { video, audio },
+      });
+      const cfg = unwrapData(res);
+      if (cfg?.room) {
+        setCallConfig({
+          ...cfg,
+          peer_title: convTitle(activeConv, meId) || "Call",
+          peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
+        });
+        setActiveCallInfo({
+          call_id: cfg.call_id,
+          status: "ringing",
+          is_video: !!video,
+          initiator: { id: meId, username: "You" },
+          conversation_id: activeId,
+        });
+      }
+    } catch (e) {
+      flash(e?.response?.data?.message || "Could not start call");
+    }
+  }, [activeId, activeConv, meId, flash]);
+
+  /**
+   * Start a call with a specific user (used by ProfileView call buttons).
+   * Opens (or reuses) the DM with that user, then starts the call.
+   */
+  const startCallWithUser = useCallback(async (user, opts = {}) => {
+    if (!user?.id) return;
+    if (callConfigRef.current) {
+      flash("You're already in a call — end it first");
+      return;
+    }
+    try {
+      // Ensure a DM exists
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/`,
+        data: { type: "private", user_id: user.id },
+      });
+      const conv = unwrapData(res) || res?.data;
+      const convId = conv?.id;
+      if (!convId) {
+        flash("Could not open conversation");
+        return;
+      }
+      // Open the chat (does nothing if already open)
+      openChat(conv);
+      // Small delay so activeId propagates before we fire the call
+      setTimeout(() => {
+        (async () => {
+          try {
+            const r = await apiRequest({
+              method: "POST",
+              url: `${MSG_API}/conversations/${convId}/call/`,
+              data: { video: !!opts.video, audio: true },
+            });
+            const cfg = unwrapData(r);
+            if (cfg?.room) {
+              setCallConfig({
+                ...cfg,
+                peer_title: user.username || "Call",
+                peer_avatar: withTokenQuery(user.avatar) || null,
+              });
+              setActiveCallInfo({
+                call_id: cfg.call_id,
+                status: "ringing",
+                is_video: !!opts.video,
+                initiator: { id: meId, username: "You" },
+                conversation_id: convId,
+              });
+            }
+          } catch (e) {
+            flash(e?.response?.data?.message || "Could not start call");
+          }
+        })();
+      }, 250);
+    } catch (e) {
+      flash(e?.response?.data?.message || "Could not start call");
+    }
+  }, [flash, meId, openChat]);
 
   /* -------------------- panel navigation -------------------- */
 
@@ -3358,25 +3526,10 @@ export default function MessengerApp() {
             </Box>
             <Tooltip title="Voice call">
               <IconButton
-                onClick={async () => {
-                  if (!activeId) return;
-                  try {
-                    const res = await apiRequest({
-                      method: "POST",
-                      url: `${MSG_API}/conversations/${activeId}/call/`,
-                      data: { video: false, audio: true },
-                    });
-                    const cfg = unwrapData(res);
-                    if (cfg?.room) {
-                      setCallConfig({
-                        ...cfg,
-                        peer_title: convTitle(activeConv, meId) || "Call",
-                        peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
-                      });
-                    }
-                  } catch (e) {
-                    flash(e?.response?.data?.message || "Could not start call");
-                  }
+                onClick={() => startCall({ video: false, audio: true })}
+                sx={{
+                  color: "text.secondary",
+                  "&:hover": { bgcolor: (t) => alpha(t.palette.success.main, 0.12), color: "success.main" },
                 }}
               >
                 <CallIcon />
@@ -3384,25 +3537,10 @@ export default function MessengerApp() {
             </Tooltip>
             <Tooltip title="Video call">
               <IconButton
-                onClick={async () => {
-                  if (!activeId) return;
-                  try {
-                    const res = await apiRequest({
-                      method: "POST",
-                      url: `${MSG_API}/conversations/${activeId}/call/`,
-                      data: { video: true, audio: true },
-                    });
-                    const cfg = unwrapData(res);
-                    if (cfg?.room) {
-                      setCallConfig({
-                        ...cfg,
-                        peer_title: convTitle(activeConv, meId) || "Call",
-                        peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
-                      });
-                    }
-                  } catch (e) {
-                    flash(e?.response?.data?.message || "Could not start call");
-                  }
+                onClick={() => startCall({ video: true, audio: true })}
+                sx={{
+                  color: "text.secondary",
+                  "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.12), color: "primary.main" },
                 }}
               >
                 <VideocamIcon />
@@ -3976,7 +4114,8 @@ export default function MessengerApp() {
             onBlockUser={(uid) => setConfirmBlock({ user: { id: uid } })}
             onMessage={(u) => startDm(u)}
             onViewProfile={(uid) => loadUserProfile(uid)}
-            onOpenPhoto={(url) => openPreview({ url, original_filename: "photo", kind: "image", content_type: "image/jpeg" })}
+            onVoiceCall={(u) => startCallWithUser(u, { video: false })}
+            onVideoCall={(u) => startCallWithUser(u, { video: true })}
             onDeleteChat={() => setConfirmDelete({ type: "chat", conv: activeConv })}
             onDeleteGroup={() => setConfirmDelete({ type: "group", conv: activeConv })}
             onCleanupChat={() => setConfirmCleanup({ conv: activeConv })}

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Box, Stack, Typography, Avatar, Button, Dialog, DialogContent, IconButton,
-  Tooltip, Snackbar, alpha, Divider, Chip, Paper,
+  Tooltip, Snackbar, Divider, Chip, Paper,
 } from "@mui/material";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import BlockIcon from "@mui/icons-material/Block";
@@ -37,9 +37,12 @@ import { withTokenQuery } from "../messengerUtils";
  *  - onBlock: (userId) => void
  *  - onOpenPhoto: (photoUrl) => void  (legacy single-photo opener — still called for fallback)
  *  - isOnline: boolean
+ *  - onVoiceCall: (user) => void   // start a voice call with this user
+ *  - onVideoCall: (user) => void   // start a video call with this user
  */
 export default function ProfileView({
-  profileData, onMessage, onAddContact, onBlock, onOpenPhoto, isOnline,
+  profileData, onMessage, onAddContact, onBlock, isOnline,
+  onVoiceCall, onVideoCall,
 }) {
   const [galleryIndex, setGalleryIndex] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -166,19 +169,23 @@ export default function ProfileView({
         >
           Message
         </Button>
-        <Tooltip title="Voice call (coming soon)">
-          <span>
-            <Button variant="outlined" disabled sx={{ minWidth: 0, px: 1.5, borderRadius: 1 }}>
-              <PhoneIcon />
-            </Button>
-          </span>
+        <Tooltip title="Voice call">
+          <Button
+            variant="outlined"
+            onClick={() => onVoiceCall?.(profileData)}
+            sx={{ minWidth: 0, px: 1.5, borderRadius: 1, color: "success.main", borderColor: "success.main", "&:hover": { bgcolor: "success.main", color: "#fff", borderColor: "success.main" } }}
+          >
+            <PhoneIcon />
+          </Button>
         </Tooltip>
-        <Tooltip title="Video call (coming soon)">
-          <span>
-            <Button variant="outlined" disabled sx={{ minWidth: 0, px: 1.5, borderRadius: 1 }}>
-              <VideocamIcon />
-            </Button>
-          </span>
+        <Tooltip title="Video call">
+          <Button
+            variant="outlined"
+            onClick={() => onVideoCall?.(profileData)}
+            sx={{ minWidth: 0, px: 1.5, borderRadius: 1, color: "primary.main", borderColor: "primary.main", "&:hover": { bgcolor: "primary.main", color: "#fff", borderColor: "primary.main" } }}
+          >
+            <VideocamIcon />
+          </Button>
         </Tooltip>
       </Stack>
 
