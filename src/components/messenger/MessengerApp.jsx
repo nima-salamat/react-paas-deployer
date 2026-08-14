@@ -1193,6 +1193,11 @@ export default function MessengerApp() {
       flash("You're already in a call — end it first");
       return;
     }
+    // Compute the active conversation inline — `activeConv` is a derived
+    // value defined further down in the component body, so referencing it
+    // here would hit a TDZ violation in production builds. We replicate the
+    // same derivation locally from already-declared state.
+    const conv = activeDetail || conversations.find((c) => c.id === activeId);
     try {
       const res = await apiRequest({
         method: "POST",
@@ -1203,8 +1208,8 @@ export default function MessengerApp() {
       if (cfg?.room) {
         setCallConfig({
           ...cfg,
-          peer_title: convTitle(activeConv, meId) || "Call",
-          peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
+          peer_title: convTitle(conv, meId) || "Call",
+          peer_avatar: withTokenQuery(convAvatar(conv, meId)) || null,
         });
         setActiveCallInfo({
           call_id: cfg.call_id,
@@ -1217,7 +1222,7 @@ export default function MessengerApp() {
     } catch (e) {
       flash(e?.response?.data?.message || "Could not start call");
     }
-  }, [activeId, activeConv, meId, flash]);
+  }, [activeId, activeDetail, conversations, meId, flash]);
 
   /**
    * Start a call with a specific user (used by ProfileView call buttons).
