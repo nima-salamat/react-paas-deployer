@@ -937,6 +937,60 @@ export default function MessageBubble({
   const bodyStr = typeof m.body === "string" ? m.body : String(m.body || "");
 
   if (m.is_system) {
+    let callInfo = null;
+    if (bodyStr.startsWith("__call__:")) {
+      try {
+        callInfo = JSON.parse(bodyStr.slice(9));
+      } catch { /* ignore */ }
+    }
+    if (callInfo && callInfo.v) {
+      const isVideo = !!callInfo.is_video;
+      const dur = Number(callInfo.duration || 0);
+      const fmt = (s) => {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return `${m}:${String(sec).padStart(2, "0")}`;
+      };
+      let label = "";
+      const who = callInfo.initiator_username || "Someone";
+      if (callInfo.event === "started") {
+        label = isVideo ? `${who} started a video call` : `${who} started a voice call`;
+      } else {
+        const st = callInfo.status || "ended";
+        if (st === "missed" || st === "no_answer") {
+          label = isVideo ? `Missed video call` : `Missed voice call`;
+        } else if (st === "declined") {
+          label = isVideo ? `Declined video call` : `Declined voice call`;
+        } else if (dur > 0) {
+          label = isVideo
+            ? `Video call · ${fmt(dur)}`
+            : `Voice call · ${fmt(dur)}`;
+        } else {
+          label = isVideo ? `Video call ended` : `Voice call ended`;
+        }
+      }
+      return (
+        <Box sx={{ textAlign: "center", my: 1.25 }}>
+          <Chip
+            label={label}
+            size="small"
+            icon={
+              <Box component="span" sx={{ display: "inline-flex", pl: 0.5, fontSize: 14 }}>
+                {isVideo ? "📹" : "📞"}
+              </Box>
+            }
+            sx={{
+              bgcolor: alpha(theme.palette.background.paper, 0.95),
+              fontSize: 12,
+              fontWeight: 500,
+              border: "1px solid",
+              borderColor: "divider",
+              "& .MuiChip-icon": { ml: 0.5 },
+            }}
+          />
+        </Box>
+      );
+    }
     return (
       <Box sx={{ textAlign: "center", my: 1 }}>
         <Chip label={bodyStr} size="small"

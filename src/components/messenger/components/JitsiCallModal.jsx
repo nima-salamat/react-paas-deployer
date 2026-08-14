@@ -274,7 +274,12 @@ export default function JitsiCallModal({
           if (!disposed) setLoading(false);
         };
 
-        api.addListener("videoConferenceJoined", markJoined);
+        api.addListener("videoConferenceJoined", () => {
+          markJoined();
+          try {
+            setParticipantCount(api.getNumberOfParticipants());
+          } catch { /* */ }
+        });
         api.addListener("audioMuteStatusChanged", ({ muted }) => {
           if (!disposed) setAudioMuted(!!muted);
         });
@@ -338,6 +343,20 @@ export default function JitsiCallModal({
       window.dispatchEvent(new Event("resize"));
     } catch { /* */ }
   }, [mode]);
+
+  // If you are alone in the room for too long (nobody answered / everyone left) → end call
+  useEffect(() => {
+    if (loading || error) return undefined;
+    if (participantCount > 1) return undefined;
+    const aloneMs = 45000; // 45s alone after connect
+    const t = setTimeout(() => {
+      try {
+        apiRef.current?.executeCommand("hangup");
+      } catch { /* */ }
+      onCloseRef.current?.();
+    }, aloneMs);
+    return () => clearTimeout(t);
+  }, [loading, error, participantCount]);
 
   const toggleAudio = useCallback(() => {
     try {
