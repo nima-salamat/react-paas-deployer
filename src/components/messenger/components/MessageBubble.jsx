@@ -1375,35 +1375,34 @@ export default function MessageBubble({
         )}
         {(m.reactions || []).length > 0 && (
           <Stack direction="row" spacing={0.35} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-            {[...new Set((m.reactions || []).map((r) => r.emoji))].map((em) => {
-              const reactors = (m.reactions || []).filter((r) => r.emoji === em);
-              const count = reactors.length;
-              const mineReact = reactors.some((r) => String(r.user?.id) === String(meId));
-              const names = reactors
-                .map((r) => r.user?.username || r.user?.full_name || "User")
-                .filter(Boolean);
-              const tip = names.length ? `${em} ${names.join(", ")}` : `${em} ${count}`;
+            {(m.reactions || []).map((r) => {
+              // Support both aggregated {emoji, count, mine} and legacy full list
+              const em = r.emoji;
+              const count = r.count != null
+                ? r.count
+                : (m.reactions || []).filter((x) => x.emoji === em).length;
+              const mineReact = r.mine != null
+                ? !!r.mine
+                : (m.reactions || []).some(
+                    (x) => x.emoji === em && String(x.user?.id) === String(meId)
+                  );
+              // Deduplicate if legacy format still present
+              if (r.count == null && (m.reactions || []).findIndex((x) => x.emoji === em) !== (m.reactions || []).indexOf(r)) {
+                return null;
+              }
+              const tip = `${em} ${count}`;
               return (
                 <Tooltip key={em} title={tip} arrow placement="top">
                   <Chip
                     size="small"
                     label={`${em} ${count}`}
                     onClick={(e) => { e.stopPropagation(); onReact(m.id, em); }}
-                    avatar={
-                      reactors[0]?.user?.avatar ? (
-                        <Avatar
-                          src={withTokenQuery(reactors[0].user.avatar)}
-                          sx={{ width: 16, height: 16 }}
-                        />
-                      ) : undefined
-                    }
                     sx={{
                       height: 24, fontSize: 12,
                       bgcolor: mineReact
                         ? alpha(theme.palette.primary.main, mine ? 0.35 : 0.15)
                         : (mine ? "rgba(255,255,255,0.12)" : "action.hover"),
                       color: mine ? "#fff" : "text.primary",
-                      "& .MuiChip-avatar": { width: 16, height: 16, ml: 0.5 },
                     }}
                   />
                 </Tooltip>

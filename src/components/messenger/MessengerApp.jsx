@@ -28,7 +28,7 @@ import {
   Stack, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
   ListItemText, Divider, Fade, Chip, Popover, Tooltip, useMediaQuery, LinearProgress,
-  Snackbar,
+  Snackbar, Paper,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -71,6 +71,10 @@ import MediaGalleryDialog from "./components/MediaGalleryDialog";
 import MediaSettingsDialog from "./components/MediaSettingsDialog";
 import VideoEditDialog from "./components/VideoEditDialog";
 import PinnedMessageBar from "./components/PinnedMessageBar";
+import JitsiCallModal from "./components/JitsiCallModal";
+import CallIcon from "@mui/icons-material/Call";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import CallEndIcon from "@mui/icons-material/CallEnd";
 
 /** Keep the pre-edit source so re-opening the editor never stacks crops. */
 function attachMessengerOriginal(file, source) {
@@ -346,6 +350,9 @@ export default function MessengerApp() {
 
   // Read receipts
   const [readersMessage, setReadersMessage] = useState(null);
+  // Jitsi call state
+  const [callConfig, setCallConfig] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null); // { conversation_id, initiator, media, ... }
 
   // Profile / contacts / blocks / invites
   const [profileData, setProfileData] = useState(null);
@@ -1128,6 +1135,17 @@ export default function MessengerApp() {
           loadPinnedMessages(Number(cid));
         }
         loadConversations({ silent: true });
+      }
+      if (data.type === "call.started") {
+        // Incoming call from another participant
+        if (String(data.initiator?.id) !== String(meId)) {
+          setIncomingCall(data);
+        }
+      }
+      if (data.type === "call.ended") {
+        setIncomingCall((prev) =>
+          prev && String(prev.conversation_id) === String(data.conversation_id) ? null : prev
+        );
       }
       if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
         if (String(data.conversation_id) === String(activeIdRef.current)) {
@@ -3227,6 +3245,46 @@ export default function MessengerApp() {
                 )}
               </Stack>
             </Box>
+            <Tooltip title="Voice call">
+              <IconButton
+                onClick={async () => {
+                  if (!activeId) return;
+                  try {
+                    const res = await apiRequest({
+                      method: "POST",
+                      url: `${MSG_API}/conversations/${activeId}/call/`,
+                      data: { video: false, audio: true },
+                    });
+                    const cfg = unwrapData(res);
+                    if (cfg?.room) setCallConfig(cfg);
+                  } catch (e) {
+                    flash(e?.response?.data?.message || "Could not start call");
+                  }
+                }}
+              >
+                <CallIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Video call">
+              <IconButton
+                onClick={async () => {
+                  if (!activeId) return;
+                  try {
+                    const res = await apiRequest({
+                      method: "POST",
+                      url: `${MSG_API}/conversations/${activeId}/call/`,
+                      data: { video: true, audio: true },
+                    });
+                    const cfg = unwrapData(res);
+                    if (cfg?.room) setCallConfig(cfg);
+                  } catch (e) {
+                    flash(e?.response?.data?.message || "Could not start call");
+                  }
+                }}
+              >
+                <VideocamIcon />
+              </IconButton>
+            </Tooltip>
             <IconButton onClick={() => pushPanel("info")}>
               <InfoOutlinedIcon />
             </IconButton>
@@ -3870,6 +3928,102 @@ export default function MessengerApp() {
         message={readersMessage}
         onClose={() => setReadersMessage(null)}
       />
+
+      {/* Jitsi call modal */}
+      {callConfig && (
+        <JitsiCallModal
+          callConfig={callConfig}
+          title={convTitle(activeConv, meId) || "Call"}
+          peerAvatar={withTokenQuery(convAvatar(activeConv, meId))}
+          onClose={async () => {
+            const cid = callConfig?.conversation_id || activeId;
+            setCallConfig(null);
+            if (cid) {
+              try {
+                await apiRequest({
+                  method: "POST",
+                  url: `${MSG_API}/conversations/${cid}/call/end/`,
+                  data: {},
+                });
+              } catch { /* */ }
+            }
+          }}
+        />
+      )}
+
+      {/* Incoming call banner */}
+      {incomingCall && !callConfig && (
+        <Paper
+          elevation={8}
+          sx={{
+            position: "fixed",
+            top: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1500,
+            px: 2.5,
+            py: 1.5,
+            borderRadius: 3,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            bgcolor: "background.paper",
+            border: "1px solid",
+            borderColor: "divider",
+            minWidth: 280,
+          }}
+        >
+          <Avatar sx={{ bgcolor: "primary.main" }}>
+            {(incomingCall.initiator?.username || "C")[0]?.toUpperCase()}
+          </Avatar>
+          <Box sx={{ flex: 1 }}>
+            <Typography fontWeight={600}>
+              {incomingCall.initiator?.username || "Incoming call"}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {incomingCall.media?.video ? "Video call" : "Voice call"}
+            </Typography>
+          </Box>
+          <IconButton
+            color="success"
+            onClick={async () => {
+              const cid = incomingCall.conversation_id;
+              setIncomingCall(null);
+              try {
+                const res = await apiRequest({
+                  method: "GET",
+                  url: `${MSG_API}/conversations/${cid}/call/join/`,
+                });
+                const cfg = unwrapData(res);
+                if (cfg?.room) {
+                  if (incomingCall.media) {
+                    cfg.config = {
+                      ...(cfg.config || {}),
+                      startWithVideoMuted: !incomingCall.media.video,
+                      startWithAudioMuted: !incomingCall.media.audio,
+                    };
+                  }
+                  setCallConfig(cfg);
+                  if (String(activeId) !== String(cid)) {
+                    const conv = conversations.find((c) => String(c.id) === String(cid));
+                    if (conv) openChat(conv);
+                  }
+                }
+              } catch (e) {
+                flash(e?.response?.data?.message || "Could not join call");
+              }
+            }}
+          >
+            <CallIcon />
+          </IconButton>
+          <IconButton
+            color="error"
+            onClick={() => setIncomingCall(null)}
+          >
+            <CallEndIcon />
+          </IconButton>
+        </Paper>
+      )}
 
       {/* In-chat media gallery dialog (image / video, with < > navigation) */}
       <MediaGalleryDialog
