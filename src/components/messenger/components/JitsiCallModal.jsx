@@ -1,8 +1,8 @@
 /**
- * Custom professional call UI powered only by Jitsi Meet External API.
- * - Full overlay OR compact floating mini window (chat stays usable)
- * - All native Jitsi chrome stripped; only our controls
- * - Single persistent iframe container so mode switch never drops the call
+ * Custom professional call UI — Jitsi External API only (chrome fully stripped).
+ * - No prejoin / no name prompt
+ * - Single stable conference instance (no reload loop)
+ * - Full overlay OR draggable mini window so chat stays usable
  */
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
@@ -67,21 +67,27 @@ function loadJitsiScript(domain) {
   });
 }
 
-/** Aggressive config so almost no native Jitsi UI shows */
+/** Force-hide almost all native Jitsi UI + skip prejoin entirely */
 const STRIP_CONFIG = {
   prejoinPageEnabled: false,
+  prejoinConfig: { enabled: false },
   disableDeepLinking: true,
   disableInviteFunctions: true,
   disableThirdPartyRequests: true,
   enableClosePage: false,
+  enableWelcomePage: false,
+  enableInsecureRoomNameWarning: false,
   hideConferenceSubject: true,
   hideConferenceTimer: true,
   hideParticipantsStats: true,
+  requireDisplayName: false,
   notifications: [],
   disabledNotifications: [
     "connection.CONNFAIL",
     "dialog.cameraNotFoundError",
     "dialog.micNotFoundError",
+    "dialog.password",
+    "notify.disconnected",
   ],
   toolbarButtons: [],
   buttonsWithNotifyClick: [],
@@ -92,6 +98,9 @@ const STRIP_CONFIG = {
   subject: " ",
   defaultLocalDisplayName: "You",
   defaultRemoteDisplayName: "Participant",
+  startSilent: false,
+  disableModeratorIndicator: true,
+  readOnlyName: true,
 };
 
 const STRIP_INTERFACE = {
@@ -113,6 +122,11 @@ const STRIP_INTERFACE = {
   MOBILE_APP_PROMO: false,
   VIDEO_LAYOUT_FIT: "both",
   TILE_VIEW_MAX_COLUMNS: 2,
+  APP_NAME: "Call",
+  NATIVE_APP_NAME: "Call",
+  PROVIDER_NAME: "Call",
+  DISPLAY_WELCOME_PAGE_CONTENT: false,
+  DISPLAY_WELCOME_FOOTER: false,
 };
 
 const MINI_W = 320;
@@ -128,6 +142,13 @@ export default function JitsiCallModal({
   const apiRef = useRef(null);
   const rootRef = useRef(null);
   const dragRef = useRef({ active: false, ox: 0, oy: 0 });
+  const onCloseRef = useRef(onClose);
+  const startingRef = useRef(false);
+
+  // Keep latest onClose without re-running the conference effect
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -137,8 +158,7 @@ export default function JitsiCallModal({
   const [fullscreen, setFullscreen] = useState(false);
   const [participantCount, setParticipantCount] = useState(1);
   const [elapsed, setElapsed] = useState(0);
-  /** 'full' | 'mini' */
-  const [mode, setMode] = useState("full");
+  const [mode, setMode] = useState("full"); // 'full' | 'mini'
   const [miniPos, setMiniPos] = useState(() => {
     if (typeof window === "undefined") return { x: 24, y: 24 };
     return {
@@ -146,6 +166,11 @@ export default function JitsiCallModal({
       y: Math.max(16, window.innerHeight - MINI_H - 100),
     };
   });
+
+  // Stable conference identity — only restart when room/domain change
+  const roomKey = callConfig
+    ? `${callConfig.domain || ""}|${callConfig.room || ""}`
+    : "";
 
   useEffect(() => {
     if (!callConfig) return undefined;
@@ -162,18 +187,44 @@ export default function JitsiCallModal({
     return `${m}:${String(sec).padStart(2, "0")}`;
   };
 
-  // Boot once — containerRef stays mounted for both modes
+  // ── Boot conference ONCE per room ─────────────────────────────────
   useEffect(() => {
-    if (!callConfig || !containerRef.current) return undefined;
+    if (!callConfig || !roomKey) return undefined;
+
     let disposed = false;
     let api = null;
+    let joinFallbackTimer = null;
 
-    (async () => {
+    const boot = async () => {
+      // Wait until container is in the DOM
+      let tries = 0;
+      while (!containerRef.current && tries < 40) {
+        await new Promise((r) => setTimeout(r, 50));
+        tries += 1;
+      }
+      if (disposed || !containerRef.current) return;
+      if (startingRef.current || apiRef.current) return;
+      startingRef.current = true;
+
       try {
         setLoading(true);
         setError(null);
+
         const JitsiMeetExternalAPI = await loadJitsiScript(callConfig.domain);
-        if (disposed) return;
+        if (disposed || !containerRef.current) {
+          startingRef.current = false;
+          return;
+        }
+
+        // Clear any leftover iframe from a previous instance
+        try {
+          containerRef.current.innerHTML = "";
+        } catch { /* */ }
+
+        const displayName =
+          callConfig.display_name ||
+          callConfig.displayName ||
+          "User";
 
         const opts = {
           roomName: callConfig.room,
@@ -181,31 +232,49 @@ export default function JitsiCallModal({
           width: "100%",
           height: "100%",
           userInfo: {
-            displayName: callConfig.display_name || "User",
+            displayName,
           },
           configOverwrite: {
             ...STRIP_CONFIG,
             ...(callConfig.config || {}),
-            toolbarButtons: [],
+            // Force again so server defaults cannot re-enable chrome
             prejoinPageEnabled: false,
+            prejoinConfig: { enabled: false },
+            requireDisplayName: false,
+            toolbarButtons: [],
+            notifications: [],
             disableDeepLinking: true,
-            startWithAudioMuted: callConfig.config?.startWithAudioMuted ?? false,
-            startWithVideoMuted: callConfig.config?.startWithVideoMuted ?? false,
+            enableWelcomePage: false,
+            startWithAudioMuted:
+              callConfig.config?.startWithAudioMuted ?? false,
+            startWithVideoMuted:
+              callConfig.config?.startWithVideoMuted ?? false,
           },
           interfaceConfigOverwrite: {
             ...STRIP_INTERFACE,
             ...(callConfig.interface_config || {}),
             TOOLBAR_BUTTONS: [],
             SHOW_JITSI_WATERMARK: false,
+            SHOW_WATERMARK_FOR_GUESTS: false,
+            SHOW_BRAND_WATERMARK: false,
+            SHOW_POWERED_BY: false,
+          },
+          onload: () => {
+            // Extra safety: if prejoin somehow still appears, try to dismiss
+            try {
+              api?.executeCommand?.("displayName", displayName);
+            } catch { /* */ }
           },
         };
 
         api = new JitsiMeetExternalAPI(callConfig.domain, opts);
         apiRef.current = api;
 
-        api.addListener("videoConferenceJoined", () => {
+        const markJoined = () => {
           if (!disposed) setLoading(false);
-        });
+        };
+
+        api.addListener("videoConferenceJoined", markJoined);
         api.addListener("audioMuteStatusChanged", ({ muted }) => {
           if (!disposed) setAudioMuted(!!muted);
         });
@@ -226,64 +295,88 @@ export default function JitsiCallModal({
           } catch { /* */ }
         });
         api.addListener("readyToClose", () => {
-          if (!disposed) onClose?.();
+          if (!disposed) onCloseRef.current?.();
         });
         api.addListener("videoConferenceLeft", () => {
-          if (!disposed) onClose?.();
+          if (!disposed) onCloseRef.current?.();
         });
 
-        setTimeout(() => {
-          if (!disposed) setLoading(false);
-        }, 6000);
+        // Fallback if join event is slow / muted
+        joinFallbackTimer = setTimeout(markJoined, 8000);
       } catch (e) {
         if (!disposed) {
           setError(e?.message || "Could not start call");
           setLoading(false);
         }
+      } finally {
+        startingRef.current = false;
       }
-    })();
+    };
+
+    boot();
 
     return () => {
       disposed = true;
+      if (joinFallbackTimer) clearTimeout(joinFallbackTimer);
+      startingRef.current = false;
       try {
         api?.dispose?.();
       } catch { /* */ }
+      try {
+        apiRef.current?.dispose?.();
+      } catch { /* */ }
       apiRef.current = null;
+      // Do NOT clear container innerHTML here while React may still own the node;
+      // dispose() already removes the iframe.
     };
-  }, [callConfig, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomKey]);
 
-  // Tell Jitsi to resize when switching modes
+  // Soft resize hint when switching full ↔ mini (does not recreate API)
   useEffect(() => {
     try {
-      // External API has no public resize, but iframe CSS is 100% so layout reflow is enough
       window.dispatchEvent(new Event("resize"));
     } catch { /* */ }
   }, [mode]);
 
   const toggleAudio = useCallback(() => {
-    try { apiRef.current?.executeCommand("toggleAudio"); } catch { /* */ }
+    try {
+      apiRef.current?.executeCommand("toggleAudio");
+    } catch { /* */ }
   }, []);
   const toggleVideo = useCallback(() => {
-    try { apiRef.current?.executeCommand("toggleVideo"); } catch { /* */ }
+    try {
+      apiRef.current?.executeCommand("toggleVideo");
+    } catch { /* */ }
   }, []);
   const toggleShare = useCallback(() => {
-    try { apiRef.current?.executeCommand("toggleShareScreen"); } catch { /* */ }
+    try {
+      apiRef.current?.executeCommand("toggleShareScreen");
+    } catch { /* */ }
   }, []);
   const hangup = useCallback(() => {
-    try { apiRef.current?.executeCommand("hangup"); } catch { /* */ }
-    onClose?.();
-  }, [onClose]);
+    try {
+      apiRef.current?.executeCommand("hangup");
+    } catch { /* */ }
+    onCloseRef.current?.();
+  }, []);
 
   const toggleFullscreen = useCallback(() => {
     const el = rootRef.current;
     if (!el) return;
     if (!document.fullscreenElement) {
-      el.requestFullscreen?.().then(() => {
-        setFullscreen(true);
-        setMode("full");
-      }).catch(() => {});
+      el
+        .requestFullscreen?.()
+        .then(() => {
+          setFullscreen(true);
+          setMode("full");
+        })
+        .catch(() => {});
     } else {
-      document.exitFullscreen?.().then(() => setFullscreen(false)).catch(() => {});
+      document
+        .exitFullscreen?.()
+        .then(() => setFullscreen(false))
+        .catch(() => {});
     }
   }, []);
 
@@ -443,7 +536,6 @@ export default function JitsiCallModal({
     );
   };
 
-  // Single tree — only outer shell changes size/position
   return (
     <Box
       ref={rootRef}
@@ -493,14 +585,23 @@ export default function JitsiCallModal({
           "&:active": isMini ? { cursor: "grabbing" } : undefined,
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={isMini ? 1 : 1.5} sx={{ minWidth: 0, flex: 1 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={isMini ? 1 : 1.5}
+          sx={{ minWidth: 0, flex: 1 }}
+        >
           {isMini && (
             <DragIndicatorIcon sx={{ fontSize: 16, opacity: 0.5, flexShrink: 0 }} />
           )}
           {peerAvatar ? (
             <Avatar
               src={peerAvatar}
-              sx={{ width: isMini ? 22 : 36, height: isMini ? 22 : 36, flexShrink: 0 }}
+              sx={{
+                width: isMini ? 22 : 36,
+                height: isMini ? 22 : 36,
+                flexShrink: 0,
+              }}
             />
           ) : (
             <Avatar
@@ -593,7 +694,7 @@ export default function JitsiCallModal({
         </Stack>
       </Stack>
 
-      {/* Video stage — SAME node for both modes */}
+      {/* Video stage — persistent node; never unmounted across mode switches */}
       <Box
         sx={{
           position: "relative",
@@ -621,7 +722,8 @@ export default function JitsiCallModal({
               sx={{
                 position: "absolute",
                 inset: 0,
-                bgcolor: "rgba(0,0,0,0.65)",
+                bgcolor: "rgba(0,0,0,0.72)",
+                zIndex: 2,
               }}
             >
               <CircularProgress size={isMini ? 28 : 40} color="inherit" />
@@ -638,7 +740,7 @@ export default function JitsiCallModal({
             alignItems="center"
             justifyContent="center"
             spacing={1}
-            sx={{ position: "absolute", inset: 0, p: 1 }}
+            sx={{ position: "absolute", inset: 0, p: 1, zIndex: 2 }}
           >
             <Typography
               color="error"
@@ -654,7 +756,6 @@ export default function JitsiCallModal({
         )}
       </Box>
 
-      {/* Controls */}
       <Paper
         elevation={0}
         sx={{
