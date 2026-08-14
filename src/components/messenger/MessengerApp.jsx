@@ -353,7 +353,59 @@ export default function MessengerApp() {
   const [readersMessage, setReadersMessage] = useState(null);
   // Jitsi call state
   const [callConfig, setCallConfig] = useState(null);
+  const callConfigRef = useRef(null);
+  useEffect(() => { callConfigRef.current = callConfig; }, [callConfig]);
   const [incomingCall, setIncomingCall] = useState(null); // { conversation_id, initiator, media, ... }
+  const [activeCallInfo, setActiveCallInfo] = useState(null); // ongoing/ringing in current chat
+  const seenRingIdsRef = useRef(new Set());
+
+  // When chat changes, check live/ringing call (also covers offline→online within ring window)
+  useEffect(() => {
+    if (!activeId) {
+      setActiveCallInfo(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiRequest({
+          method: "GET",
+          url: `${MSG_API}/conversations/${activeId}/call/active/`,
+        });
+        const data = unwrapData(res);
+        if (cancelled) return;
+        if (data?.active) {
+          setActiveCallInfo({ ...data, conversation_id: data.conversation_id || activeId });
+          if (
+            data.status === "ringing"
+            && String(data.initiator?.id) !== String(meId)
+            && !callConfigRef.current
+          ) {
+            const rid = data.call_id;
+            if (rid && !seenRingIdsRef.current.has(String(rid))) {
+              seenRingIdsRef.current.add(String(rid));
+              const remaining = data.ring_remaining ?? 30;
+              setIncomingCall({
+                conversation_id: data.conversation_id || activeId,
+                call_id: data.call_id,
+                media: data.media,
+                is_video: data.is_video,
+                initiator: data.initiator,
+                ring_timeout: remaining,
+                _receivedAt: Date.now() - (30 - remaining) * 1000,
+                replay: true,
+              });
+            }
+          }
+        } else {
+          setActiveCallInfo(null);
+        }
+      } catch {
+        if (!cancelled) setActiveCallInfo(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeId, meId]);
 
   // Profile / contacts / blocks / invites
   const [profileData, setProfileData] = useState(null);
@@ -1155,7 +1207,20 @@ export default function MessengerApp() {
             })();
             return;
           }
-          setIncomingCall({ ...data, _receivedAt: Date.now() });
+          const rid = data.call_id || `${data.conversation_id}:${data.initiator?.id}`;
+          if (seenRingIdsRef.current.has(String(rid))) return;
+          seenRingIdsRef.current.add(String(rid));
+          setIncomingCall({ ...data, _receivedAt: data._receivedAt || Date.now() });
+          // If this is the open chat, show in-chat join bar too
+          if (String(data.conversation_id) === String(activeIdRef.current)) {
+            setActiveCallInfo({
+              call_id: data.call_id,
+              status: "ringing",
+              is_video: !!(data.media?.video || data.is_video),
+              initiator: data.initiator,
+              conversation_id: data.conversation_id,
+            });
+          }
         }
       }
       if (data.type === "call.answered") {
@@ -1183,6 +1248,15 @@ export default function MessengerApp() {
         if (data.status === "busy") {
           try { flash("User is busy on another call"); } catch { /* */ }
         }
+        if (data.call_id) {
+          seenRingIdsRef.current.delete(String(data.call_id));
+        }
+        setActiveCallInfo((prev) => {
+          if (!prev) return null;
+          if (data.call_id && String(prev.call_id) === String(data.call_id)) return null;
+          if (String(prev.conversation_id) === String(data.conversation_id)) return null;
+          return prev;
+        });
       }
       if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
         if (String(data.conversation_id) === String(activeIdRef.current)) {
@@ -3453,6 +3527,57 @@ export default function MessengerApp() {
             />
           )}
 
+            {activeCallInfo && !callConfig && (
+              <Paper
+                elevation={0}
+                sx={{
+                  mx: 1.5, mt: 1, mb: 0.5, px: 1.5, py: 1, borderRadius: 1,
+                  display: "flex", alignItems: "center", gap: 1.5,
+                  bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(25,118,210,0.15)" : "rgba(25,118,210,0.08)",
+                  border: "1px solid", borderColor: "primary.main",
+                }}
+              >
+                <CallIcon color="primary" fontSize="small" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={600} noWrap>
+                    {activeCallInfo.status === "ringing" ? "Incoming call" : "Call in progress"}
+                    {activeCallInfo.is_video ? " · video" : " · voice"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {activeCallInfo.initiator?.username || "Tap join to enter"}
+                  </Typography>
+                </Box>
+                <IconButton
+                  color="success"
+                  size="small"
+                  sx={{ bgcolor: "success.main", color: "#fff", "&:hover": { bgcolor: "success.dark" } }}
+                  onClick={async () => {
+                    const cid = activeId;
+                    const callId = activeCallInfo.call_id;
+                    try {
+                      const res = await apiRequest({
+                        method: "GET",
+                        url: `${MSG_API}/conversations/${cid}/call/join/` + (callId ? `?call_id=${encodeURIComponent(callId)}` : ""),
+                      });
+                      const cfg = unwrapData(res);
+                      if (cfg?.room) {
+                        setIncomingCall(null);
+                        setCallConfig({
+                          ...cfg,
+                          peer_title: activeCallInfo.initiator?.username || convTitle(activeConv, meId) || "Call",
+                          peer_avatar: null,
+                        });
+                        setActiveCallInfo(null);
+                      }
+                    } catch (e) {
+                      flash(e?.response?.data?.message || "Could not join call");
+                    }
+                  }}
+                >
+                  <CallIcon fontSize="small" />
+                </IconButton>
+              </Paper>
+            )}
           <Box
             ref={listRef} onScroll={onScrollMsgs}
             sx={{

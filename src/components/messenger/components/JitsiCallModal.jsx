@@ -1,21 +1,14 @@
 /**
- * Custom professional call UI — Jitsi External API only (chrome fully stripped).
- * - No prejoin / no name prompt
- * - Single stable conference instance (no reload loop)
- * - Full overlay OR draggable mini window so chat stays usable
+ * Fully custom call UI powered by lib-jitsi-meet (NOT the Jitsi Meet web app).
+ * - Own video grid, controls, screen-share stage, settings
+ * - No Jitsi chrome / prejoin / watermarks
+ * - Mini floating mode so chat stays usable
  */
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
-  Box,
-  IconButton,
-  Stack,
-  Typography,
-  Avatar,
-  Chip,
-  Tooltip,
-  CircularProgress,
-  Fade,
-  Paper,
+  Box, IconButton, Stack, Typography, Avatar, Chip, Tooltip,
+  CircularProgress, Paper, Drawer, List, ListItemButton, ListItemText,
+  Switch, FormControlLabel, Divider,
 } from "@mui/material";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import MicIcon from "@mui/icons-material/Mic";
@@ -32,105 +25,151 @@ import OpenInFullIcon from "@mui/icons-material/OpenInFull";
 import CloseFullscreenIcon from "@mui/icons-material/CloseFullscreen";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import PictureInPictureAltIcon from "@mui/icons-material/PictureInPictureAlt";
+import SettingsIcon from "@mui/icons-material/Settings";
+import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
 
-const JITSI_SCRIPT_CDN =
-  "https://cdn.jsdelivr.net/npm/@jitsi/external-api@2.0.1/index.min.js";
+const MINI_W = 300;
+const MINI_H = 180;
 
-function scriptForDomain(domain) {
-  return `https://${domain}/external_api.js`;
-}
-
-function loadJitsiScript(domain) {
+function loadLibJitsi(domain) {
   return new Promise((resolve, reject) => {
-    if (window.JitsiMeetExternalAPI) {
-      resolve(window.JitsiMeetExternalAPI);
+    if (window.JitsiMeetJS) {
+      resolve(window.JitsiMeetJS);
       return;
     }
-    const tryUrls = [scriptForDomain(domain), JITSI_SCRIPT_CDN];
+    const urls = [
+      `https://${domain}/libs/lib-jitsi-meet.min.js`,
+      `https://${domain}/lib-jitsi-meet.min.js`,
+      "https://cdn.jsdelivr.net/npm/lib-jitsi-meet-dist@latest/lib-jitsi-meet.min.js",
+    ];
     let i = 0;
-    const tryNext = () => {
-      if (i >= tryUrls.length) {
-        reject(new Error("Failed to load Jitsi Meet External API"));
+    const next = () => {
+      if (i >= urls.length) {
+        reject(new Error("Could not load media engine"));
         return;
       }
       const s = document.createElement("script");
-      s.src = tryUrls[i++];
+      s.src = urls[i++];
       s.async = true;
       s.onload = () => {
-        if (window.JitsiMeetExternalAPI) resolve(window.JitsiMeetExternalAPI);
-        else tryNext();
+        if (window.JitsiMeetJS) resolve(window.JitsiMeetJS);
+        else next();
       };
-      s.onerror = () => tryNext();
+      s.onerror = () => next();
       document.body.appendChild(s);
     };
-    tryNext();
+    next();
   });
 }
 
-/** Force-hide almost all native Jitsi UI + skip prejoin entirely */
-const STRIP_CONFIG = {
-  prejoinPageEnabled: false,
-  prejoinConfig: { enabled: false },
-  disableDeepLinking: true,
-  disableInviteFunctions: true,
-  disableThirdPartyRequests: true,
-  enableClosePage: false,
-  enableWelcomePage: false,
-  enableInsecureRoomNameWarning: false,
-  hideConferenceSubject: true,
-  hideConferenceTimer: true,
-  hideParticipantsStats: true,
-  requireDisplayName: false,
-  notifications: [],
-  disabledNotifications: [
-    "connection.CONNFAIL",
-    "dialog.cameraNotFoundError",
-    "dialog.micNotFoundError",
-    "dialog.password",
-    "notify.disconnected",
-  ],
-  toolbarButtons: [],
-  buttonsWithNotifyClick: [],
-  filmstrip: { disableResizable: true, disableStageFilmstrip: true },
-  disableProfile: true,
-  disableRemoteMute: true,
-  remoteVideoMenu: { disableKick: true, disableGrantModerator: true },
-  subject: " ",
-  defaultLocalDisplayName: "You",
-  defaultRemoteDisplayName: "Participant",
-  startSilent: false,
-  disableModeratorIndicator: true,
-  readOnlyName: true,
-};
+function attachTrack(track, el) {
+  if (!el || !track) return;
+  try {
+    track.attach(el);
+  } catch {
+    try {
+      const stream = new MediaStream([track.getTrack?.() || track.stream?.getTracks?.()?.[0]].filter(Boolean));
+      if (stream.getTracks().length) el.srcObject = stream;
+    } catch { /* */ }
+  }
+}
 
-const STRIP_INTERFACE = {
-  SHOW_JITSI_WATERMARK: false,
-  SHOW_WATERMARK_FOR_GUESTS: false,
-  SHOW_BRAND_WATERMARK: false,
-  SHOW_POWERED_BY: false,
-  SHOW_CHROME_EXTENSION_BANNER: false,
-  TOOLBAR_ALWAYS_VISIBLE: false,
-  TOOLBAR_BUTTONS: [],
-  DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
-  DISABLE_FOCUS_INDICATOR: true,
-  DISABLE_DOMINANT_SPEAKER_INDICATOR: false,
-  FILM_STRIP_MAX_HEIGHT: 0,
-  VERTICAL_FILMSTRIP: false,
-  INITIAL_TOOLBAR_TIMEOUT: 1,
-  TOOLBAR_TIMEOUT: 1,
-  HIDE_INVITE_MORE_HEADER: true,
-  MOBILE_APP_PROMO: false,
-  VIDEO_LAYOUT_FIT: "both",
-  TILE_VIEW_MAX_COLUMNS: 2,
-  APP_NAME: "Call",
-  NATIVE_APP_NAME: "Call",
-  PROVIDER_NAME: "Call",
-  DISPLAY_WELCOME_PAGE_CONTENT: false,
-  DISPLAY_WELCOME_FOOTER: false,
-};
+function detachTrack(track, el) {
+  if (!track) return;
+  try {
+    if (el) track.detach(el);
+    else track.detach();
+  } catch { /* */ }
+}
 
-const MINI_W = 320;
-const MINI_H = 200;
+/** One participant tile */
+function ParticipantTile({ participant, isLocal, isDominant, compact }) {
+  const videoRef = useRef(null);
+  const audioRef = useRef(null);
+  const vTrack = participant?.videoTrack;
+  const aTrack = participant?.audioTrack;
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !vTrack) return undefined;
+    attachTrack(vTrack, el);
+    return () => detachTrack(vTrack, el);
+  }, [vTrack]);
+
+  useEffect(() => {
+    if (isLocal) return undefined; // don't play own audio
+    const el = audioRef.current;
+    if (!el || !aTrack) return undefined;
+    attachTrack(aTrack, el);
+    return () => detachTrack(aTrack, el);
+  }, [aTrack, isLocal]);
+
+  const muted = participant?.audioMuted;
+  const videoMuted = participant?.videoMuted || !vTrack;
+  const name = participant?.displayName || (isLocal ? "You" : "Participant");
+
+  return (
+    <Box
+      sx={{
+        position: "relative",
+        bgcolor: "#111",
+        borderRadius: 1,
+        overflow: "hidden",
+        border: isDominant ? "2px solid" : "1px solid",
+        borderColor: isDominant ? "primary.main" : "rgba(255,255,255,0.08)",
+        aspectRatio: compact ? "16/10" : "16/9",
+        minHeight: compact ? 80 : 120,
+      }}
+    >
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isLocal}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: videoMuted ? "none" : "block",
+          transform: isLocal && !participant?.isScreen ? "scaleX(-1)" : undefined,
+        }}
+      />
+      {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
+      {videoMuted && (
+        <Stack
+          alignItems="center"
+          justifyContent="center"
+          sx={{ position: "absolute", inset: 0 }}
+        >
+          <Avatar sx={{ width: compact ? 40 : 64, height: compact ? 40 : 64, bgcolor: "primary.dark", fontSize: compact ? 18 : 28 }}>
+            {(name || "?")[0]?.toUpperCase()}
+          </Avatar>
+        </Stack>
+      )}
+      <Stack
+        direction="row"
+        spacing={0.5}
+        alignItems="center"
+        sx={{
+          position: "absolute",
+          left: 6,
+          bottom: 6,
+          px: 0.75,
+          py: 0.25,
+          borderRadius: 1,
+          bgcolor: "rgba(0,0,0,0.55)",
+          maxWidth: "90%",
+        }}
+      >
+        {muted && <MicOffIcon sx={{ fontSize: 12, color: "error.light" }} />}
+        <Typography variant="caption" noWrap sx={{ color: "#fff", fontSize: 11 }}>
+          {name}{isLocal ? " (you)" : ""}
+          {participant?.isScreen ? " · screen" : ""}
+        </Typography>
+      </Stack>
+    </Box>
+  );
+}
 
 export default function JitsiCallModal({
   callConfig,
@@ -138,27 +177,30 @@ export default function JitsiCallModal({
   title = "Call",
   peerAvatar,
 }) {
-  const containerRef = useRef(null);
-  const apiRef = useRef(null);
   const rootRef = useRef(null);
-  const dragRef = useRef({ active: false, ox: 0, oy: 0 });
+  const connRef = useRef(null);
+  const roomRef = useRef(null);
+  const localTracksRef = useRef([]);
   const onCloseRef = useRef(onClose);
+  const dragRef = useRef({ active: false, ox: 0, oy: 0 });
   const startingRef = useRef(false);
 
-  // Keep latest onClose without re-running the conference effect
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [audioMuted, setAudioMuted] = useState(false);
-  const [videoMuted, setVideoMuted] = useState(false);
+  const [videoMuted, setVideoMuted] = useState(!!callConfig?.config?.startWithVideoMuted);
   const [sharing, setSharing] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
-  const [participantCount, setParticipantCount] = useState(1);
   const [elapsed, setElapsed] = useState(0);
-  const [mode, setMode] = useState("full"); // 'full' | 'mini'
+  const [mode, setMode] = useState("full");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [devices, setDevices] = useState({ audioInputs: [], videoInputs: [] });
+  const [selectedMic, setSelectedMic] = useState("");
+  const [selectedCam, setSelectedCam] = useState("");
+  const [participants, setParticipants] = useState({}); // id -> { displayName, audioTrack, videoTrack, audioMuted, videoMuted, isScreen }
+  const [localId, setLocalId] = useState("local");
   const [miniPos, setMiniPos] = useState(() => {
     if (typeof window === "undefined") return { x: 24, y: 24 };
     return {
@@ -167,7 +209,6 @@ export default function JitsiCallModal({
     };
   });
 
-  // Stable conference identity — only restart when room/domain change
   const roomKey = callConfig
     ? `${callConfig.domain || ""}|${callConfig.room || ""}`
     : "";
@@ -182,132 +223,250 @@ export default function JitsiCallModal({
     const m = Math.floor(s / 60);
     const sec = s % 60;
     const h = Math.floor(m / 60);
-    if (h > 0)
-      return `${h}:${String(m % 60).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+    if (h > 0) return `${h}:${String(m % 60).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
     return `${m}:${String(sec).padStart(2, "0")}`;
   };
 
-  // ── Boot conference ONCE per room ─────────────────────────────────
+  const upsertParticipant = useCallback((id, patch) => {
+    setParticipants((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] || { id }), ...patch },
+    }));
+  }, []);
+
+  const removeParticipant = useCallback((id) => {
+    setParticipants((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  // ── Boot lib-jitsi-meet conference ────────────────────────────────
   useEffect(() => {
     if (!callConfig || !roomKey) return undefined;
-
     let disposed = false;
-    let api = null;
-    let joinFallbackTimer = null;
+
+    const cleanup = async () => {
+      try {
+        for (const t of localTracksRef.current) {
+          try { t.dispose?.(); } catch { /* */ }
+        }
+        localTracksRef.current = [];
+        if (roomRef.current) {
+          try { await roomRef.current.leave(); } catch { /* */ }
+          roomRef.current = null;
+        }
+        if (connRef.current) {
+          try { connRef.current.disconnect(); } catch { /* */ }
+          connRef.current = null;
+        }
+      } catch { /* */ }
+    };
 
     const boot = async () => {
-      // Wait until container is in the DOM
-      let tries = 0;
-      while (!containerRef.current && tries < 40) {
-        await new Promise((r) => setTimeout(r, 50));
-        tries += 1;
-      }
-      if (disposed || !containerRef.current) return;
-      if (startingRef.current || apiRef.current) return;
+      if (startingRef.current) return;
       startingRef.current = true;
+      setLoading(true);
+      setError(null);
 
       try {
-        setLoading(true);
-        setError(null);
+        const domain = callConfig.domain;
+        const roomName = callConfig.room;
+        const displayName = callConfig.display_name || callConfig.displayName || "User";
+        const startAudioMuted = !!callConfig.config?.startWithAudioMuted;
+        const startVideoMuted = !!callConfig.config?.startWithVideoMuted;
 
-        const JitsiMeetExternalAPI = await loadJitsiScript(callConfig.domain);
-        if (disposed || !containerRef.current) {
-          startingRef.current = false;
+        const JitsiMeetJS = await loadLibJitsi(domain);
+        if (disposed) return;
+
+        JitsiMeetJS.init({
+          disableAudioLevels: false,
+          disableSimulcast: false,
+        });
+        JitsiMeetJS.setLogLevel?.(JitsiMeetJS.logLevels?.ERROR || "error");
+
+        const connection = new JitsiMeetJS.JitsiConnection(null, null, {
+          hosts: {
+            domain,
+            muc: `muc.${domain}`,
+          },
+          serviceUrl: `wss://${domain}/xmpp-websocket`,
+          clientNode: "http://jitsi.org/jitsimeet",
+        });
+        connRef.current = connection;
+
+        await new Promise((resolve, reject) => {
+          const onOk = () => {
+            connection.removeEventListener(
+              JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
+              onOk
+            );
+            resolve();
+          };
+          const onFail = (err) => {
+            connection.removeEventListener(
+              JitsiMeetJS.events.connection.CONNECTION_FAILED,
+              onFail
+            );
+            reject(err || new Error("Connection failed"));
+          };
+          connection.addEventListener(
+            JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
+            onOk
+          );
+          connection.addEventListener(
+            JitsiMeetJS.events.connection.CONNECTION_FAILED,
+            onFail
+          );
+          connection.connect();
+        });
+
+        if (disposed) {
+          connection.disconnect();
           return;
         }
 
-        // Clear any leftover iframe from a previous instance
+        const room = connection.initJitsiConference(roomName, {
+          startAudioMuted: false,
+          startVideoMuted: false,
+          p2p: { enabled: true },
+          enableNoAudioDetection: false,
+          enableNoisyMicDetection: false,
+        });
+        roomRef.current = room;
+
+        room.on(JitsiMeetJS.events.conference.TRACK_ADDED, (track) => {
+          if (track.isLocal()) return;
+          const pid = track.getParticipantId();
+          const isVideo = track.getType() === "video";
+          const isScreen = isVideo && track.videoType === "desktop";
+          if (isVideo) {
+            upsertParticipant(pid, {
+              videoTrack: track,
+              videoMuted: track.isMuted(),
+              isScreen: !!isScreen,
+            });
+          } else {
+            upsertParticipant(pid, {
+              audioTrack: track,
+              audioMuted: track.isMuted(),
+            });
+          }
+          track.addEventListener(JitsiMeetJS.events.track.TRACK_MUTE_CHANGED, () => {
+            if (track.getType() === "video") {
+              upsertParticipant(pid, { videoMuted: track.isMuted() });
+            } else {
+              upsertParticipant(pid, { audioMuted: track.isMuted() });
+            }
+          });
+          track.addEventListener(JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED, () => {
+            if (track.getType() === "video") {
+              upsertParticipant(pid, { videoTrack: null, videoMuted: true, isScreen: false });
+            } else {
+              upsertParticipant(pid, { audioTrack: null });
+            }
+          });
+        });
+
+        room.on(JitsiMeetJS.events.conference.TRACK_REMOVED, (track) => {
+          if (track.isLocal()) return;
+          const pid = track.getParticipantId();
+          if (track.getType() === "video") {
+            upsertParticipant(pid, { videoTrack: null, videoMuted: true, isScreen: false });
+          } else {
+            upsertParticipant(pid, { audioTrack: null });
+          }
+        });
+
+        room.on(JitsiMeetJS.events.conference.USER_JOINED, (id, user) => {
+          upsertParticipant(id, {
+            displayName: user?.getDisplayName?.() || "Participant",
+          });
+        });
+
+        room.on(JitsiMeetJS.events.conference.USER_LEFT, (id) => {
+          removeParticipant(id);
+        });
+
+        room.on(JitsiMeetJS.events.conference.DISPLAY_NAME_CHANGED, (id, name) => {
+          upsertParticipant(id, { displayName: name });
+        });
+
+        room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, () => {
+          if (!disposed) setLoading(false);
+          try {
+            room.setDisplayName(displayName);
+          } catch { /* */ }
+        });
+
+        room.on(JitsiMeetJS.events.conference.CONFERENCE_LEFT, () => {
+          if (!disposed) onCloseRef.current?.();
+        });
+
+        // Local tracks
+        const trackOpts = [];
+        trackOpts.push({ devices: ["audio"] });
+        if (!startVideoMuted) {
+          trackOpts.push({ devices: ["video"] });
+        }
+
+        let tracks = [];
         try {
-          containerRef.current.innerHTML = "";
+          tracks = await JitsiMeetJS.createLocalTracks({
+            devices: startVideoMuted ? ["audio"] : ["audio", "video"],
+          });
+        } catch (e) {
+          // fallback audio only
+          try {
+            tracks = await JitsiMeetJS.createLocalTracks({ devices: ["audio"] });
+          } catch (e2) {
+            throw e2;
+          }
+        }
+
+        if (disposed) {
+          tracks.forEach((tr) => tr.dispose?.());
+          return;
+        }
+
+        localTracksRef.current = tracks;
+        const localPatch = {
+          displayName: "You",
+          audioMuted: startAudioMuted,
+          videoMuted: startVideoMuted,
+        };
+        for (const track of tracks) {
+          if (startAudioMuted && track.getType() === "audio") {
+            try { await track.mute(); } catch { /* */ }
+          }
+          await room.addTrack(track);
+          if (track.getType() === "audio") {
+            localPatch.audioTrack = track;
+            localPatch.audioMuted = track.isMuted();
+          } else {
+            localPatch.videoTrack = track;
+            localPatch.videoMuted = track.isMuted();
+          }
+        }
+        setLocalId("local");
+        upsertParticipant("local", localPatch);
+        setAudioMuted(!!localPatch.audioMuted);
+        setVideoMuted(!!localPatch.videoMuted);
+
+        // Enumerate devices for settings
+        try {
+          const list = await navigator.mediaDevices.enumerateDevices();
+          setDevices({
+            audioInputs: list.filter((d) => d.kind === "audioinput"),
+            videoInputs: list.filter((d) => d.kind === "videoinput"),
+          });
         } catch { /* */ }
 
-        const displayName =
-          callConfig.display_name ||
-          callConfig.displayName ||
-          "User";
-
-        const opts = {
-          roomName: callConfig.room,
-          parentNode: containerRef.current,
-          width: "100%",
-          height: "100%",
-          userInfo: {
-            displayName,
-          },
-          configOverwrite: {
-            ...STRIP_CONFIG,
-            ...(callConfig.config || {}),
-            // Force again so server defaults cannot re-enable chrome
-            prejoinPageEnabled: false,
-            prejoinConfig: { enabled: false },
-            requireDisplayName: false,
-            toolbarButtons: [],
-            notifications: [],
-            disableDeepLinking: true,
-            enableWelcomePage: false,
-            startWithAudioMuted:
-              callConfig.config?.startWithAudioMuted ?? false,
-            startWithVideoMuted:
-              callConfig.config?.startWithVideoMuted ?? false,
-          },
-          interfaceConfigOverwrite: {
-            ...STRIP_INTERFACE,
-            ...(callConfig.interface_config || {}),
-            TOOLBAR_BUTTONS: [],
-            SHOW_JITSI_WATERMARK: false,
-            SHOW_WATERMARK_FOR_GUESTS: false,
-            SHOW_BRAND_WATERMARK: false,
-            SHOW_POWERED_BY: false,
-          },
-          onload: () => {
-            // Extra safety: if prejoin somehow still appears, try to dismiss
-            try {
-              api?.executeCommand?.("displayName", displayName);
-            } catch { /* */ }
-          },
-        };
-
-        api = new JitsiMeetExternalAPI(callConfig.domain, opts);
-        apiRef.current = api;
-
-        const markJoined = () => {
+        room.join();
+        setTimeout(() => {
           if (!disposed) setLoading(false);
-        };
-
-        api.addListener("videoConferenceJoined", () => {
-          markJoined();
-          try {
-            setParticipantCount(api.getNumberOfParticipants());
-          } catch { /* */ }
-        });
-        api.addListener("audioMuteStatusChanged", ({ muted }) => {
-          if (!disposed) setAudioMuted(!!muted);
-        });
-        api.addListener("videoMuteStatusChanged", ({ muted }) => {
-          if (!disposed) setVideoMuted(!!muted);
-        });
-        api.addListener("screenSharingStatusChanged", ({ on }) => {
-          if (!disposed) setSharing(!!on);
-        });
-        api.addListener("participantJoined", () => {
-          try {
-            setParticipantCount(api.getNumberOfParticipants());
-          } catch { /* */ }
-        });
-        api.addListener("participantLeft", () => {
-          try {
-            setParticipantCount(api.getNumberOfParticipants());
-          } catch { /* */ }
-        });
-        api.addListener("readyToClose", () => {
-          if (!disposed) onCloseRef.current?.();
-        });
-        api.addListener("videoConferenceLeft", () => {
-          if (!disposed) onCloseRef.current?.();
-        });
-
-        // Fallback if join event is slow / muted
-        joinFallbackTimer = setTimeout(markJoined, 8000);
+        }, 8000);
       } catch (e) {
         if (!disposed) {
           setError(e?.message || "Could not start call");
@@ -322,80 +481,136 @@ export default function JitsiCallModal({
 
     return () => {
       disposed = true;
-      if (joinFallbackTimer) clearTimeout(joinFallbackTimer);
       startingRef.current = false;
-      try {
-        api?.dispose?.();
-      } catch { /* */ }
-      try {
-        apiRef.current?.dispose?.();
-      } catch { /* */ }
-      apiRef.current = null;
-      // Do NOT clear container innerHTML here while React may still own the node;
-      // dispose() already removes the iframe.
+      cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomKey]);
 
-  // Soft resize hint when switching full ↔ mini (does not recreate API)
-  useEffect(() => {
-    try {
-      window.dispatchEvent(new Event("resize"));
-    } catch { /* */ }
-  }, [mode]);
-
-  // If you are alone in the room for too long (nobody answered / everyone left) → end call
+  // Alone timeout
+  const remoteCount = Object.keys(participants).filter((k) => k !== "local").length;
   useEffect(() => {
     if (loading || error) return undefined;
-    if (participantCount > 1) return undefined;
-    const aloneMs = 45000; // 45s alone after connect
+    if (remoteCount > 0) return undefined;
     const t = setTimeout(() => {
-      try {
-        apiRef.current?.executeCommand("hangup");
-      } catch { /* */ }
-      onCloseRef.current?.();
-    }, aloneMs);
+      hangup();
+    }, 45000);
     return () => clearTimeout(t);
-  }, [loading, error, participantCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, remoteCount]);
 
-  const toggleAudio = useCallback(() => {
-    try {
-      apiRef.current?.executeCommand("toggleAudio");
-    } catch { /* */ }
-  }, []);
-  const toggleVideo = useCallback(() => {
-    try {
-      apiRef.current?.executeCommand("toggleVideo");
-    } catch { /* */ }
-  }, []);
-  const toggleShare = useCallback(() => {
-    try {
-      apiRef.current?.executeCommand("toggleShareScreen");
-    } catch { /* */ }
-  }, []);
   const hangup = useCallback(() => {
-    try {
-      apiRef.current?.executeCommand("hangup");
-    } catch { /* */ }
-    onCloseRef.current?.();
+    (async () => {
+      try {
+        for (const t of localTracksRef.current) {
+          try { await t.dispose?.(); } catch { /* */ }
+        }
+        localTracksRef.current = [];
+        try { await roomRef.current?.leave(); } catch { /* */ }
+        try { connRef.current?.disconnect(); } catch { /* */ }
+      } finally {
+        onCloseRef.current?.();
+      }
+    })();
   }, []);
+
+  const toggleAudio = useCallback(async () => {
+    const track = localTracksRef.current.find((t) => t.getType?.() === "audio");
+    if (!track) return;
+    try {
+      if (track.isMuted()) await track.unmute();
+      else await track.mute();
+      setAudioMuted(track.isMuted());
+      upsertParticipant("local", { audioMuted: track.isMuted() });
+    } catch { /* */ }
+  }, [upsertParticipant]);
+
+  const toggleVideo = useCallback(async () => {
+    let track = localTracksRef.current.find((t) => t.getType?.() === "video" && t.videoType !== "desktop");
+    const JitsiMeetJS = window.JitsiMeetJS;
+    const room = roomRef.current;
+    if (!track && JitsiMeetJS && room) {
+      try {
+        const created = await JitsiMeetJS.createLocalTracks({ devices: ["video"] });
+        track = created.find((t) => t.getType() === "video");
+        if (track) {
+          localTracksRef.current.push(track);
+          await room.addTrack(track);
+          upsertParticipant("local", { videoTrack: track, videoMuted: false });
+          setVideoMuted(false);
+        }
+      } catch { /* */ }
+      return;
+    }
+    if (!track) return;
+    try {
+      if (track.isMuted()) await track.unmute();
+      else await track.mute();
+      setVideoMuted(track.isMuted());
+      upsertParticipant("local", { videoMuted: track.isMuted(), videoTrack: track });
+    } catch { /* */ }
+  }, [upsertParticipant]);
+
+  const toggleShare = useCallback(async () => {
+    const JitsiMeetJS = window.JitsiMeetJS;
+    const room = roomRef.current;
+    if (!JitsiMeetJS || !room) return;
+
+    const existing = localTracksRef.current.find((t) => t.videoType === "desktop");
+    if (existing) {
+      try {
+        await room.removeTrack(existing);
+        existing.dispose?.();
+      } catch { /* */ }
+      localTracksRef.current = localTracksRef.current.filter((t) => t !== existing);
+      setSharing(false);
+      upsertParticipant("local", { isScreen: false });
+      return;
+    }
+    try {
+      const tracks = await JitsiMeetJS.createLocalTracks({ devices: ["desktop"] });
+      const desk = tracks.find((t) => t.getType() === "video");
+      if (!desk) return;
+      localTracksRef.current.push(desk);
+      await room.addTrack(desk);
+      setSharing(true);
+      // Prefer showing screen on local tile when sharing
+      upsertParticipant("local", { videoTrack: desk, videoMuted: false, isScreen: true });
+      desk.addEventListener(JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED, async () => {
+        try { await room.removeTrack(desk); } catch { /* */ }
+        localTracksRef.current = localTracksRef.current.filter((t) => t !== desk);
+        setSharing(false);
+        const cam = localTracksRef.current.find((t) => t.getType?.() === "video");
+        upsertParticipant("local", {
+          videoTrack: cam || null,
+          videoMuted: !cam || cam.isMuted(),
+          isScreen: false,
+        });
+      });
+    } catch (e) {
+      setError(e?.message || "Screen share failed");
+      setTimeout(() => setError(null), 2500);
+    }
+  }, [upsertParticipant]);
+
+  const switchCamera = useCallback(async () => {
+    const track = localTracksRef.current.find((t) => t.getType?.() === "video" && t.videoType !== "desktop");
+    if (!track || !selectedCam) return;
+    try {
+      await track.setDevice?.(selectedCam);
+    } catch { /* */ }
+  }, [selectedCam]);
 
   const toggleFullscreen = useCallback(() => {
     const el = rootRef.current;
     if (!el) return;
     if (!document.fullscreenElement) {
-      el
-        .requestFullscreen?.()
-        .then(() => {
-          setFullscreen(true);
-          setMode("full");
-        })
-        .catch(() => {});
+      el.requestFullscreen?.().then(() => {
+        setFullscreen(true);
+        setMode("full");
+      }).catch(() => {});
     } else {
-      document
-        .exitFullscreen?.()
-        .then(() => setFullscreen(false))
-        .catch(() => {});
+      document.exitFullscreen?.().then(() => setFullscreen(false)).catch(() => {});
     }
   }, []);
 
@@ -405,39 +620,25 @@ export default function JitsiCallModal({
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
 
-  const onDragStart = useCallback(
-    (e) => {
-      if (mode !== "mini") return;
-      e.preventDefault();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      dragRef.current = {
-        active: true,
-        ox: clientX - miniPos.x,
-        oy: clientY - miniPos.y,
-      };
-    },
-    [mode, miniPos]
-  );
+  const onDragStart = useCallback((e) => {
+    if (mode !== "mini") return;
+    e.preventDefault();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragRef.current = { active: true, ox: clientX - miniPos.x, oy: clientY - miniPos.y };
+  }, [mode, miniPos]);
 
   useEffect(() => {
     const onMove = (e) => {
       if (!dragRef.current.active) return;
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const x = Math.min(
-        Math.max(8, clientX - dragRef.current.ox),
-        window.innerWidth - MINI_W - 8
-      );
-      const y = Math.min(
-        Math.max(8, clientY - dragRef.current.oy),
-        window.innerHeight - MINI_H - 90
-      );
-      setMiniPos({ x, y });
+      setMiniPos({
+        x: Math.min(Math.max(8, clientX - dragRef.current.ox), window.innerWidth - MINI_W - 8),
+        y: Math.min(Math.max(8, clientY - dragRef.current.oy), window.innerHeight - MINI_H - 90),
+      });
     };
-    const onUp = () => {
-      dragRef.current.active = false;
-    };
+    const onUp = () => { dragRef.current.active = false; };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     window.addEventListener("touchmove", onMove, { passive: false });
@@ -451,83 +652,57 @@ export default function JitsiCallModal({
   }, []);
 
   const goMini = useCallback(() => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.().catch(() => {});
-    }
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     setMode("mini");
     setFullscreen(false);
   }, []);
-
-  const goFull = useCallback(() => {
-    setMode("full");
-  }, []);
+  const goFull = useCallback(() => setMode("full"), []);
 
   if (!callConfig) return null;
-
   const isMini = mode === "mini";
 
+  const list = Object.entries(participants).map(([id, p]) => ({ id, ...p }));
+  const screen = list.find((p) => p.isScreen && p.videoTrack);
+  const others = list.filter((p) => p !== screen);
+  const count = list.length;
+
   const controlBtn = (active, danger, size = 44) => ({
-    bgcolor: danger
-      ? "error.main"
-      : active
-        ? "primary.main"
-        : "rgba(255,255,255,0.12)",
+    bgcolor: danger ? "error.main" : active ? "primary.main" : "rgba(255,255,255,0.12)",
     color: "#fff",
     width: size,
     height: size,
     "&:hover": {
-      bgcolor: danger
-        ? "error.dark"
-        : active
-          ? "primary.dark"
-          : "rgba(255,255,255,0.22)",
+      bgcolor: danger ? "error.dark" : active ? "primary.dark" : "rgba(255,255,255,0.22)",
     },
   });
 
   const Controls = ({ compact = false }) => {
-    const sz = compact ? 36 : 48;
+    const sz = compact ? 34 : 46;
     return (
-      <Stack
-        direction="row"
-        spacing={compact ? 0.75 : 1.25}
-        alignItems="center"
-        justifyContent="center"
-        sx={{ width: "100%" }}
-      >
+      <Stack direction="row" spacing={compact ? 0.6 : 1.1} alignItems="center" justifyContent="center" sx={{ width: "100%" }}>
         <Tooltip title={audioMuted ? "Unmute" : "Mute"}>
           <IconButton onClick={toggleAudio} sx={controlBtn(false, audioMuted, sz)}>
-            {audioMuted ? (
-              <MicOffIcon fontSize={compact ? "small" : "medium"} />
-            ) : (
-              <MicIcon fontSize={compact ? "small" : "medium"} />
-            )}
+            {audioMuted ? <MicOffIcon fontSize={compact ? "small" : "medium"} /> : <MicIcon fontSize={compact ? "small" : "medium"} />}
           </IconButton>
         </Tooltip>
         <Tooltip title={videoMuted ? "Start video" : "Stop video"}>
           <IconButton onClick={toggleVideo} sx={controlBtn(false, videoMuted, sz)}>
-            {videoMuted ? (
-              <VideocamOffIcon fontSize={compact ? "small" : "medium"} />
-            ) : (
-              <VideocamIcon fontSize={compact ? "small" : "medium"} />
-            )}
+            {videoMuted ? <VideocamOffIcon fontSize={compact ? "small" : "medium"} /> : <VideocamIcon fontSize={compact ? "small" : "medium"} />}
           </IconButton>
         </Tooltip>
         {!compact && (
-          <Tooltip title={sharing ? "Stop sharing" : "Share screen"}>
-            <IconButton onClick={toggleShare} sx={controlBtn(sharing, false, sz)}>
-              {sharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
-            </IconButton>
-          </Tooltip>
-        )}
-        {compact ? (
-          <Tooltip title="Expand">
-            <IconButton onClick={goFull} sx={controlBtn(false, false, sz)}>
-              <OpenInFullIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        ) : (
           <>
-            <Tooltip title="Minimize (keep chatting)">
+            <Tooltip title={sharing ? "Stop sharing" : "Share screen"}>
+              <IconButton onClick={toggleShare} sx={controlBtn(sharing, false, sz)}>
+                {sharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Settings">
+              <IconButton onClick={() => setSettingsOpen(true)} sx={controlBtn(false, false, sz)}>
+                <SettingsIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Minimize">
               <IconButton onClick={goMini} sx={controlBtn(false, false, sz)}>
                 <PictureInPictureAltIcon />
               </IconButton>
@@ -539,21 +714,23 @@ export default function JitsiCallModal({
             </Tooltip>
           </>
         )}
+        {compact && (
+          <Tooltip title="Expand">
+            <IconButton onClick={goFull} sx={controlBtn(false, false, sz)}>
+              <OpenInFullIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip title="Hang up">
-          <IconButton
-            onClick={hangup}
-            sx={{
-              ...controlBtn(false, true, compact ? 40 : 56),
-              borderRadius: compact ? 2 : 3,
-              ml: compact ? 0.5 : 1,
-            }}
-          >
+          <IconButton onClick={hangup} sx={{ ...controlBtn(false, true, compact ? 38 : 52), borderRadius: 2, ml: 0.5 }}>
             <CallEndIcon fontSize={compact ? "small" : "medium"} />
           </IconButton>
         </Tooltip>
       </Stack>
     );
   };
+
+  const gridCols = count <= 1 ? 1 : count === 2 ? 2 : count <= 4 ? 2 : 3;
 
   return (
     <Box
@@ -566,7 +743,7 @@ export default function JitsiCallModal({
               top: miniPos.y,
               width: MINI_W,
               zIndex: 1450,
-              borderRadius: 1.5,
+              borderRadius: 1,
               overflow: "hidden",
               bgcolor: "#0b0e11",
               color: "#fff",
@@ -596,52 +773,23 @@ export default function JitsiCallModal({
         onTouchStart={isMini ? onDragStart : undefined}
         sx={{
           px: isMini ? 1 : 2,
-          py: isMini ? 0.6 : 1.2,
+          py: isMini ? 0.5 : 1,
           bgcolor: "rgba(0,0,0,0.55)",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
-          backdropFilter: "blur(10px)",
           cursor: isMini ? "grab" : "default",
-          "&:active": isMini ? { cursor: "grabbing" } : undefined,
         }}
       >
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={isMini ? 1 : 1.5}
-          sx={{ minWidth: 0, flex: 1 }}
-        >
-          {isMini && (
-            <DragIndicatorIcon sx={{ fontSize: 16, opacity: 0.5, flexShrink: 0 }} />
-          )}
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flex: 1 }}>
+          {isMini && <DragIndicatorIcon sx={{ fontSize: 16, opacity: 0.5 }} />}
           {peerAvatar ? (
-            <Avatar
-              src={peerAvatar}
-              sx={{
-                width: isMini ? 22 : 36,
-                height: isMini ? 22 : 36,
-                flexShrink: 0,
-              }}
-            />
+            <Avatar src={peerAvatar} sx={{ width: isMini ? 22 : 34, height: isMini ? 22 : 34 }} />
           ) : (
-            <Avatar
-              sx={{
-                width: isMini ? 22 : 36,
-                height: isMini ? 22 : 36,
-                bgcolor: "primary.main",
-                fontSize: isMini ? 11 : 16,
-                flexShrink: 0,
-              }}
-            >
+            <Avatar sx={{ width: isMini ? 22 : 34, height: isMini ? 22 : 34, bgcolor: "primary.main", fontSize: isMini ? 11 : 15 }}>
               {(title || "C")[0]}
             </Avatar>
           )}
           <Box sx={{ minWidth: 0 }}>
-            <Typography
-              variant={isMini ? "caption" : "subtitle1"}
-              fontWeight={600}
-              lineHeight={1.2}
-              noWrap
-            >
+            <Typography variant={isMini ? "caption" : "subtitle1"} fontWeight={600} noWrap>
               {title}
             </Typography>
             {!isMini && (
@@ -649,146 +797,145 @@ export default function JitsiCallModal({
                 <Chip
                   size="small"
                   icon={<PeopleIcon sx={{ fontSize: 14 }} />}
-                  label={participantCount}
-                  sx={{
-                    height: 20,
-                    fontSize: 11,
-                    bgcolor: "rgba(255,255,255,0.1)",
-                    color: "#fff",
-                    "& .MuiChip-icon": { color: "#fff" },
-                  }}
+                  label={count}
+                  sx={{ height: 20, fontSize: 11, bgcolor: "rgba(255,255,255,0.1)", color: "#fff", "& .MuiChip-icon": { color: "#fff" } }}
                 />
-                <Typography
-                  variant="caption"
-                  sx={{ opacity: 0.75, fontVariantNumeric: "tabular-nums" }}
-                >
+                <Typography variant="caption" sx={{ opacity: 0.75, fontVariantNumeric: "tabular-nums" }}>
                   {formatElapsed(elapsed)}
                 </Typography>
               </Stack>
             )}
           </Box>
           {isMini && (
-            <Typography
-              variant="caption"
-              sx={{
-                opacity: 0.7,
-                fontVariantNumeric: "tabular-nums",
-                ml: "auto",
-                mr: 0.5,
-                flexShrink: 0,
-              }}
-            >
+            <Typography variant="caption" sx={{ opacity: 0.7, ml: "auto", fontVariantNumeric: "tabular-nums" }}>
               {formatElapsed(elapsed)}
             </Typography>
           )}
         </Stack>
-
-        <Stack direction="row" spacing={0.25} alignItems="center" sx={{ flexShrink: 0 }}>
+        <Stack direction="row" spacing={0.25}>
           {isMini ? (
-            <IconButton
-              size="small"
-              onClick={goFull}
-              sx={{ color: "rgba(255,255,255,0.75)", p: 0.4 }}
-            >
+            <IconButton size="small" onClick={goFull} sx={{ color: "rgba(255,255,255,0.75)", p: 0.4 }}>
               <OpenInFullIcon sx={{ fontSize: 16 }} />
             </IconButton>
           ) : (
             <Tooltip title="Minimize — keep chatting">
-              <IconButton
-                onClick={goMini}
-                size="small"
-                sx={{ color: "rgba(255,255,255,0.8)" }}
-              >
+              <IconButton onClick={goMini} size="small" sx={{ color: "rgba(255,255,255,0.8)" }}>
                 <CloseFullscreenIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
-          <IconButton
-            onClick={hangup}
-            size="small"
-            sx={{ color: "rgba(255,255,255,0.7)", p: isMini ? 0.4 : undefined }}
-          >
+          <IconButton onClick={hangup} size="small" sx={{ color: "rgba(255,255,255,0.7)", p: isMini ? 0.4 : undefined }}>
             <CloseIcon sx={{ fontSize: isMini ? 16 : 20 }} />
           </IconButton>
         </Stack>
       </Stack>
 
-      {/* Video stage — persistent node; never unmounted across mode switches */}
+      {/* Stage */}
       <Box
         sx={{
           position: "relative",
           flex: isMini ? "none" : 1,
-          width: "100%",
           height: isMini ? MINI_H : "auto",
           minHeight: isMini ? MINI_H : 0,
           bgcolor: "#000",
+          p: isMini ? 0.5 : 1.5,
+          overflow: "auto",
         }}
       >
+        {screen && !isMini && (
+          <Box sx={{ mb: 1 }}>
+            <ParticipantTile participant={screen} isLocal={screen.id === "local"} isDominant compact={false} />
+          </Box>
+        )}
         <Box
-          ref={containerRef}
           sx={{
-            position: "absolute",
-            inset: 0,
-            "& iframe": { border: "none !important" },
+            display: "grid",
+            gridTemplateColumns: `repeat(${isMini ? 1 : gridCols}, 1fr)`,
+            gap: 1,
+            height: isMini ? "100%" : screen ? "auto" : "100%",
           }}
-        />
-        {loading && (
-          <Fade in>
-            <Stack
-              alignItems="center"
-              justifyContent="center"
-              spacing={isMini ? 1 : 2}
-              sx={{
-                position: "absolute",
-                inset: 0,
-                bgcolor: "rgba(0,0,0,0.72)",
-                zIndex: 2,
-              }}
-            >
-              <CircularProgress size={isMini ? 28 : 40} color="inherit" />
-              {!isMini && (
-                <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                  Connecting…
-                </Typography>
-              )}
+        >
+          {(isMini ? list.slice(0, 1) : (screen ? others : list)).map((p) => (
+            <ParticipantTile
+              key={p.id}
+              participant={p}
+              isLocal={p.id === "local"}
+              isDominant={false}
+              compact={isMini}
+            />
+          ))}
+          {!isMini && list.length === 0 && !loading && (
+            <Stack alignItems="center" justifyContent="center" sx={{ gridColumn: "1 / -1", minHeight: 200 }}>
+              <Typography sx={{ opacity: 0.7 }}>Waiting for others…</Typography>
             </Stack>
-          </Fade>
+          )}
+        </Box>
+
+        {loading && (
+          <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,0.7)", zIndex: 2 }}>
+            <CircularProgress size={isMini ? 28 : 40} color="inherit" />
+            {!isMini && <Typography variant="body2" sx={{ opacity: 0.85 }}>Connecting…</Typography>}
+          </Stack>
         )}
         {error && (
-          <Stack
-            alignItems="center"
-            justifyContent="center"
-            spacing={1}
-            sx={{ position: "absolute", inset: 0, p: 1, zIndex: 2 }}
-          >
-            <Typography
-              color="error"
-              variant={isMini ? "caption" : "body2"}
-              textAlign="center"
-            >
-              {error}
-            </Typography>
-            <IconButton onClick={hangup} color="error" size="small">
-              <CallEndIcon fontSize="small" />
-            </IconButton>
+          <Stack alignItems="center" justifyContent="center" spacing={1} sx={{ position: "absolute", inset: 0, zIndex: 2, p: 2 }}>
+            <Typography color="error" textAlign="center">{error}</Typography>
+            <IconButton onClick={hangup} color="error"><CallEndIcon /></IconButton>
           </Stack>
         )}
       </Box>
 
-      <Paper
-        elevation={0}
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          py: isMini ? 0.75 : 1.5,
-          px: isMini ? 1 : 2,
-          bgcolor: "rgba(0,0,0,0.72)",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-          backdropFilter: "blur(12px)",
-        }}
-      >
+      <Paper elevation={0} sx={{ py: isMini ? 0.6 : 1.25, px: 1, bgcolor: "rgba(0,0,0,0.75)", borderTop: "1px solid rgba(255,255,255,0.08)" }}>
         <Controls compact={isMini} />
       </Paper>
+
+      <Drawer anchor="right" open={settingsOpen} onClose={() => setSettingsOpen(false)}
+        PaperProps={{ sx: { width: 300, bgcolor: "#12151a", color: "#fff" } }}>
+        <Box sx={{ p: 2 }}>
+          <Typography fontWeight={700} gutterBottom>Call settings</Typography>
+          <Divider sx={{ borderColor: "rgba(255,255,255,0.1)", mb: 1 }} />
+          <Typography variant="caption" sx={{ opacity: 0.7 }}>Microphone</Typography>
+          <List dense>
+            {devices.audioInputs.map((d) => (
+              <ListItemButton
+                key={d.deviceId}
+                selected={selectedMic === d.deviceId}
+                onClick={async () => {
+                  setSelectedMic(d.deviceId);
+                  const track = localTracksRef.current.find((t) => t.getType?.() === "audio");
+                  try { await track?.setDevice?.(d.deviceId); } catch { /* */ }
+                }}
+              >
+                <ListItemText primary={d.label || "Microphone"} primaryTypographyProps={{ fontSize: 13 }} />
+              </ListItemButton>
+            ))}
+          </List>
+          <Typography variant="caption" sx={{ opacity: 0.7 }}>Camera</Typography>
+          <List dense>
+            {devices.videoInputs.map((d) => (
+              <ListItemButton
+                key={d.deviceId}
+                selected={selectedCam === d.deviceId}
+                onClick={async () => {
+                  setSelectedCam(d.deviceId);
+                  const track = localTracksRef.current.find((t) => t.getType?.() === "video" && t.videoType !== "desktop");
+                  try { await track?.setDevice?.(d.deviceId); } catch { /* */ }
+                }}
+              >
+                <ListItemText primary={d.label || "Camera"} primaryTypographyProps={{ fontSize: 13 }} />
+              </ListItemButton>
+            ))}
+          </List>
+          <FormControlLabel
+            control={<Switch checked={!audioMuted} onChange={toggleAudio} color="primary" />}
+            label="Microphone on"
+          />
+          <FormControlLabel
+            control={<Switch checked={!videoMuted} onChange={toggleVideo} color="primary" />}
+            label="Camera on"
+          />
+        </Box>
+      </Drawer>
     </Box>
   );
 }
