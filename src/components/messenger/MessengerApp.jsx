@@ -3401,6 +3401,32 @@ export default function MessengerApp() {
 
   /* -------------------- chat pane -------------------- */
 
+  // The call modal is rendered INLINE inside the chat pane (under the chat
+  // header, above the audio player) so it never escapes the viewport on
+  // window resize. We build it as a stable element here so the chat pane
+  // can drop it into the right slot.
+  const callModalElement = callConfig ? (
+    <JitsiCallModal
+      callConfig={callConfig}
+      title={callConfig.peer_title || convTitle(activeConv, meId) || "Call"}
+      peerAvatar={callConfig.peer_avatar || withTokenQuery(convAvatar(activeConv, meId))}
+      onClose={async () => {
+        const cid = callConfig?.conversation_id || activeId;
+        const callId = callConfig?.call_id;
+        setCallConfig(null);
+        if (cid) {
+          try {
+            await apiRequest({
+              method: "POST",
+              url: `${MSG_API}/conversations/${cid}/call/end/`,
+              data: { call_id: callId, reason: "ended" },
+            });
+          } catch { /* */ }
+        }
+      }}
+    />
+  ) : null;
+
   const chatPane = (
     <Box
       sx={{
@@ -3607,6 +3633,21 @@ export default function MessengerApp() {
             </Menu>
           </Stack>
 
+          {/* Call surface — rendered UNDER the chat header (above audio
+              player + messages list) on BOTH desktop and mobile. The
+              JitsiCallModal itself supports a "minimise" button that
+              collapses it into a floating mini card so the user can keep
+              chatting. */}
+          {callModalElement && (
+            <Box sx={{
+              flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
+              position: "relative",
+              bgcolor: "#0b0e11",
+            }}>
+              {callModalElement}
+            </Box>
+          )}
+
           {/* Mini-player sits UNDER the user header (avatar + username) */}
           <AudioPlayerBar
             player={audioPlayer}
@@ -3742,6 +3783,10 @@ export default function MessengerApp() {
               "& > *": { transition: "opacity 0.2s ease" },
               touchAction: selectionMode ? "none" : "pan-y",
               userSelect: selectionMode ? "none" : "auto",
+              // When an inline call is active, the call surface takes over
+              // the chat pane. Messages stay mounted (so scroll position is
+              // preserved when the user minimises the call) but hidden.
+              display: callModalElement ? "none" : "flex",
             }}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -3903,10 +3948,14 @@ export default function MessengerApp() {
           </Box>
 
           {/* Channel mode: if only_admins_send is on and the current user is not
-              an admin, show a notice instead of the composer. */}
-          {activeConv?.type === "group"
-            && Boolean(activeConv.only_admins_send)
-            && role !== "owner" && role !== "admin" ? (
+              an admin, show a notice instead of the composer.
+              When a call is active (inline), the composer is hidden because
+              the call surface takes over the chat pane. The user can
+              minimise the call to chat. */}
+          {callModalElement ? null : (
+            activeConv?.type === "group"
+              && Boolean(activeConv.only_admins_send)
+              && role !== "owner" && role !== "admin" ? (
             <Box sx={{
               px: 2, py: 1.5, bgcolor: "action.hover",
               borderTop: "1px solid", borderColor: "divider",
@@ -3944,7 +3993,7 @@ export default function MessengerApp() {
                 }
               }}
             />
-          )}
+          ))}
 
           {showScrollDown && (
             <Box
@@ -4258,28 +4307,11 @@ export default function MessengerApp() {
         onClose={() => setReadersMessage(null)}
       />
 
-      {/* Jitsi call modal */}
-      {callConfig && (
-        <JitsiCallModal
-          callConfig={callConfig}
-          title={callConfig.peer_title || convTitle(activeConv, meId) || "Call"}
-          peerAvatar={callConfig.peer_avatar || withTokenQuery(convAvatar(activeConv, meId))}
-          onClose={async () => {
-            const cid = callConfig?.conversation_id || activeId;
-            const callId = callConfig?.call_id;
-            setCallConfig(null);
-            if (cid) {
-              try {
-                await apiRequest({
-                  method: "POST",
-                  url: `${MSG_API}/conversations/${cid}/call/end/`,
-                  data: { call_id: callId, reason: "ended" },
-                });
-              } catch { /* */ }
-            }
-          }}
-        />
-      )}
+      {/* Jitsi call modal — now rendered INSIDE chatPane so it sits under
+          the chat header (above the audio player). On mobile it occupies
+          the settings pane area. The JitsiCallModal itself supports a
+          "mini" floating mode if the user wants to keep chatting while in
+          a call. */}
 
       {/* Incoming call banner + ringtone (max 30s) */}
       {incomingCall && !callConfig && (
