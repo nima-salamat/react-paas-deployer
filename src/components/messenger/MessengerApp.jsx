@@ -1140,6 +1140,21 @@ export default function MessengerApp() {
       if (data.type === "call.started") {
         // Incoming call from another participant
         if (String(data.initiator?.id) !== String(meId)) {
+          // Already in another call → busy (auto-decline)
+          if (callConfigRef.current) {
+            const cid = data.conversation_id;
+            const callId = data.call_id;
+            (async () => {
+              try {
+                await apiRequest({
+                  method: "POST",
+                  url: `${MSG_API}/conversations/${cid}/call/end/`,
+                  data: { call_id: callId, reason: "busy" },
+                });
+              } catch { /* */ }
+            })();
+            return;
+          }
           setIncomingCall({ ...data, _receivedAt: Date.now() });
         }
       }
@@ -1165,6 +1180,9 @@ export default function MessengerApp() {
           if (String(prev.conversation_id) === String(data.conversation_id)) return null;
           return prev;
         });
+        if (data.status === "busy") {
+          try { flash("User is busy on another call"); } catch { /* */ }
+        }
       }
       if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
         if (String(data.conversation_id) === String(activeIdRef.current)) {
@@ -3275,7 +3293,13 @@ export default function MessengerApp() {
                       data: { video: false, audio: true },
                     });
                     const cfg = unwrapData(res);
-                    if (cfg?.room) setCallConfig(cfg);
+                    if (cfg?.room) {
+                      setCallConfig({
+                        ...cfg,
+                        peer_title: convTitle(activeConv, meId) || "Call",
+                        peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
+                      });
+                    }
                   } catch (e) {
                     flash(e?.response?.data?.message || "Could not start call");
                   }
@@ -3295,7 +3319,13 @@ export default function MessengerApp() {
                       data: { video: true, audio: true },
                     });
                     const cfg = unwrapData(res);
-                    if (cfg?.room) setCallConfig(cfg);
+                    if (cfg?.room) {
+                      setCallConfig({
+                        ...cfg,
+                        peer_title: convTitle(activeConv, meId) || "Call",
+                        peer_avatar: withTokenQuery(convAvatar(activeConv, meId)) || null,
+                      });
+                    }
                   } catch (e) {
                     flash(e?.response?.data?.message || "Could not start call");
                   }
@@ -3952,8 +3982,8 @@ export default function MessengerApp() {
       {callConfig && (
         <JitsiCallModal
           callConfig={callConfig}
-          title={convTitle(activeConv, meId) || "Call"}
-          peerAvatar={withTokenQuery(convAvatar(activeConv, meId))}
+          title={callConfig.peer_title || convTitle(activeConv, meId) || "Call"}
+          peerAvatar={callConfig.peer_avatar || withTokenQuery(convAvatar(activeConv, meId))}
           onClose={async () => {
             const cid = callConfig?.conversation_id || activeId;
             const callId = callConfig?.call_id;
@@ -3993,7 +4023,11 @@ export default function MessengerApp() {
                     startWithAudioMuted: !incomingCall.media.audio,
                   };
                 }
-                setCallConfig(cfg);
+                setCallConfig({
+                  ...cfg,
+                  peer_title: incomingCall.initiator?.username || "Call",
+                  peer_avatar: null,
+                });
                 if (String(activeId) !== String(cid)) {
                   const conv = conversations.find((c) => String(c.id) === String(cid));
                   if (conv) openChat(conv);

@@ -57,6 +57,35 @@ import AudioPlayerBar from "./AudioPlayerBar";
  *  - onOpenCreateGroup, onOpenJoin, onOpenSettings, onNavigateHome
  *  - onOpenMyRequests: () => void          (open the "My Join Requests" panel)
  */
+
+function formatLastMessagePreview(lm) {
+  if (!lm) return "No messages yet";
+  const body = typeof lm.body === "string" ? lm.body : "";
+  if (body.startsWith("__call__:")) {
+    try {
+      const d = JSON.parse(body.slice(9));
+      const kind = d.is_video ? "Video call" : "Voice call";
+      const st = d.status || "";
+      const dur = Number(d.duration || 0);
+      if (d.event === "started") return `${kind} started`;
+      if (st === "missed" || st === "no_answer") return `Missed ${kind.toLowerCase()}`;
+      if (st === "declined") return `Declined ${kind.toLowerCase()}`;
+      if (st === "busy") return `Line busy`;
+      if (dur > 0) {
+        const m = Math.floor(dur / 60);
+        const s = dur % 60;
+        return `${kind} · ${m}:${String(s).padStart(2, "0")}`;
+      }
+      return `${kind} ended`;
+    } catch {
+      return "Call";
+    }
+  }
+  if (body) return body;
+  if (lm.has_attachments) return "📎 Attachment";
+  return "No messages yet";
+}
+
 export default function Sidebar({
   meId, conversations, loadingConvs,
   activeId, openChat,
@@ -455,7 +484,7 @@ export default function Sidebar({
                   }
                   secondary={
                     <Typography noWrap variant="body2" color="text.secondary" fontSize={13}>
-                      {c.last_message?.body || (c.last_message?.has_attachments ? "📎 Attachment" : "No messages yet")}
+                      {formatLastMessagePreview(c.last_message)}
                     </Typography>
                   }
                 />

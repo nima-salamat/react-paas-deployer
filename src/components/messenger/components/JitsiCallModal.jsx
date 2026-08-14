@@ -566,7 +566,7 @@ export default function JitsiCallModal({
               top: miniPos.y,
               width: MINI_W,
               zIndex: 1450,
-              borderRadius: 3,
+              borderRadius: 1.5,
               overflow: "hidden",
               bgcolor: "#0b0e11",
               color: "#fff",

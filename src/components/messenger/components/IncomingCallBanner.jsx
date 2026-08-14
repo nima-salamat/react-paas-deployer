@@ -6,7 +6,7 @@ import { Paper, Avatar, Box, Typography, IconButton } from "@mui/material";
 import CallIcon from "@mui/icons-material/Call";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 
-const RING_MS = 30000;
+const DEFAULT_RING_MS = 30000;
 
 /** Classic double-ring phone pattern via Web Audio API (no asset needed). */
 function startRingtone() {
@@ -76,7 +76,10 @@ export default function IncomingCallBanner({
     const already = incomingCall._receivedAt
       ? Math.max(0, Date.now() - incomingCall._receivedAt)
       : 0;
-    const left = Math.max(1000, RING_MS - already);
+    const totalMs = Number(incomingCall.ring_timeout) > 0
+      ? Number(incomingCall.ring_timeout) * 1000
+      : DEFAULT_RING_MS;
+    const left = Math.max(1500, incomingCall.replay ? totalMs : (DEFAULT_RING_MS - already));
     timeoutRef.current = setTimeout(() => {
       onTimeoutRef.current?.();
     }, left);
