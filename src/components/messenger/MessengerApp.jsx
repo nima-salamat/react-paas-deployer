@@ -55,7 +55,7 @@ import apiRequest, { refreshAccessToken } from "../customHooks/apiRequest.jsx";
 import { MSG_API, WS_URL, unwrapData, unwrapList, authHeaders } from "./api";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
-  copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE,
+  copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE, LOAD_OLDER_SIZE,
   downloadAttachmentToCache, getCachedAttachment, getIsMobileDevice,
 } from "./messengerUtils";
 import Sidebar from "./components/Sidebar";
@@ -74,6 +74,10 @@ import VideoEditDialog from "./components/VideoEditDialog";
 import PinnedMessageBar from "./components/PinnedMessageBar";
 import JitsiCallModal from "./components/JitsiCallModal";
 import IncomingCallBanner from "./components/IncomingCallBanner";
+import AddToContactsBanner from "./components/AddToContactsBanner";
+import GroupDescriptionBanner from "./components/GroupDescriptionBanner";
+import { mergeConversations } from "./modules/mergeConversations";
+
 import CallIcon from "@mui/icons-material/Call";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import CallEndIcon from "@mui/icons-material/CallEnd";
@@ -229,7 +233,9 @@ export default function MessengerApp() {
   const loadingMoreRef = useRef(false);
   // Per-conversation message cache — switching chats restores instantly, no flicker
   const messagesCacheRef = useRef(new Map()); // cid -> { messages, hasMore, nextBefore, detail, scroll }
-  const pendingScrollRestoreRef = useRef(null);
+  const pendingScrollRestoreRef = useRef(null); // chat-switch viewport restore
+  const olderScrollPinRef = useRef(null); // { el, prevH, prevTop } after loadOlder
+  const scrollVelRef = useRef({ lastTop: 0, lastTs: 0, velocity: 0 });
   const restoringScrollRef = useRef(false);
   const messagesConvIdRef = useRef(null); // which conversation current messages state belongs to
   const hasMoreMsgsRef = useRef(false);
@@ -645,7 +651,9 @@ export default function MessengerApp() {
   // is the bottom of the conversation.
   useLayoutEffect(() => {
     const restore = pendingScrollRestoreRef.current;
-    if (!restore || !activeId || !messages?.length || !listRef.current) return;
+    // Ignore loadOlder pin objects (they use olderScrollPinRef)
+    if (!restore || restore.prevH != null || restore.el) return;
+    if (!activeId || !messages?.length || !listRef.current) return;
 
     const box = listRef.current;
     restoringScrollRef.current = true;
@@ -772,8 +780,11 @@ export default function MessengerApp() {
         url: `${MSG_API}/conversations/?page_size=50${localStorage.getItem("access") ? `&token=${encodeURIComponent(localStorage.getItem("access"))}` : ""}`,
       });
       const data = unwrapData(res);
-      setConversations(data?.results || []);
-      return data?.results || [];
+      const next = data?.results || [];
+      // Merge by id: keep previous object reference when payload is unchanged so
+      // Sidebar Avatars do not remount / re-download on every silent refresh.
+      setConversations((prev) => mergeConversations(prev, next));
+      return next;
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load chats");
       return [];
@@ -929,9 +940,12 @@ export default function MessengerApp() {
     const el = listRef.current;
     const prevH = el?.scrollHeight || 0;
     const prevTop = el?.scrollTop || 0;
+    if (el) {
+      olderScrollPinRef.current = { el, prevH, prevTop };
+    }
     try {
       const token = localStorage.getItem("access") || "";
-      const url = `${MSG_API}/conversations/${cid}/messages/?limit=${PAGE_SIZE}&before_id=${cursor}`
+      const url = `${MSG_API}/conversations/${cid}/messages/?limit=${LOAD_OLDER_SIZE}&before_id=${cursor}`
         + (token ? `&token=${encodeURIComponent(token)}` : "");
       const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
@@ -941,6 +955,7 @@ export default function MessengerApp() {
         setNextBefore(null);
         hasMoreMsgsRef.current = false;
         nextBeforeRef.current = null;
+        olderScrollPinRef.current = null;
         return;
       }
       setMessages((prev) => {
@@ -954,14 +969,20 @@ export default function MessengerApp() {
       setNextBefore(nb);
       hasMoreMsgsRef.current = hm;
       nextBeforeRef.current = nb;
-      requestAnimationFrame(() => {
-        if (!el) return;
-        const diff = el.scrollHeight - prevH;
-        el.scrollTop = prevTop + diff;
-      });
-    } catch { /* */ } finally {
+    } catch {
+      olderScrollPinRef.current = null;
+    } finally {
       loadingMoreRef.current = false;
       setLoadingMore(false);
+      // Prefetch next page if still near top after this batch
+      requestAnimationFrame(() => {
+        const box = listRef.current;
+        if (!box || !hasMoreMsgsRef.current || loadingMoreRef.current) return;
+        const h = box.clientHeight || 1;
+        if (box.scrollTop < Math.max(360, h * 0.75)) {
+          loadOlder();
+        }
+      });
     }
   }, [hasMoreMsgs, nextBefore]);
 
@@ -1209,6 +1230,9 @@ export default function MessengerApp() {
       if (cfg?.room) {
         setCallConfig({
           ...cfg,
+          is_initiator: true,
+          is_group: conv?.type === "group",
+          conversation_id: activeId,
           peer_title: convTitle(conv, meId) || "Call",
           peer_avatar: withTokenQuery(convAvatar(conv, meId)) || null,
         });
@@ -1263,6 +1287,7 @@ export default function MessengerApp() {
             if (cfg?.room) {
               setCallConfig({
                 ...cfg,
+                is_initiator: true,
                 peer_title: user.username || "Call",
                 peer_avatar: withTokenQuery(user.avatar) || null,
               });
@@ -3241,13 +3266,44 @@ export default function MessengerApp() {
     }
 
     markVisibleMessagesRead();
-    const threshold = isMobile
-      ? Math.max(520, h * 0.6)
-      : Math.max(280, h * 0.3);
+
+    // Scroll velocity (px/ms). Negative => moving toward older messages (up).
+    const now = performance.now();
+    const sv = scrollVelRef.current;
+    const dt = Math.max(1, now - (sv.lastTs || now));
+    const dy = el.scrollTop - (sv.lastTop || el.scrollTop);
+    // EMA so one-frame spikes don't dominate
+    const inst = dy / dt;
+    sv.velocity = sv.lastTs ? (sv.velocity * 0.65 + inst * 0.35) : inst;
+    sv.lastTop = el.scrollTop;
+    sv.lastTs = now;
+    const speedUp = sv.velocity < 0 ? -sv.velocity : 0; // px/ms upward
+
+    // Base prefetch window + expand aggressively when flinging upward.
+    // speedUp ~0.5+ is a quick flick; ~1.5+ is a hard fling.
+    let threshold = isMobile ? Math.max(480, h * 0.9) : Math.max(360, h * 0.75);
+    if (speedUp > 0.35) threshold = Math.max(threshold, h * 1.35);
+    if (speedUp > 0.8) threshold = Math.max(threshold, h * 2.0);
+    if (speedUp > 1.4) threshold = Math.max(threshold, h * 2.8);
+
     if (el.scrollTop < threshold && (hasMoreMsgs || hasMoreMsgsRef.current) && !loadingMoreRef.current) {
       loadOlder();
     }
   };
+
+  // Pin viewport after prepending older messages (separate from chat-switch restore).
+  useLayoutEffect(() => {
+    const snap = olderScrollPinRef.current;
+    if (!snap?.el) return;
+    olderScrollPinRef.current = null;
+    const { el, prevH, prevTop } = snap;
+    const apply = () => {
+      const diff = el.scrollHeight - prevH;
+      if (diff > 0) el.scrollTop = prevTop + diff;
+    };
+    apply();
+    requestAnimationFrame(apply);
+  }, [messages]);
 
   const messagesWithDays = useMemo(() => {
     const out = [];
@@ -3406,11 +3462,81 @@ export default function MessengerApp() {
   // header, above the audio player) so it never escapes the viewport on
   // window resize. We build it as a stable element here so the chat pane
   // can drop it into the right slot.
+  const callMemberDirectory = useMemo(() => {
+    const conv = activeDetail || activeConv;
+    const parts = conv?.participants || [];
+    const out = [];
+    for (const p of parts) {
+      const u = p.user || p;
+      if (!u) continue;
+      out.push({
+        id: u.id,
+        username: u.username,
+        display_name: u.display_name || u.username,
+        avatar: withTokenQuery(u.avatar || u.avatar_url) || null,
+      });
+    }
+    if (meId) {
+      out.push({
+        id: meId,
+        username: profileData?.username || "You",
+        display_name: profileData?.username || "You",
+        avatar: meAvatar || withTokenQuery(profileData?.avatar) || null,
+      });
+    }
+    return out;
+  }, [activeDetail, activeConv, meId, meAvatar, profileData]);
+
+  const callIsGroup = Boolean(
+    activeConv?.type === "group"
+    || activeDetail?.type === "group"
+    || callConfig?.is_group
+  );
+
+  const sendCallChat = useCallback(async (body) => {
+    const cid = callConfig?.conversation_id || activeId;
+    if (!cid || !body?.trim()) return;
+    try {
+      const form = new FormData();
+      form.append("body", body.trim());
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${cid}/messages/`,
+        data: form,
+      });
+      const created = unwrapData(res);
+      if (created) {
+        setMessages((prev) => {
+          const map = new Map();
+          for (const m of prev || []) {
+            if (m?.id != null) map.set(String(m.id), m);
+          }
+          map.set(String(created.id), created);
+          return Array.from(map.values()).sort((a, b) => {
+            const ta = new Date(a.created_at || 0).getTime();
+            const tb = new Date(b.created_at || 0).getTime();
+            return ta - tb;
+          });
+        });
+      }
+    } catch {
+      flash("Could not send message");
+    }
+  }, [callConfig, activeId, flash]);
+
   const callModalElement = callConfig ? (
     <JitsiCallModal
       callConfig={callConfig}
       title={callConfig.peer_title || convTitle(activeConv, meId) || "Call"}
       peerAvatar={callConfig.peer_avatar || withTokenQuery(convAvatar(activeConv, meId))}
+      isGroup={callIsGroup}
+      memberDirectory={callMemberDirectory}
+      messages={messages}
+      meId={meId}
+      onSendChat={sendCallChat}
+      onLoadOlder={loadOlder}
+      loadingMore={loadingMore}
+      hasMoreMessages={hasMoreMsgs}
       onModeChange={setCallMode}
       onClose={async () => {
         const cid = callConfig?.conversation_id || activeId;
@@ -3638,36 +3764,8 @@ export default function MessengerApp() {
             </Menu>
           </Stack>
 
-          {/* Call surface:
-              - expanded (inline/full): fills chat stage (desktop) or is a
-                fixed fullscreen overlay (mobile — handled inside modal).
-              - mini: thin bar under header so messages remain visible
-                (Telegram / WhatsApp ongoing-call strip). */}
-          {callModalElement && (
-            <Box sx={
-              callIsMini
-                ? {
-                    flexShrink: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    position: "relative",
-                    zIndex: 6,
-                  }
-                : {
-                    flex: 1,
-                    minHeight: 0,
-                    display: "flex",
-                    flexDirection: "column",
-                    position: "relative",
-                    bgcolor: "#0b0e11",
-                    // Mobile full mode is position:fixed inside the modal;
-                    // keep a zero-height placeholder so layout doesn't collapse oddly.
-                    ...(callMode === "full" ? { flex: "0 0 0", minHeight: 0, height: 0, overflow: "visible" } : {}),
-                  }
-            }>
-              {callModalElement}
-            </Box>
-          )}
+          {/* Call surface is mounted at Messenger shell level (below) so the
+              mini bar sits under the settings / list header, not floating over it. */}
 
           {/* Mini-player sits UNDER the user header (avatar + username) */}
           <AudioPlayerBar
@@ -3780,6 +3878,9 @@ export default function MessengerApp() {
                         setIncomingCall(null);
                         setCallConfig({
                           ...cfg,
+                          is_initiator: false,
+                          is_group: activeConv?.type === "group",
+                          conversation_id: cid,
                           peer_title: activeCallInfo.initiator?.username || convTitle(activeConv, meId) || "Call",
                           peer_avatar: null,
                         });
@@ -3807,7 +3908,9 @@ export default function MessengerApp() {
               // Expanded call takes the stage; mini bar keeps messages visible
               // (Telegram / WhatsApp style). Messages stay mounted so scroll
               // position is preserved across minimise/expand.
+              // MUST be column — default flex row lays messages left-to-right.
               display: callIsExpanded ? "none" : "flex",
+              flexDirection: "column",
             }}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -4128,12 +4231,45 @@ export default function MessengerApp() {
       }}
       onClick={() => { if (ctx) setCtx(null); }}
     >
+      {/* Ongoing-call mini strip — directly under the top of the messenger shell
+          (settings header lives inside Sidebar below this when on the list;
+          when in a chat the strip stays global so it does not cover chat menus).
+          Full/expanded mode is position:fixed inside JitsiCallModal. */}
+      {callConfig && (
+        <Box
+          sx={
+            callIsMini
+              ? {
+                  flexShrink: 0,
+                  width: "100%",
+                  zIndex: 20,
+                  order: -1,
+                }
+              : {
+                  // full: modal is fixed overlay; keep a zero-size mount point
+                  position: "fixed",
+                  width: 0,
+                  height: 0,
+                  overflow: "visible",
+                  zIndex: 1400,
+                  pointerEvents: "none",
+                  "& > *": { pointerEvents: "auto" },
+                }
+          }
+        >
+          {callModalElement}
+        </Box>
+      )}
+
       <Box sx={{ flex: 1, minHeight: 0, display: "flex", position: "relative" }}>
-      {/* Mobile sidebar — player is rendered inside Sidebar above the search bar */}
-      {isMobile && (!activeId || !mobileShowChat) && (
+      {/* Mobile sidebar — kept mounted so avatars are not re-fetched every
+          time the user leaves a chat. Hidden with visibility when in a chat. */}
+      {isMobile && (
         <Box sx={{
           width: "100%", height: "100%", position: "absolute", inset: 0, zIndex: 2,
           bgcolor: "background.paper",
+          visibility: (!activeId || !mobileShowChat) ? "visible" : "hidden",
+          pointerEvents: (!activeId || !mobileShowChat) ? "auto" : "none",
         }}>
           {sidebarEl}
         </Box>
@@ -4151,13 +4287,25 @@ export default function MessengerApp() {
       {/* Chat pane */}
       <Box sx={{
         flex: 1, height: "100%", minWidth: 0, display: "flex",
-        visibility: isMobile && (!activeId || !mobileShowChat) ? "hidden" : "visible",
+        // When a call is active on mobile, keep the pane "visible" to the
+        // compositor so the fixed call UI is never clipped/suppressed —
+        // still cover with the sidebar layer when browsing the chat list.
+        visibility: (isMobile && (!activeId || !mobileShowChat) && !callConfig) ? "hidden" : "visible",
         position: isMobile && (!activeId || !mobileShowChat) ? "absolute" : "relative",
-        width: isMobile && (!activeId || !mobileShowChat) ? 0 : "auto",
-        overflow: "hidden",
+        width: isMobile && (!activeId || !mobileShowChat) && !callConfig ? 0 : "auto",
+        overflow: callConfig ? "visible" : "hidden",
+        zIndex: callConfig && isMobile ? 3 : "auto",
       }}>
         {chatPane}
       </Box>
+
+      {/* Mobile call surface portal:
+          Chat pane uses visibility:hidden when the list is shown, which would
+          hide position:fixed children in some cases / stacking contexts.
+          Re-parenting is handled inside JitsiCallModal via position:fixed +
+          high z-index; this spacer keeps the connection alive when the pane
+          is hidden by still allowing the existing instance inside chatPane
+          to paint (fixed escapes). No second instance. */}
 
       </Box>{/* end main flex row under player */}
 
@@ -4358,6 +4506,9 @@ export default function MessengerApp() {
                 }
                 setCallConfig({
                   ...cfg,
+                  is_initiator: false,
+                  is_group: !!incomingCall.is_group || conversations.find((c) => String(c.id) === String(cid))?.type === "group",
+                  conversation_id: cid,
                   peer_title: incomingCall.initiator?.username || "Call",
                   peer_avatar: null,
                 });
@@ -4719,93 +4870,3 @@ export default function MessengerApp() {
  *  - Clicking "Add" calls onAdd() and the parent calls the contacts API
  *  - Clicking X dismisses the banner for the current session (per-peer)
  */
-function AddToContactsBanner({ username, onAdd }) {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 1.5,
-        px: 2,
-        py: 1,
-        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(33,150,243,0.12)" : "rgba(33,150,243,0.08)",
-        borderBottom: "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      <PersonAddIcon fontSize="small" color="primary" />
-      <Typography variant="body2" sx={{ flex: 1 }}>
-        <strong>@{username || "this user"}</strong> is not in your contacts. Add them?
-      </Typography>
-      <Button
-        size="small"
-        variant="contained"
-        color="primary"
-        startIcon={<PersonAddIcon />}
-        onClick={() => { onAdd(); setDismissed(true); }}
-      >
-        Add
-      </Button>
-      <IconButton size="small" onClick={() => setDismissed(true)}>
-        <CloseIcon fontSize="small" />
-      </IconButton>
-    </Box>
-  );
-}
-
-/**
- * Group description banner — shown to non-admin members at the top of the chat
- * so they can see what the group is about without opening the info panel.
- * Dismissible per-conversation (parent tracks dismissed set).
- */
-function GroupDescriptionBanner({ description, onDismiss }) {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = description.length > 140;
-  const display = expanded || !isLong ? description : `${description.slice(0, 140)}…`;
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 1.25,
-        px: 2,
-        py: 1,
-        bgcolor: (t) => t.palette.mode === "dark" ? "rgba(33,150,243,0.10)" : "rgba(33,150,243,0.06)",
-        borderBottom: "1px solid",
-        borderColor: "divider",
-      }}
-    >
-      <InfoOutlinedIcon fontSize="small" color="primary" sx={{ mt: 0.25 }} />
-      <Typography
-        variant="body2"
-        sx={{
-          flex: 1,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          color: "text.primary",
-        }}
-      >
-        {display}
-        {isLong && (
-          <Box
-            component="span"
-            onClick={() => setExpanded((e) => !e)}
-            sx={{
-              color: "primary.main",
-              cursor: "pointer",
-              ml: 0.5,
-              fontWeight: 600,
-            }}
-          >
-            {expanded ? "Show less" : "Show more"}
-          </Box>
-        )}
-      </Typography>
-      <IconButton size="small" onClick={onDismiss} sx={{ mt: -0.25 }}>
-        <CloseIcon fontSize="small" />
-      </IconButton>
-    </Box>
-  );
-}

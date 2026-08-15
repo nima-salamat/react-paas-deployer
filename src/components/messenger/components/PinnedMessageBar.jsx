@@ -43,22 +43,22 @@ export default function PinnedMessageBar({
 
   const pin = pinnedMessages[currentIndex];
   const total = pinnedMessages.length;
-
-  // Nothing to show
-  if (!total || !pin) return null;
-
-  const msg = pin.message;
+  const msg = pin?.message;
   const bodyPreview = typeof msg?.body === "string"
     ? (msg.body.length > 60 ? msg.body.slice(0, 60) + "…" : msg.body)
     : "Pinned message";
   const senderName = msg?.sender?.username || "";
   const barHeight = Math.max(28, Math.round(headerHeight / 2));
 
+  // Hooks must run unconditionally (before any early return).
   const handleClick = useCallback(() => {
     if (msg?.id && onJumpToMessage) {
       onJumpToMessage(msg.id);
     }
   }, [msg?.id, onJumpToMessage]);
+
+  // Nothing to show
+  if (!total || !pin) return null;
 
   return (
     <Box

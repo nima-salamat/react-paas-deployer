@@ -573,4 +573,5 @@ export function getIsMobileDevice() {
 }
 
 export const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👏", "🎉", "🤔", "👎"];
-export const PAGE_SIZE = 30;
+export const PAGE_SIZE = 40;
+export const LOAD_OLDER_SIZE = 80;

@@ -4,9 +4,8 @@
  * Layout contract:
  *  - Full / inline mode: fills the chat stage (desktop) or goes true fullscreen
  *    overlay on mobile so the call is the primary surface.
- *  - Mini mode: collapses into a thin bar (like the audio player / WhatsApp /
- *    Telegram ongoing-call strip) under the chat header — NOT a floating card —
- *    so the user can keep chatting. Desktop keeps a compact floating PiP card.
+ *  - Mini mode: thin top bar (WhatsApp / Telegram style) on BOTH mobile and
+ *    desktop — never a floating card. Resize-safe; stays fixed to the viewport.
  *
  * OS / platform handling:
  *  - Reads `navigator.userAgent` + `navigator.platform` + `maxTouchPoints`
@@ -21,12 +20,13 @@
  */
 
 import React, {
-  useEffect, useRef, useState, useCallback, useMemo,
+  useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo,
 } from "react";
 import {
   Box, IconButton, Stack, Typography, Avatar, Chip, Tooltip,
   CircularProgress, Paper, Modal, Slide, List, ListItemButton, ListItemText,
   ListItemIcon, Switch, FormControlLabel, Divider, alpha, useMediaQuery,
+  Menu, MenuItem, TextField, Drawer,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import CallEndIcon from "@mui/icons-material/CallEnd";
@@ -50,6 +50,12 @@ import PresentToAllIcon from "@mui/icons-material/PresentToAll";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import SpeakerIcon from "@mui/icons-material/Speaker";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { parseFormattedBody } from "../messengerUtils";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import ChatIcon from "@mui/icons-material/Chat";
+import SendIcon from "@mui/icons-material/Send";
 
 /* ── Constants (IEC 61508: explicit limits) ─────────────────────────── */
 const MINI_W = 320;
@@ -121,10 +127,45 @@ function writeSavedDevices(patch) {
   } catch { /* */ }
 }
 
+/**
+ * Load the deployment's config.js (script tag — no CORS issue).
+ * This is the ONLY reliable way to get the correct hosts.muc / websocket
+ * for a self-hosted Jitsi; guessing conference. vs muc. puts callers in
+ * different XMPP rooms so they never see each other.
+ */
+function loadJitsiDeployConfig(domain) {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") { resolve({}); return; }
+    const cacheKey = `__jitsiConfig_${domain}`;
+    if (window[cacheKey]) { resolve(window[cacheKey]); return; }
+
+    // config.js assigns `var config = {...}` globally
+    const prev = window.config;
+    const s = document.createElement("script");
+    s.src = `https://${domain}/config.js`;
+    s.async = true;
+    const done = (cfg) => {
+      window[cacheKey] = cfg || {};
+      resolve(window[cacheKey]);
+    };
+    s.onload = () => {
+      const cfg = window.config && typeof window.config === "object" ? { ...window.config } : {};
+      // restore any previous global if we overwrote something unrelated
+      if (prev !== undefined) window.config = prev;
+      done(cfg);
+    };
+    s.onerror = () => done({});
+    document.head.appendChild(s);
+    // safety timeout
+    setTimeout(() => done(window[cacheKey] || {}), 8000);
+  });
+}
+
 function loadLibJitsi(domain) {
   return new Promise((resolve, reject) => {
     if (typeof window === "undefined") { reject(new Error("No window")); return; }
     if (window.JitsiMeetJS) { resolve(window.JitsiMeetJS); return; }
+    // Prefer the SAME server's lib so protocol matches Prosody/Jicofo versions.
     const urls = [
       `https://${domain}/libs/lib-jitsi-meet.min.js`,
       `https://${domain}/lib-jitsi-meet.min.js`,
@@ -144,12 +185,32 @@ function loadLibJitsi(domain) {
   });
 }
 
+/** Normalize room id: strip muc JID suffix, lowercase, safe chars. */
+function normalizeRoomName(raw) {
+  let r = String(raw || "").trim();
+  if (!r) return r;
+  // room@conference.domain → room
+  if (r.includes("@")) r = r.split("@")[0];
+  r = r.toLowerCase();
+  // Jitsi room names are typically alphanumeric + -_
+  return r;
+}
+
 function attachTrack(track, el) {
   if (!el || !track) return;
-  try { track.attach(el); return; } catch { /* */ }
   try {
-    const stream = new MediaStream([track.getTrack?.() || track.stream?.getTracks?.()?.[0]].filter(Boolean));
-    if (stream.getTracks().length) el.srcObject = stream;
+    track.attach(el);
+  } catch {
+    try {
+      const media = track.getTrack?.() || track.stream?.getTracks?.()?.[0];
+      const stream = new MediaStream([media].filter(Boolean));
+      if (stream.getTracks().length) el.srcObject = stream;
+    } catch { /* */ }
+  }
+  // Autoplay policy: attempt play after attach (user gesture from accepting call helps).
+  try {
+    const p = el.play?.();
+    if (p && typeof p.catch === "function") p.catch(() => {});
   } catch { /* */ }
 }
 
@@ -171,6 +232,57 @@ function formatElapsed(s) {
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
+
+/** Outgoing ringback (phone-style double ring) while waiting for peer. */
+function startRingback() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return { stop() {} };
+  let ctx;
+  try { ctx = new Ctx(); } catch { return { stop() {} }; }
+  let stopped = false;
+  let timer = null;
+
+  const beep = (freq, when, dur) => {
+    try {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, when);
+      g.gain.exponentialRampToValueAtTime(0.12, when + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(when);
+      o.stop(when + dur + 0.02);
+    } catch { /* */ }
+  };
+
+  const cycle = () => {
+    if (stopped) return;
+    try {
+      const t0 = ctx.currentTime + 0.02;
+      // Classic ringback: two short tones, pause, repeat
+      beep(440, t0, 0.4);
+      beep(480, t0, 0.4);
+      beep(440, t0 + 0.55, 0.4);
+      beep(480, t0 + 0.55, 0.4);
+    } catch { /* */ }
+    timer = setTimeout(cycle, 2800);
+  };
+
+  try { ctx.resume?.(); } catch { /* */ }
+  cycle();
+
+  return {
+    stop() {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      try { ctx.close(); } catch { /* */ }
+    },
+  };
+}
+
 
 /* ── Avatar with device chips + speaking ring ──────────────────────── */
 function ParticipantAvatar({ p, isLocal, size = 44, speaking = false }) {
@@ -214,14 +326,13 @@ function ParticipantAvatar({ p, isLocal, size = 44, speaking = false }) {
   );
 }
 
-/* ── Single video tile ─────────────────────────────────────────────── */
+/* ── Camera / avatar tile (no zoom) ───────────────────────────────── */
 function ParticipantTile({
-  participant, isLocal, isDominant, compact, onClick, isSelected, showAvatar = true,
+  participant, isLocal, isDominant, compact, onClick, isSelected, showAvatar = true, speaking = false,
 }) {
   const videoRef = useRef(null);
-  const audioRef = useRef(null);
   const vTrack = participant?.videoTrack;
-  const aTrack = participant?.audioTrack;
+  const isScreen = !!participant?.isScreen;
 
   useEffect(() => {
     const el = videoRef.current;
@@ -230,18 +341,9 @@ function ParticipantTile({
     return () => detachTrack(vTrack, el);
   }, [vTrack]);
 
-  useEffect(() => {
-    if (isLocal) return undefined;
-    const el = audioRef.current;
-    if (!el || !aTrack) return undefined;
-    attachTrack(aTrack, el);
-    return () => detachTrack(aTrack, el);
-  }, [aTrack, isLocal]);
-
   const muted = !!participant?.audioMuted;
   const videoMuted = !!participant?.videoMuted || !vTrack;
   const name = participant?.displayName || (isLocal ? "You" : "Participant");
-  const isScreen = !!participant?.isScreen;
 
   return (
     <Box
@@ -251,16 +353,27 @@ function ParticipantTile({
         bgcolor: "#0d1117",
         borderRadius: compact ? 1.5 : 2,
         overflow: "hidden",
-        border: isSelected ? "2px solid" : "1px solid",
-        borderColor: isSelected ? "primary.main"
+        border: speaking ? "2px solid" : (isSelected ? "2px solid" : "1px solid"),
+        borderColor: speaking ? "#22c55e"
+          : isSelected ? "primary.main"
           : isDominant ? "primary.main"
           : "rgba(255,255,255,0.08)",
-        aspectRatio: isScreen && !compact ? "16/9" : (compact ? "16/10" : "16/9"),
-        minHeight: compact ? 80 : 120,
+        boxShadow: speaking
+          ? "0 0 0 3px rgba(34,197,94,0.35), 0 0 18px rgba(34,197,94,0.45)"
+          : "none",
+        transition: "box-shadow 0.15s ease, border-color 0.15s ease",
+        aspectRatio: compact ? "16/10" : undefined,
+        width: "100%",
+        height: "100%",
+        minHeight: 0,
         cursor: onClick ? "pointer" : "default",
-        transition: "border-color 0.18s ease",
         background: "linear-gradient(135deg, #0d1117 0%, #161b22 100%)",
         touchAction: onClick ? "manipulation" : "auto",
+        "@keyframes speakPulse": {
+          "0%, 100%": { boxShadow: "0 0 0 2px rgba(34,197,94,0.35), 0 0 12px rgba(34,197,94,0.3)" },
+          "50%": { boxShadow: "0 0 0 5px rgba(34,197,94,0.2), 0 0 22px rgba(34,197,94,0.55)" },
+        },
+        animation: speaking ? "speakPulse 1.1s ease-in-out infinite" : "none",
       }}
     >
       <video
@@ -269,49 +382,476 @@ function ParticipantTile({
         playsInline
         muted={isLocal}
         style={{
-          width: "100%", height: "100%",
+          width: "100%",
+          height: "100%",
           objectFit: isScreen ? "contain" : "cover",
           display: videoMuted ? "none" : "block",
           transform: (isLocal && !isScreen) ? "scaleX(-1)" : undefined,
           background: "#000",
         }}
       />
-      {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
       {videoMuted && showAvatar && (
         <Stack alignItems="center" justifyContent="center" spacing={1}
           sx={{ position: "absolute", inset: 0 }}>
-          <Avatar sx={{
-            width: compact ? 40 : 64, height: compact ? 40 : 64,
-            bgcolor: isLocal ? "primary.dark" : "secondary.dark",
-            fontSize: compact ? 18 : 28,
-          }}>
+          <Avatar
+            src={participant?.avatar || undefined}
+            sx={{
+              width: compact ? 40 : (isDominant ? 96 : 72),
+              height: compact ? 40 : (isDominant ? 96 : 72),
+              bgcolor: isLocal ? "primary.dark" : "secondary.dark",
+              fontSize: compact ? 16 : (isDominant ? 36 : 28),
+              border: "2px solid rgba(255,255,255,0.12)",
+            }}
+          >
             {(name || "?")[0]?.toUpperCase()}
           </Avatar>
           {!compact && (
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
-              Camera off
+            <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>
+              {name}{isLocal ? " (you)" : ""}
             </Typography>
           )}
         </Stack>
       )}
-      <Stack direction="row" spacing={0.75} alignItems="center"
+      <Stack direction="row" spacing={0.5} alignItems="center"
         sx={{
           position: "absolute", left: 6, bottom: 6,
-          px: 1, py: 0.4, borderRadius: 1.5,
-          bgcolor: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
-          maxWidth: "calc(100% - 12px)",
+          px: 0.85, py: 0.3, borderRadius: 1.25,
+          bgcolor: "rgba(0,0,0,0.7)", maxWidth: "calc(100% - 12px)",
         }}>
         {muted && <MicOffIcon sx={{ fontSize: 12, color: "error.light" }} />}
         {isScreen && <PresentToAllIcon sx={{ fontSize: 12, color: "info.light" }} />}
-        <Typography variant="caption" noWrap sx={{
-          color: "#fff", fontSize: 11, fontWeight: 500,
-          maxWidth: compact ? 80 : 160,
-        }}>
+        <Typography variant="caption" noWrap sx={{ color: "#fff", fontSize: 11, fontWeight: 500 }}>
           {name}{isLocal ? " (you)" : ""}{isScreen ? " · screen" : ""}
         </Typography>
       </Stack>
     </Box>
   );
+}
+
+/**
+ * Dedicated screen-share viewer: stable <video>, zoom, pan, element fullscreen.
+ * Does NOT remount the video when entering fullscreen (avoids the "page jump").
+ */
+function ScreenShareViewer({ participant, isLocal }) {
+  const wrapRef = useRef(null);
+  const videoRef = useRef(null);
+  const vTrack = participant?.videoTrack;
+
+  const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [fs, setFs] = useState(false);
+  const drag = useRef({ on: false, sx: 0, sy: 0, px: 0, py: 0 });
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !vTrack) return undefined;
+    attachTrack(vTrack, el);
+    return () => detachTrack(vTrack, el);
+  }, [vTrack]);
+
+  useEffect(() => {
+    zoomRef.current = 1;
+    panRef.current = { x: 0, y: 0 };
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [vTrack]);
+
+  const applyTransform = (z, p) => {
+    zoomRef.current = z;
+    panRef.current = p;
+    setZoom(z);
+    setPan(p);
+  };
+
+  const zoomBy = (delta) => {
+    const next = Math.min(4, Math.max(1, +(zoomRef.current + delta).toFixed(2)));
+    const p = next <= 1 ? { x: 0, y: 0 } : panRef.current;
+    applyTransform(next, p);
+  };
+
+  // Wheel zoom
+  useEffect(() => {
+    const node = wrapRef.current;
+    if (!node) return undefined;
+    const onWheel = (e) => {
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 0.15 : -0.15);
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, []);
+
+  useEffect(() => {
+    const onFs = () => {
+      const el = wrapRef.current;
+      setFs(!!(document.fullscreenElement === el || document.webkitFullscreenElement === el));
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    document.addEventListener("webkitfullscreenchange", onFs);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      document.removeEventListener("webkitfullscreenchange", onFs);
+    };
+  }, []);
+
+  const toggleFs = async () => {
+    const el = wrapRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        await (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
+      } else {
+        await (el.requestFullscreen?.() || el.webkitRequestFullscreen?.());
+      }
+    } catch { /* */ }
+  };
+
+  const onPointerDown = (e) => {
+    if (zoomRef.current <= 1) return;
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* */ }
+    drag.current = {
+      on: true,
+      sx: e.clientX,
+      sy: e.clientY,
+      px: panRef.current.x,
+      py: panRef.current.y,
+    };
+  };
+  const onPointerMove = (e) => {
+    if (!drag.current.on) return;
+    const nx = drag.current.px + (e.clientX - drag.current.sx);
+    const ny = drag.current.py + (e.clientY - drag.current.sy);
+    applyTransform(zoomRef.current, { x: nx, y: ny });
+  };
+  const onPointerUp = () => { drag.current.on = false; };
+
+  const name = participant?.displayName || (isLocal ? "Your screen" : "Screen");
+
+  return (
+    <Box
+      ref={wrapRef}
+      sx={{
+        position: "relative",
+        flex: 1,
+        minHeight: 0,
+        minWidth: 0,
+        width: "100%",
+        height: "100%",
+        bgcolor: "#000",
+        borderRadius: fs ? 0 : 2,
+        overflow: "hidden",
+        border: fs ? "none" : "1px solid rgba(255,255,255,0.1)",
+        touchAction: "none",
+        cursor: zoom > 1 ? "grab" : "default",
+        "&:active": { cursor: zoom > 1 ? "grabbing" : "default" },
+      }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+        }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={!!isLocal}
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: "center center",
+            transition: drag.current.on ? "none" : "transform 0.12s ease-out",
+            pointerEvents: "none",
+            background: "#000",
+          }}
+        />
+      </Box>
+
+      {/* Controls overlay */}
+      <Stack
+        direction="row"
+        spacing={0.5}
+        alignItems="center"
+        sx={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 5,
+          bgcolor: "rgba(0,0,0,0.65)",
+          borderRadius: 2,
+          px: 0.5,
+          py: 0.35,
+          backdropFilter: "blur(8px)",
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <IconButton size="small" onClick={() => zoomBy(-0.25)} sx={{ color: "#fff" }} aria-label="Zoom out">
+          <ZoomOutIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+        <Typography variant="caption" sx={{ color: "#fff", minWidth: 40, textAlign: "center", fontWeight: 600 }}>
+          {Math.round(zoom * 100)}%
+        </Typography>
+        <IconButton size="small" onClick={() => zoomBy(0.25)} sx={{ color: "#fff" }} aria-label="Zoom in">
+          <ZoomInIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+        <IconButton size="small" onClick={() => applyTransform(1, { x: 0, y: 0 })} sx={{ color: "#fff" }} aria-label="Reset zoom">
+          <Typography sx={{ fontSize: 11, fontWeight: 700, px: 0.5 }}>1:1</Typography>
+        </IconButton>
+        <IconButton size="small" onClick={toggleFs} sx={{ color: "#fff" }} aria-label="Fullscreen">
+          {fs ? <FullscreenExitIcon sx={{ fontSize: 20 }} /> : <FullscreenIcon sx={{ fontSize: 20 }} />}
+        </IconButton>
+      </Stack>
+
+      <Chip
+        size="small"
+        icon={<PresentToAllIcon sx={{ fontSize: 14 }} />}
+        label={name}
+        sx={{
+          position: "absolute",
+          left: 10,
+          bottom: 10,
+          bgcolor: "rgba(0,0,0,0.65)",
+          color: "#fff",
+          "& .MuiChip-icon": { color: "#93c5fd" },
+        }}
+      />
+    </Box>
+  );
+}
+
+/**
+ * Always-mounted remote audio players. Independent of video tiles so audio
+ * keeps playing in mobile mini-bar mode (where tiles are not rendered).
+ */
+function RemoteAudioSink({ participants }) {
+  const entries = Object.entries(participants || {}).filter(([id, p]) => id !== "local" && p?.audioTrack);
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: "fixed",
+        width: 0,
+        height: 0,
+        overflow: "hidden",
+        pointerEvents: "none",
+        opacity: 0,
+        zIndex: -1,
+      }}
+    >
+      {entries.map(([id, p]) => (
+        <RemoteAudioKey key={`${id}-${p.audioTrack?.getId?.() || id}`} track={p.audioTrack} />
+      ))}
+    </Box>
+  );
+}
+
+function RemoteAudioKey({ track }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !track) return undefined;
+    attachTrack(track, el);
+    // Retry play a few times — mobile browsers often block the first attempt
+    let tries = 0;
+    const id = setInterval(() => {
+      tries += 1;
+      try {
+        const p = el.play?.();
+        if (p && typeof p.then === "function") {
+          p.then(() => clearInterval(id)).catch(() => {});
+        }
+      } catch { /* */ }
+      if (tries >= 8) clearInterval(id);
+    }, 400);
+    return () => {
+      clearInterval(id);
+      detachTrack(track, el);
+    };
+  }, [track]);
+  return <audio ref={ref} autoPlay playsInline />;
+}
+
+
+function CallChatSpoiler({ children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Box
+      component="span"
+      onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+      sx={{
+        display: "inline",
+        cursor: "pointer",
+        borderRadius: 0.75,
+        px: 0.45,
+        bgcolor: open ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.28)",
+        color: open ? "inherit" : "transparent",
+        filter: open ? "none" : "blur(5px)",
+        userSelect: open ? "text" : "none",
+        transition: "filter 0.15s",
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function formatCallSystemLabel(bodyStr) {
+  if (!bodyStr || typeof bodyStr !== "string") return null;
+  if (!bodyStr.startsWith("__call__:")) return null;
+  try {
+    const callInfo = JSON.parse(bodyStr.slice(9));
+    if (!callInfo || !callInfo.v) return bodyStr;
+    const isVideo = !!callInfo.is_video;
+    const dur = Number(callInfo.duration || 0);
+    const fmt = (s) => {
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${m}:${String(sec).padStart(2, "0")}`;
+    };
+    const who = callInfo.initiator_username || "Someone";
+    if (callInfo.event === "started") {
+      return isVideo ? `📹 ${who} started a video call` : `📞 ${who} started a voice call`;
+    }
+    const st = callInfo.status || "ended";
+    if (st === "missed" || st === "no_answer") {
+      return isVideo ? "📹 Missed video call" : "📞 Missed voice call";
+    }
+    if (st === "declined") {
+      return isVideo ? "📹 Declined video call" : "📞 Declined voice call";
+    }
+    if (st === "ringing") {
+      return isVideo ? `📹 ${who} is calling…` : `📞 ${who} is calling…`;
+    }
+    if (dur > 0) {
+      return isVideo ? `📹 Video call · ${fmt(dur)}` : `📞 Voice call · ${fmt(dur)}`;
+    }
+    return isVideo ? "📹 Video call ended" : "📞 Voice call ended";
+  } catch {
+    return bodyStr;
+  }
+}
+
+function renderCallChatSegments(bodyStr) {
+  const segments = parseFormattedBody(bodyStr || "");
+  if (!segments.length) {
+    return (
+      <Typography component="span" variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        {bodyStr}
+      </Typography>
+    );
+  }
+  return segments.map((seg, i) => {
+    if (seg.type === "text") {
+      return (
+        <Typography key={i} component="span" variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+          {seg.value}
+        </Typography>
+      );
+    }
+    if (seg.type === "mention") {
+      return (
+        <Box
+          key={i}
+          component="span"
+          sx={{ color: "#7dd3fc", fontWeight: 700, cursor: "default" }}
+        >
+          @{seg.value}
+        </Box>
+      );
+    }
+    if (seg.type === "spoiler") {
+      return <CallChatSpoiler key={i}>{seg.value}</CallChatSpoiler>;
+    }
+    if (seg.type === "code") {
+      return (
+        <Box
+          key={i}
+          component="code"
+          sx={{
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: "0.88em",
+            px: 0.55,
+            py: 0.1,
+            borderRadius: 0.75,
+            bgcolor: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.12)",
+          }}
+        >
+          {seg.value}
+        </Box>
+      );
+    }
+    if (seg.type === "codeblock") {
+      return (
+        <Box
+          key={i}
+          component="pre"
+          sx={{
+            display: "block",
+            my: 0.75,
+            p: 1,
+            borderRadius: 1.25,
+            bgcolor: "#0a0a0a",
+            border: "1px solid rgba(255,255,255,0.12)",
+            overflowX: "auto",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: 12,
+            lineHeight: 1.45,
+            whiteSpace: "pre",
+            color: "#e2e8f0",
+          }}
+        >
+          {seg.lang ? (
+            <Typography variant="caption" sx={{ display: "block", color: "rgba(255,255,255,0.4)", mb: 0.5 }}>
+              {seg.lang}
+            </Typography>
+          ) : null}
+          {seg.value}
+        </Box>
+      );
+    }
+    if (seg.type === "quote") {
+      return (
+        <Box
+          key={i}
+          sx={{
+            display: "block",
+            my: 0.5,
+            pl: 1.1,
+            borderLeft: "3px solid rgba(255,255,255,0.35)",
+            opacity: 0.9,
+            fontStyle: "italic",
+            whiteSpace: "pre-wrap",
+            color: "rgba(255,255,255,0.75)",
+            fontSize: 13,
+          }}
+        >
+          {seg.value}
+        </Box>
+      );
+    }
+    return (
+      <Typography key={i} component="span" variant="body2">
+        {seg.value}
+      </Typography>
+    );
+  });
 }
 
 /* ── Main component ────────────────────────────────────────────────── */
@@ -321,6 +861,14 @@ export default function JitsiCallModal({
   title = "Call",
   peerAvatar,
   onModeChange,
+  isGroup = false,
+  memberDirectory = [], // [{ id, username, avatar }]
+  messages = [],
+  meId = null,
+  onSendChat,
+  onLoadOlder,
+  loadingMore = false,
+  hasMoreMessages = false,
 }) {
   const theme = useTheme();
   const isMobileView = useMediaQuery(theme.breakpoints.down("md"));
@@ -342,14 +890,10 @@ export default function JitsiCallModal({
   const analyserRef = useRef(null);
   const rafRef = useRef(null);
   const savedDevicesRef = useRef(readSavedDevices());
+  const chatScrollRef = useRef(null);
+  const chatScrollVelRef = useRef({ lastTop: 0, lastTs: 0, velocity: 0 });
 
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
-
-  // Keep parent in sync so MessengerApp can show/hide the message list
-  // and place the mini bar under the chat header.
-  useEffect(() => {
-    onModeChange?.(mode);
-  }, [mode, onModeChange]);
 
   /* ── State ────────────────────────────────────────────────────────── */
   const [loading, setLoading] = useState(true);
@@ -360,10 +904,54 @@ export default function JitsiCallModal({
   const [sharing, setSharing] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  // Mobile starts fullscreen so the call is the primary surface (Meet / Telegram).
-  // Desktop starts inline inside the chat pane.
-  const [mode, setMode] = useState(() => (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches ? "full" : "inline")); // "full" | "inline" | "mini"
-  const [railOpen, setRailOpen] = useState(!isMobileView);
+  // Always start expanded (full). Desktop fills the chat stage; mobile is a
+  // true viewport overlay. Mini is only after the user explicitly minimises.
+  const [mode, setMode] = useState("full"); // "full" | "inline" | "mini"
+  const [moreAnchor, setMoreAnchor] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatDraft, setChatDraft] = useState("");
+  const [railOpen, setRailOpen] = useState(false);
+
+  // Scroll behavior for in-call chat
+  const chatNearBottomRef = useRef(true);
+  const chatPrevLenRef = useRef(0);
+  const chatLoadingOlderRef = useRef(false);
+  const chatPinAfterLoadRef = useRef(null); // { height, top }
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    chatNearBottomRef.current = true;
+    chatPrevLenRef.current = (messages || []).length;
+  }, [chatOpen]);
+
+  useLayoutEffect(() => {
+    if (!chatOpen) return;
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const len = (messages || []).length;
+    const prevLen = chatPrevLenRef.current;
+    chatPrevLenRef.current = len;
+
+    if (chatPinAfterLoadRef.current) {
+      const snap = chatPinAfterLoadRef.current;
+      chatPinAfterLoadRef.current = null;
+      chatLoadingOlderRef.current = false;
+      const apply = () => {
+        const diff = el.scrollHeight - snap.height;
+        if (diff > 0) el.scrollTop = snap.top + diff;
+      };
+      apply();
+      requestAnimationFrame(apply);
+      return;
+    }
+
+    if (len > prevLen && chatNearBottomRef.current && !chatLoadingOlderRef.current) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [chatOpen, messages]);
   const [deviceSheetOpen, setDeviceSheetOpen] = useState(false);
   const [devices, setDevices] = useState({ audioInputs: [], videoInputs: [], audioOutputs: [] });
   const [selectedMic, setSelectedMic] = useState(savedDevicesRef.current.micId || "");
@@ -381,6 +969,20 @@ export default function JitsiCallModal({
     };
   });
 
+  // Keep parent in sync so MessengerApp can show/hide the message list
+  // and place the mini bar under the chat header. Must run AFTER mode state exists.
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
+
+  // Resize policy:
+  //  - "inline" legacy → "full"
+  //  - User can mini/full freely on any width; mini is always the thin top bar
+  //    so desktop↔mobile transitions stay consistent without losing the call UI.
+  useEffect(() => {
+    setMode((prev) => (prev === "inline" ? "full" : prev));
+  }, [isMobileView]);
+
   const roomKey = callConfig
     ? `${callConfig.domain || ""}|${callConfig.room || ""}`
     : "";
@@ -390,6 +992,22 @@ export default function JitsiCallModal({
     setToast(msg);
     setTimeout(() => setToast(""), 2500);
   }, []);
+
+  const resolveAvatar = useCallback((displayName, explicit) => {
+    if (explicit) return explicit;
+    const dir = memberDirectory || [];
+    const n = String(displayName || "").trim().toLowerCase();
+    if (!n) return peerAvatar || null;
+    const hit = dir.find((m) =>
+      String(m.username || "").toLowerCase() === n
+      || String(m.display_name || "").toLowerCase() === n
+      || String(m.id) === n
+    );
+    if (hit?.avatar) return hit.avatar;
+    // 1:1 fallback
+    if (!isGroup) return peerAvatar || null;
+    return null;
+  }, [memberDirectory, peerAvatar, isGroup]);
 
   const upsertParticipant = useCallback((id, patch) => {
     if (!id) return;
@@ -486,30 +1104,76 @@ export default function JitsiCallModal({
 
       try {
         const domain = callConfig.domain;
-        const roomName = callConfig.room;
+        const roomName = normalizeRoomName(callConfig.room);
         const displayName = callConfig.display_name || callConfig.displayName || "User";
         const startAudioMuted = !!callConfig.config?.startWithAudioMuted;
         const startVideoMuted = !!callConfig.config?.startWithVideoMuted;
+        const jwt = callConfig.jwt || callConfig.token || callConfig.config?.jwt || null;
+
+        // Load the REAL deployment config so both peers use identical hosts.muc.
+        // Without this, guessing conference. vs muc. puts them in different rooms.
+        const deployCfg = await loadJitsiDeployConfig(domain);
+        if (disposed) return;
+
+        const hosts = deployCfg.hosts || {};
+        const xmppDomain = hosts.domain || domain;
+        const muc = callConfig.muc
+          || callConfig.config?.muc
+          || hosts.muc
+          || `conference.${xmppDomain}`;
+        const focus = hosts.focus || `focus.${xmppDomain}`;
+        // websocket may be relative "//host/xmpp-websocket" or absolute
+        let wsUrl = callConfig.websocket || callConfig.serviceUrl
+          || callConfig.config?.websocket
+          || deployCfg.websocket
+          || deployCfg.bosh
+          || `wss://${domain}/xmpp-websocket`;
+        if (typeof wsUrl === "string") {
+          if (wsUrl.startsWith("//")) wsUrl = `wss:${wsUrl}`;
+          // bosh http-bind is not a websocket — prefer xmpp-websocket path
+          if (/http-bind|bosh/i.test(wsUrl) && !/xmpp-websocket/i.test(wsUrl)) {
+            wsUrl = `wss://${domain}/xmpp-websocket`;
+          }
+        }
 
         const JitsiMeetJS = await loadLibJitsi(domain);
         if (disposed) return;
 
-        JitsiMeetJS.init({ disableAudioLevels: false, disableSimulcast: false });
-        JitsiMeetJS.setLogLevel?.(JitsiMeetJS.logLevels?.ERROR || "error");
+        JitsiMeetJS.init({
+          disableAudioLevels: false,
+          disableSimulcast: false,
+          enableAnalyticsLogging: false,
+        });
+        try {
+          JitsiMeetJS.setLogLevel(JitsiMeetJS.logLevels?.ERROR || "error");
+        } catch { /* */ }
 
-        const connection = new JitsiMeetJS.JitsiConnection(null, null, {
-          hosts: { domain, muc: `muc.${domain}` },
-          serviceUrl: `wss://${domain}/xmpp-websocket`,
+        console.info("[call] connecting", {
+          domain: xmppDomain, roomName, muc, focus, wsUrl, hasJwt: !!jwt,
+          fromDeployConfig: !!(deployCfg && deployCfg.hosts),
+        });
+
+        const connection = new JitsiMeetJS.JitsiConnection(null, jwt, {
+          hosts: {
+            domain: xmppDomain,
+            muc,
+            focus,
+            ...(hosts.anonymousdomain ? { anonymousdomain: hosts.anonymousdomain } : {}),
+          },
+          serviceUrl: wsUrl,
           clientNode: "http://jitsi.org/jitsimeet",
+          websocket: wsUrl,
         });
         connRef.current = connection;
 
         await new Promise((resolve, reject) => {
           const onOk = () => {
             connection.removeEventListener(JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED, onOk);
+            connection.removeEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, onFail);
             resolve();
           };
           const onFail = (err) => {
+            connection.removeEventListener(JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED, onOk);
             connection.removeEventListener(JitsiMeetJS.events.connection.CONNECTION_FAILED, onFail);
             reject(err || new Error("Connection failed"));
           };
@@ -523,9 +1187,17 @@ export default function JitsiCallModal({
         const room = connection.initJitsiConference(roomName, {
           startAudioMuted: false,
           startVideoMuted: false,
-          p2p: { enabled: true },
           enableNoAudioDetection: false,
           enableNoisyMicDetection: false,
+          openBridgeChannel: "websocket",
+          channelLastN: -1,
+          p2p: {
+            enabled: true,
+            stunServers: [
+              { urls: "stun:stun.l.google.com:19302" },
+              { urls: "stun:stun1.l.google.com:19302" },
+            ],
+          },
         });
         roomRef.current = room;
 
@@ -538,7 +1210,12 @@ export default function JitsiCallModal({
             upsertParticipant(pid, {
               videoTrack: track, videoMuted: track.isMuted(), isScreen: !!isScreen,
             });
-            setStagedScreenId((cur) => cur || pid);
+            if (isScreen) {
+              setStagedScreenId(pid);
+              setRailOpen(false);
+            } else {
+              setStagedScreenId((cur) => cur || null);
+            }
           } else {
             upsertParticipant(pid, { audioTrack: track, audioMuted: track.isMuted() });
           }
@@ -564,19 +1241,32 @@ export default function JitsiCallModal({
         });
 
         room.on(JitsiMeetJS.events.conference.USER_JOINED, (id, user) => {
-          upsertParticipant(id, { displayName: user?.getDisplayName?.() || "Participant" });
+          const dn = user?.getDisplayName?.() || "Participant";
+          upsertParticipant(id, {
+            displayName: dn,
+            avatar: resolveAvatar(dn),
+          });
         });
         room.on(JitsiMeetJS.events.conference.USER_LEFT, (id) => {
           removeParticipant(id);
           setStagedScreenId((cur) => (cur === id ? null : cur));
         });
         room.on(JitsiMeetJS.events.conference.DISPLAY_NAME_CHANGED, (id, name) => {
-          upsertParticipant(id, { displayName: name });
+          upsertParticipant(id, {
+            displayName: name,
+            avatar: resolveAvatar(name),
+          });
         });
-        room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, () => {
-          if (!disposed) setLoading(false);
-          try { room.setDisplayName(displayName); } catch { /* */ }
-        });
+        // Speaking indicator for remote participants
+        try {
+          room.on(JitsiMeetJS.events.conference.TRACK_AUDIO_LEVEL_CHANGED, (participantId, level) => {
+            if (!participantId || participantId === room.myUserId?.()) return;
+            if (level > 0.18) setSpeakingId(String(participantId));
+            else setSpeakingId((cur) => (cur === String(participantId) ? null : cur));
+          });
+        } catch { /* older lib may lack event */ }
+        // CONFERENCE_JOINED is bound later (after local tracks are ready) so we
+        // can publish tracks on join. Only LEFT is bound here.
         room.on(JitsiMeetJS.events.conference.CONFERENCE_LEFT, () => {
           if (!disposed) onCloseRef.current?.();
         });
@@ -589,6 +1279,7 @@ export default function JitsiCallModal({
           ? { devices: ["video"], cameraDeviceId: saved.cameraId }
           : { devices: ["video"] };
 
+        // Create local tracks BEFORE join so permission prompt happens early
         let tracks = [];
         try {
           if (startVideoMuted) {
@@ -600,7 +1291,8 @@ export default function JitsiCallModal({
             catch (ve) { console.warn("Camera unavailable:", ve?.message); }
             tracks = [...audioTracks, ...videoTracks];
           }
-        } catch {
+        } catch (err) {
+          console.warn("createLocalTracks failed, retry audio only", err);
           tracks = await JitsiMeetJS.createLocalTracks({ devices: ["audio"] });
         }
 
@@ -611,19 +1303,18 @@ export default function JitsiCallModal({
           displayName: "You",
           audioMuted: startAudioMuted,
           videoMuted: startVideoMuted,
-          avatar: peerAvatar || null,
+          avatar: resolveAvatar("You") || (memberDirectory.find((m) => String(m.id) === String(callConfig?.user_id))?.avatar) || peerAvatar || null,
         };
         for (const track of tracks) {
           if (startAudioMuted && track.getType() === "audio") {
             try { await track.mute(); } catch { /* */ }
           }
-          await room.addTrack(track);
           if (track.getType() === "audio") {
             localPatch.audioTrack = track;
             localPatch.audioMuted = track.isMuted();
             try {
-              const ms = new MediaStream([track.getTrack?.()]);
-              startMicMeter(ms);
+              const mediaTrack = track.getTrack?.();
+              if (mediaTrack) startMicMeter(new MediaStream([mediaTrack]));
             } catch { /* */ }
           } else {
             localPatch.videoTrack = track;
@@ -633,6 +1324,67 @@ export default function JitsiCallModal({
         upsertParticipant("local", localPatch);
         setAudioMuted(!!localPatch.audioMuted);
         setVideoMuted(!!localPatch.videoMuted);
+
+        let published = false;
+        const publishLocalTracks = async () => {
+          for (const track of tracks) {
+            try {
+              // Skip if already added
+              await room.addTrack(track);
+            } catch (e) {
+              // "Track already added" is fine
+              console.warn("addTrack", track.getType?.(), e?.message || e);
+            }
+          }
+        };
+
+        const syncExistingParticipants = () => {
+          try {
+            const existing = room.getParticipants?.() || [];
+            existing.forEach((user) => {
+              const id = user.getId?.() || user._id;
+              if (!id) return;
+              upsertParticipant(id, {
+                displayName: user.getDisplayName?.() || "Participant",
+              });
+              // Attach already-present tracks (join race)
+              try {
+                (user.getTracks?.() || []).forEach((track) => {
+                  if (track.isLocal?.()) return;
+                  const isVideo = track.getType() === "video";
+                  if (isVideo) {
+                    upsertParticipant(id, {
+                      videoTrack: track,
+                      videoMuted: track.isMuted(),
+                      isScreen: track.videoType === "desktop",
+                    });
+                  } else {
+                    upsertParticipant(id, {
+                      audioTrack: track,
+                      audioMuted: track.isMuted(),
+                    });
+                  }
+                });
+              } catch { /* */ }
+            });
+          } catch { /* */ }
+        };
+
+        const onJoined = () => {
+          if (disposed || published) return;
+          published = true;
+          setLoading(false);
+          try { room.setDisplayName(displayName); } catch { /* */ }
+          publishLocalTracks();
+          // Peer may already be in the room (callee joined first)
+          syncExistingParticipants();
+        };
+        room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, onJoined);
+
+        room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (err) => {
+          console.error("[call] CONFERENCE_FAILED", err);
+          if (!disposed) setError(String(err || "Conference failed"));
+        });
 
         try {
           const list = await navigator.mediaDevices.enumerateDevices();
@@ -685,7 +1437,15 @@ export default function JitsiCallModal({
         navigator.mediaDevices.addEventListener?.("devicechange", onDeviceChange);
 
         room.join();
-        setTimeout(() => { if (!disposed) setLoading(false); }, BOOT_FALLBACK_MS);
+        // Fallback: if CONFERENCE_JOINED is slow/missed, still try publish + stop spinner
+        setTimeout(() => {
+          if (disposed) return;
+          setLoading(false);
+          if (!published) {
+            published = true;
+            publishLocalTracks();
+          }
+        }, BOOT_FALLBACK_MS);
       } catch (e) {
         if (!disposed) {
           setError(e?.message || "Could not start call");
@@ -708,20 +1468,50 @@ export default function JitsiCallModal({
 
   useEffect(() => () => stopMicMeter(), [stopMicMeter]);
 
+  const remoteCount = Object.keys(participants).filter((k) => k !== "local").length;
+  const hasPeer = remoteCount > 0;
+
+  // Call timer only ticks once at least one remote participant is present
+  // (phone-style: ringing phase has no elapsed time).
   useEffect(() => {
-    if (!callConfig) return undefined;
+    if (!callConfig || !hasPeer) return undefined;
     const t = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(t);
-  }, [callConfig]);
+  }, [callConfig, hasPeer]);
 
-  const remoteCount = Object.keys(participants).filter((k) => k !== "local").length;
+  // Direct (1:1): ringback only for initiator while waiting.
+  // Group (Meet-style): no ringback — you just join the room; others get
+  // the normal incoming-call notification from the messenger backend.
+  const isInitiator = !!(callConfig?.is_initiator ?? callConfig?.initiator_is_me ?? callConfig?.isInitiator);
+  const groupCall = !!(isGroup || callConfig?.is_group || callConfig?.call_type === "group");
+  useEffect(() => {
+    if (!callConfig || loading || error || hasPeer || !isInitiator || groupCall) return undefined;
+    const ring = startRingback();
+    return () => ring.stop();
+  }, [callConfig, loading, error, hasPeer, isInitiator, groupCall]);
+
+  // Track whether anyone ever joined (group call: end when last person leaves)
+  const hadPeerRef = useRef(false);
+  useEffect(() => {
+    if (hasPeer) hadPeerRef.current = true;
+  }, [hasPeer]);
+
+  // Auto hangup:
+  //  1) Nobody ever joined → after ALONE_TIMEOUT_MS (ringing timeout)
+  //  2) Someone was here and everyone left → end quickly and announce
   useEffect(() => {
     if (loading || error) return undefined;
-    if (remoteCount > 0) return undefined;
-    const t = setTimeout(() => { hangup(); }, ALONE_TIMEOUT_MS);
+    if (hasPeer) return undefined;
+    const grace = hadPeerRef.current ? 2500 : ALONE_TIMEOUT_MS;
+    const t = setTimeout(() => {
+      if (hadPeerRef.current) {
+        flash("Call ended — no one left in the call");
+      }
+      hangup();
+    }, grace);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error, remoteCount]);
+  }, [loading, error, hasPeer]);
 
   /* ── Action handlers (every action is precondition-checked) ──────── */
 
@@ -801,8 +1591,8 @@ export default function JitsiCallModal({
       } catch { /* */ }
       localTracksRef.current = localTracksRef.current.filter((t) => t !== existing);
       setSharing(false);
-      upsertParticipant("local", { isScreen: false });
-      setStagedScreenId((cur) => (cur === "local" ? null : cur));
+      removeParticipant("local-screen");
+      setStagedScreenId((cur) => (cur === "local-screen" || cur === "local" ? null : cur));
       return;
     }
     try {
@@ -818,24 +1608,29 @@ export default function JitsiCallModal({
       localTracksRef.current.push(desk);
       await room.addTrack(desk);
       setSharing(true);
-      upsertParticipant("local", { videoTrack: desk, videoMuted: false, isScreen: true });
-      setStagedScreenId("local");
+      // Stage screen as dominant view; do not hide the rail-fighting layout —
+      // close the participants rail so the share fills the stage.
+      setRailOpen(false);
+      // Keep a dedicated screen participant so camera tile can stay separate
+      upsertParticipant("local-screen", {
+        displayName: "Your screen",
+        videoTrack: desk,
+        videoMuted: false,
+        isScreen: true,
+        audioMuted: true,
+      });
+      setStagedScreenId("local-screen");
       desk.addEventListener(JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED, async () => {
         try { await room.removeTrack(desk); } catch { /* */ }
         localTracksRef.current = localTracksRef.current.filter((t) => t !== desk);
         setSharing(false);
-        const cam = localTracksRef.current.find((t) => t.getType?.() === "video");
-        upsertParticipant("local", {
-          videoTrack: cam || null,
-          videoMuted: !cam || cam.isMuted(),
-          isScreen: false,
-        });
-        setStagedScreenId((cur) => (cur === "local" ? null : cur));
+        removeParticipant("local-screen");
+        setStagedScreenId((cur) => (cur === "local-screen" || cur === "local" ? null : cur));
       });
     } catch {
       flash("Screen share failed or cancelled");
     }
-  }, [flash, upsertParticipant]);
+  }, [flash, upsertParticipant, removeParticipant]);
 
   const toggleFullscreen = useCallback(() => {
     // Fullscreen on the root element. We use webkit fallbacks for iOS Safari
@@ -928,21 +1723,13 @@ export default function JitsiCallModal({
     if (document.fullscreenElement) {
       try { document.exitFullscreen?.(); } catch { /* */ }
     }
-    // Desktop: floating PiP card. Mobile: thin strip under header (parent layout).
-    if (!isMobileView) {
-      const w = typeof window !== "undefined" ? window.innerWidth : 1000;
-      const h = typeof window !== "undefined" ? window.innerHeight : 800;
-      setMiniPos((prev) => ({
-        x: clamp(prev.x, 8, Math.max(8, w - MINI_W - 8)),
-        y: clamp(prev.y, 8, Math.max(8, h - MINI_H - 90)),
-      }));
-    }
+    // Always thin top strip (desktop + mobile) — no floating card.
     setMode("mini");
     setFullscreen(false);
-  }, [isMobileView]);
+  }, []);
   const goFull = useCallback(() => {
-    setMode(isMobileView ? "full" : "inline");
-  }, [isMobileView]);
+    setMode("full");
+  }, []);
 
   /* ── Derived participant list ─────────────────────────────────────── */
   const list = useMemo(
@@ -963,7 +1750,10 @@ export default function JitsiCallModal({
     return local || screenShares[0];
   }, [screenShares, stagedScreenId]);
 
-  const others = useMemo(() => list.filter((p) => p !== staged), [list, staged]);
+  const others = useMemo(() => {
+    if (!staged) return list;
+    return list.filter((p) => p.id !== staged.id);
+  }, [list, staged]);
   const count = list.length;
   const gridCols = others.length <= 1 ? 1 : others.length === 2 ? 2 : others.length <= 4 ? 2 : 3;
 
@@ -1033,11 +1823,13 @@ export default function JitsiCallModal({
 
   /* ── Controls bar (inline render — NO nested component) ───────────── */
   const renderControls = (compact = false) => {
-    const sz = compact ? 36 : (isSmallView ? 42 : 48);
+    const mobile = isMobileView || isSmallView;
+    const sz = compact ? 36 : (mobile ? 44 : 48);
+    // Mobile full: mic, cam, more, mini, hangup — rest in "more" menu
     return (
       <Stack
         direction="row"
-        spacing={compact ? 0.6 : (isSmallView ? 0.7 : 1)}
+        spacing={compact ? 0.6 : (mobile ? 0.75 : 1)}
         alignItems="center"
         justifyContent="center"
         sx={{ width: "100%", flexWrap: "wrap", rowGap: 0.5 }}
@@ -1058,38 +1850,56 @@ export default function JitsiCallModal({
 
         {!compact && (
           <>
-            <Tooltip title={sharing ? "Stop screen share" : "Share screen"}>
-              <IconButton onClick={toggleShare} sx={controlBtnSx(sharing, false, sz)}
-                aria-label={sharing ? "Stop screen share" : "Share screen"}>
-                {sharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+            {/* Always-visible core actions */}
+            <Tooltip title="In-call chat">
+              <IconButton onClick={() => setChatOpen((v) => !v)} sx={controlBtnSx(chatOpen, false, sz)}
+                aria-label="In-call chat">
+                <ChatIcon fontSize={mobile ? "small" : "medium"} />
               </IconButton>
             </Tooltip>
-
-            <Tooltip title="Microphone & camera">
-              <IconButton onClick={() => setDeviceSheetOpen(true)} sx={controlBtnSx(false, false, sz)}
-                aria-label="Microphone & camera">
-                <SettingsIcon />
-              </IconButton>
-            </Tooltip>
-
             <Tooltip title="Participants">
               <IconButton onClick={() => setRailOpen((v) => !v)} sx={controlBtnSx(railOpen, false, sz)}
                 aria-label="Participants">
-                <PeopleIcon />
+                <PeopleIcon fontSize={mobile ? "small" : "medium"} />
               </IconButton>
             </Tooltip>
-
+            {!mobile && (
+              <>
+                <Tooltip title={sharing ? "Stop screen share" : "Share screen"}>
+                  <IconButton onClick={toggleShare} sx={controlBtnSx(sharing, false, sz)}
+                    aria-label={sharing ? "Stop screen share" : "Share screen"}>
+                    {sharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Microphone & camera">
+                  <IconButton onClick={() => setDeviceSheetOpen(true)} sx={controlBtnSx(false, false, sz)}
+                    aria-label="Microphone & camera">
+                    <SettingsIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
+                  <IconButton onClick={toggleFullscreen} sx={controlBtnSx(false, false, sz)}
+                    aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
+                    {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
+            {mobile && (
+              <Tooltip title="More">
+                <IconButton
+                  onClick={(e) => setMoreAnchor(e.currentTarget)}
+                  sx={controlBtnSx(Boolean(moreAnchor), false, sz)}
+                  aria-label="More"
+                >
+                  <MoreHorizIcon />
+                </IconButton>
+              </Tooltip>
+            )}
             <Tooltip title="Minimise">
               <IconButton onClick={goMini} sx={controlBtnSx(false, false, sz)}
                 aria-label="Minimise">
-                <PictureInPictureAltIcon />
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
-              <IconButton onClick={toggleFullscreen} sx={controlBtnSx(false, false, sz)}
-                aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
-                {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                <PictureInPictureAltIcon fontSize={mobile ? "small" : "medium"} />
               </IconButton>
             </Tooltip>
           </>
@@ -1107,13 +1917,44 @@ export default function JitsiCallModal({
         <Tooltip title="Hang up">
           <IconButton onClick={hangup}
             sx={{
-              ...controlBtnSx(false, true, compact ? 38 : (isSmallView ? 44 : 52)),
+              ...controlBtnSx(false, true, compact ? 38 : (mobile ? 46 : 52)),
               borderRadius: 3, ml: 0.5, px: compact ? 0.5 : 1.5,
             }}
             aria-label="Hang up">
             <CallEndIcon fontSize={compact ? "small" : "medium"} />
           </IconButton>
         </Tooltip>
+
+        <Menu
+          anchorEl={moreAnchor}
+          open={Boolean(moreAnchor)}
+          onClose={() => setMoreAnchor(null)}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+          sx={{ zIndex: 1800 }}
+          MenuListProps={{ dense: true }}
+        >
+          <MenuItem onClick={() => { setMoreAnchor(null); toggleShare(); }}>
+            <ListItemIcon>{sharing ? <StopScreenShareIcon fontSize="small" /> : <ScreenShareIcon fontSize="small" />}</ListItemIcon>
+            <ListItemText>{sharing ? "Stop sharing" : "Share screen"}</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreAnchor(null); setDeviceSheetOpen(true); }}>
+            <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Audio &amp; video</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreAnchor(null); setRailOpen(true); }}>
+            <ListItemIcon><PeopleIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Participants</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreAnchor(null); setChatOpen(true); }}>
+            <ListItemIcon><ChatIcon fontSize="small" /></ListItemIcon>
+            <ListItemText>Chat</ListItemText>
+          </MenuItem>
+          <MenuItem onClick={() => { setMoreAnchor(null); toggleFullscreen(); }}>
+            <ListItemIcon>{fullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}</ListItemIcon>
+            <ListItemText>{fullscreen ? "Exit fullscreen" : "Fullscreen"}</ListItemText>
+          </MenuItem>
+        </Menu>
       </Stack>
     );
   };
@@ -1271,7 +2112,7 @@ export default function JitsiCallModal({
 
     if (isMobileView) {
       return (
-        <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)}
+        <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)} closeAfterTransition sx={{ zIndex: 1800 }}
           aria-labelledby="device-sheet-title">
           <Slide direction="up" in={deviceSheetOpen} mountOnEnter unmountOnExit>
             <Box sx={{
@@ -1286,7 +2127,7 @@ export default function JitsiCallModal({
       );
     }
     return (
-      <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)}
+      <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)} closeAfterTransition sx={{ zIndex: 1800 }}
         aria-labelledby="device-sheet-title">
         <Box sx={{
           position: "absolute", top: "50%", left: "50%",
@@ -1303,16 +2144,17 @@ export default function JitsiCallModal({
 
   /* ── Participants rail ────────────────────────────────────────────── */
   const renderRail = () => {
-    if (isMini) return null;
-    return (
+    if (isMini || !railOpen) return null;
+    const body = (
       <Box sx={{
-        width: isMobileView ? "100%" : 260, flexShrink: 0,
-        bgcolor: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)",
-        borderLeft: "1px solid rgba(255,255,255,0.06)",
-        display: "flex", flexDirection: "column",
-        position: isMobileView ? "absolute" : "relative",
-        right: 0, top: 0, bottom: 0, zIndex: 3,
-        maxWidth: isMobileView ? "85%" : "none",
+        width: isMobileView ? "100%" : 260,
+        height: "100%",
+        flexShrink: 0,
+        bgcolor: "rgba(12,16,22,0.98)",
+        backdropFilter: "blur(10px)",
+        borderLeft: "1px solid rgba(255,255,255,0.08)",
+        display: "flex",
+        flexDirection: "column",
       }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between"
           sx={{ px: 1.5, py: 1, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -1389,6 +2231,30 @@ export default function JitsiCallModal({
         </Box>
       </Box>
     );
+
+    if (isMobileView) {
+      return (
+        <Drawer
+          anchor="right"
+          open={railOpen}
+          onClose={() => setRailOpen(false)}
+          transitionDuration={280}
+          ModalProps={{ keepMounted: true }}
+          sx={{ zIndex: 1800 }}
+          PaperProps={{
+            sx: {
+              width: "min(320px, 90vw)",
+              bgcolor: "rgba(12,16,22,0.98)",
+              color: "#fff",
+              boxShadow: "-8px 0 32px rgba(0,0,0,0.5)",
+            },
+          }}
+        >
+          {body}
+        </Drawer>
+      );
+    }
+    return body;
   };
 
   /* ── Render ───────────────────────────────────────────────────────── */
@@ -1399,47 +2265,327 @@ export default function JitsiCallModal({
    *   parent places under the chat header — NOT a floating card.
    * MINI (desktop): small floating PiP card, clamped to viewport.
    */
+
+  const submitChat = () => {
+    const body = chatDraft.trim();
+    if (!body || !onSendChat) return;
+    onSendChat(body);
+    setChatDraft("");
+  };
+
+  const renderCallChat = () => {
+    const formatMsgBody = (m) => {
+      if (!m) return "";
+      if (typeof m.body === "string" && m.body.trim()) return m.body;
+      if (m.event_type || m.type) {
+        const t = m.event_type || m.type;
+        if (String(t).includes("call")) return m.body || "📞 Call event";
+        return m.body || String(t);
+      }
+      if ((m.attachments || []).length) {
+        const kinds = (m.attachments || []).map((a) => a.content_type || a.type || "file");
+        return "📎 " + (kinds[0] || "Attachment");
+      }
+      if (m.system_message || m.is_system) return m.body || m.system_message || "System";
+      return m.body || "";
+    };
+
+    const onChatScroll = (e) => {
+      const el = e.currentTarget;
+      const distBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      chatNearBottomRef.current = distBottom < 80;
+
+      const now = performance.now();
+      const sv = chatScrollVelRef.current;
+      const dt = Math.max(1, now - (sv.lastTs || now));
+      const dy = el.scrollTop - (sv.lastTop || el.scrollTop);
+      const inst = dy / dt;
+      sv.velocity = sv.lastTs ? (sv.velocity * 0.65 + inst * 0.35) : inst;
+      sv.lastTop = el.scrollTop;
+      sv.lastTs = now;
+      const speedUp = sv.velocity < 0 ? -sv.velocity : 0;
+
+      let threshold = Math.max(220, el.clientHeight * 0.55);
+      if (speedUp > 0.35) threshold = Math.max(threshold, el.clientHeight * 1.1);
+      if (speedUp > 0.8) threshold = Math.max(threshold, el.clientHeight * 1.7);
+      if (speedUp > 1.4) threshold = Math.max(threshold, el.clientHeight * 2.4);
+
+      if (el.scrollTop < threshold && hasMoreMessages && !loadingMore && onLoadOlder && !chatLoadingOlderRef.current) {
+        chatLoadingOlderRef.current = true;
+        chatPinAfterLoadRef.current = {
+          height: el.scrollHeight,
+          top: el.scrollTop,
+        };
+        onLoadOlder();
+        setTimeout(() => {
+          if (chatLoadingOlderRef.current && chatPinAfterLoadRef.current) {
+            chatLoadingOlderRef.current = false;
+            chatPinAfterLoadRef.current = null;
+          }
+        }, 2500);
+      }
+    };
+
+    const panel = (
+      <Box sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        bgcolor: "#000",
+        color: "#f1f5f9",
+        borderRight: isMobileView ? "none" : "1px solid rgba(255,255,255,0.1)",
+      }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between"
+          sx={{ px: 1.5, py: 1, borderBottom: "1px solid rgba(255,255,255,0.1)", flexShrink: 0, bgcolor: "#0a0a0a" }}>
+          <Typography variant="subtitle2" fontWeight={700} sx={{ color: "#fff" }}>
+            Chat
+          </Typography>
+          <IconButton size="small" onClick={() => setChatOpen(false)} sx={{ color: "rgba(255,255,255,0.7)" }}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+        <Box
+          ref={chatScrollRef}
+          onScroll={onChatScroll}
+          sx={{ flex: 1, overflowY: "auto", px: 1.25, py: 1.25, minHeight: 0, bgcolor: "#000" }}
+        >
+          {loadingMore && (
+            <Stack alignItems="center" sx={{ py: 1 }}>
+              <CircularProgress size={18} sx={{ color: "rgba(255,255,255,0.5)" }} />
+            </Stack>
+          )}
+          {hasMoreMessages && !loadingMore && (
+            <Typography
+              variant="caption"
+              onClick={() => {
+                const el = chatScrollRef.current;
+                if (el) {
+                  chatLoadingOlderRef.current = true;
+                  chatPinAfterLoadRef.current = { height: el.scrollHeight, top: el.scrollTop };
+                }
+                onLoadOlder?.();
+              }}
+              sx={{ display: "block", textAlign: "center", color: "rgba(255,255,255,0.45)", cursor: "pointer", mb: 1 }}
+            >
+              Load older messages
+            </Typography>
+          )}
+          {(messages || []).length === 0 && (
+            <Typography variant="caption" sx={{ opacity: 0.45, display: "block", textAlign: "center", mt: 4 }}>
+              No messages yet
+            </Typography>
+          )}
+          {(messages || []).map((m) => {
+            if (m?.type === "day") {
+              return (
+                <Typography key={m.id || m.label} variant="caption" sx={{ display: "block", textAlign: "center", color: "rgba(255,255,255,0.35)", my: 1 }}>
+                  {m.label}
+                </Typography>
+              );
+            }
+            const bodyStr = typeof m?.body === "string" ? m.body : String(m?.body || "");
+            const callLabel = formatCallSystemLabel(bodyStr);
+            const isCallOrSystem = !!(
+              callLabel
+              || m?.is_system
+              || m?.system_message
+              || (bodyStr.startsWith("__call__"))
+            );
+            if (isCallOrSystem) {
+              const label = callLabel || m?.system_message || bodyStr;
+              return (
+                <Box key={m.id} sx={{ textAlign: "center", my: 1.1 }}>
+                  <Chip
+                    size="small"
+                    label={label}
+                    sx={{
+                      bgcolor: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.75)",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      maxWidth: "95%",
+                      height: "auto",
+                      py: 0.5,
+                      "& .MuiChip-label": { whiteSpace: "normal" },
+                    }}
+                  />
+                </Box>
+              );
+            }
+            const mine = String(m?.sender?.id) === String(meId);
+            const hasAtt = (m.attachments || []).length > 0;
+            if (!bodyStr.trim() && hasAtt) {
+              return (
+                <Box key={m.id} sx={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start", mb: 0.85 }}>
+                  <Box sx={{ maxWidth: "88%", px: 1.25, py: 0.75, borderRadius: 2, bgcolor: mine ? "#1a1a1a" : "#111", border: "1px solid rgba(255,255,255,0.1)" }}>
+                    {!mine && (
+                      <Typography variant="caption" sx={{ color: "#93c5fd", fontWeight: 700, display: "block", mb: 0.4, fontSize: 12 }}>
+                        {m.sender?.username || "User"}
+                      </Typography>
+                    )}
+                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.65)" }}>📎 Attachment</Typography>
+                  </Box>
+                </Box>
+              );
+            }
+            if (!bodyStr.trim()) return null;
+            return (
+              <Box
+                key={m.id}
+                sx={{
+                  display: "flex",
+                  justifyContent: mine ? "flex-end" : "flex-start",
+                  mb: 0.9,
+                }}
+              >
+                <Box sx={{
+                  maxWidth: "88%",
+                  px: 1.25,
+                  py: 0.8,
+                  borderRadius: 2,
+                  bgcolor: mine ? "#1a1a1a" : "#111",
+                  border: "1px solid",
+                  borderColor: mine ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.08)",
+                }}>
+                  {!mine && (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#7dd3fc",
+                        fontWeight: 700,
+                        display: "block",
+                        mb: 0.45,
+                        fontSize: 12.5,
+                        letterSpacing: 0.2,
+                      }}
+                    >
+                      {m.sender?.username || m.sender?.display_name || "User"}
+                    </Typography>
+                  )}
+                  <Box sx={{ color: "#f8fafc", lineHeight: 1.45, fontSize: 14 }}>
+                    {renderCallChatSegments(bodyStr)}
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+        <Stack direction="row" spacing={0.75} alignItems="flex-end"
+          sx={{ px: 1, py: 1, borderTop: "1px solid rgba(255,255,255,0.1)", flexShrink: 0, bgcolor: "#0a0a0a" }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder="Message…"
+            value={chatDraft}
+            onChange={(e) => setChatDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submitChat();
+              }
+            }}
+            multiline
+            maxRows={3}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: "#111",
+                color: "#f1f5f9",
+                borderRadius: 2,
+                "& fieldset": { borderColor: "rgba(255,255,255,0.12)" },
+                "&:hover fieldset": { borderColor: "rgba(255,255,255,0.25)" },
+                "&.Mui-focused fieldset": { borderColor: "rgba(255,255,255,0.35)" },
+              },
+            }}
+          />
+          <IconButton
+            onClick={submitChat}
+            disabled={!chatDraft.trim()}
+            sx={{
+              bgcolor: "#fff",
+              color: "#000",
+              width: 40, height: 40,
+              "&:hover": { bgcolor: "#e5e5e5" },
+              "&.Mui-disabled": { bgcolor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.25)" },
+            }}
+          >
+            <SendIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      </Box>
+    );
+
+    if (isMobileView) {
+      return (
+        <Drawer
+          anchor="left"
+          open={chatOpen}
+          onClose={() => setChatOpen(false)}
+          transitionDuration={280}
+          ModalProps={{ keepMounted: true }}
+          sx={{ zIndex: 1800 }}
+          PaperProps={{
+            sx: {
+              width: "min(360px, 92vw)",
+              height: "100%",
+              bgcolor: "#000",
+              color: "#fff",
+              boxShadow: "8px 0 32px rgba(0,0,0,0.5)",
+            },
+          }}
+        >
+          {panel}
+        </Drawer>
+      );
+    }
+    if (!chatOpen) return null;
+    return (
+      <Box sx={{
+        width: 320,
+        flexShrink: 0,
+        height: "100%",
+        minHeight: 0,
+        order: -1,
+      }}>
+        {panel}
+      </Box>
+    );
+  };
+
   const isFull = mode === "full";
-  const isMobileMini = isMini && isMobileView;
-  const isDesktopMini = isMini && !isMobileView;
+  // Mini is ALWAYS the thin top strip (mobile + desktop) — never a floating card.
+  const isMiniBar = isMini;
 
   let rootSx;
-  if (isMobileMini) {
-    // Thin bar under header — parent owns placement; we just size ourselves.
+  if (isMiniBar) {
+    // Flow layout — parent (MessengerApp) places this under the settings /
+    // chat header. NOT position:fixed so it never covers menus or headers.
     rootSx = {
-      flexShrink: 0,
+      position: "relative",
       width: "100%",
-      bgcolor: "#0f1419",
+      flexShrink: 0,
+      bgcolor: "#1b2836",
       color: "#fff",
-      borderBottom: "1px solid rgba(255,255,255,0.08)",
+      borderBottom: "1px solid",
+      borderColor: "divider",
       display: "flex",
       flexDirection: "column",
       userSelect: "none",
-      zIndex: 6,
-    };
-  } else if (isDesktopMini) {
-    rootSx = {
-      position: "fixed",
-      left: miniPos.x, top: miniPos.y,
-      width: MINI_W,
-      zIndex: 1450,
-      borderRadius: 2, overflow: "hidden",
-      bgcolor: "#0b0e11", color: "#fff",
-      border: "1px solid rgba(255,255,255,0.12)",
-      boxShadow: "0 16px 48px rgba(0,0,0,0.65)",
-      display: "flex", flexDirection: "column",
-      userSelect: "none",
+      zIndex: 8,
+      boxShadow: "0 1px 0 rgba(0,0,0,0.12)",
     };
   } else if (isFull) {
-    // Mobile full-screen call surface
     rootSx = {
       position: "fixed",
       inset: 0,
       zIndex: 1400,
-      bgcolor: "#0b0e11", color: "#fff",
-      display: "flex", flexDirection: "column",
-      background: "radial-gradient(ellipse at top, #161b22 0%, #0b0e11 70%)",
+      bgcolor: "#0b0e11",
+      color: "#fff",
+      display: "flex",
+      flexDirection: "column",
       minWidth: 0,
+      minHeight: 0,
+      overflow: "hidden",
     };
   } else {
     // Desktop inline
@@ -1457,18 +2603,21 @@ export default function JitsiCallModal({
       ref={rootRef}
       sx={rootSx}
     >
-      {/* ── Mobile mini: thin ongoing-call strip (Telegram / WhatsApp) ── */}
-      {isMobileMini ? (
+      {/* Remote audio always mounted so minimize doesn't kill the other person's voice */}
+      <RemoteAudioSink participants={participants} />
+
+      {/* ── Mini strip (desktop + mobile): thin ongoing-call bar ── */}
+      {isMiniBar ? (
         <Stack
           direction="row"
           alignItems="center"
           spacing={1}
           sx={{
-            px: 1.25,
-            py: 0.75,
-            minHeight: 52,
+            px: 1.5,
+            py: 0.85,
+            minHeight: 48,
             width: "100%",
-            bgcolor: "rgba(15, 20, 25, 0.98)",
+            bgcolor: "transparent",
           }}
         >
           {peerAvatar ? (
@@ -1486,7 +2635,7 @@ export default function JitsiCallModal({
               {title}
             </Typography>
             <Typography variant="caption" sx={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>
-              {loading ? "Connecting…" : formatElapsed(elapsed)}
+              {loading ? "Connecting…" : (hasPeer ? formatElapsed(elapsed) : "Ringing…")}
               {audioMuted ? " · muted" : ""}
             </Typography>
           </Box>
@@ -1532,204 +2681,272 @@ export default function JitsiCallModal({
           </IconButton>
         </Stack>
       ) : (
-      <>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between"
-        onMouseDown={isDesktopMini ? onDragStart : undefined}
-        onTouchStart={isDesktopMini ? onDragStart : undefined}
-        sx={{
-          px: isDesktopMini ? 1 : (isSmallView ? 1.25 : 2),
-          py: isDesktopMini ? 0.5 : 1,
-          bgcolor: "rgba(0,0,0,0.55)", backdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          cursor: isDesktopMini ? "grab" : "default",
-          minHeight: 52, flexShrink: 0,
-        }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flex: 1 }}>
-          {isMini && <DragIndicatorIcon sx={{ fontSize: 16, opacity: 0.5 }} />}
-          {peerAvatar ? (
-            <Avatar src={peerAvatar} sx={{ width: isMini ? 22 : 34, height: isMini ? 22 : 34 }} />
-          ) : (
-            <Avatar sx={{ width: isMini ? 22 : 34, height: isMini ? 22 : 34, bgcolor: "primary.main", fontSize: isMini ? 11 : 15 }}>
-              {(title || "C")[0]}
-            </Avatar>
-          )}
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant={isMini ? "caption" : "subtitle1"} fontWeight={600} noWrap>
-              {title}
-            </Typography>
-            {!isMini && (
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
-                <Chip size="small" icon={<PeopleIcon sx={{ fontSize: 14 }} />} label={count}
-                  sx={{ height: 20, fontSize: 11, bgcolor: "rgba(255,255,255,0.08)", color: "#fff", "& .MuiChip-icon": { color: "#fff" } }} />
+      <Box sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        width: "100%",
+        minHeight: 0,
+        overflow: "hidden",
+      }}>
+        {/* ── Header ── */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{
+            px: isSmallView ? 1.25 : 2,
+            py: 1,
+            flexShrink: 0,
+            bgcolor: "rgba(0,0,0,0.45)",
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            minHeight: 52,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0, flex: 1 }}>
+            {peerAvatar ? (
+              <Avatar src={peerAvatar} sx={{ width: 34, height: 34 }} />
+            ) : (
+              <Avatar sx={{ width: 34, height: 34, bgcolor: "primary.main", fontSize: 15 }}>
+                {(title || "C")[0]}
+              </Avatar>
+            )}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle1" fontWeight={600} noWrap>
+                {title}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
                 <Typography variant="caption" sx={{ opacity: 0.75, fontVariantNumeric: "tabular-nums" }}>
-                  {formatElapsed(elapsed)}
+                  {loading ? "Connecting…" : (hasPeer ? formatElapsed(elapsed) : "Ringing…")}
                 </Typography>
+                <Chip
+                  size="small"
+                  icon={<PeopleIcon sx={{ fontSize: 14 }} />}
+                  label={count}
+                  sx={{
+                    height: 20, fontSize: 11,
+                    bgcolor: "rgba(255,255,255,0.08)", color: "#fff",
+                    "& .MuiChip-icon": { color: "#fff" },
+                  }}
+                />
                 {staged && (
-                  <Chip size="small" icon={<PresentToAllIcon sx={{ fontSize: 12 }} />} label="Screen share"
-                    sx={{ height: 20, fontSize: 10, bgcolor: alpha("#3b82f6", 0.18), color: "#93c5fd" }} />
+                  <Chip
+                    size="small"
+                    icon={<PresentToAllIcon sx={{ fontSize: 12 }} />}
+                    label="Screen"
+                    sx={{ height: 20, fontSize: 10, bgcolor: alpha("#3b82f6", 0.2), color: "#93c5fd" }}
+                  />
                 )}
               </Stack>
-            )}
-          </Box>
-          {isMini && (
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ ml: "auto" }}>
-              {staged && <PresentToAllIcon sx={{ fontSize: 14, color: "#93c5fd" }} />}
-              <Typography variant="caption" sx={{ opacity: 0.7, fontVariantNumeric: "tabular-nums" }}>
-                {formatElapsed(elapsed)}
-              </Typography>
-            </Stack>
-          )}
-        </Stack>
-        <Stack direction="row" spacing={0.25}>
-          {isMini ? (
-            <IconButton size="small" onClick={goFull}
-              sx={{ color: "rgba(255,255,255,0.75)", p: 0.4 }}
-              aria-label="Expand">
-              <OpenInFullIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-          ) : (
-            <Tooltip title="Minimise — keep chatting">
-              <IconButton onClick={goMini} size="small"
-                sx={{ color: "rgba(255,255,255,0.8)" }} aria-label="Minimise">
+            </Box>
+          </Stack>
+          <Stack direction="row" spacing={0.25}>
+            <Tooltip title="Minimise">
+              <IconButton onClick={goMini} size="small" sx={{ color: "rgba(255,255,255,0.85)" }} aria-label="Minimise">
                 <CloseFullscreenIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-          )}
-          <IconButton onClick={hangup} size="small"
-            sx={{ color: "rgba(255,255,255,0.7)", p: isMini ? 0.4 : undefined }}
-            aria-label="Close">
-            <CloseIcon sx={{ fontSize: isMini ? 16 : 20 }} />
-          </IconButton>
+          </Stack>
         </Stack>
-      </Stack>
 
-      {/* Stage + side rail */}
-      <Box sx={{
-        flex: 1, display: "flex",
-        flexDirection: isMini ? "column" : "row",
-        minHeight: 0, overflow: "hidden", position: "relative",
-      }}>
-        {/* Main video stage */}
+        {/* ── Stage + optional in-call chat ── */}
         <Box sx={{
-          position: "relative",
-          flex: isMini ? "none" : 1,
-          height: isMini ? MINI_H : "auto",
-          minHeight: isMini ? MINI_H : 0,
-          bgcolor: "#000",
-          p: isMini ? 0.5 : (isSmallView ? 1 : 1.5),
-          overflow: "auto",
-          display: "flex", flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "row",
+          overflow: "hidden",
         }}>
-          {!isMini && (
-            <>
-              {staged ? (
-                <Box sx={{ mb: 1.5, flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column" }}>
-                  <ParticipantTile participant={staged} isLocal={staged.id === "local"}
-                    isDominant compact={false} />
-                  {screenShares.length > 1 && (
-                    <Stack direction="row" spacing={1} sx={{ mt: 1, overflowX: "auto", pb: 0.5 }}>
-                      {screenShares.map((p) => (
-                        <Box key={p.id} onClick={() => setStagedScreenId(p.id)}
-                          sx={{
-                            flex: "0 0 160px", cursor: "pointer",
-                            borderRadius: 1.5, overflow: "hidden",
-                            border: staged?.id === p.id ? "2px solid" : "1px solid",
-                            borderColor: staged?.id === p.id ? "primary.main" : "rgba(255,255,255,0.08)",
-                          }}>
-                          <ParticipantTile participant={p} isLocal={p.id === "local"} compact showAvatar={false} />
-                        </Box>
-                      ))}
-                    </Stack>
-                  )}
-                </Box>
-              ) : null}
-
-              <Box sx={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-                gap: 1,
-                flex: staged ? "0 0 auto" : "1 1 auto",
-                alignContent: staged ? "start" : "stretch",
-              }}>
-                {others.map((p) => (
-                  <ParticipantTile key={p.id} participant={p} isLocal={p.id === "local"}
-                    isDominant={false} compact={false} />
-                ))}
-                {!staged && list.length === 0 && !loading && (
-                  <Stack alignItems="center" justifyContent="center"
-                    sx={{ gridColumn: "1 / -1", minHeight: 200 }}>
-                    <Avatar sx={{ width: 80, height: 80, bgcolor: "primary.dark", mb: 2, fontSize: 32 }}>
-                      {(title || "C")[0]?.toUpperCase()}
-                    </Avatar>
-                    <Typography sx={{ opacity: 0.7, mb: 0.5 }}>Waiting for others…</Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.5 }}>
-                      The call will end in {Math.floor(ALONE_TIMEOUT_MS / 1000)}s if no one joins
-                    </Typography>
-                  </Stack>
-                )}
-              </Box>
-            </>
-          )}
-
-          {isMini && (
-            <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 0.5 }}>
-              {(staged || list[0]) && (
-                <ParticipantTile participant={staged || list[0]}
-                  isLocal={(staged || list[0])?.id === "local"} compact />
-              )}
-            </Box>
-          )}
-
+        <Box sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          position: "relative",
+          bgcolor: "#0a0c10",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}>
           {loading && (
             <Stack alignItems="center" justifyContent="center" spacing={1.5}
-              sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,0.85)",
-                zIndex: 2, backdropFilter: "blur(4px)" }}>
-              <CircularProgress size={isMini ? 28 : 44} color="primary" />
-              {!isMini && <Typography variant="body2" sx={{ opacity: 0.85 }}>Connecting…</Typography>}
+              sx={{ position: "absolute", inset: 0, zIndex: 5, bgcolor: "rgba(0,0,0,0.8)" }}>
+              <CircularProgress size={44} color="primary" />
+              <Typography variant="body2" sx={{ opacity: 0.85 }}>Connecting…</Typography>
             </Stack>
           )}
           {error && (
             <Stack alignItems="center" justifyContent="center" spacing={1}
-              sx={{ position: "absolute", inset: 0, zIndex: 2, p: 2 }}>
+              sx={{ position: "absolute", inset: 0, zIndex: 5, p: 2 }}>
               <Typography color="error" textAlign="center">{error}</Typography>
               <IconButton onClick={hangup} color="error"><CallEndIcon /></IconButton>
             </Stack>
           )}
+
+          {/* Screen-share layout: big viewer + picker + filmstrip */}
+          {staged ? (
+            <Box sx={{
+              flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
+              p: isSmallView ? 0.75 : 1.25, gap: 1,
+            }}>
+              {screenShares.length > 1 && (
+                <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, overflowX: "auto", pb: 0.25 }}>
+                  {screenShares.map((p) => (
+                    <Chip
+                      key={`pick-${p.id}`}
+                      clickable
+                      onClick={() => setStagedScreenId(p.id)}
+                      icon={<PresentToAllIcon sx={{ fontSize: 16 }} />}
+                      label={p.displayName || (p.id === "local-screen" || p.id === "local" ? "Your screen" : "Screen")}
+                      sx={{
+                        bgcolor: staged.id === p.id ? "primary.main" : "rgba(255,255,255,0.1)",
+                        color: "#fff",
+                        fontWeight: staged.id === p.id ? 700 : 500,
+                        border: "1px solid",
+                        borderColor: staged.id === p.id ? "primary.light" : "rgba(255,255,255,0.15)",
+                        "& .MuiChip-icon": { color: "#fff" },
+                      }}
+                    />
+                  ))}
+                </Stack>
+              )}
+              <Box sx={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+                <ScreenShareViewer
+                  participant={staged}
+                  isLocal={staged.id === "local" || staged.id === "local-screen"}
+                />
+              </Box>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{
+                  flexShrink: 0,
+                  height: isSmallView ? 80 : 92,
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  pb: 0.25,
+                }}
+              >
+                {screenShares.map((p) => (
+                  <Box
+                    key={`ss-${p.id}`}
+                    onClick={() => setStagedScreenId(p.id)}
+                    sx={{
+                      width: isSmallView ? 120 : 140,
+                      height: isSmallView ? 72 : 84,
+                      flex: "0 0 auto",
+                      borderRadius: 1.5,
+                      overflow: "hidden",
+                      cursor: "pointer",
+                      border: "2px solid",
+                      borderColor: staged.id === p.id ? "primary.main" : "rgba(255,255,255,0.12)",
+                    }}
+                  >
+                    <ParticipantTile
+                      participant={p}
+                      isLocal={p.id === "local" || p.id === "local-screen"}
+                      compact
+                      showAvatar={false}
+                    />
+                  </Box>
+                ))}
+                {others.filter((p) => !p.isScreen).map((p) => (
+                  <Box
+                    key={p.id}
+                    sx={{
+                      width: isSmallView ? 120 : 140,
+                      height: isSmallView ? 72 : 84,
+                      flex: "0 0 auto",
+                      borderRadius: 1.5,
+                      overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                    }}
+                  >
+                    <ParticipantTile
+                      participant={p}
+                      isLocal={p.id === "local"}
+                      compact
+                      speaking={speakingId === p.id || (p.id === "local" && speakingId === "local")}
+                    />
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          ) : (
+            /* Normal participant grid */
+            <Box sx={{
+              flex: 1,
+              minHeight: 0,
+              p: isSmallView ? 1 : 1.5,
+              display: "grid",
+              gridTemplateColumns: count <= 1 ? "1fr" : count === 2 ? "1fr 1fr" : count <= 4 ? "1fr 1fr" : "1fr 1fr 1fr",
+              gridTemplateRows: count <= 2 ? "1fr" : count <= 4 ? "1fr 1fr" : "1fr 1fr 1fr",
+              gap: isSmallView ? 1 : 1.25,
+              alignContent: "stretch",
+            }}>
+              {list.length === 0 && !loading ? (
+                <Stack alignItems="center" justifyContent="center" sx={{ gridColumn: "1 / -1" }}>
+                  <Avatar sx={{ width: 88, height: 88, bgcolor: "primary.dark", mb: 2, fontSize: 36 }}>
+                    {(title || "C")[0]?.toUpperCase()}
+                  </Avatar>
+                  <Typography sx={{ opacity: 0.75, mb: 0.5 }}>Ringing… waiting for others</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.5 }}>
+                    Ends in {Math.floor(ALONE_TIMEOUT_MS / 1000)}s if no one joins
+                  </Typography>
+                </Stack>
+              ) : (
+                list.filter((p) => !p.isScreen || p.id === "local").map((p) => (
+                  <Box key={p.id} sx={{ minHeight: 0, minWidth: 0, height: "100%" }}>
+                    <ParticipantTile
+                      participant={p}
+                      isLocal={p.id === "local"}
+                      isDominant={count === 1}
+                      compact={false}
+                      speaking={speakingId === p.id || (p.id === "local" && speakingId === "local")}
+                    />
+                  </Box>
+                ))
+              )}
+            </Box>
+          )}
         </Box>
 
-        {!isMini && railOpen && renderRail()}
-      </Box>
+        {railOpen && renderRail()}
+        {renderCallChat()}
+        </Box>
 
-      {/* Controls */}
-      <Paper elevation={0} sx={{
-        py: isMini ? 0.6 : (isSmallView ? 1 : 1.25),
-        px: 1,
-        bgcolor: "rgba(0,0,0,0.7)", backdropFilter: "blur(12px)",
-        borderTop: "1px solid rgba(255,255,255,0.06)",
-        flexShrink: 0,
-      }}>
-        {renderControls(isMini)}
-      </Paper>
-
-      {/* Device selection sheet */}
-      {renderDeviceSheet()}
-
-      {/* Toast */}
-      {toast && (
-        <Box sx={{
-          position: "absolute",
-          bottom: 80, left: "50%",
-          transform: "translateX(-50%)",
-          bgcolor: "rgba(0,0,0,0.85)", color: "#fff",
-          px: 2, py: 1, borderRadius: 2, fontSize: 13,
-          zIndex: 10, maxWidth: "80%", textAlign: "center",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+        {/* ── Controls ── */}
+        <Paper elevation={0} sx={{
+          py: isSmallView ? 1 : 1.25,
+          px: 1,
+          bgcolor: "rgba(0,0,0,0.75)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          flexShrink: 0,
         }}>
-          {toast}
-        </Box>
-      )}
-      </>
+          {renderControls(false)}
+        </Paper>
+
+        {renderDeviceSheet()}
+
+        {toast && (
+          <Box sx={{
+            position: "absolute",
+            bottom: 88,
+            left: "50%",
+            transform: "translateX(-50%)",
+            bgcolor: "rgba(0,0,0,0.88)",
+            color: "#fff",
+            px: 2, py: 1,
+            borderRadius: 2,
+            fontSize: 13,
+            zIndex: 20,
+            maxWidth: "80%",
+            textAlign: "center",
+          }}>
+            {toast}
+          </Box>
+        )}
+      </Box>
       )}
     </Box>
   );
