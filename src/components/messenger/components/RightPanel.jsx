@@ -26,6 +26,8 @@ import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
 import SendIcon from "@mui/icons-material/Send";
+import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
+import ChatMediaLibraryDialog from "./ChatMediaLibraryDialog";
 import {
   convAvatar, convTitle, peerUser, myRole, withTokenQuery,
 } from "../messengerUtils";
@@ -64,6 +66,14 @@ export default function RightPanel({
   canGoBack, onBack, onClose,
   onOpenMyProfile, onOpenContacts, onOpenBlocks, onOpenMyRequests, onOpenConvJoinRequests,
   onOpenCreateGroup, onOpenJoin, onNavigateHome, onOpenMediaSettings,
+  onOpenSharedMedia,
+  onOpenChatInfo,
+  conversationId,
+  onMediaShowInChat,
+  onMediaView,
+  onMediaDownload,
+  onMediaReply,
+  onMediaForward,
   onStartDm, onRemoveContact, onUnblock,
   onPatchGroup, onCreateInvite, onRevokeInvite,
   onOpenAddMembers, onAddContact, onBlockUser, onMessage, onViewProfile,
@@ -76,6 +86,7 @@ export default function RightPanel({
   // All hooks MUST be declared before any conditional `return` — otherwise
   // the hook count varies between renders of different `kind` panels and
   // React throws "Invalid hook call" (#300) when the user switches panels.
+    const [showSharedMedia, setShowSharedMedia] = useState(false);
   const [memberCtx, setMemberCtx] = useState(null); // { x, y, user, role }
   const [memberMenuAnchor, setMemberMenuAnchor] = useState(null); // for ⋮ button
   const [memberMenuTarget, setMemberMenuTarget] = useState(null);
@@ -358,6 +369,7 @@ export default function RightPanel({
         {header}
         <ProfileView
           profileData={profileData}
+          onOpenChatInfo={onOpenChatInfo}
           isOnline={profileData?.id && onlineUsers?.has(Number(profileData.id))}
           onMessage={onMessage}
           onAddContact={onAddContact}
@@ -365,6 +377,37 @@ export default function RightPanel({
           onVoiceCall={onVoiceCall}
           onVideoCall={onVideoCall}
         />
+      </Box>
+    );
+  }
+
+
+  if (showSharedMedia) {
+    return (
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.paper", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {header}
+        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: 1, pb: 1 }}>
+          <ChatMediaLibraryDialog
+            embedded
+            open
+            onClose={() => setShowSharedMedia(false)}
+            conversationId={conversationId || activeConv?.id}
+            onShowInChat={(att) => {
+              setShowSharedMedia(false);
+              onMediaShowInChat?.(att);
+            }}
+            onView={(att, ctx) => onMediaView?.(att, ctx)}
+            onDownload={(att) => onMediaDownload?.(att)}
+            onReply={(att) => {
+              setShowSharedMedia(false);
+              onMediaReply?.(att);
+            }}
+            onForward={(att) => {
+              setShowSharedMedia(false);
+              onMediaForward?.(att);
+            }}
+          />
+        </Box>
       </Box>
     );
   }
@@ -501,6 +544,27 @@ export default function RightPanel({
           </Typography>
         )}
       </Box>
+
+      {typeof onOpenSharedMedia === "function" && (
+        <Box sx={{ px: 2, pb: 1.5 }}>
+          <ListItemButton
+            data-shared-media-btn="" onClick={() => setShowSharedMedia(true)}
+            sx={{
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: (t) => t.palette.mode === "dark" ? "rgba(25,118,210,0.08)" : "rgba(25,118,210,0.04)",
+            }}
+          >
+            <ListItemIcon><PhotoLibraryIcon color="primary" /></ListItemIcon>
+            <ListItemText
+              primary="Shared media"
+              secondary="Photos · Videos · Music"
+              primaryTypographyProps={{ fontWeight: 700 }}
+            />
+          </ListItemButton>
+        </Box>
+      )}
 
       {activeConv?.type === "group" && (
         <Box sx={{ px: 2, pb: 2 }}>

@@ -125,8 +125,6 @@ export default function SimpleHtmlEditor({
             flex: 1,
             minHeight: expanded ? Math.max(minHeight, 72) : minHeight,
             maxHeight: expanded ? Math.max(maxHeight, 220) : maxHeight,
-            px: 1,
-            py: 0.75,
             overflow: "auto",
             px: 1.5,
             py: compact ? 1 : 1.25,

@@ -24,12 +24,24 @@ import { attachmentKind, withTokenQuery, formatDuration } from "../messengerUtil
  *  - video: custom controls (play, seek, volume, fullscreen)
  *  - arrow navigation between media in the conversation
  */
-export default function MediaGalleryDialog({ open, conversationId, startAttachment, onClose }) {
+export default function MediaGalleryDialog({
+  open,
+  conversationId,
+  startAttachment,
+  onClose,
+  onShowInChat,
+  onReply,
+  onForward,
+  initialItems = null,
+  kinds = null,
+}) {
   const [items, setItems] = useState([]);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextBefore, setNextBefore] = useState(null);
+  const pendingAdvanceRef = useRef(false);
+  const kindsParam = kinds || "image,video";
 
   const videoRef = useRef(null);
   const containerRef = useRef(null);
@@ -59,27 +71,39 @@ export default function MediaGalleryDialog({ open, conversationId, startAttachme
     }
   }, [open, startAttachment]);
 
-  // Fetch media list
+  // Fetch media list (or use list handed from Shared media)
   useEffect(() => {
-    if (!open || !conversationId || !startAttachment) return;
+    if (!open || !startAttachment) return;
     let cancelled = false;
     (async () => {
+      // Prefer the same list the user was browsing in Shared media
+      if (Array.isArray(initialItems) && initialItems.length) {
+        let list = [...initialItems];
+        if (startAttachment?.id && !list.some((a) => String(a.id) === String(startAttachment.id))) {
+          list = [startAttachment, ...list];
+        }
+        setItems(list);
+        const foundIdx = list.findIndex((a) => String(a.id) === String(startAttachment.id));
+        setIndex(foundIdx >= 0 ? foundIdx : 0);
+        setHasMore(true); // allow loading older while paging
+        setNextBefore(list[list.length - 1]?.message_id || list[list.length - 1]?.message?.id || null);
+        return;
+      }
+      if (!conversationId) return;
       setLoading(true);
       try {
         const k = attachmentKind(startAttachment);
-        const kindsParam = k === "video" || k === "image" ? "image,video" : k;
+        const kp = kinds || (k === "video" || k === "image" ? "image,video" : k);
         const res = await apiRequest({
           method: "GET",
-          url: `${MSG_API}/conversations/${conversationId}/media/?kind=${kindsParam}&limit=50`,
+          url: `${MSG_API}/conversations/${conversationId}/media/?kind=${encodeURIComponent(kp)}&limit=50`,
         });
         if (cancelled) return;
         const data = unwrapData(res);
         let list = data?.results || [];
-        // Ensure the clicked attachment is in the list
         if (startAttachment?.id && !list.some((a) => String(a.id) === String(startAttachment.id))) {
           list = [startAttachment, ...list];
         }
-        // If API returned nothing, still show the clicked item
         if (!list.length && startAttachment) list = [startAttachment];
         setItems(list);
         setHasMore(Boolean(data?.has_more));
@@ -96,37 +120,61 @@ export default function MediaGalleryDialog({ open, conversationId, startAttachme
       }
     })();
     return () => { cancelled = true; };
-  }, [open, conversationId, startAttachment]);
+  }, [open, conversationId, startAttachment, initialItems, kinds]);
+
 
   const loadMore = useCallback(async () => {
-    if (!conversationId || !hasMore || loading || !nextBefore) return;
+    if (!conversationId || loading) return false;
+    const cursor = nextBefore;
+    if (!cursor && !hasMore) return false;
     setLoading(true);
     try {
-      const res = await apiRequest({
-        method: "GET",
-        url: `${MSG_API}/conversations/${conversationId}/media/?kind=image,video&before_id=${nextBefore}&limit=50`,
-      });
+      let url = `${MSG_API}/conversations/${conversationId}/media/?kind=${encodeURIComponent(kindsParam)}&limit=40`;
+      if (cursor) url += `&before_id=${cursor}`;
+      const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const older = data?.results || [];
-      setItems((prev) => [...prev, ...older]);
+      if (!older.length) {
+        setHasMore(false);
+        setNextBefore(null);
+        return false;
+      }
+      setItems((prev) => {
+        const ids = new Set(prev.map((x) => String(x.id)));
+        return [...prev, ...older.filter((x) => x?.id != null && !ids.has(String(x.id)))];
+      });
       setHasMore(Boolean(data?.has_more));
-      setNextBefore(data?.next_before_id || null);
-    } catch { /* */ } finally {
+      setNextBefore(data?.next_before_id || older[older.length - 1]?.message_id || null);
+      return true;
+    } catch {
+      return false;
+    } finally {
       setLoading(false);
     }
-  }, [conversationId, hasMore, loading, nextBefore]);
+  }, [conversationId, hasMore, loading, nextBefore, kindsParam]);
 
-  const goPrev = useCallback(() => {
-    setIndex((i) => {
-      if (i > 0) return i - 1;
-      if (hasMore) loadMore();
-      return i;
-    });
-  }, [hasMore, loadMore]);
-
-  const goNext = useCallback(() => {
+  // After load-more for "next", advance once new items arrive
+  useEffect(() => {
+    if (!pendingAdvanceRef.current) return;
+    pendingAdvanceRef.current = false;
     setIndex((i) => (i < items.length - 1 ? i + 1 : i));
   }, [items.length]);
+
+  const goPrev = useCallback(() => {
+    setIndex((i) => (i > 0 ? i - 1 : i));
+  }, []);
+
+  const goNext = useCallback(() => {
+    setIndex((i) => {
+      if (i < items.length - 1) return i + 1;
+      // At end of loaded list → fetch older media, then advance
+      if (conversationId && (hasMore || nextBefore)) {
+        pendingAdvanceRef.current = true;
+        loadMore();
+      }
+      return i;
+    });
+  }, [items.length, conversationId, hasMore, nextBefore, loadMore]);
 
   // Keyboard
   useEffect(() => {
@@ -261,8 +309,26 @@ export default function MediaGalleryDialog({ open, conversationId, startAttachme
             {current?.original_filename || (kind === "video" ? "Video" : "Photo")}
             {items.length > 1 ? `  ·  ${index + 1}/${items.length}` : ""}
           </Typography>
+          {onShowInChat && current && (
+            <IconButton
+              onClick={() => { onShowInChat(current); onClose?.(); }}
+              sx={{ color: "#fff" }}
+              title="Show in chat"
+            >
+              <Typography variant="caption" sx={{ color: "#fff", px: 0.5 }}>In chat</Typography>
+            </IconButton>
+          )}
+          {onReply && current && (
+            <IconButton
+              onClick={() => { onReply(current); onClose?.(); }}
+              sx={{ color: "#fff" }}
+              title="Reply"
+            >
+              <Typography variant="caption" sx={{ color: "#fff", px: 0.5 }}>Reply</Typography>
+            </IconButton>
+          )}
           {src && (
-            <IconButton onClick={onDownload} sx={{ color: "#fff" }} size="small">
+            <IconButton onClick={onDownload} sx={{ color: "#fff" }} size="small" title="Download">
               <DownloadIcon />
             </IconButton>
           )}

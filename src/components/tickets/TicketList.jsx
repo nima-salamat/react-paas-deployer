@@ -206,11 +206,11 @@ export default function TicketList() {
               })}
             </TableBody>
           </Table>
-          {Math.ceil((count || 0) / 15) > 1 && (
+          {Math.ceil((count || 0) / 10) > 1 && (
             <Box display="flex" justifyContent="center" py={1.5}>
               <Pagination
                 page={page}
-                count={Math.max(1, Math.ceil((count || 0) / 15))}
+                count={Math.max(1, Math.ceil((count || 0) / 10))}
                 onChange={(_, p) => setPage(p)}
                 color="primary"
                 showFirstButton

@@ -74,7 +74,8 @@ export default function ChatComposer({
           </IconButton>
         </Tooltip>
 
-        <SimpleHtmlEditor enterSends={false} maxHeight={192} minHeight={36} 
+        <SimpleHtmlEditor
+          enterSends={false}
           value={value}
           onChange={(html) => {
             valueRef.current = html;

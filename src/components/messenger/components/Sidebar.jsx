@@ -196,41 +196,79 @@ export default function Sidebar({
         />
       )}
 
-      <Box sx={{ px: 1.25, pb: 1 }}>
+      <Box sx={{ px: { xs: 1.5, sm: 1.25 }, pb: 1 }}>
         <TextField
-          fullWidth size="small" placeholder="Search users…"
-          value={searchQ} onChange={(e) => setSearchQ(e.target.value)}
+          fullWidth
+          size="small"
+          placeholder={listTab === 1 ? "Search public groups…" : "Search users…"}
+          value={listTab === 1 ? publicSearchQ : searchQ}
+          onChange={(e) => {
+            if (listTab === 1) {
+              onPublicSearchChange(e);
+            } else {
+              setSearchQ(e.target.value);
+            }
+          }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                {searching ? <CircularProgress size={14} /> : <SearchIcon fontSize="small" />}
+                {listTab === 0 && searching ? <CircularProgress size={16} /> : <SearchIcon fontSize="small" />}
               </InputAdornment>
             ),
-            endAdornment: searchQ ? (
+            endAdornment: (listTab === 1 ? publicSearchQ : searchQ) ? (
               <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchQ("")}><CloseIcon fontSize="small" /></IconButton>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    if (listTab === 1) {
+                      setPublicSearchQ("");
+                      searchPublicGroups("");
+                    } else {
+                      setSearchQ("");
+                    }
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
               </InputAdornment>
             ) : null,
+          }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2,
+              minHeight: { xs: 44, sm: 40 },
+              fontSize: { xs: 16, sm: 14 },
+              bgcolor: "action.hover",
+            },
+            "& .MuiOutlinedInput-input": {
+              py: { xs: 1.25, sm: 1 },
+            },
           }}
         />
       </Box>
 
-      {!searchQ.trim() && (
-        <Tabs value={listTab} onChange={(_, v) => {
+      <Tabs
+        value={listTab}
+        onChange={(_, v) => {
           setListTab(v);
-          // When switching to "Public groups" tab, do NOT auto-load — clear results
+          // Clear the other mode's query so the shared search bar stays relevant
           if (v === 1) {
+            setSearchQ("");
+            setPublicSearchQ("");
+            searchPublicGroups("");
+          } else {
             setPublicSearchQ("");
             searchPublicGroups("");
           }
         }}
-          variant="fullWidth" sx={{ minHeight: 36, "& .MuiTab-root": { minHeight: 36, py: 0.5, fontSize: 13 } }}>
-          <Tab label="Chats" />
-          <Tab label="Public groups" />
-        </Tabs>
-      )}
+        variant="fullWidth"
+        sx={{ minHeight: 36, "& .MuiTab-root": { minHeight: 36, py: 0.5, fontSize: 13 } }}
+      >
+        <Tab label="Chats" />
+        <Tab label="Public groups" />
+      </Tabs>
 
-      {searchQ.trim() ? (
+      {listTab === 0 && searchQ.trim() ? (
         <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
           {searchResults.map((u) => (
             <ListItemButton
@@ -269,32 +307,6 @@ export default function Sidebar({
         </List>
       ) : listTab === 1 ? (
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <Box sx={{ px: 1.25, py: 1.25 }}>
-            <TextField
-              fullWidth size="small"
-              placeholder="Search public groups by name…"
-              value={publicSearchQ}
-              onChange={onPublicSearchChange}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-                endAdornment: publicSearchQ ? (
-                  <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => {
-                      setPublicSearchQ("");
-                      searchPublicGroups("");
-                    }}><CloseIcon fontSize="small" /></IconButton>
-                  </InputAdornment>
-                ) : null,
-              }}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, px: 0.5 }}>
-              Type to discover public groups. They are not listed automatically.
-            </Typography>
-          </Box>
           <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
             {publicGroups.map((g) => {
               const isMember = Boolean(g.is_member);

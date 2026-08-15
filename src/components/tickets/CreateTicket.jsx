@@ -6,6 +6,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, unwrapData, unwrapList } from "./api";
+import SimpleHtmlEditor, { htmlToPlain } from "./SimpleHtmlEditor";
 
 export default function CreateTicket() {
   const navigate = useNavigate();
@@ -63,7 +64,8 @@ export default function CreateTicket() {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!departmentId || subject.trim().length < 3 || !body.trim()) {
+    const plain = htmlToPlain(body);
+    if (!departmentId || subject.trim().length < 3 || !plain) {
       setError("Please fill department, subject (min 3 chars) and message.");
       return;
     }
@@ -72,7 +74,11 @@ export default function CreateTicket() {
       const form = new FormData();
       form.append("department_id", departmentId);
       form.append("subject", subject.trim());
-      form.append("body", body.trim().includes("<") ? body : `<p>${body.replace(/\n/g, "<br>")}</p>`);
+      // Keep rich HTML when present; otherwise wrap plain text
+      const htmlBody = body && /<[a-z][\s\S]*>/i.test(body)
+        ? body
+        : `<p>${String(body || "").replace(/\n/g, "<br>")}</p>`;
+      form.append("body", htmlBody);
       form.append("priority", priority);
       if (serviceId) form.append("service_id", serviceId);
       if (deployId) form.append("deploy_id", deployId);
@@ -144,7 +150,22 @@ export default function CreateTicket() {
               <MenuItem value="urgent">Urgent</MenuItem>
             </Select>
           </FormControl>
-          <TextField label="Message" required multiline minRows={6} value={body} onChange={(e) => setBody(e.target.value)} fullWidth />
+          <Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
+              Message
+            </Typography>
+            <SimpleHtmlEditor
+              value={body}
+              onChange={setBody}
+              placeholder="Describe your issue…"
+              minHeight={140}
+              maxHeight={320}
+              enterSends={false}
+              compact={false}
+              showToolbarToggle
+              expanded
+            />
+          </Box>
           <Button variant="outlined" component="label">
             Attach files
             <input hidden type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />

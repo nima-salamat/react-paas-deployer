@@ -547,11 +547,16 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
 
 
 
-function ChatVideo({ src, filename, contentType, circular = false, attachment, onOpen }) {
+function ChatVideo({ src, filename, contentType, circular = false, attachment, onOpen, conversationId }) {
   const videoRef = React.useRef(null);
   const [playing, setPlaying] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [progress, setProgress] = React.useState(0);
   const safeSrc = React.useMemo(() => withTokenQuery(src), [src]);
+  const pipKey = React.useMemo(
+    () => `vn:${attachment?.id || safeSrc || filename || Math.random()}`,
+    [attachment?.id, safeSrc, filename]
+  );
 
   const applySpeakerSink = React.useCallback(async (forceId) => {
     const el = videoRef.current;
@@ -572,6 +577,7 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
   React.useEffect(() => {
     setError("");
     setPlaying(false);
+    setProgress(0);
   }, [safeSrc]);
 
   React.useEffect(() => {
@@ -585,6 +591,27 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
       window.removeEventListener("storage", onStorage);
     };
   }, [applySpeakerSink, safeSrc]);
+
+  const publishPip = React.useCallback((payload) => {
+    try {
+      window.dispatchEvent(new CustomEvent("messenger:video-note-pip", { detail: payload }));
+    } catch { /* */ }
+  }, []);
+
+  React.useEffect(() => () => {
+    const v = videoRef.current;
+    if (v && !v.paused && !v.ended && circular) {
+      publishPip({
+        key: pipKey,
+        src: safeSrc,
+        currentTime: v.currentTime || 0,
+        conversationId: conversationId ?? null,
+        filename,
+        contentType,
+        playing: true,
+      });
+    }
+  }, [circular, pipKey, safeSrc, conversationId, filename, contentType, publishPip]);
 
   const openFull = (e) => {
     e?.stopPropagation?.();
@@ -614,7 +641,7 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
   if (!safeSrc) {
     return (
       <Box sx={{
-        width: circular ? 300 : "100%", height: circular ? 300 : 180, maxWidth: 360,
+        width: circular ? 220 : "100%", height: circular ? 220 : 180, maxWidth: 360,
         bgcolor: "action.hover", borderRadius: circular ? "50%" : 2,
         display: "flex", alignItems: "center", justifyContent: "center",
         mx: circular ? "auto" : undefined,
@@ -628,12 +655,18 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
     return (
       <Box
         sx={{
-          width: 300, height: 300, position: "relative", display: "block",
+          width: 220, height: 220, position: "relative", display: "block",
           borderRadius: "50%", overflow: "hidden", bgcolor: "#000", cursor: "pointer",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.4), 0 0 0 4px rgba(0,0,0,0.55)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.35), 0 0 0 3px rgba(0,0,0,0.45)",
           mx: "auto",
+          isolation: "isolate",
+          "& video": {
+            borderRadius: "50%",
+            objectFit: "cover",
+            objectPosition: "center",
+          },
         }}
-        onClick={openFull}
+        onClick={toggleLocal}
       >
         <video
           ref={videoRef}
@@ -641,28 +674,66 @@ function ChatVideo({ src, filename, contentType, circular = false, attachment, o
           playsInline
           preload="metadata"
           muted={false}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
-          onError={() => setError("Could not load video")}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", background: "#000" }}
-        />
-        <Box
-          onClick={(e) => { e.stopPropagation(); openFull(e); }}
-          sx={{
-            position: "absolute", inset: 0, display: "flex", alignItems: "center",
-            justifyContent: "center", bgcolor: "rgba(0,0,0,0.22)",
-            "&:hover": { bgcolor: "rgba(0,0,0,0.38)" },
+          onPlay={() => {
+            setPlaying(true);
+            publishPip(null);
           }}
-        >
-          <Box sx={{
-            width: 64, height: 64, borderRadius: "50%", bgcolor: "rgba(0,0,0,0.55)",
-            display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
-            border: "2px solid rgba(255,255,255,0.35)",
-          }}>
-            <PlayArrowIcon sx={{ fontSize: 34, ml: 0.5 }} />
+          onPause={() => setPlaying(false)}
+          onEnded={() => {
+            setPlaying(false);
+            setProgress(0);
+            publishPip(null);
+          }}
+          onTimeUpdate={(e) => {
+            const el = e.currentTarget;
+            if (el.duration) setProgress(el.currentTime / el.duration);
+          }}
+          onError={() => setError("Could not load video")}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center",
+            display: "block",
+            background: "#000",
+            borderRadius: "50%",
+          }}
+        />
+        {playing && (
+          <Box
+            component="svg"
+            viewBox="0 0 100 100"
+            sx={{
+              position: "absolute", inset: 0, pointerEvents: "none",
+              transform: "rotate(-90deg)",
+            }}
+          >
+            <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
+            <circle
+              cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="3"
+              strokeDasharray={`${2 * Math.PI * 48}`}
+              strokeDashoffset={`${2 * Math.PI * 48 * (1 - progress)}`}
+              strokeLinecap="round"
+            />
           </Box>
-        </Box>
+        )}
+        {!playing && (
+          <Box
+            sx={{
+              position: "absolute", inset: 0, display: "flex", alignItems: "center",
+              justifyContent: "center", bgcolor: "rgba(0,0,0,0.28)",
+              pointerEvents: "none",
+            }}
+          >
+            <Box sx={{
+              width: 56, height: 56, borderRadius: "50%", bgcolor: "rgba(0,0,0,0.55)",
+              display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
+              border: "2px solid rgba(255,255,255,0.35)",
+            }}>
+              <PlayArrowIcon sx={{ fontSize: 32, ml: 0.4 }} />
+            </Box>
+          </Box>
+        )}
         {error && (
           <Typography variant="caption" sx={{
             position: "absolute", bottom: 8, left: 8, right: 8, color: "#fff",
@@ -916,6 +987,8 @@ export default function MessageBubble({
   onOpenPreview, onShowReaders, onLoadUserProfile,
   onJumpToMessage, onPlayAudio, onToggleAudio, onSeekAudio,
   onMentionClick,
+  onDayClick,
+  onCancelSchedule,
   // Global audio player state — used to render inline progress on the active message
   activeAudioId, audioIsPlaying, audioCurrentTime, audioDuration,
   selectionMode = false,
@@ -926,10 +999,61 @@ export default function MessageBubble({
 }) {
   const theme = useTheme();
   if (m.type === "day") {
+    const dayActive = Boolean(m._dayHighlight);
     return (
-      <Box sx={{ textAlign: "center", my: 1.5 }}>
-        <Chip label={m.label} size="small"
-          sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), fontSize: 11 }} />
+      <Box
+        data-day-id={m.id}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.25,
+          my: 1.75,
+          px: 1,
+        }}
+      >
+        <Box
+          sx={{
+            flex: 1,
+            height: 0,
+            borderTop: "1px solid",
+            borderColor: dayActive ? "warning.main" : "divider",
+            opacity: dayActive ? 0.85 : 0.7,
+          }}
+        />
+        <Chip
+          label={m.label}
+          size="small"
+          onClick={(e) => { e.stopPropagation(); onDayClick?.(m); }}
+          sx={{
+            fontSize: 11,
+            fontWeight: dayActive ? 800 : 600,
+            cursor: onDayClick ? "pointer" : "default",
+            flexShrink: 0,
+            bgcolor: dayActive
+              ? (t) => t.palette.mode === "dark" ? "rgba(255,193,7,0.35)" : "rgba(255,193,7,0.55)"
+              : alpha(theme.palette.background.paper, 0.92),
+            color: dayActive ? "warning.contrastText" : "text.secondary",
+            boxShadow: dayActive ? "0 0 0 3px rgba(255,193,7,0.45)" : "none",
+            transition: "background-color 0.25s, box-shadow 0.25s, transform 0.25s",
+            transform: dayActive ? "scale(1.06)" : "none",
+            animation: dayActive ? "dayChipFlash 2.2s ease-out" : "none",
+            "@keyframes dayChipFlash": {
+              "0%": { boxShadow: "0 0 0 6px rgba(255,193,7,0.55)", transform: "scale(1.08)" },
+              "40%": { boxShadow: "0 0 0 3px rgba(255,193,7,0.4)", transform: "scale(1.05)" },
+              "100%": { boxShadow: "0 0 0 0 rgba(255,193,7,0)", transform: "scale(1)" },
+            },
+            "&:hover": onDayClick ? { bgcolor: dayActive ? undefined : "action.selected" } : undefined,
+          }}
+        />
+        <Box
+          sx={{
+            flex: 1,
+            height: 0,
+            borderTop: "1px solid",
+            borderColor: dayActive ? "warning.main" : "divider",
+            opacity: dayActive ? 0.85 : 0.7,
+          }}
+        />
       </Box>
     );
   }
@@ -1243,6 +1367,23 @@ export default function MessageBubble({
             Download all ({(m.attachments || []).length})
           </Button>
         )}
+        {m.is_scheduled && mine && (
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+            <Typography variant="caption" sx={{ opacity: 0.85 }}>
+              Scheduled{m.scheduled_for ? ` · ${new Date(m.scheduled_for).toLocaleString()}` : ""}
+            </Typography>
+            {onCancelSchedule && (
+              <Typography
+                variant="caption"
+                color="error"
+                sx={{ cursor: "pointer", fontWeight: 700 }}
+                onClick={(e) => { e.stopPropagation(); onCancelSchedule(m); }}
+              >
+                Cancel
+              </Typography>
+            )}
+          </Stack>
+        )}
         {(m.attachments || []).map((a) => {
           const k = attachmentKind(a);
           const url = withTokenQuery(a.url);
@@ -1309,6 +1450,7 @@ export default function MessageBubble({
                   circular={!!videoMsg}
                   attachment={a}
                   onOpen={onOpenPreview}
+                  conversationId={m.conversation_id || activeConv?.id}
                 />
               ) : voice || k === "audio" ? (
                 /* Single Telegram-style player for voice + music.

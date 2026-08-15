@@ -43,6 +43,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 import { withTokenQuery } from "../messengerUtils";
 
@@ -468,6 +469,70 @@ function joinMarkdownCode(prefix, files, suffix) {
   return [prefix, mid, suffix].filter((x) => x && String(x).length).join("\n\n");
 }
 
+
+/** Center-crop recorded video into a square (circle content only, no white frame). */
+async function cropVideoMessageToSquare(blob) {
+  if (!blob || !blob.size) return blob;
+  try {
+    const url = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    await new Promise((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = reject;
+    });
+    const w = video.videoWidth || 480;
+    const h = video.videoHeight || 480;
+    const side = Math.min(w, h);
+    const sx = Math.floor((w - side) / 2);
+    const sy = Math.floor((h - side) / 2);
+    const canvas = document.createElement("canvas");
+    canvas.width = side;
+    canvas.height = side;
+    const ctx = canvas.getContext("2d");
+    const stream = canvas.captureStream(30);
+    // Prefer keeping original audio track if present
+    try {
+      const srcStream = video.captureStream?.() || video.mozCaptureStream?.();
+      if (srcStream) {
+        srcStream.getAudioTracks().forEach((tr) => stream.addTrack(tr));
+      }
+    } catch { /* */ }
+    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
+      ? "video/webm;codecs=vp9,opus"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+        ? "video/webm;codecs=vp8,opus"
+        : "video/webm";
+    const chunks = [];
+    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1_200_000 });
+    rec.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
+    const stopped = new Promise((resolve) => { rec.onstop = resolve; });
+    rec.start(100);
+    await video.play().catch(() => {});
+    const draw = () => {
+      if (video.paused || video.ended) return;
+      try { ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side); } catch { /* */ }
+      requestAnimationFrame(draw);
+    };
+    draw();
+    await new Promise((resolve) => {
+      video.onended = resolve;
+      // safety timeout
+      setTimeout(resolve, Math.min(65000, (video.duration || 15) * 1000 + 500));
+    });
+    try { rec.stop(); } catch { /* */ }
+    await stopped;
+    URL.revokeObjectURL(url);
+    try { stream.getTracks().forEach((tr) => tr.stop()); } catch { /* */ }
+    if (!chunks.length) return blob;
+    return new Blob(chunks, { type: mime });
+  } catch {
+    return blob;
+  }
+}
+
 export default function MessageComposer({
 
   text, setText, files, setFiles,
@@ -475,12 +540,19 @@ export default function MessageComposer({
   onSend, onPickImage, onPickVideo, onEditAttachment, inputRef, onKeyDown,
   sendFilesTogether = true, setSendFilesTogether,
   mentionUsers = [],
+  scheduledFor = null,
+  setScheduledFor,
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const fileRef = useRef(null);
   const emojiBtnRef = useRef(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleDraft, setScheduleDraft] = useState("");
+  const sendLongPressTimer = useRef(null);
+  const sendLongPressFired = useRef(false);
+
   const [scQuery, setScQuery] = useState(null); // { query, start, end }
   const [scIndex, setScIndex] = useState(0);
   const scMatches = React.useMemo(
@@ -712,12 +784,22 @@ export default function MessageComposer({
         return;
       }
       const ts = Date.now();
-      const filename = mode === "video" ? `video_message_${ts}.webm` : `voice_${ts}.webm`;
-      const file = new File([blob], filename, { type: recordedType });
-      flushSync(() => {
-        setFiles((prev) => [...prev, file]);
-      });
-      try { onSend?.(); } catch { /* */ }
+      const finish = (finalBlob, finalType) => {
+        const filename = mode === "video" ? `video_message_${ts}.webm` : `voice_${ts}.webm`;
+        const file = new File([finalBlob], filename, { type: finalType || recordedType });
+        flushSync(() => {
+          setFiles((prev) => [...prev, file]);
+        });
+        try { onSend?.(); } catch { /* */ }
+      };
+      if (mode === "video") {
+        // Center-crop to the circular view (square content only — no white padding)
+        cropVideoMessageToSquare(blob).then((cropped) => {
+          finish(cropped, cropped.type || recordedType);
+        }).catch(() => finish(blob, recordedType));
+      } else {
+        finish(blob, recordedType);
+      }
     };
     mediaRecorderRef.current = mr;
     mr.start(100);
@@ -1432,6 +1514,19 @@ export default function MessageComposer({
             }}
           >
             <Box sx={{ position: "relative" }}>
+              {/* Fixed circle frame: white outside the record area (Telegram-style) */}
+              <Box
+                sx={{
+                  width: { xs: 196, sm: 232 },
+                  height: { xs: 196, sm: 232 },
+                  borderRadius: "50%",
+                  bgcolor: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
+                }}
+              >
               <Box
                 sx={{
                   width: { xs: 168, sm: 200 },
@@ -1440,7 +1535,7 @@ export default function MessageComposer({
                   overflow: "hidden",
                   border: "3px solid",
                   borderColor: showLock ? "warning.main" : "error.main",
-                  boxShadow: "0 12px 40px rgba(0,0,0,0.45), 0 0 0 4px rgba(0,0,0,0.25)",
+                  boxShadow: "0 0 0 2px rgba(0,0,0,0.08)",
                   bgcolor: "#000",
                 }}
               >
@@ -1458,6 +1553,7 @@ export default function MessageComposer({
                     transform: cameraFacing === "user" ? "scaleX(-1)" : "none",
                   }}
                 />
+              </Box>
               </Box>
               <IconButton
                 onClick={flipCamera}
@@ -2216,12 +2312,6 @@ export default function MessageComposer({
             updateSuggestionsFromText(el.value, el.selectionStart);
           }}
           onMouseUp={(e) => rememberSelection(e.target)}
-          onTouchEnd={(e) => {
-            // mobile: selection often finalizes after touchend
-            const el = e.target;
-            setTimeout(() => rememberSelection(el), 0);
-          }}
-
           onTouchStart={(e) => {
             if (!isMobile) return;
             const t = e.touches?.[0];
@@ -2244,7 +2334,12 @@ export default function MessageComposer({
             }, 480);
           }}
           onTouchMove={() => { clearTimeout(fmtLongPressTimer.current); }}
-          onTouchEnd={() => { clearTimeout(fmtLongPressTimer.current); }}
+          onTouchEnd={(e) => {
+            clearTimeout(fmtLongPressTimer.current);
+            // mobile: selection often finalizes after touchend
+            const el = e.target;
+            setTimeout(() => rememberSelection(el), 0);
+          }}
           onTouchCancel={() => { clearTimeout(fmtLongPressTimer.current); }}
           onBlur={(e) => {
             // Keep last range so format buttons still wrap the right text
@@ -2269,18 +2364,96 @@ export default function MessageComposer({
           }}
         />
 
+        {/* Schedule clock — desktop only (mobile: long-press Send) */}
+        {canSend && !editingMsg && setScheduledFor && !isMobile && (
+          <Tooltip title={scheduledFor ? `Scheduled: ${new Date(scheduledFor).toLocaleString()}` : "Schedule message"}>
+            <IconButton
+              size="small"
+              color={scheduledFor ? "warning" : "default"}
+              onClick={() => {
+                const d = scheduledFor ? new Date(scheduledFor) : new Date();
+                const pad = (n) => String(n).padStart(2, "0");
+                const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                setScheduleDraft(local);
+                setScheduleDialogOpen(true);
+              }}
+              sx={{ mb: 0.25 }}
+            >
+              <AccessTimeIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
         {/* When there is something to send → Send. Otherwise Telegram-style media buttons. */}
         {canSend ? (
-          <IconButton
-            color="primary"
-            onClick={onSend}
-            sx={{
-              bgcolor: "primary.main", color: "#fff",
-              "&:hover": { bgcolor: "primary.dark" },
-            }}
-          >
-            {editingMsg ? <DoneIcon /> : <SendIcon />}
-          </IconButton>
+          <Box sx={{ position: "relative", display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+            {/* Tiny schedule badge in the corner between text input & Send — no layout height */}
+            {scheduledFor && !editingMsg && (
+              <Box
+                aria-hidden
+                sx={{
+                  position: "absolute",
+                  left: -2,
+                  top: 2,
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  bgcolor: "background.paper",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                  pointerEvents: "none",
+                  boxShadow: (t) => `0 0 0 1px ${alpha(t.palette.warning.main, 0.35)}`,
+                }}
+              >
+                <AccessTimeIcon sx={{ fontSize: 10, color: "warning.main" }} />
+              </Box>
+            )}
+            <IconButton
+              color="primary"
+              title={
+                isMobile && !editingMsg
+                  ? (scheduledFor
+                    ? `Scheduled: ${new Date(scheduledFor).toLocaleString()} · hold to change`
+                    : "Tap to send · hold to schedule")
+                  : (scheduledFor ? `Scheduled: ${new Date(scheduledFor).toLocaleString()}` : "Send")
+              }
+              onClick={() => {
+                if (sendLongPressFired.current) {
+                  sendLongPressFired.current = false;
+                  return;
+                }
+                onSend?.();
+              }}
+              onPointerDown={(e) => {
+                if (!isMobile || editingMsg || !setScheduledFor) return;
+                if (e.button != null && e.button !== 0) return;
+                sendLongPressFired.current = false;
+                clearTimeout(sendLongPressTimer.current);
+                sendLongPressTimer.current = setTimeout(() => {
+                  sendLongPressFired.current = true;
+                  try { e.target?.releasePointerCapture?.(e.pointerId); } catch { /* */ }
+                  // Prefer previously chosen time so user can edit; otherwise start from now
+                  const d = scheduledFor ? new Date(scheduledFor) : new Date();
+                  const pad = (n) => String(n).padStart(2, "0");
+                  const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+                  setScheduleDraft(local);
+                  setScheduleDialogOpen(true);
+                }, 450);
+              }}
+              onPointerUp={() => clearTimeout(sendLongPressTimer.current)}
+              onPointerLeave={() => clearTimeout(sendLongPressTimer.current)}
+              onPointerCancel={() => clearTimeout(sendLongPressTimer.current)}
+              onContextMenu={(e) => { if (isMobile) e.preventDefault(); }}
+              sx={{
+                bgcolor: scheduledFor ? "warning.main" : "primary.main",
+                color: "#fff",
+                "&:hover": { bgcolor: scheduledFor ? "warning.dark" : "primary.dark" },
+              }}
+            >
+              {editingMsg ? <DoneIcon /> : <SendIcon />}
+            </IconButton>
+          </Box>
         ) : (
           <Tooltip title={primaryMode === "voice" ? "Tap for video · hold to record voice" : "Tap for voice · hold to record video"}>
             <IconButton
@@ -2390,6 +2563,110 @@ export default function MessageComposer({
         </DialogContent>
         <DialogActions>
           <Button onClick={closeFilePreview} sx={{ textTransform: "none" }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={scheduleDialogOpen} onClose={() => setScheduleDialogOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ pr: 6, position: "relative" }}>
+          Schedule message
+          <IconButton
+            onClick={() => setScheduleDialogOpen(false)}
+            size="small"
+            aria-label="Close"
+            sx={{ position: "absolute", right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Pick date and time. The message stays only on your side until then; cancel removes it for everyone.
+          </Typography>
+          {/* Mobile: separate date + time so native pickers don't overflow the screen.
+              Desktop: single datetime-local is fine. */}
+          {isMobile ? (
+            <Stack spacing={1.5}>
+              <TextField
+                label="Date"
+                type="date"
+                fullWidth
+                value={(scheduleDraft || "").split("T")[0] || ""}
+                onChange={(e) => {
+                  const datePart = e.target.value;
+                  const timePart = (scheduleDraft || "").split("T")[1] || "00:00:00";
+                  setScheduleDraft(datePart ? `${datePart}T${timePart}` : "");
+                }}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="Time"
+                type="time"
+                fullWidth
+                value={(() => {
+                  const t = (scheduleDraft || "").split("T")[1] || "";
+                  // Ensure HH:mm:ss for step=1
+                  if (!t) return "";
+                  const parts = t.split(":");
+                  if (parts.length === 2) return `${parts[0]}:${parts[1]}:00`;
+                  return t.slice(0, 8);
+                })()}
+                onChange={(e) => {
+                  let timePart = e.target.value || "";
+                  if (timePart && timePart.split(":").length === 2) timePart = `${timePart}:00`;
+                  const datePart = (scheduleDraft || "").split("T")[0] || "";
+                  if (!datePart && timePart) {
+                    const d = new Date();
+                    const pad = (n) => String(n).padStart(2, "0");
+                    const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+                    setScheduleDraft(`${today}T${timePart}`);
+                  } else {
+                    setScheduleDraft(datePart ? `${datePart}T${timePart}` : "");
+                  }
+                }}
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ step: 1 }}
+              />
+            </Stack>
+          ) : (
+            <TextField
+              label="Send at"
+              type="datetime-local"
+              fullWidth
+              value={scheduleDraft}
+              onChange={(e) => setScheduleDraft(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ step: 1 }}
+            />
+          )}
+          {scheduledFor && (
+            <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: "block" }}>
+              Currently scheduled: {new Date(scheduledFor).toLocaleString()}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {scheduledFor && (
+            <Button color="inherit" onClick={() => { setScheduledFor?.(null); setScheduleDialogOpen(false); }}>
+              Clear
+            </Button>
+          )}
+          <Button onClick={() => setScheduleDialogOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (!scheduleDraft) return;
+              const dt = new Date(scheduleDraft);
+              // Must be in the future (allow ~1s tolerance for clock skew)
+              if (Number.isNaN(dt.getTime()) || dt.getTime() <= Date.now() - 1000) {
+                return;
+              }
+              setScheduledFor?.(dt.toISOString());
+              setScheduleDialogOpen(false);
+              // Only set schedule — user taps Send when ready (same on mobile & desktop)
+            }}
+          >
+            Set
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

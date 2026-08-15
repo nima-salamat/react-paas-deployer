@@ -2397,24 +2397,26 @@ export default function JitsiCallModal({
       sv.lastTs = now;
       const speedUp = sv.velocity < 0 ? -sv.velocity : 0;
 
-      let threshold = Math.max(220, el.clientHeight * 0.55);
-      if (speedUp > 0.35) threshold = Math.max(threshold, el.clientHeight * 1.1);
-      if (speedUp > 0.8) threshold = Math.max(threshold, el.clientHeight * 1.7);
-      if (speedUp > 1.4) threshold = Math.max(threshold, el.clientHeight * 2.4);
+      let threshold = Math.max(420, el.clientHeight * 1.1);
+      if (speedUp > 0.25) threshold = Math.max(threshold, el.clientHeight * 1.5);
+      if (speedUp > 0.6) threshold = Math.max(threshold, el.clientHeight * 2.0);
+      if (speedUp > 1.1) threshold = Math.max(threshold, el.clientHeight * 2.8);
 
       if (el.scrollTop < threshold && hasMoreMessages && !loadingMore && onLoadOlder && !chatLoadingOlderRef.current) {
         chatLoadingOlderRef.current = true;
+        chatNearBottomRef.current = false; // prevent auto-jump to bottom while prepending
         chatPinAfterLoadRef.current = {
           height: el.scrollHeight,
           top: el.scrollTop,
         };
-        onLoadOlder();
-        setTimeout(() => {
-          if (chatLoadingOlderRef.current && chatPinAfterLoadRef.current) {
-            chatLoadingOlderRef.current = false;
-            chatPinAfterLoadRef.current = null;
-          }
-        }, 2500);
+        Promise.resolve(onLoadOlder()).finally(() => {
+          // Keep pin until the messages-effect restores scroll; then release.
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              chatLoadingOlderRef.current = false;
+            }, 80);
+          });
+        });
       }
     };
 

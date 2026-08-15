@@ -41,7 +41,7 @@ import { withTokenQuery } from "../messengerUtils";
  *  - onVideoCall: (user) => void   // start a video call with this user
  */
 export default function ProfileView({
-  profileData, onMessage, onAddContact, onBlock, isOnline,
+  profileData, onMessage, onAddContact, onBlock, isOnline, onOpenChatInfo,
   onVoiceCall, onVideoCall,
 }) {
   const [galleryIndex, setGalleryIndex] = useState(null);
@@ -169,6 +169,16 @@ export default function ProfileView({
         >
           Message
         </Button>
+        {typeof onOpenChatInfo === "function" && (
+          <Button
+            variant="outlined"
+            onClick={onOpenChatInfo}
+            sx={{ borderRadius: 1, textTransform: "none", fontWeight: 700 }}
+          >
+            Chat info
+          </Button>
+        )}
+
         <Tooltip title="Voice call">
           <Button
             variant="outlined"
@@ -228,11 +238,11 @@ export default function ProfileView({
         )}
       </Stack>
 
-      {/* Photos section */}
+      {/* Profile images section */}
       {photos.length > 0 && (
         <Box sx={{ mt: 2 }}>
           <Typography variant="caption" color="text.secondary" gutterBottom sx={{ fontWeight: 600 }}>
-            Photos ({photos.length})
+            Profile images ({photos.length})
           </Typography>
           <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
             {photos.map((ph, i) => (

@@ -37,7 +37,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+/* ContentCopyIcon removed from chat header — copy lives in ProfileView */
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import BlockIcon from "@mui/icons-material/Block";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -69,6 +69,7 @@ import ConfirmDialog from "./components/ConfirmDialog";
 import ContextMenu from "./components/ContextMenu";
 import AudioPlayerBar from "./components/AudioPlayerBar";
 import MediaGalleryDialog from "./components/MediaGalleryDialog";
+import ChatMediaLibraryDialog from "./components/ChatMediaLibraryDialog";
 import MediaSettingsDialog from "./components/MediaSettingsDialog";
 import VideoEditDialog from "./components/VideoEditDialog";
 import PinnedMessageBar from "./components/PinnedMessageBar";
@@ -76,99 +77,87 @@ import JitsiCallModal from "./components/JitsiCallModal";
 import IncomingCallBanner from "./components/IncomingCallBanner";
 import AddToContactsBanner from "./components/AddToContactsBanner";
 import GroupDescriptionBanner from "./components/GroupDescriptionBanner";
+import DayJumpDialog from "./components/DayJumpDialog";
+import MessageSearchDialog from "./components/MessageSearchDialog";
+import AuthRequiredDialog from "./components/AuthRequiredDialog";
+import PreviewTextBody from "./components/PreviewTextBody";
+import { attachMessengerOriginal, messengerOriginalOf, guessLangFromName } from "./modules/fileHelpers";
 import { mergeConversations } from "./modules/mergeConversations";
 
 import CallIcon from "@mui/icons-material/Call";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import CallEndIcon from "@mui/icons-material/CallEnd";
+import SearchIcon from "@mui/icons-material/Search";
+import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
-/** Keep the pre-edit source so re-opening the editor never stacks crops. */
-function attachMessengerOriginal(file, source) {
-  if (!file) return file;
+
+
+
+
+/* ── Composer text drafts (per conversation, localStorage) ── */
+const DRAFTS_LS_KEY = "messenger.composerDrafts";
+function readComposerDrafts() {
   try {
-    const orig = source?.__messengerOriginal || source || file;
-    Object.defineProperty(file, "__messengerOriginal", {
-      value: orig,
-      writable: true,
-      configurable: true,
-    });
+    const raw = localStorage.getItem(DRAFTS_LS_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return obj && typeof obj === "object" ? obj : {};
   } catch {
-    file.__messengerOriginal = source?.__messengerOriginal || source || file;
+    return {};
   }
-  return file;
 }
-function messengerOriginalOf(file) {
-  return file?.__messengerOriginal || file;
+function writeComposerDraft(convId, text) {
+  if (convId == null) return;
+  const key = String(convId);
+  try {
+    const all = readComposerDrafts();
+    const t = String(text || "");
+    if (!t.trim()) delete all[key];
+    else all[key] = t;
+    localStorage.setItem(DRAFTS_LS_KEY, JSON.stringify(all));
+  } catch { /* quota / private mode */ }
+}
+function readComposerDraft(convId) {
+  if (convId == null) return "";
+  try {
+    const all = readComposerDrafts();
+    return typeof all[String(convId)] === "string" ? all[String(convId)] : "";
+  } catch {
+    return "";
+  }
 }
 
-
-function guessLangFromName(name = "") {
-  const n = String(name).toLowerCase();
-  const map = {
-    py: "python", js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
-    java: "java", c: "c", h: "c", cpp: "cpp", hpp: "cpp", cs: "csharp", go: "go", rs: "rust",
-    rb: "ruby", php: "php", swift: "swift", sh: "bash", bash: "bash", sql: "sql",
-    html: "html", htm: "html", css: "css", scss: "scss", json: "json", md: "markdown",
-    yml: "yaml", yaml: "yaml", xml: "xml", toml: "ini",
-  };
-  const m = n.match(/\.([a-z0-9]+)$/);
-  return (m && map[m[1]]) || "";
+/* ── Group description dismissals (persist; re-show if text changes) ── */
+const DESC_DISMISS_LS_KEY = "messenger.dismissedGroupDesc";
+function readDismissedGroupDesc() {
+  try {
+    const raw = localStorage.getItem(DESC_DISMISS_LS_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return obj && typeof obj === "object" ? obj : {};
+  } catch {
+    return {};
+  }
 }
-
-function PreviewTextBody({ text, filename }) {
-  const [html, setHtml] = React.useState(null);
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const raw = text || "";
-      const lang = guessLangFromName(filename);
-      try {
-        const mod = await import("highlight.js");
-        try { await import("highlight.js/styles/github-dark.css"); } catch { /* */ }
-        const hljs = mod.default || mod;
-        let out;
-        if (lang && hljs.getLanguage(lang)) {
-          out = hljs.highlight(raw, { language: lang, ignoreIllegals: true }).value;
-        } else {
-          out = hljs.highlightAuto(raw).value;
-        }
-        if (!cancelled) setHtml(out);
-      } catch {
-        if (!cancelled) setHtml(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [text, filename]);
-
-  return (
-    <Box
-      component="pre"
-      sx={{
-        m: 0,
-        p: { xs: 1, sm: 2 },
-        width: "100%",
-        maxHeight: "70vh",
-        overflow: "auto",
-        bgcolor: "#0d1117",
-        borderRadius: 1,
-        fontSize: { xs: 12, sm: 13 },
-        lineHeight: 1.55,
-        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-        color: "#e6edf3",
-        whiteSpace: "pre",
-        wordBreak: "normal",
-        "& .hljs-comment": { color: "#8b949e", fontStyle: "italic" },
-        "& .hljs-keyword": { color: "#ff7b72" },
-        "& .hljs-string": { color: "#a5d6ff" },
-        "& .hljs-number": { color: "#79c0ff" },
-        "& .hljs-title": { color: "#d2a8ff" },
-        "& .hljs-built_in": { color: "#ffa657" },
-      }}
-      {...(html
-        ? { dangerouslySetInnerHTML: { __html: html } }
-        : { children: text })}
-    />
-  );
+function isGroupDescDismissed(convId, description) {
+  if (convId == null) return false;
+  try {
+    const map = readDismissedGroupDesc();
+    const entry = map[String(convId)];
+    if (!entry) return false;
+    // If description text changed since dismiss, show again
+    return entry === String(description || "");
+  } catch {
+    return false;
+  }
+}
+function persistGroupDescDismiss(convId, description) {
+  if (convId == null) return;
+  try {
+    const map = readDismissedGroupDesc();
+    map[String(convId)] = String(description || "");
+    localStorage.setItem(DESC_DISMISS_LS_KEY, JSON.stringify(map));
+  } catch { /* */ }
 }
 
 export default function MessengerApp() {
@@ -225,6 +214,7 @@ export default function MessengerApp() {
   const [activeId, setActiveId] = useState(null);
   const [activeDetail, setActiveDetail] = useState(null);
   const [messages, setMessages] = useState([]);
+  const messagesRef = useRef([]);
   const [hasMoreMsgs, setHasMoreMsgs] = useState(false);
   const [nextBefore, setNextBefore] = useState(null);
   const [loadingConvs, setLoadingConvs] = useState(true);
@@ -269,6 +259,15 @@ export default function MessengerApp() {
 
   // Composer state
   const [text, setText] = useState("");
+  const [scheduledFor, setScheduledFor] = useState(null);
+  const [dayJumpOpen, setDayJumpOpen] = useState(false);
+  const [msgSearchOpen, setMsgSearchOpen] = useState(false);
+  const [msgSearchQ, setMsgSearchQ] = useState("");
+  const [msgSearchResults, setMsgSearchResults] = useState([]);
+  const [msgSearchLoading, setMsgSearchLoading] = useState(false);
+  const [msgSearchIdx, setMsgSearchIdx] = useState(-1);
+
+
   const [files, setFiles] = useState([]);
   const [sendFilesTogether, setSendFilesTogether] = useState(() => {
     try { return localStorage.getItem("messenger.sendFilesTogether") !== "false"; } catch { return true; }
@@ -347,6 +346,7 @@ export default function MessengerApp() {
 
   // Media settings dialog (camera / microphone picker for voice & video msgs)
   const [mediaSettingsOpen, setMediaSettingsOpen] = useState(false);
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
 
   // Video edit dialog (trim + crop before sending)
   const [videoEditFile, setVideoEditFile] = useState(null);
@@ -365,11 +365,39 @@ export default function MessengerApp() {
   const [incomingCall, setIncomingCall] = useState(null); // { conversation_id, initiator, media, ... }
   const [activeCallInfo, setActiveCallInfo] = useState(null); // ongoing/ringing in current chat
   const [callMode, setCallMode] = useState("inline"); // "full" | "inline" | "mini" — from JitsiCallModal
+  // Telegram-style fixed video-note PiP (not draggable; tied to one conversation)
+  const [videoNotePip, setVideoNotePip] = useState(null); // { key, src, currentTime, conversationId, ... }
+
   const seenRingIdsRef = useRef(new Set());
   const incomingCallRef = useRef(null);
   useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
   const conversationsRef = useRef([]);
   useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+
+  // Video-note PiP: listen for hand-off from ChatVideo; stop when leaving that chat
+  useEffect(() => {
+    const onPip = (e) => {
+      const d = e?.detail;
+      if (!d) {
+        setVideoNotePip(null);
+        return;
+      }
+      setVideoNotePip(d);
+    };
+    window.addEventListener("messenger:video-note-pip", onPip);
+    return () => window.removeEventListener("messenger:video-note-pip", onPip);
+  }, []);
+
+  useEffect(() => {
+    // Leaving the conversation that owns the video-note → stop PiP
+    setVideoNotePip((prev) => {
+      if (!prev) return null;
+      if (prev.conversationId == null) return null;
+      if (activeId == null) return null; // chat list: stop
+      if (String(prev.conversationId) !== String(activeId)) return null;
+      return prev;
+    });
+  }, [activeId]);
 
 
   // When chat changes, check live/ringing call (also covers offline→online within ring window)
@@ -443,8 +471,16 @@ export default function MessengerApp() {
 
   // Audio player bar — persists across chat switches
   const [audioPlayer, setAudioPlayer] = useState(null); // { att, title }
-  // Group description banners the user has dismissed (per conversation id)
-  const [dismissedGroupDesc, setDismissedGroupDesc] = useState(() => new Set());
+  // Group description banners the user has dismissed (per conversation id).
+  // Values are description snapshots so a changed description shows again.
+  const [dismissedGroupDesc, setDismissedGroupDesc] = useState(() => {
+    try {
+      const map = readDismissedGroupDesc();
+      return new Map(Object.entries(map));
+    } catch {
+      return new Map();
+    }
+  });
   // Lifted audio player state — shared with MessageBubble so the active voice/audio
   // bubble can render inline progress + play/pause.
   const [audioState, setAudioState] = useState({
@@ -532,6 +568,7 @@ export default function MessengerApp() {
 
   // Reply-jump highlight
   const [jumpHighlightId, setJumpHighlightId] = useState(null);
+  const [jumpHighlightDayId, setJumpHighlightDayId] = useState(null);
 
   // Refs
   const bottomRef = useRef(null);
@@ -564,6 +601,7 @@ export default function MessengerApp() {
   useEffect(() => { profileDataRef.current = profileData; }, [profileData]);
 
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   /**
    * Cross-chat incoming-call poller.
@@ -961,7 +999,15 @@ export default function MessengerApp() {
       setMessages((prev) => {
         const ids = new Set(prev.map((m) => String(m.id)));
         const uniqueOlder = older.filter((m) => m?.id != null && !ids.has(String(m.id)));
-        return [...uniqueOlder, ...prev];
+        const next = [...uniqueOlder, ...prev];
+        // Keep cache + ref in sync immediately so jump-to-day can read oldest day
+        try {
+          const key = String(cid);
+          const cached = messagesCacheRef.current.get(key) || {};
+          messagesCacheRef.current.set(key, { ...cached, messages: next, hasMore: Boolean(data?.has_more), nextBefore: data?.next_before_id || older[0]?.id || null });
+          messagesRef.current = next;
+        } catch { /* */ }
+        return next;
       });
       const hm = Boolean(data?.has_more);
       const nb = data?.next_before_id || older[0]?.id || null;
@@ -1019,8 +1065,9 @@ export default function MessengerApp() {
     closePanel();
     setHashReady(true);
     setHash(null);
-    if (isMobile) setDrawerOpen(true);
-  }, [isMobile, closePanel]);
+    // Always show the chat-list sidebar after leaving a chat (desktop + mobile)
+    setDrawerOpen(true);
+  }, [closePanel]);
 
   const openChat = useCallback(async (c, { hashUser, jumpToMessageId } = {}) => {
     if (!c?.id) return;
@@ -1045,9 +1092,14 @@ export default function MessengerApp() {
     setActiveId(c.id);
     activeIdRef.current = c.id;
     setMobileShowChat(true);
+    setMsgSearchOpen(false);
+    setMsgSearchQ("");
+    setMsgSearchResults([]);
+    setMsgSearchIdx(-1);
     setReplyTo(null);
     setEditingMsg(null);
-    setText("");
+    // Restore any unsent text draft for this conversation
+    setText(readComposerDraft(c.id));
     setCtx(null);
     if (isMobile) setDrawerOpen(false);
 
@@ -1228,13 +1280,19 @@ export default function MessengerApp() {
       });
       const cfg = unwrapData(res);
       if (cfg?.room) {
+        const isGroup = conv?.type === "group";
+        const peer = !isGroup ? peerUser(conv, meId) : null;
         setCallConfig({
           ...cfg,
           is_initiator: true,
-          is_group: conv?.type === "group",
+          is_group: isGroup,
           conversation_id: activeId,
-          peer_title: convTitle(conv, meId) || "Call",
-          peer_avatar: withTokenQuery(convAvatar(conv, meId)) || null,
+          peer_title: isGroup
+            ? (convTitle(conv, meId) || "Group call")
+            : (peer?.username || peer?.display_name || convTitle(conv, meId) || "Call"),
+          peer_avatar: withTokenQuery(
+            isGroup ? convAvatar(conv, meId) : (peer?.avatar || peer?.avatar_url || convAvatar(conv, meId))
+          ) || null,
         });
         setActiveCallInfo({
           call_id: cfg.call_id,
@@ -1288,8 +1346,10 @@ export default function MessengerApp() {
               setCallConfig({
                 ...cfg,
                 is_initiator: true,
-                peer_title: user.username || "Call",
-                peer_avatar: withTokenQuery(user.avatar) || null,
+                is_group: false,
+                conversation_id: convId,
+                peer_title: user.username || user.display_name || "Call",
+                peer_avatar: withTokenQuery(user.avatar || user.avatar_url) || null,
               });
               setActiveCallInfo({
                 call_id: cfg.call_id,
@@ -1712,22 +1772,47 @@ export default function MessengerApp() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== "Escape") return;
+      // Don't steal Esc from an open native <dialog> / contenteditable edge case
       if (preview) { setPreview(null); return; }
       if (galleryState) { setGalleryState(null); return; }
+      if (mediaLibraryOpen) { setMediaLibraryOpen(false); return; }
       if (readersMessage) { setReadersMessage(null); return; }
       if (videoEditFile) { setVideoEditFile(null); return; }
       if (cropFile) { setCropFile(null); return; }
       if (mediaSettingsOpen) { setMediaSettingsOpen(false); return; }
+      if (msgSearchOpen) { closeMsgSearch(); return; }
+      if (dayJumpOpen) { setDayJumpOpen(false); return; }
       if (ctx) { setCtx(null); return; }
       if (reactAnchor) { setReactAnchor(null); return; }
-      if (editingMsg) { setEditingMsg(null); setText(""); return; }
+      if (editingMsg) {
+        setEditingMsg(null);
+        setText(activeId ? readComposerDraft(activeId) : "");
+        return;
+      }
       if (replyTo) { setReplyTo(null); return; }
-      if (panelHistory.length) { popPanel(); return; }
-      if (activeId) { closeChat(); return; }
+      if (panelHistory.length) {
+        // Close the entire right panel stack so the next Esc can leave the chat
+        closePanel();
+        return;
+      }
+      // Desktop: if the chat-list drawer was hidden with ">", reopen it first
+      if (!isMobile && !drawerOpen) {
+        setDrawerOpen(true);
+        return;
+      }
+      // Leave the open chat → show conversation list (drawer guaranteed open)
+      if (activeId || mobileShowChat) {
+        closeChat();
+        return;
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [preview, galleryState, readersMessage, videoEditFile, cropFile, mediaSettingsOpen, ctx, reactAnchor, editingMsg, replyTo, panelHistory, activeId, closeChat, popPanel]);
+  }, [
+    preview, galleryState, mediaLibraryOpen, readersMessage, videoEditFile, cropFile,
+    mediaSettingsOpen, msgSearchOpen, dayJumpOpen, ctx, reactAnchor, editingMsg, replyTo,
+    panelHistory, activeId, mobileShowChat, closeChat, closePanel, drawerOpen, isMobile,
+  ]);
 
   /**
    * Mobile browser / OS back button:
@@ -1928,7 +2013,9 @@ export default function MessengerApp() {
         });
         const updated = unwrapData(res);
         setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)));
-        setEditingMsg(null); setText("");
+        setEditingMsg(null);
+        // After edit, restore any remaining draft for this chat (or empty)
+        setText(readComposerDraft(activeId));
         flash("Edited");
       } catch (e) {
         setError(e?.response?.data?.message || "Edit failed");
@@ -1949,6 +2036,7 @@ export default function MessengerApp() {
       const form = new FormData();
       form.append("body", body);
       if (replyTo) form.append("reply_to", replyTo.id);
+      if (scheduledFor) form.append("scheduled_for", scheduledFor);
       filesToSend.forEach((f) => form.append("files", f));
       const pendingId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const tempMsgId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -1959,7 +2047,7 @@ export default function MessengerApp() {
         const optimistic = {
           id: tempMsgId,
           body,
-          created_at: localCreatedAt,
+          created_at: scheduledFor || localCreatedAt,
           sender: {
             id: meId,
             username: profileDataRef.current?.username || "You",
@@ -1975,6 +2063,8 @@ export default function MessengerApp() {
             : null,
           read_state: "pending",
           _pending: true,
+          is_scheduled: Boolean(scheduledFor),
+          scheduled_for: scheduledFor || null,
         };
         setMessages((prev) => {
           const next = [...prev, optimistic].sort((a, b) => {
@@ -1996,7 +2086,9 @@ export default function MessengerApp() {
         }]);
       }
       setText(""); setFiles([]);
+      writeComposerDraft(activeId, "");
       setReplyTo(null);
+      setScheduledFor(null);
       try {
         const res = await apiRequest({
           method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`, data: form,
@@ -2038,6 +2130,7 @@ export default function MessengerApp() {
           } else {
             await loadMessages(activeId, { silent: true });
           }
+          setScheduledFor(null);
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
           loadConversations({ silent: true });
           if (filesToSend.length) setTimeout(() => setPendingUploads((prev) => prev.filter((u) => u.id !== pendingId)), 600);
@@ -2058,6 +2151,8 @@ export default function MessengerApp() {
     // "Send separately": each selected file becomes its own message.
     const rep = replyTo;
     setText(""); setFiles([]); setReplyTo(null);
+    writeComposerDraft(activeId, "");
+    setScheduledFor(null);
     let firstError = null;
     for (let i = 0; i < filesToSend.length; i += 1) {
       const file = filesToSend[i];
@@ -2106,11 +2201,25 @@ export default function MessengerApp() {
   };
 
   const onComposerKeyDown = (e) => {
-    if (e.key === "ArrowUp" && !text.trim() && !editingMsg) {
+    // ArrowUp → edit last own message ONLY when the composer is completely empty
+    // (no text, no blank lines from Shift+Enter). Whitespace-only / "\n\n" must NOT trigger.
+    if (
+      e.key === "ArrowUp"
+      && !e.shiftKey
+      && !e.altKey
+      && !e.ctrlKey
+      && !e.metaKey
+      && !editingMsg
+      && !replyTo
+      && text === ""
+    ) {
       const lastMine = [...messages].reverse().find(
-        (m) => String(m.sender?.id) === String(meId) && !m.is_deleted
+        (m) => String(m.sender?.id) === String(meId) && !m.is_deleted && !m.is_system
       );
-      if (lastMine) { e.preventDefault(); startEdit(lastMine); }
+      if (lastMine) {
+        e.preventDefault();
+        startEdit(lastMine);
+      }
       return;
     }
     // Real mobile device: Enter = new line (Send button only).
@@ -2332,6 +2441,247 @@ export default function MessengerApp() {
   const isMessagePinned = useCallback((msgId) => {
     return pinnedMessages.some((p) => String(p.message?.id) === String(msgId));
   }, [pinnedMessages]);
+  const jumpToMessageInChat = useCallback(async (messageId) => {
+    if (!messageId || !activeIdRef.current) return;
+    const id = String(messageId);
+
+    const flashTarget = (el) => {
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch { /* */ }
+      // Drive the React highlight on the message wrapper (yellow pulse)
+      setJumpHighlightId(id);
+      window.setTimeout(() => {
+        setJumpHighlightId((cur) => (String(cur) === id ? null : cur));
+      }, 2200);
+    };
+
+    const findEl = () =>
+      document.getElementById(`msg-${id}`)
+      || document.querySelector(`[data-msg-id="${id}"]`);
+
+    let el = findEl();
+    if (el) {
+      // Double rAF so layout is settled after dialog close
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      el = findEl() || el;
+      flashTarget(el);
+      return;
+    }
+
+    // Not in DOM yet — load older pages until it appears (wait for paint)
+    for (let i = 0; i < 30; i += 1) {
+      if (!hasMoreMsgsRef.current && i > 0) break;
+      await loadOlder();
+      // Wait for React commit + browser paint after prepending messages
+      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      el = findEl();
+      if (el) {
+        flashTarget(el);
+        return;
+      }
+    }
+    try { flash("Message not found — try Load older messages"); } catch { /* */ }
+  }, [loadOlder, flash]);
+
+  const jumpToDayInChat = useCallback(async (dayItem) => {
+    if (!dayItem) return;
+    const label = String(dayItem.label || "").trim();
+    if (!label) return;
+
+    const waitPaint = async () => {
+      await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    };
+
+    const findDayEl = () => {
+      // Always prefer label — day element id changes as older chunks prepend
+      const byLabel = Array.from(document.querySelectorAll("[data-day-label]")).find(
+        (n) => n.getAttribute("data-day-label") === label
+      );
+      if (byLabel) return byLabel;
+      const dayId = String(dayItem.id || "");
+      if (dayId) {
+        return document.getElementById(dayId)
+          || document.querySelector(`[data-day-id="${dayId}"]`);
+      }
+      return null;
+    };
+
+    const oldestDayLabel = () => {
+      let list = messagesRef.current || [];
+      if (!list.length) {
+        const cached = messagesCacheRef.current.get(String(activeIdRef.current));
+        list = cached?.messages || [];
+      }
+      if (!list.length) return null;
+      // messages are chronological ascending (oldest first)
+      return formatDay(list[0]?.created_at);
+    };
+
+    const flashDay = (el) => {
+      if (!el) return;
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch { /* */ }
+      // Highlight by label so it survives id renames after more loads
+      setJumpHighlightDayId(label);
+      window.setTimeout(() => {
+        setJumpHighlightDayId((cur) => (String(cur) === label ? null : cur));
+      }, 2200);
+    };
+
+    await waitPaint();
+
+    // Keep loading older history until we reach the START of this day:
+    // stop when the oldest loaded message is from an earlier day, or no more pages.
+    // Stopping at the first chunk that merely contains this day leaves the separator
+    // mid-day — user asked to land on the first message / day tag of that day.
+    for (let i = 0; i < 40; i += 1) {
+      const oldest = oldestDayLabel();
+      const el = findDayEl();
+
+      // True start of day: we have the day marker AND oldest message is NOT still this day
+      // (i.e. previous day is loaded, or history is exhausted).
+      if (el && oldest && oldest !== label) {
+        await waitPaint();
+        flashDay(findDayEl() || el);
+        return;
+      }
+      // History exhausted while still on this day → separator is at true start
+      if (el && !hasMoreMsgsRef.current) {
+        await waitPaint();
+        flashDay(findDayEl() || el);
+        return;
+      }
+
+      if (!hasMoreMsgsRef.current) break;
+      const lenBefore = (messagesRef.current || []).length;
+      await loadOlder();
+      // Wait until React commits prepended messages (or timeout)
+      for (let w = 0; w < 20; w += 1) {
+        await waitPaint();
+        if ((messagesRef.current || []).length !== lenBefore) break;
+      }
+    }
+
+    // Fallback: best available day marker even if mid-day
+    const finalEl = findDayEl();
+    if (finalEl) {
+      flashDay(finalEl);
+      return;
+    }
+    try { flash("Day not found — try Load older messages"); } catch { /* */ }
+  }, [loadOlder, flash]);
+
+  // Force yellow flash even when jumping to the same message again
+  const flashJumpMessage = useCallback((messageId) => {
+    if (messageId == null) return;
+    const id = String(messageId);
+    setJumpHighlightId(null);
+    // Re-apply on next frame so CSS animation restarts
+    requestAnimationFrame(() => {
+      setJumpHighlightId(id);
+      window.setTimeout(() => {
+        setJumpHighlightId((cur) => (String(cur) === id ? null : cur));
+      }, 2200);
+    });
+  }, []);
+
+  const msgSearchResultsRef = useRef([]);
+  useEffect(() => { msgSearchResultsRef.current = msgSearchResults; }, [msgSearchResults]);
+  const msgSearchIdxRef = useRef(-1);
+  useEffect(() => { msgSearchIdxRef.current = msgSearchIdx; }, [msgSearchIdx]);
+  const msgSearchLastQRef = useRef("");
+
+  const runMessageSearch = useCallback(async (q, { keepIndex = false } = {}) => {
+    const cid = activeIdRef.current;
+    const query = (q ?? "").trim();
+    if (!cid || !query) {
+      setMsgSearchResults([]);
+      setMsgSearchIdx(-1);
+      msgSearchLastQRef.current = "";
+      return;
+    }
+    // Skip duplicate network search for identical query (stops blink loop)
+    if (query === msgSearchLastQRef.current && msgSearchResultsRef.current.length) {
+      const idx = keepIndex && msgSearchIdxRef.current >= 0 ? msgSearchIdxRef.current : 0;
+      const mid = msgSearchResultsRef.current[idx]?.id
+        || msgSearchResultsRef.current[0]?.id;
+      if (mid) {
+        setMsgSearchIdx(idx >= 0 ? idx : 0);
+        await jumpToMessageInChat(mid);
+        flashJumpMessage(mid);
+      }
+      return;
+    }
+    setMsgSearchLoading(true);
+    try {
+      const res = await apiRequest({
+        method: "GET",
+        url: `${MSG_API}/conversations/${cid}/messages/search/?q=${encodeURIComponent(query)}&limit=80`,
+      });
+      const data = unwrapData(res);
+      const list = data?.results || [];
+      msgSearchLastQRef.current = query;
+      setMsgSearchResults(list);
+      if (list.length) {
+        const idx = 0;
+        setMsgSearchIdx(idx);
+        const mid = list[idx]?.id;
+        if (mid) {
+          await jumpToMessageInChat(mid);
+          flashJumpMessage(mid);
+        }
+      } else {
+        setMsgSearchIdx(-1);
+      }
+    } catch {
+      setMsgSearchResults([]);
+      setMsgSearchIdx(-1);
+    } finally {
+      setMsgSearchLoading(false);
+    }
+  }, [jumpToMessageInChat, flashJumpMessage]);
+
+  const goMsgSearchResult = useCallback((dir) => {
+    const list = msgSearchResultsRef.current;
+    if (!list.length) return;
+    let next = msgSearchIdxRef.current < 0 ? 0 : msgSearchIdxRef.current + dir;
+    if (next < 0) next = list.length - 1;
+    if (next >= list.length) next = 0;
+    setMsgSearchIdx(next);
+    const mid = list[next]?.id;
+    if (mid) {
+      jumpToMessageInChat(mid).then(() => flashJumpMessage(mid));
+    }
+  }, [jumpToMessageInChat, flashJumpMessage]);
+
+  const focusCurrentSearchResult = useCallback(() => {
+    const list = msgSearchResultsRef.current;
+    const idx = msgSearchIdxRef.current;
+    if (!list.length) {
+      runMessageSearch(msgSearchQ, { keepIndex: false });
+      return;
+    }
+    const i = idx >= 0 && idx < list.length ? idx : 0;
+    setMsgSearchIdx(i);
+    const mid = list[i]?.id;
+    if (mid) {
+      jumpToMessageInChat(mid).then(() => flashJumpMessage(mid));
+    }
+  }, [jumpToMessageInChat, flashJumpMessage, runMessageSearch, msgSearchQ]);
+
+  const closeMsgSearch = useCallback(() => {
+    setMsgSearchOpen(false);
+    setMsgSearchQ("");
+    setMsgSearchResults([]);
+    setMsgSearchIdx(-1);
+    msgSearchLastQRef.current = "";
+    setJumpHighlightId(null);
+  }, []);
+
 
   const sendTypingSignal = useCallback((isTyping) => {
     const cid = activeIdRef.current;
@@ -2366,6 +2716,12 @@ export default function MessengerApp() {
       return next;
     });
   }, [sendTypingSignal]);
+
+  // Persist draft whenever composer text changes (skip while editing a message)
+  useEffect(() => {
+    if (!activeId || editingMsg) return;
+    writeComposerDraft(activeId, text);
+  }, [text, activeId, editingMsg]);
 
   const formatTypingLabel = useCallback((map, isGroup) => {
     const list = Object.values(map || {});
@@ -2406,6 +2762,11 @@ export default function MessengerApp() {
       const data = unwrapData(res);
       setActiveDetail(data);
       setConversations((prev) => prev.map((c) => (c.id === data.id ? { ...c, ...data } : c)));
+      // History visibility changes require a fresh message window for all members
+      if (patch && Object.prototype.hasOwnProperty.call(patch, "history_visibility")) {
+        messagesCacheRef.current.delete(String(activeId));
+        await loadMessages(activeId, { silent: false, preserveOlder: false });
+      }
       flash("Updated");
     } catch (e) {
       setError(e?.response?.data?.message || "Update failed");
@@ -2870,29 +3231,9 @@ export default function MessengerApp() {
 
   // Reply-jump: scroll the replied message into view + flash highlight
   const onJumpToMessage = useCallback(async (msgId) => {
-    if (!msgId) return;
-    const el0 = document.getElementById(`msg-${msgId}`);
-    if (el0) {
-      el0.scrollIntoView({ behavior: "smooth", block: "center" });
-      setJumpHighlightId(msgId);
-      setTimeout(() => setJumpHighlightId((cur) => (cur === msgId ? null : cur)), 2000);
-      return;
-    }
-    // Message not in DOM yet — load older pages until it appears
-    for (let i = 0; i < 25; i++) {
-      if (!hasMoreMsgsRef.current && i > 0) break;
-      await loadOlder();
-      await new Promise((r) => setTimeout(r, 50));
-      const el = document.getElementById(`msg-${msgId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        setJumpHighlightId(msgId);
-        setTimeout(() => setJumpHighlightId((cur) => (cur === msgId ? null : cur)), 2000);
-        return;
-      }
-    }
-    flash("Message not found — try Load older messages");
-  }, [loadOlder]);
+    // Share the same robust path as search / day-jump
+    return jumpToMessageInChat(msgId);
+  }, [jumpToMessageInChat]);
 
   const goToAudioTrack = useCallback(async ({ conversationId, messageId }) => {
     if (conversationId && String(conversationId) !== String(activeId)) {
@@ -3238,13 +3579,29 @@ export default function MessengerApp() {
     }
     nearBottomRef.current = distBottom < 120;
 
-    // Activity-driven jump-to-bottom control:
-    //  - visible while the user is away from the bottom
-    //  - fades after a short idle, then unmounts
-    //  - reaching the bottom hides it until the user scrolls away again
-    //  - a click that programmatically scrolls stays suppressed until a real gesture
-    const shouldShowScrollDown = distBottom > 180;
-    if (!shouldShowScrollDown) {
+    // Scroll velocity (px/ms). Positive => toward newer msgs (down the list).
+    // Negative => toward older msgs (up).
+    const now = performance.now();
+    const sv = scrollVelRef.current;
+    const dt = Math.max(1, now - (sv.lastTs || now));
+    const dy = el.scrollTop - (sv.lastTop || el.scrollTop);
+    const inst = dy / dt;
+    sv.velocity = sv.lastTs ? (sv.velocity * 0.65 + inst * 0.35) : inst;
+    sv.lastTop = el.scrollTop;
+    sv.lastTs = now;
+    const scrollingDown = sv.velocity > 0.05;   // toward bottom / newer
+    const scrollingUp = sv.velocity < -0.05;    // toward top / older
+    const speedUp = sv.velocity < 0 ? -sv.velocity : 0;
+
+    // Jump-to-bottom FAB:
+    //  - hide at bottom
+    //  - show when the user scrolls DOWN while away from bottom (or has new msgs below)
+    //  - hide when the user scrolls UP through history (not useful then)
+    //  - stay suppressed during programmatic smooth-scroll until a real gesture
+    const awayFromBottom = distBottom > 180;
+    const hasNewBelow = (pendingNewIdsRef.current?.length || 0) > 0 || newBelowCount > 0;
+
+    if (!awayFromBottom) {
       scrollDownDismissedRef.current = false;
       userScrollIntentRef.current = false;
       if (scrollDownFadeTimerRef.current) {
@@ -3256,35 +3613,31 @@ export default function MessengerApp() {
       pendingNewIdsRef.current = [];
       setNewBelowCount(0);
     } else if (scrollDownDismissedRef.current && !userScrollIntentRef.current) {
-      // Programmatic smooth-scroll events — keep hidden until a real user gesture.
       setShowScrollDown(false);
       setScrollDownOpacity(0);
-    } else {
-      // Real user scroll (or not dismissed): show and (re)start idle fade.
+    } else if (scrollingUp && !hasNewBelow) {
+      // Reading older history — tuck the control away
+      if (scrollDownFadeTimerRef.current) {
+        clearTimeout(scrollDownFadeTimerRef.current);
+        scrollDownFadeTimerRef.current = null;
+      }
+      setScrollDownOpacity(0);
+      setShowScrollDown(false);
+    } else if (scrollingDown || hasNewBelow) {
       armScrollDownButton();
       recountNewBelow();
     }
+    // else: idle mid-chat — leave current visibility as-is (fade timer handles hide)
 
     markVisibleMessagesRead();
 
-    // Scroll velocity (px/ms). Negative => moving toward older messages (up).
-    const now = performance.now();
-    const sv = scrollVelRef.current;
-    const dt = Math.max(1, now - (sv.lastTs || now));
-    const dy = el.scrollTop - (sv.lastTop || el.scrollTop);
-    // EMA so one-frame spikes don't dominate
-    const inst = dy / dt;
-    sv.velocity = sv.lastTs ? (sv.velocity * 0.65 + inst * 0.35) : inst;
-    sv.lastTop = el.scrollTop;
-    sv.lastTs = now;
-    const speedUp = sv.velocity < 0 ? -sv.velocity : 0; // px/ms upward
-
     // Base prefetch window + expand aggressively when flinging upward.
     // speedUp ~0.5+ is a quick flick; ~1.5+ is a hard fling.
-    let threshold = isMobile ? Math.max(480, h * 0.9) : Math.max(360, h * 0.75);
-    if (speedUp > 0.35) threshold = Math.max(threshold, h * 1.35);
-    if (speedUp > 0.8) threshold = Math.max(threshold, h * 2.0);
-    if (speedUp > 1.4) threshold = Math.max(threshold, h * 2.8);
+    // Prefetch older messages earlier for smoother upward scroll
+    let threshold = isMobile ? Math.max(720, h * 1.35) : Math.max(560, h * 1.15);
+    if (speedUp > 0.25) threshold = Math.max(threshold, h * 1.6);
+    if (speedUp > 0.6) threshold = Math.max(threshold, h * 2.2);
+    if (speedUp > 1.1) threshold = Math.max(threshold, h * 3.0);
 
     if (el.scrollTop < threshold && (hasMoreMsgs || hasMoreMsgsRef.current) && !loadingMoreRef.current) {
       loadOlder();
@@ -3462,8 +3815,19 @@ export default function MessengerApp() {
   // header, above the audio player) so it never escapes the viewport on
   // window resize. We build it as a stable element here so the chat pane
   // can drop it into the right slot.
+  // Resolve the conversation the active call belongs to — never the currently
+  // open chat if the user navigated away mid-call.
+  const callConversationId = callConfig?.conversation_id || null;
+  const callConv = useMemo(() => {
+    if (!callConversationId) return null;
+    if (String(activeId) === String(callConversationId)) {
+      return activeDetail || activeConv || null;
+    }
+    return conversations.find((c) => String(c.id) === String(callConversationId)) || null;
+  }, [callConversationId, activeId, activeDetail, activeConv, conversations]);
+
   const callMemberDirectory = useMemo(() => {
-    const conv = activeDetail || activeConv;
+    const conv = callConv || (String(activeId) === String(callConversationId) ? (activeDetail || activeConv) : null);
     const parts = conv?.participants || [];
     const out = [];
     for (const p of parts) {
@@ -3485,13 +3849,21 @@ export default function MessengerApp() {
       });
     }
     return out;
-  }, [activeDetail, activeConv, meId, meAvatar, profileData]);
+  }, [callConv, callConversationId, activeId, activeDetail, activeConv, meId, meAvatar, profileData]);
 
   const callIsGroup = Boolean(
-    activeConv?.type === "group"
-    || activeDetail?.type === "group"
-    || callConfig?.is_group
+    callConfig?.is_group
+    || callConv?.type === "group"
   );
+
+  // In-call chat must show the call's conversation messages, not whatever
+  // chat the user currently has open in the main pane.
+  const callChatMessages = useMemo(() => {
+    if (!callConversationId) return [];
+    if (String(activeId) === String(callConversationId)) return messages || [];
+    const cached = messagesCacheRef.current.get(String(callConversationId));
+    return cached?.messages || [];
+  }, [callConversationId, activeId, messages]);
 
   const sendCallChat = useCallback(async (body) => {
     const cid = callConfig?.conversation_id || activeId;
@@ -3506,7 +3878,7 @@ export default function MessengerApp() {
       });
       const created = unwrapData(res);
       if (created) {
-        setMessages((prev) => {
+        const merge = (prev) => {
           const map = new Map();
           for (const m of prev || []) {
             if (m?.id != null) map.set(String(m.id), m);
@@ -3517,7 +3889,19 @@ export default function MessengerApp() {
             const tb = new Date(b.created_at || 0).getTime();
             return ta - tb;
           });
-        });
+        };
+        // Always keep cache for the call conversation in sync
+        const key = String(cid);
+        const cached = messagesCacheRef.current.get(key);
+        if (cached) {
+          messagesCacheRef.current.set(key, { ...cached, messages: merge(cached.messages) });
+        } else {
+          messagesCacheRef.current.set(key, { messages: merge([]), hasMore: true });
+        }
+        // Only mutate the visible messages list when that chat is open
+        if (String(activeIdRef.current) === String(cid)) {
+          setMessages((prev) => merge(prev));
+        }
       }
     } catch {
       flash("Could not send message");
@@ -3527,16 +3911,16 @@ export default function MessengerApp() {
   const callModalElement = callConfig ? (
     <JitsiCallModal
       callConfig={callConfig}
-      title={callConfig.peer_title || convTitle(activeConv, meId) || "Call"}
-      peerAvatar={callConfig.peer_avatar || withTokenQuery(convAvatar(activeConv, meId))}
+      title={callConfig.peer_title || convTitle(callConv, meId) || "Call"}
+      peerAvatar={callConfig.peer_avatar || withTokenQuery(convAvatar(callConv, meId))}
       isGroup={callIsGroup}
       memberDirectory={callMemberDirectory}
-      messages={messages}
+      messages={callChatMessages}
       meId={meId}
       onSendChat={sendCallChat}
-      onLoadOlder={loadOlder}
-      loadingMore={loadingMore}
-      hasMoreMessages={hasMoreMsgs}
+      onLoadOlder={String(activeId) === String(callConversationId) ? loadOlder : undefined}
+      loadingMore={String(activeId) === String(callConversationId) ? loadingMore : false}
+      hasMoreMessages={String(activeId) === String(callConversationId) ? hasMoreMsgs : false}
       onModeChange={setCallMode}
       onClose={async () => {
         const cid = callConfig?.conversation_id || activeId;
@@ -3623,13 +4007,27 @@ export default function MessengerApp() {
               </Box>
             </Box>
           )}
-          <Stack direction="row" alignItems="center" spacing={1}
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={msgSearchOpen ? (isMobile ? 0 : 0.5) : 1}
             sx={{
-              px: 1, py: 0.85, bgcolor: "background.paper",
-              borderBottom: "1px solid", borderColor: "divider", minHeight: 56,
-              position: "relative", zIndex: 11,
-            }}>
-            {isMobile && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
+              px: msgSearchOpen && isMobile ? 0.35 : 1,
+              py: 0.85,
+              bgcolor: "background.paper",
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              minHeight: 56,
+              position: "relative",
+              zIndex: 11,
+            }}
+          >
+            {isMobile && !msgSearchOpen && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
+            {isMobile && msgSearchOpen && (
+              <IconButton onClick={closeMsgSearch} size="small" sx={{ p: 0.4, flexShrink: 0 }} title="Close search">
+                <ArrowBackIcon fontSize="small" />
+              </IconButton>
+            )}
             {!isMobile && (
               <IconButton
                 onClick={() => setDrawerOpen((v) => !v)}
@@ -3639,6 +4037,113 @@ export default function MessengerApp() {
                 {drawerOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
               </IconButton>
             )}
+            {msgSearchOpen ? (
+              <>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  placeholder="Search messages…"
+                  value={msgSearchQ}
+                  onChange={(e) => setMsgSearchQ(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") { e.preventDefault(); closeMsgSearch(); }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      // First Enter: search (or re-focus current). Shift not used here.
+                      if (!msgSearchResults.length || msgSearchLastQRef.current !== msgSearchQ.trim()) {
+                        runMessageSearch(msgSearchQ);
+                      } else {
+                        goMsgSearchResult(1);
+                      }
+                    }
+                    if (e.key === "Enter" && e.shiftKey) {
+                      e.preventDefault();
+                      goMsgSearchResult(-1);
+                    }
+                    if (e.key === "F3") {
+                      e.preventDefault();
+                      goMsgSearchResult(e.shiftKey ? -1 : 1);
+                    }
+                  }}
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                      bgcolor: "action.hover",
+                      minHeight: { xs: 40, sm: 36 },
+                      fontSize: { xs: 16, sm: 14 },
+                    },
+                    "& .MuiOutlinedInput-input": {
+                      py: { xs: 1, sm: 0.75 },
+                      px: { xs: 1, sm: 1.5 },
+                    },
+                  }}
+                />
+                <IconButton
+                  color="primary"
+                  size="small"
+                  title="Search"
+                  disabled={msgSearchLoading || !msgSearchQ.trim()}
+                  onClick={() => {
+                    if (msgSearchLastQRef.current === msgSearchQ.trim() && msgSearchResults.length) {
+                      focusCurrentSearchResult();
+                    } else {
+                      runMessageSearch(msgSearchQ);
+                    }
+                  }}
+                  sx={{ p: isMobile ? 0.45 : 1, flexShrink: 0 }}
+                >
+                  {msgSearchLoading ? <CircularProgress size={18} /> : <SearchIcon fontSize={isMobile ? "small" : "medium"} />}
+                </IconButton>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  onClick={focusCurrentSearchResult}
+                  sx={{
+                    minWidth: isMobile ? 28 : 48,
+                    textAlign: "center",
+                    px: isMobile ? 0 : 0.25,
+                    flexShrink: 0,
+                    cursor: msgSearchResults.length ? "pointer" : "default",
+                    userSelect: "none",
+                    fontSize: isMobile ? 11 : undefined,
+                  }}
+                  title="Go to current result"
+                >
+                  {msgSearchLoading
+                    ? "…"
+                    : msgSearchResults.length
+                      ? `${msgSearchIdx + 1}/${msgSearchResults.length}`
+                      : (msgSearchLastQRef.current ? "0/0" : "")}
+                </Typography>
+                <IconButton
+                  size="small"
+                  disabled={!msgSearchResults.length}
+                  onClick={() => goMsgSearchResult(-1)}
+                  title="Previous result"
+                  sx={{ p: isMobile ? 0.35 : 1, flexShrink: 0 }}
+                >
+                  <KeyboardArrowUpIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  disabled={!msgSearchResults.length}
+                  onClick={() => goMsgSearchResult(1)}
+                  title="Next result"
+                  sx={{ p: isMobile ? 0.35 : 1, flexShrink: 0 }}
+                >
+                  <KeyboardArrowDownIcon fontSize="small" />
+                </IconButton>
+                {!isMobile && (
+                  <IconButton onClick={closeMsgSearch} size="small" title="Close search">
+                    <CloseIcon />
+                  </IconButton>
+                )}
+              </>
+            ) : (
+              <>
             <Box sx={{ position: "relative" }}>
               <Avatar src={convAvatar(activeConv, meId)} sx={{ width: 40, height: 40, cursor: "pointer" }}
                 onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
@@ -3663,39 +4168,20 @@ export default function MessengerApp() {
             <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }}
               onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
               <Typography fontWeight={600} noWrap fontSize={15}>{convTitle(activeConv, meId)}</Typography>
-              <Stack direction="row" spacing={0.5} alignItems="center"
-                onClick={(e) => { if (peer?.username) e.stopPropagation(); }}
+              <Typography
+                variant="caption"
+                color={Object.keys(typingUsers).length ? "primary.main" : "text.secondary"}
+                noWrap
+                sx={{ fontStyle: Object.keys(typingUsers).length ? "italic" : "normal", maxWidth: 280 }}
               >
-                <Typography
-                  variant="caption"
-                  color={Object.keys(typingUsers).length ? "primary.main" : "text.secondary"}
-                  noWrap
-                  sx={{ fontStyle: Object.keys(typingUsers).length ? "italic" : "normal", maxWidth: 220 }}
-                >
-                  {Object.keys(typingUsers).length
-                    ? formatTypingLabel(typingUsers, activeConv?.type === "group")
-                    : activeConv?.type === "group"
-                      ? `${(activeConv?.participants || []).length} members`
-                      : peer?.id && onlineUsers.has(Number(peer.id))
-                        ? "online"
-                        : peer?.username ? `@${peer.username}` : "tap for info"}
-                </Typography>
-                {peer?.username && (
-                  <Tooltip title="Copy username">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigator.clipboard?.writeText(peer.username);
-                        flash("Username copied");
-                      }}
-                      sx={{ p: 0.2 }}
-                    >
-                      <ContentCopyIcon sx={{ fontSize: 12 }} />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Stack>
+                {Object.keys(typingUsers).length
+                  ? formatTypingLabel(typingUsers, activeConv?.type === "group")
+                  : activeConv?.type === "group"
+                    ? `${(activeConv?.participants || []).length} members`
+                    : peer?.id && onlineUsers.has(Number(peer.id))
+                      ? "online"
+                      : "tap for info"}
+              </Typography>
             </Box>
             <Tooltip title="Voice call">
               <IconButton
@@ -3722,6 +4208,9 @@ export default function MessengerApp() {
             <IconButton onClick={() => pushPanel("info")}>
               <InfoOutlinedIcon />
             </IconButton>
+            <IconButton size="small" title="Search messages" onClick={() => setMsgSearchOpen(true)}>
+              <SearchIcon fontSize="small" />
+            </IconButton>
             <IconButton onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
             <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
               {peer && (
@@ -3734,6 +4223,9 @@ export default function MessengerApp() {
                   <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Add contact
                 </MenuItem>
               )}
+              <MenuItem onClick={() => { pushPanel("info"); setHeaderMenu(null); setTimeout(() => { try { document.querySelector("[data-shared-media-btn]")?.click(); } catch {} }, 80); }}>
+                <ListItemIcon><PhotoLibraryIcon fontSize="small" /></ListItemIcon> Shared media
+              </MenuItem>
               <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
                 <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon> Clear messages
               </MenuItem>
@@ -3762,6 +4254,9 @@ export default function MessengerApp() {
                 <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon> Leave
               </MenuItem>
             </Menu>
+              </>
+            )}
+
           </Stack>
 
           {/* Call surface is mounted at Messenger shell level (below) so the
@@ -3774,6 +4269,69 @@ export default function MessengerApp() {
             onStateChange={onAudioStateChange}
             onGoToTrack={goToAudioTrack}
           />
+
+          {videoNotePip?.src && String(videoNotePip.conversationId) === String(activeId) && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 64,
+                right: 12,
+                zIndex: 30,
+                width: 120,
+                height: 120,
+                borderRadius: "50%",
+                overflow: "hidden",
+                bgcolor: "#000",
+                boxShadow: 6,
+                border: "2px solid",
+                borderColor: "background.paper",
+                pointerEvents: "auto",
+              }}
+            >
+              <video
+                key={videoNotePip.key}
+                src={videoNotePip.src}
+                autoPlay
+                playsInline
+                ref={(el) => {
+                  if (el && videoNotePip.currentTime != null) {
+                    try {
+                      if (Math.abs((el.currentTime || 0) - videoNotePip.currentTime) > 0.35) {
+                        el.currentTime = videoNotePip.currentTime;
+                      }
+                    } catch { /* */ }
+                  }
+                }}
+                onEnded={() => setVideoNotePip(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const v = e.currentTarget;
+                  if (v.paused) v.play().catch(() => {});
+                  else v.pause();
+                }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  objectPosition: "center",
+                  display: "block",
+                  borderRadius: "50%",
+                }}
+              />
+              <IconButton
+                size="small"
+                onClick={(e) => { e.stopPropagation(); setVideoNotePip(null); }}
+                sx={{
+                  position: "absolute", top: 2, right: 2,
+                  bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
+                  width: 24, height: 24,
+                  "&:hover": { bgcolor: "rgba(0,0,0,0.75)" },
+                }}
+              >
+                <CloseIcon sx={{ fontSize: 14 }} />
+              </IconButton>
+            </Box>
+          )}
 
           {/* Multi-select action bar — under header + audio player */}
           {selectionMode && (
@@ -3834,10 +4392,18 @@ export default function MessengerApp() {
           {activeConv?.type === "group"
             && activeConv.description
             && role !== "owner" && role !== "admin"
-            && !dismissedGroupDesc.has(activeConv.id) && (
+            && dismissedGroupDesc.get(String(activeConv.id)) !== String(activeConv.description || "")
+            && (
             <GroupDescriptionBanner
               description={activeConv.description}
-              onDismiss={() => setDismissedGroupDesc((s) => new Set(s).add(activeConv.id))}
+              onDismiss={() => {
+                persistGroupDescDismiss(activeConv.id, activeConv.description);
+                setDismissedGroupDesc((m) => {
+                  const next = new Map(m);
+                  next.set(String(activeConv.id), String(activeConv.description || ""));
+                  return next;
+                });
+              }}
             />
           )}
 
@@ -3896,7 +4462,7 @@ export default function MessengerApp() {
               </Paper>
             )}
           <Box
-            ref={listRef} onScroll={onScrollMsgs}
+            ref={listRef} className="messenger-msg-scroll" onScroll={onScrollMsgs}
             sx={{
               position: "relative",
               flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, py: 1,
@@ -3962,26 +4528,57 @@ export default function MessengerApp() {
             {loadingMsgs && !messages.length && (
               <Box sx={{ textAlign: "center", py: 6 }}><CircularProgress /></Box>
             )}
-            {messagesWithDays.map((m) => (
+            {messagesWithDays.map((m) => {
+              const isMsg = m.type === "msg";
+              const isDay = m.type === "day";
+              const msgHl = isMsg && jumpHighlightId != null && String(jumpHighlightId) === String(m.id);
+              const dayHl = isDay && jumpHighlightDayId != null && (
+                String(jumpHighlightDayId) === String(m.id)
+                || String(jumpHighlightDayId) === String(m.label)
+              );
+              return (
               <Box
                 key={m.id}
-                id={m.type === "msg" ? `msg-${m.id}` : undefined}
+                id={isMsg ? `msg-${m.id}` : isDay ? m.id : undefined}
+                data-day-id={isDay ? m.id : undefined}
+                data-day-label={isDay ? m.label : undefined}
                 sx={
-                  m.type === "msg" && jumpHighlightId === m.id
+                  msgHl
                     ? {
-                        animation: "msgFlash 1.6s ease-out",
+                        animation: "msgFlash 2.2s ease-out",
                         borderRadius: 2,
                         "@keyframes msgFlash": {
-                          "0%": { bgcolor: (t) => t.palette.warning.main, boxShadow: "0 0 0 4px rgba(255,193,7,0.4)" },
-                          "70%": { bgcolor: "transparent", boxShadow: "0 0 0 0 rgba(255,193,7,0)" },
-                          "100%": { bgcolor: "transparent", boxShadow: "none" },
+                          "0%": {
+                            backgroundColor: "rgba(255, 193, 7, 0.55)",
+                            boxShadow: "0 0 0 3px rgba(255, 193, 7, 0.65)",
+                          },
+                          "35%": {
+                            backgroundColor: "rgba(255, 193, 7, 0.35)",
+                            boxShadow: "0 0 0 2px rgba(255, 193, 7, 0.4)",
+                          },
+                          "100%": {
+                            backgroundColor: "transparent",
+                            boxShadow: "none",
+                          },
                         },
                       }
                     : undefined
                 }
               >
                 <MessageBubble
-                  m={m} meId={meId} activeConv={activeConv}
+                  onDayClick={() => setDayJumpOpen(true)}
+                  onCancelSchedule={async (msg) => {
+                    if (!msg?.id) return;
+                    try {
+                      await apiRequest({ method: "POST", url: `${MSG_API}/messages/${msg.id}/cancel-schedule/` });
+                      setMessages((prev) => prev.filter((m) => String(m.id) !== String(msg.id)));
+                      flash("Scheduled message cancelled");
+                    } catch (e) {
+                      setError(e?.response?.data?.message || "Cancel failed");
+                    }
+                  }}
+                  m={isDay ? { ...m, _dayHighlight: dayHl } : m}
+                  meId={meId} activeConv={activeConv}
                   onContextOpen={openCtx}
                   selectionMode={selectionMode}
                   selected={selectedIds.has(String(m.id))}
@@ -4024,7 +4621,8 @@ export default function MessengerApp() {
                   onMentionClick={loadUserProfileByUsername}
                 />
               </Box>
-            ))}
+            );})}
+
             {pendingUploads
               .filter((u) => String(u.conversationId) === String(activeId))
               .map((u) => (
@@ -4100,8 +4698,15 @@ export default function MessengerApp() {
               sendFilesTogether={sendFilesTogether}
               setSendFilesTogether={setSendFilesTogether}
               replyTo={replyTo} editingMsg={editingMsg}
-              onCancelReplyOrEdit={() => { setReplyTo(null); setEditingMsg(null); setText(""); }}
+              onCancelReplyOrEdit={() => {
+                setReplyTo(null);
+                setEditingMsg(null);
+                // Restore draft after canceling edit/reply
+                setText(activeId ? readComposerDraft(activeId) : "");
+              }}
               onSend={sendOrEdit}
+              scheduledFor={scheduledFor}
+              setScheduledFor={setScheduledFor}
               onPickImage={(f) => { attachMessengerOriginal(f, f); setCropFile(f); }}
               onPickVideo={(f) => setVideoEditFile(f)}
               inputRef={inputRef}
@@ -4149,18 +4754,48 @@ export default function MessengerApp() {
                 variant="contained"
                 size="small"
                 onClick={newBelowCount > 0 ? scrollToNextNew : scrollToBottom}
+                aria-label={newBelowCount > 0 ? `Go to new messages (${newBelowCount})` : "Scroll to bottom"}
+                title={newBelowCount > 0 ? `${newBelowCount} new` : "Scroll to bottom"}
                 sx={{
                   pointerEvents: scrollDownOpacity > 0.05 ? "auto" : "none",
-                  borderRadius: 999,
-                  minWidth: 44,
-                  height: 44,
-                  px: newBelowCount > 0 ? 1.5 : 1.25,
+                  borderRadius: "50%",
+                  minWidth: 48,
+                  width: 48,
+                  height: 48,
+                  p: 0,
                   boxShadow: 6,
                   textTransform: "none",
                   fontWeight: 800,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
                 }}
               >
-                {newBelowCount > 0 ? `↓ ${newBelowCount}` : "↓"}
+                <KeyboardArrowDownIcon sx={{ fontSize: 28 }} />
+                {newBelowCount > 0 && (
+                  <Box
+                    component="span"
+                    sx={{
+                      position: "absolute",
+                      top: -4,
+                      right: -4,
+                      minWidth: 20,
+                      height: 20,
+                      px: 0.5,
+                      borderRadius: 10,
+                      bgcolor: "error.main",
+                      color: "#fff",
+                      fontSize: 11,
+                      fontWeight: 800,
+                      lineHeight: "20px",
+                      textAlign: "center",
+                      boxShadow: 2,
+                    }}
+                  >
+                    {newBelowCount > 99 ? "99+" : newBelowCount}
+                  </Box>
+                )}
               </Button>
             </Box>
           )}
@@ -4231,6 +4866,22 @@ export default function MessengerApp() {
       }}
       onClick={() => { if (ctx) setCtx(null); }}
     >
+      <style>{`
+        .messenger-msg-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(120,120,120,0.45) transparent;
+        }
+        .messenger-msg-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .messenger-msg-scroll::-webkit-scrollbar-thumb {
+          background: rgba(120,120,120,0.45);
+          border-radius: 8px;
+        }
+        .messenger-msg-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(120,120,120,0.7);
+        }
+        .messenger-msg-scroll::-webkit-scrollbar-track { background: transparent; }
+      `}</style>
+
       {/* Ongoing-call mini strip — directly under the top of the messenger shell
           (settings header lives inside Sidebar below this when on the list;
           when in a chat the strip stays global so it does not cover chat menus).
@@ -4329,6 +4980,10 @@ export default function MessengerApp() {
             onBack={popPanel}
             onClose={closePanel}
             onOpenMyProfile={() => pushPanel("my-profile")}
+            onOpenChatInfo={() => {
+              // From peer profile → open this chat's info panel
+              setPanelHistory(["info"]);
+            }}
             onOpenContacts={() => { loadContacts(); pushPanel("contacts"); }}
             onOpenBlocks={() => { loadBlocks(); pushPanel("blocks"); }}
             onOpenMyRequests={() => { loadMyJoinRequests(); pushPanel("my-requests"); }}
@@ -4337,6 +4992,52 @@ export default function MessengerApp() {
             onOpenJoin={() => setJoinOpen(true)}
             onNavigateHome={() => navigate("/")}
             onOpenMediaSettings={() => setMediaSettingsOpen(true)}
+            onOpenSharedMedia={() => setMediaLibraryOpen(true)}
+            conversationId={activeId}
+            onMediaShowInChat={(att) => {
+              closePanel();
+              const mid = att?.message_id || att?.message?.id;
+              if (mid) jumpToMessageInChat(mid);
+            }}
+            onMediaView={(att, ctx) => {
+              if (!att) return;
+              setGalleryState({
+                startAttachment: att,
+                initialItems: ctx?.items || null,
+                kinds: ctx?.kinds || null,
+                fromSharedMedia: true,
+              });
+            }}
+            onMediaDownload={async (att) => {
+              try {
+                const url = withTokenQuery(att?.file_url || att?.url || att?.file || "");
+                if (!url) return;
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = att?.original_filename || att?.name || "download";
+                a.target = "_blank";
+                a.rel = "noopener";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+              } catch { /* */ }
+            }}
+            onMediaReply={(att) => {
+              closePanel();
+              const mid = att?.message_id || att?.message?.id;
+              const msg = (messagesRef.current || messages || []).find((m) => String(m.id) === String(mid));
+              if (msg) {
+                setReplyTo(msg);
+                setEditingMsg(null);
+              } else if (mid) jumpToMessageInChat(mid);
+            }}
+            onMediaForward={(att) => {
+              closePanel();
+              const mid = att?.message_id || att?.message?.id;
+              const msg = (messagesRef.current || messages || []).find((m) => String(m.id) === String(mid));
+              if (msg) setForwardOpen(msg);
+              else if (mid) jumpToMessageInChat(mid);
+            }}
             onStartDm={startDm}
             onRemoveContact={removeContact}
             onUnblock={unblockUser}
@@ -4504,17 +5205,31 @@ export default function MessengerApp() {
                     startWithAudioMuted: !incomingCall.media.audio,
                   };
                 }
+                const joinConv = conversations.find((c) => String(c.id) === String(cid));
+                const isGroupCall = !!incomingCall.is_group || joinConv?.type === "group";
+                const initiator = incomingCall.initiator || {};
+                // Private call: show the other person's identity, not whichever chat is open
+                const peerTitle = isGroupCall
+                  ? (convTitle(joinConv, meId) || incomingCall.peer_title || "Group call")
+                  : (initiator.username || initiator.display_name || incomingCall.peer_title || "Call");
+                const peerAv = isGroupCall
+                  ? withTokenQuery(convAvatar(joinConv, meId))
+                  : withTokenQuery(initiator.avatar || initiator.avatar_url) || null;
                 setCallConfig({
                   ...cfg,
                   is_initiator: false,
-                  is_group: !!incomingCall.is_group || conversations.find((c) => String(c.id) === String(cid))?.type === "group",
+                  is_group: isGroupCall,
                   conversation_id: cid,
-                  peer_title: incomingCall.initiator?.username || "Call",
-                  peer_avatar: null,
+                  peer_title: peerTitle,
+                  peer_avatar: peerAv,
                 });
+                // Always open the conversation the call belongs to
                 if (String(activeId) !== String(cid)) {
-                  const conv = conversations.find((c) => String(c.id) === String(cid));
-                  if (conv) openChat(conv);
+                  if (joinConv) openChat(joinConv);
+                  else {
+                    // Cold join: still switch active id so chat pane matches the call
+                    openChat({ id: cid, type: isGroupCall ? "group" : "private", peer: initiator });
+                  }
                 }
               }
             } catch (e) {
@@ -4548,12 +5263,82 @@ export default function MessengerApp() {
         />
       )}
 
-      {/* In-chat media gallery dialog (image / video, with < > navigation) */}
+<ChatMediaLibraryDialog
+        open={mediaLibraryOpen}
+        onClose={() => setMediaLibraryOpen(false)}
+        conversationId={activeId}
+        onView={(att, ctx) => {
+          // Keep Shared media open underneath; only open the viewer
+          if (!att) return;
+          setGalleryState({
+            startAttachment: att,
+            initialItems: ctx?.items || null,
+            kinds: ctx?.kinds || null,
+            fromSharedMedia: true,
+          });
+        }}
+        onShowInChat={(att) => {
+          setMediaLibraryOpen(false);
+          closePanel();
+          const mid = att?.message_id || att?.message?.id;
+          if (mid) jumpToMessageInChat(mid);
+        }}
+        onDownload={async (att) => {
+          try {
+            const url = withTokenQuery(att?.file_url || att?.url || att?.file || "");
+            if (!url) return;
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = att?.original_filename || att?.name || "download";
+            a.target = "_blank";
+            a.rel = "noopener";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          } catch { /* */ }
+        }}
+        onReply={(att) => {
+          setMediaLibraryOpen(false);
+          const mid = att?.message_id || att?.message?.id;
+          const msg = (messagesRef.current || messages || []).find((m) => String(m.id) === String(mid));
+          if (msg) {
+            setReplyTo(msg);
+            setEditingMsg(null);
+            setTimeout(() => inputRef.current?.focus?.(), 50);
+          } else if (mid) {
+            jumpToMessageInChat(mid);
+          }
+        }}
+        onForward={(att) => {
+          setMediaLibraryOpen(false);
+          const mid = att?.message_id || att?.message?.id;
+          const msg = (messagesRef.current || messages || []).find((m) => String(m.id) === String(mid));
+          if (msg) setForwardOpen(msg);
+          else if (mid) jumpToMessageInChat(mid);
+        }}
+      />
+
+{/* In-chat media gallery dialog (image / video, with < > navigation) */}
       <MediaGalleryDialog
         open={Boolean(galleryState)}
         conversationId={activeId}
         startAttachment={galleryState?.startAttachment}
-        onClose={() => setGalleryState(null)}
+        initialItems={galleryState?.initialItems || null}
+        kinds={galleryState?.kinds || null}
+        onClose={() => {
+          // Return to Shared media (do not close chat info)
+          setGalleryState(null);
+        }}
+        onShowInChat={(att) => {
+          const mid = att?.message_id || att?.message?.id || galleryState?.messageId;
+          if (mid) jumpToMessageInChat(mid);
+        }}
+        onReply={(att) => {
+          const mid = att?.message_id || att?.message?.id || galleryState?.messageId;
+          const msg = messages.find((m) => String(m.id) === String(mid));
+          if (msg) setReplyTo(msg);
+          else if (mid) setReplyTo({ id: mid, body: att?.original_filename || "Media", sender: null });
+        }}
       />
 
       {/* Text / file preview dialog (non-media) */}
@@ -4826,47 +5611,19 @@ export default function MessengerApp() {
         </Box>
       )}
 
-      {/* "Not authenticated" popup — prompts the user to sign in / sign up
-          instead of leaving them looking at a blank black screen. */}
-      <Dialog
+      <DayJumpDialog
+        open={dayJumpOpen}
+        onClose={() => setDayJumpOpen(false)}
+        messagesWithDays={messagesWithDays}
+        messages={messages}
+        onJumpToDay={jumpToDayInChat}
+      />
+      {/* Message search is inline in the chat header (Telegram-style) */}
+      <AuthRequiredDialog
         open={showAuthPopup}
         onClose={() => setShowAuthPopup(false)}
-        fullWidth
-        maxWidth="xs"
-        PaperProps={{ sx: { borderRadius: 1.25 } }}
-      >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <LockOutlinedIcon color="primary" />
-          Sign in required
-        </DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="body2" color="text.secondary">
-            You need to be signed in to use the messenger. Please sign in or
-            create an account to continue.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
-          <Button onClick={() => setShowAuthPopup(false)} color="inherit">
-            Dismiss
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => navigate("/signin_or_signup")}
-          >
-            Go to sign in
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onSignIn={() => navigate("/signin_or_signup")}
+      />
     </Box>
   );
 }
-
-/**
- * Telegram-style "Add to contacts?" banner shown at the top of a private chat
- * when the peer is not yet in the user's contacts.
- *
- * Behaviour:
- *  - Clicking "Add" calls onAdd() and the parent calls the contacts API
- *  - Clicking X dismisses the banner for the current session (per-peer)
- */
