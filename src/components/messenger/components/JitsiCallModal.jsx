@@ -288,16 +288,27 @@ function startRingback() {
 function ParticipantAvatar({ p, isLocal, size = 44, speaking = false }) {
   const name = p?.displayName || (isLocal ? "You" : "User");
   const initial = (name || "?")[0]?.toUpperCase();
+  const live = speaking && !p?.audioMuted;
   return (
-    <Box sx={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+    <Box sx={{
+      position: "relative", width: size, height: size, flexShrink: 0,
+      borderRadius: "50%",
+      boxShadow: live
+        ? "0 0 0 3px rgba(34,197,94,0.55), 0 0 14px rgba(34,197,94,0.45)"
+        : "none",
+      "@keyframes speakPulseAv": {
+        "0%, 100%": { boxShadow: "0 0 0 2px rgba(34,197,94,0.45), 0 0 10px rgba(34,197,94,0.3)" },
+        "50%": { boxShadow: "0 0 0 5px rgba(34,197,94,0.25), 0 0 20px rgba(34,197,94,0.55)" },
+      },
+      animation: live ? "speakPulseAv 1s ease-in-out infinite" : "none",
+      transition: "box-shadow 0.15s ease",
+    }}>
       <Avatar
         src={p?.avatar || undefined}
         sx={{
           width: size, height: size, fontSize: size * 0.4,
           bgcolor: isLocal ? "primary.dark" : "secondary.dark",
-          border: speaking ? "2px solid" : "2px solid transparent",
-          borderColor: speaking ? "success.main" : "transparent",
-          transition: "border-color 0.18s ease",
+          border: live ? "2px solid #22c55e" : "2px solid transparent",
         }}
       >
         {initial}
@@ -353,15 +364,11 @@ function ParticipantTile({
         bgcolor: "#0d1117",
         borderRadius: compact ? 1.5 : 2,
         overflow: "hidden",
-        border: speaking ? "2px solid" : (isSelected ? "2px solid" : "1px solid"),
-        borderColor: speaking ? "#22c55e"
-          : isSelected ? "primary.main"
+        border: isSelected ? "2px solid" : "1px solid",
+        borderColor: isSelected ? "primary.main"
           : isDominant ? "primary.main"
           : "rgba(255,255,255,0.08)",
-        boxShadow: speaking
-          ? "0 0 0 3px rgba(34,197,94,0.35), 0 0 18px rgba(34,197,94,0.45)"
-          : "none",
-        transition: "box-shadow 0.15s ease, border-color 0.15s ease",
+        transition: "border-color 0.15s ease",
         aspectRatio: compact ? "16/10" : undefined,
         width: "100%",
         height: "100%",
@@ -369,11 +376,6 @@ function ParticipantTile({
         cursor: onClick ? "pointer" : "default",
         background: "linear-gradient(135deg, #0d1117 0%, #161b22 100%)",
         touchAction: onClick ? "manipulation" : "auto",
-        "@keyframes speakPulse": {
-          "0%, 100%": { boxShadow: "0 0 0 2px rgba(34,197,94,0.35), 0 0 12px rgba(34,197,94,0.3)" },
-          "50%": { boxShadow: "0 0 0 5px rgba(34,197,94,0.2), 0 0 22px rgba(34,197,94,0.55)" },
-        },
-        animation: speaking ? "speakPulse 1.1s ease-in-out infinite" : "none",
       }}
     >
       <video
@@ -400,7 +402,15 @@ function ParticipantTile({
               height: compact ? 40 : (isDominant ? 96 : 72),
               bgcolor: isLocal ? "primary.dark" : "secondary.dark",
               fontSize: compact ? 16 : (isDominant ? 36 : 28),
-              border: "2px solid rgba(255,255,255,0.12)",
+              border: (speaking && !muted) ? "3px solid #22c55e" : "2px solid rgba(255,255,255,0.12)",
+              boxShadow: (speaking && !muted)
+                ? "0 0 0 4px rgba(34,197,94,0.35), 0 0 18px rgba(34,197,94,0.5)"
+                : "none",
+              "@keyframes speakPulseAv2": {
+                "0%, 100%": { boxShadow: "0 0 0 3px rgba(34,197,94,0.4), 0 0 12px rgba(34,197,94,0.35)" },
+                "50%": { boxShadow: "0 0 0 7px rgba(34,197,94,0.2), 0 0 24px rgba(34,197,94,0.55)" },
+              },
+              animation: (speaking && !muted) ? "speakPulseAv2 1s ease-in-out infinite" : "none",
             }}
           >
             {(name || "?")[0]?.toUpperCase()}
@@ -411,6 +421,30 @@ function ParticipantTile({
             </Typography>
           )}
         </Stack>
+      )}
+      {!videoMuted && speaking && !muted && (
+        <Box
+          sx={{
+            position: "absolute", top: 8, right: 8, zIndex: 2,
+            width: compact ? 28 : 40, height: compact ? 28 : 40,
+            borderRadius: "50%",
+            border: "2px solid #22c55e",
+            boxShadow: "0 0 0 3px rgba(34,197,94,0.35), 0 0 12px rgba(34,197,94,0.5)",
+            "@keyframes speakPulseAv3": {
+              "0%, 100%": { boxShadow: "0 0 0 2px rgba(34,197,94,0.4)" },
+              "50%": { boxShadow: "0 0 0 6px rgba(34,197,94,0.2), 0 0 16px rgba(34,197,94,0.5)" },
+            },
+            animation: "speakPulseAv3 1s ease-in-out infinite",
+            overflow: "hidden",
+          }}
+        >
+          <Avatar
+            src={participant?.avatar || undefined}
+            sx={{ width: "100%", height: "100%", fontSize: compact ? 12 : 16, bgcolor: isLocal ? "primary.dark" : "secondary.dark" }}
+          >
+            {(name || "?")[0]?.toUpperCase()}
+          </Avatar>
+        </Box>
       )}
       <Stack direction="row" spacing={0.5} alignItems="center"
         sx={{
@@ -900,6 +934,8 @@ export default function JitsiCallModal({
   const [error, setError] = useState(null);
   const [toast, setToast] = useState("");
   const [audioMuted, setAudioMuted] = useState(false);
+  const audioMutedRef = useRef(false);
+  useEffect(() => { audioMutedRef.current = audioMuted; }, [audioMuted]);
   const [videoMuted, setVideoMuted] = useState(!!callConfig?.config?.startWithVideoMuted);
   const [sharing, setSharing] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -910,7 +946,22 @@ export default function JitsiCallModal({
   const [moreAnchor, setMoreAnchor] = useState(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
+  const [chatUnread, setChatUnread] = useState(0);
+  const chatSeenCountRef = useRef(0);
   const [railOpen, setRailOpen] = useState(false);
+
+
+  // Unread badge for in-call chat
+  useEffect(() => {
+    const n = (messages || []).length;
+    if (chatOpen) {
+      chatSeenCountRef.current = n;
+      setChatUnread(0);
+      return;
+    }
+    const delta = Math.max(0, n - chatSeenCountRef.current);
+    setChatUnread(delta);
+  }, [messages, chatOpen]);
 
   // Scroll behavior for in-call chat
   const chatNearBottomRef = useRef(true);
@@ -990,7 +1041,7 @@ export default function JitsiCallModal({
   /* ── Helpers ──────────────────────────────────────────────────────── */
   const flash = useCallback((msg) => {
     setToast(msg);
-    setTimeout(() => setToast(""), 2500);
+    setTimeout(() => setToast(""), 1600);
   }, []);
 
   const resolveAvatar = useCallback((displayName, explicit) => {
@@ -1062,11 +1113,17 @@ export default function JitsiCallModal({
           const v = (data[i] - 128) / 128;
           sumSq += v * v;
         }
+        if (audioMutedRef.current) {
+          setMicLevel(0);
+          setSpeakingId((cur) => (cur === "local" ? null : cur));
+          rafRef.current = requestAnimationFrame(tick);
+          return;
+        }
         const rms = Math.sqrt(sumSq / data.length);
         const level = Math.min(1, Math.pow(rms * 4.0, 0.7));
         setMicLevel(level);
-        if (level > 0.18) setSpeakingId("local");
-        else if (speakingId === "local" && level < 0.08) setSpeakingId(null);
+        if (level > 0.15) setSpeakingId("local");
+        else if (level < 0.06) setSpeakingId((cur) => (cur === "local" ? null : cur));
         rafRef.current = requestAnimationFrame(tick);
       };
       tick();
@@ -1220,8 +1277,13 @@ export default function JitsiCallModal({
             upsertParticipant(pid, { audioTrack: track, audioMuted: track.isMuted() });
           }
           track.addEventListener(JitsiMeetJS.events.track.TRACK_MUTE_CHANGED, () => {
-            if (track.getType() === "video") upsertParticipant(pid, { videoMuted: track.isMuted() });
-            else upsertParticipant(pid, { audioMuted: track.isMuted() });
+            if (track.getType() === "video") {
+              upsertParticipant(pid, { videoMuted: track.isMuted() });
+            } else {
+              const muted = track.isMuted();
+              upsertParticipant(pid, { audioMuted: muted });
+              if (muted) setSpeakingId((cur) => (cur === String(pid) ? null : cur));
+            }
           });
           track.addEventListener(JitsiMeetJS.events.track.LOCAL_TRACK_STOPPED, () => {
             if (track.getType() === "video") upsertParticipant(pid, { videoTrack: null, videoMuted: true, isScreen: false });
@@ -1260,9 +1322,23 @@ export default function JitsiCallModal({
         // Speaking indicator for remote participants
         try {
           room.on(JitsiMeetJS.events.conference.TRACK_AUDIO_LEVEL_CHANGED, (participantId, level) => {
-            if (!participantId || participantId === room.myUserId?.()) return;
-            if (level > 0.18) setSpeakingId(String(participantId));
-            else setSpeakingId((cur) => (cur === String(participantId) ? null : cur));
+            if (!participantId) return;
+            const pid = String(participantId);
+            if (pid === String(room.myUserId?.())) return;
+            // Ignore muted remote participants
+            setParticipants((prev) => {
+              const p = prev[pid];
+              if (p?.audioMuted) {
+                setSpeakingId((cur) => (cur === pid ? null : cur));
+                return prev;
+              }
+              return prev;
+            });
+            if (typeof level === "number" && level > 0.12) {
+              setSpeakingId(pid);
+            } else if (typeof level === "number" && level < 0.04) {
+              setSpeakingId((cur) => (cur === pid ? null : cur));
+            }
           });
         } catch { /* older lib may lack event */ }
         // CONFERENCE_JOINED is bound later (after local tracks are ready) so we
@@ -1539,6 +1615,7 @@ export default function JitsiCallModal({
       else await track.mute();
       setAudioMuted(track.isMuted());
       upsertParticipant("local", { audioMuted: track.isMuted() });
+      if (track.isMuted()) setSpeakingId((cur) => (cur === "local" ? null : cur));
     } catch {
       flash("Could not toggle microphone");
     }
@@ -1852,9 +1929,19 @@ export default function JitsiCallModal({
           <>
             {/* Always-visible core actions */}
             <Tooltip title="In-call chat">
-              <IconButton onClick={() => setChatOpen((v) => !v)} sx={controlBtnSx(chatOpen, false, sz)}
+              <IconButton onClick={() => setChatOpen((v) => !v)} sx={{ ...controlBtnSx(chatOpen, false, sz), position: "relative" }}
                 aria-label="In-call chat">
                 <ChatIcon fontSize={mobile ? "small" : "medium"} />
+                {chatUnread > 0 && !chatOpen && (
+                  <Box sx={{
+                    position: "absolute", top: 6, right: 6,
+                    minWidth: 16, height: 16, px: 0.4,
+                    borderRadius: 8, bgcolor: "#ef4444", color: "#fff",
+                    fontSize: 10, fontWeight: 700, lineHeight: "16px", textAlign: "center",
+                  }}>
+                    {chatUnread > 99 ? "99+" : chatUnread}
+                  </Box>
+                )}
               </IconButton>
             </Tooltip>
             <Tooltip title="Participants">
@@ -1931,8 +2018,10 @@ export default function JitsiCallModal({
           onClose={() => setMoreAnchor(null)}
           anchorOrigin={{ vertical: "top", horizontal: "center" }}
           transformOrigin={{ vertical: "bottom", horizontal: "center" }}
-          sx={{ zIndex: 1800 }}
+          disablePortal
+          sx={{ zIndex: 2000 }}
           MenuListProps={{ dense: true }}
+          PaperProps={{ sx: { zIndex: 2000, bgcolor: "#1a1d24", color: "#fff", minWidth: 200 } }}
         >
           <MenuItem onClick={() => { setMoreAnchor(null); toggleShare(); }}>
             <ListItemIcon>{sharing ? <StopScreenShareIcon fontSize="small" /> : <ScreenShareIcon fontSize="small" />}</ListItemIcon>
@@ -2112,7 +2201,7 @@ export default function JitsiCallModal({
 
     if (isMobileView) {
       return (
-        <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)} closeAfterTransition sx={{ zIndex: 1800 }}
+        <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)} closeAfterTransition disablePortal sx={{ position: "absolute", zIndex: 2000 }}
           aria-labelledby="device-sheet-title">
           <Slide direction="up" in={deviceSheetOpen} mountOnEnter unmountOnExit>
             <Box sx={{
@@ -2127,7 +2216,7 @@ export default function JitsiCallModal({
       );
     }
     return (
-      <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)} closeAfterTransition sx={{ zIndex: 1800 }}
+      <Modal open={deviceSheetOpen} onClose={() => setDeviceSheetOpen(false)} closeAfterTransition disablePortal sx={{ position: "absolute", zIndex: 2000 }}
         aria-labelledby="device-sheet-title">
         <Box sx={{
           position: "absolute", top: "50%", left: "50%",
@@ -2180,7 +2269,7 @@ export default function JitsiCallModal({
         <Box sx={{ flex: 1, overflowY: "auto", py: 0.5 }}>
           {list.map((p) => {
             const isMe = p.id === "local";
-            const isSpk = speakingId === p.id;
+            const isSpk = speakingId === p.id && !p.audioMuted;
             return (
               <Stack key={p.id} direction="row" spacing={1.25} alignItems="center"
                 sx={{ px: 1.5, py: 1, "&:hover": { bgcolor: "rgba(255,255,255,0.04)" } }}>
@@ -2239,11 +2328,14 @@ export default function JitsiCallModal({
           open={railOpen}
           onClose={() => setRailOpen(false)}
           transitionDuration={280}
-          ModalProps={{ keepMounted: true }}
-          sx={{ zIndex: 1800 }}
+          disablePortal
+          ModalProps={{ keepMounted: true, disablePortal: true }}
+          sx={{ position: "absolute", zIndex: 2000 }}
           PaperProps={{
             sx: {
+              position: "absolute",
               width: "min(320px, 90vw)",
+              height: "100%",
               bgcolor: "rgba(12,16,22,0.98)",
               color: "#fff",
               boxShadow: "-8px 0 32px rgba(0,0,0,0.5)",
@@ -2463,7 +2555,7 @@ export default function JitsiCallModal({
                       {m.sender?.username || m.sender?.display_name || "User"}
                     </Typography>
                   )}
-                  <Box sx={{ color: "#f8fafc", lineHeight: 1.45, fontSize: 14 }}>
+                  <Box sx={{ color: "#f8fafc", lineHeight: 1.45, fontSize: 14 }} dir="auto">
                     {renderCallChatSegments(bodyStr)}
                   </Box>
                 </Box>
@@ -2479,6 +2571,7 @@ export default function JitsiCallModal({
             placeholder="Message…"
             value={chatDraft}
             onChange={(e) => setChatDraft(e.target.value)}
+            inputProps={{ dir: "auto" }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -2522,10 +2615,12 @@ export default function JitsiCallModal({
           open={chatOpen}
           onClose={() => setChatOpen(false)}
           transitionDuration={280}
-          ModalProps={{ keepMounted: true }}
-          sx={{ zIndex: 1800 }}
+          disablePortal
+          ModalProps={{ keepMounted: true, disablePortal: true }}
+          sx={{ position: "absolute", zIndex: 2000 }}
           PaperProps={{
             sx: {
+              position: "absolute",
               width: "min(360px, 92vw)",
               height: "100%",
               bgcolor: "#000",
@@ -2866,7 +2961,7 @@ export default function JitsiCallModal({
                       participant={p}
                       isLocal={p.id === "local"}
                       compact
-                      speaking={speakingId === p.id || (p.id === "local" && speakingId === "local")}
+                      speaking={(speakingId === p.id || (p.id === "local" && speakingId === "local")) && !p.audioMuted}
                     />
                   </Box>
                 ))}
@@ -2902,7 +2997,7 @@ export default function JitsiCallModal({
                       isLocal={p.id === "local"}
                       isDominant={count === 1}
                       compact={false}
-                      speaking={speakingId === p.id || (p.id === "local" && speakingId === "local")}
+                      speaking={(speakingId === p.id || (p.id === "local" && speakingId === "local")) && !p.audioMuted}
                     />
                   </Box>
                 ))

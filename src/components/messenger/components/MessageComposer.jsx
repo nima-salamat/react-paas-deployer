@@ -2200,6 +2200,7 @@ export default function MessageComposer({
           minRows={1}
           size="small"
           placeholder={editingMsg ? "Edit message…" : "Message"}
+          inputProps={{ dir: "auto" }}
           onContextMenu={onTextContextMenu}
           value={text}
           onChange={(e) => {

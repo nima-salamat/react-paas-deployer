@@ -8,7 +8,7 @@ import PendingFilesBar from "./PendingFilesBar";
 /**
  * Messenger-style composer:
  * [attach] [ text input …………… ] [send]
- * Enter = send · Shift+Enter = new line
+ * Enter = new line · send via button only
  */
 export default function ChatComposer({
   value,
@@ -54,7 +54,7 @@ export default function ChatComposer({
   }, [sending, disabled, onChange, onSend]);
 
   return (
-    <Box sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", px: 1, py: 1 }}>
+    <Box sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", px: 0.75, py: 0.6 }}>
       <PendingFilesBar
         files={files}
         onRemove={(i) => onFilesChange?.((files || []).filter((_, idx) => idx !== i))}
@@ -74,7 +74,7 @@ export default function ChatComposer({
           </IconButton>
         </Tooltip>
 
-        <SimpleHtmlEditor
+        <SimpleHtmlEditor enterSends={false} maxHeight={192} minHeight={36} 
           value={value}
           onChange={(html) => {
             valueRef.current = html;
@@ -89,7 +89,7 @@ export default function ChatComposer({
           showToolbarToggle
         />
 
-        <Tooltip title="Send (Enter) · New line (Shift+Enter)">
+        <Tooltip title="Send">
           <span>
             <IconButton
               color="primary"

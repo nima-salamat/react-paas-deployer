@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box, CircularProgress, Drawer, FormControl, IconButton,
   MenuItem, Select, Stack, Tooltip, Typography, Chip, alpha, Divider,
@@ -35,7 +35,39 @@ export default function TicketDetailDrawer({
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [viewUser, setViewUser] = useState(null);
+  const msgListRef = useRef(null);
+  const scrolledForTicketRef = useRef(null);
+
+  // Scroll to first unread customer message (not top, not bottom)
+  useEffect(() => {
+    if (!open || !detail?.id) return;
+    const key = String(detail.id);
+    if (scrolledForTicketRef.current === key) return;
+    const msgs = detail.messages || [];
+    if (!msgs.length) return;
+    const firstUnread = msgs.find(
+      (m) => !m.is_staff_reply && !(m.seen_at || m.is_seen || m.read_state === "read")
+    );
+    const t = setTimeout(() => {
+      const root = msgListRef.current;
+      if (!root) return;
+      scrolledForTicketRef.current = key;
+      if (firstUnread) {
+        const el = root.querySelector(`[data-msg-id="${firstUnread.id}"]`);
+        if (el) {
+          el.scrollIntoView({ block: "center", behavior: "smooth" });
+          return;
+        }
+      }
+      // Fallback: near bottom (latest activity) rather than absolute top
+      root.scrollTop = Math.max(0, root.scrollHeight - root.clientHeight);
+    }, 80);
+    return () => clearTimeout(t);
+  }, [open, detail?.id, detail?.messages]);
   const statusColor = STATUS_COLOR[detail?.status] || "default";
+  useEffect(() => {
+    if (!open) scrolledForTicketRef.current = null;
+  }, [open]);
 
   const ticketUser = detail?.user || null;
   const username = ticketUser?.username;
@@ -210,6 +242,7 @@ export default function TicketDetailDrawer({
             {detail && (
               <>
                 <Box
+                  ref={msgListRef}
                   sx={{
                     flex: 1,
                     minHeight: 0,
@@ -232,12 +265,13 @@ export default function TicketDetailDrawer({
                     </Typography>
                   ) : (
                     (detail.messages || []).map((msg) => (
-                      <AdminTicketMessage
-                        key={msg.id}
-                        message={msg}
-                        showHtmlToggle
-                        onAvatarClick={(user) => setViewUser(user || msg.user || msg.author)}
-                      />
+                      <Box key={msg.id} data-msg-id={msg.id}>
+                        <AdminTicketMessage
+                          message={msg}
+                          showHtmlToggle
+                          onAvatarClick={(user) => setViewUser(user || msg.user || msg.author)}
+                        />
+                      </Box>
                     ))
                   )}
                 </Box>

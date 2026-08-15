@@ -1349,6 +1349,8 @@ export default function MessageBubble({
         })}
         {bodyStr && (
           <Typography
+            component="div"
+            dir="auto"
             sx={{
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
@@ -1359,6 +1361,7 @@ export default function MessageBubble({
               letterSpacing: isBigEmoji ? "0.04em" : undefined,
               userSelect: "text",
               WebkitUserSelect: "text",
+              unicodeBidi: "plaintext",
             }}
           >
             {bodySegments.map((seg, i) => {

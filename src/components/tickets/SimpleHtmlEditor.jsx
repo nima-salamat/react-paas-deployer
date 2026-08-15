@@ -12,7 +12,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
 /**
  * Compact HTML editor. Toolbar hidden by default; expand with button.
- * Enter → onSubmit (send). Shift+Enter → new line.
+ * Enter → new line (send only via toolbar/send button from parent).
  */
 export default function SimpleHtmlEditor({
   value = "",
@@ -20,7 +20,8 @@ export default function SimpleHtmlEditor({
   onSubmit,
   placeholder = "Message…",
   minHeight = 40,
-  maxHeight = 160,
+  maxHeight = 192,
+  enterSends = false,
   disabled = false,
   compact = true,
   showToolbarToggle = true,
@@ -67,16 +68,10 @@ export default function SimpleHtmlEditor({
 
   const onKeyDown = (e) => {
     if (e.key !== "Enter") return;
-    // IME composition (e.g. Persian/Chinese) — don't send mid-composition
     if (e.isComposing || e.keyCode === 229) return;
-
-    if (e.shiftKey) {
-      // Shift+Enter → allow default new line in contentEditable
-      return;
-    }
-
-    // Enter alone → send
-    if (onSubmit) {
+    // Default: Enter inserts a new line (do not send).
+    // Only send on Enter when enterSends=true and Shift is NOT held.
+    if (enterSends && !e.shiftKey && onSubmit) {
       e.preventDefault();
       e.stopPropagation();
       if (ref.current) {
@@ -103,7 +98,7 @@ export default function SimpleHtmlEditor({
     >
       {showToolbarToggle && (
         <Collapse in={expanded}>
-          <Box sx={{ px: 0.5, py: 0.25, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
+          <Box sx={{ px: 0.25, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
             <ButtonGroup size="small" variant="text">
               <Tooltip title="Bold"><IconButton size="small" onClick={() => cmd("bold")} disabled={disabled}><FormatBoldIcon fontSize="small" /></IconButton></Tooltip>
               <Tooltip title="Italic"><IconButton size="small" onClick={() => cmd("italic")} disabled={disabled}><FormatItalicIcon fontSize="small" /></IconButton></Tooltip>
@@ -120,6 +115,7 @@ export default function SimpleHtmlEditor({
         <Box
           ref={ref}
           contentEditable={!disabled}
+          dir="auto"
           suppressContentEditableWarning
           onInput={emit}
           onBlur={emit}
@@ -127,8 +123,10 @@ export default function SimpleHtmlEditor({
           data-placeholder={placeholder}
           sx={{
             flex: 1,
-            minHeight: expanded ? Math.max(minHeight, 80) : minHeight,
-            maxHeight: expanded ? maxHeight + 80 : maxHeight,
+            minHeight: expanded ? Math.max(minHeight, 72) : minHeight,
+            maxHeight: expanded ? Math.max(maxHeight, 220) : maxHeight,
+            px: 1,
+            py: 0.75,
             overflow: "auto",
             px: 1.5,
             py: compact ? 1 : 1.25,
