@@ -539,6 +539,8 @@ export default function MessageComposer({
   replyTo, editingMsg, onCancelReplyOrEdit,
   onSend, onPickImage, onPickVideo, onEditAttachment, inputRef, onKeyDown,
   sendFilesTogether = true, setSendFilesTogether,
+  mediaSpoiler = false, setMediaSpoiler,
+  mediaViewOnce = false, setMediaViewOnce,
   mentionUsers = [],
   scheduledFor = null,
   setScheduledFor,
@@ -1880,6 +1882,36 @@ export default function MessageComposer({
             <Typography variant="caption" color="text.secondary" fontWeight={700}>
               {files.length} {files.length === 1 ? "file" : "files"} selected
             </Typography>
+            {files.some((f) => String(f.type || "").startsWith("image/") || String(f.type || "").startsWith("video/")) && (
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75, flexWrap: "wrap" }}>
+                {setMediaSpoiler && (
+                  <Chip
+                    size="small"
+                    clickable
+                    color={mediaSpoiler ? "warning" : "default"}
+                    variant={mediaSpoiler ? "filled" : "outlined"}
+                    label={mediaSpoiler ? "Spoiler on" : "Spoiler"}
+                    onClick={() => setMediaSpoiler((v) => !v)}
+                  />
+                )}
+                {setMediaViewOnce && (
+                  <Chip
+                    size="small"
+                    clickable
+                    color={mediaViewOnce ? "secondary" : "default"}
+                    variant={mediaViewOnce ? "filled" : "outlined"}
+                    label={mediaViewOnce ? "View once on" : "View once"}
+                    onClick={() => {
+                      setMediaViewOnce((v) => {
+                        const next = !v;
+                        // view-once implies image privacy; keep spoiler optional
+                        return next;
+                      });
+                    }}
+                  />
+                )}
+              </Stack>
+            )}
             {setSendFilesTogether && files.length > 1 && (
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <input

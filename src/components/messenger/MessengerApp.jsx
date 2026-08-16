@@ -269,6 +269,8 @@ export default function MessengerApp() {
 
 
   const [files, setFiles] = useState([]);
+  const [mediaSpoiler, setMediaSpoiler] = useState(false);
+  const [mediaViewOnce, setMediaViewOnce] = useState(false);
   const [sendFilesTogether, setSendFilesTogether] = useState(() => {
     try { return localStorage.getItem("messenger.sendFilesTogether") !== "false"; } catch { return true; }
   });
@@ -2038,6 +2040,8 @@ export default function MessengerApp() {
       if (replyTo) form.append("reply_to", replyTo.id);
       if (scheduledFor) form.append("scheduled_for", scheduledFor);
       filesToSend.forEach((f) => form.append("files", f));
+      if (mediaSpoiler) form.append("is_spoiler", "1");
+      if (mediaViewOnce) form.append("is_view_once", "1");
       const pendingId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const tempMsgId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       const localCreatedAt = new Date().toISOString();
@@ -2086,6 +2090,8 @@ export default function MessengerApp() {
         }]);
       }
       setText(""); setFiles([]);
+      setMediaSpoiler(false);
+      setMediaViewOnce(false);
       writeComposerDraft(activeId, "");
       setReplyTo(null);
       setScheduledFor(null);
@@ -2166,6 +2172,8 @@ export default function MessengerApp() {
       if (i === 0) form.append("body", body);
       if (i === 0 && rep) form.append("reply_to", rep.id);
       form.append("files", file);
+      if (mediaSpoiler) form.append("is_spoiler", "1");
+      if (mediaViewOnce) form.append("is_view_once", "1");
       try {
         await apiRequest({
           method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`, data: form,
@@ -4696,6 +4704,10 @@ export default function MessengerApp() {
                 setFiles(next);
               }}
               sendFilesTogether={sendFilesTogether}
+              mediaSpoiler={mediaSpoiler}
+              setMediaSpoiler={setMediaSpoiler}
+              mediaViewOnce={mediaViewOnce}
+              setMediaViewOnce={setMediaViewOnce}
               setSendFilesTogether={setSendFilesTogether}
               replyTo={replyTo} editingMsg={editingMsg}
               onCancelReplyOrEdit={() => {

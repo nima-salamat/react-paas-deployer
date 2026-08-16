@@ -1,3 +1,5 @@
+import apiRequest from "../../customHooks/apiRequest";
+import { MSG_API } from "../api";
 import React, { useMemo } from "react";
 import CheckIcon from "@mui/icons-material/Check";
 import {
@@ -981,6 +983,166 @@ function FileAttachmentCard({ att, url, mine, onOpen, authHeaders }) {
   );
 }
 
+
+/**
+ * Image attachment with spoiler blur + view-once handling.
+ */
+function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onReply }) {
+  const [spoilerOpen, setSpoilerOpen] = React.useState(false);
+  const [viewOnceUrl, setViewOnceUrl] = React.useState(null);
+  const [viewOnceState, setViewOnceState] = React.useState(att.view_once_state || (att.is_view_once ? "pending" : "none"));
+  const [opening, setOpening] = React.useState(false);
+  const isSpoiler = Boolean(att.is_spoiler);
+  const isViewOnce = Boolean(att.is_view_once);
+  const showBlur = isSpoiler && !spoilerOpen && !mine;
+  const effectiveUrl = viewOnceUrl || url;
+
+  const openViewOnce = async () => {
+    if (opening) return;
+    setOpening(true);
+    try {
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/attachments/${att.id}/view-once/`,
+      });
+      const data = res?.data?.data || res?.data || {};
+      const raw = data.url;
+      if (raw) {
+        setViewOnceUrl(withTokenQuery(raw));
+        setViewOnceState(data.view_once_state || "opened");
+        setSpoilerOpen(true);
+        onOpenPreview?.({ ...att, url: withTokenQuery(raw), message, _viewOnce: true });
+      } else {
+        setViewOnceState("opened");
+      }
+    } catch (e) {
+      const st = e?.response?.status;
+      if (st === 410) setViewOnceState("opened");
+    } finally {
+      setOpening(false);
+    }
+  };
+
+  // View-once pending for recipient: locked card
+  if (isViewOnce && !mine && viewOnceState === "pending" && !viewOnceUrl) {
+    return (
+      <Box
+        onClick={(e) => { e.stopPropagation(); openViewOnce(); }}
+        sx={{
+          position: "relative", width: 220, height: 160, borderRadius: 1.5,
+          bgcolor: "action.hover", display: "flex", alignItems: "center",
+          justifyContent: "center", cursor: "pointer", userSelect: "none",
+          border: "1px dashed", borderColor: "divider",
+        }}
+      >
+        <Stack alignItems="center" spacing={0.5}>
+          <Typography variant="caption" fontWeight={700}>
+            {opening ? "Opening…" : "View once photo"}
+          </Typography>
+          <Typography variant="caption" sx={{ opacity: 0.7 }}>Tap to view</Typography>
+        </Stack>
+      </Box>
+    );
+  }
+
+  // View-once already opened (and no live URL)
+  if (isViewOnce && !mine && viewOnceState === "opened" && !viewOnceUrl) {
+    return (
+      <Box
+        sx={{
+          width: 180, height: 72, borderRadius: 1.5, bgcolor: "action.selected",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        <Typography variant="caption" sx={{ opacity: 0.8 }}>Photo opened</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ position: "relative", display: "inline-block", maxWidth: "100%" }}>
+      {effectiveUrl ? (
+        <Box
+          component="img"
+          src={effectiveUrl}
+          alt={att.original_filename}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (showBlur) {
+              setSpoilerOpen(true);
+              return;
+            }
+            onOpenPreview?.({ ...att, url: effectiveUrl, message });
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onReply?.({
+              ...message,
+              body: message.body || "",
+              _replyAttachment: att,
+              reply_to_preview: {
+                id: message.id,
+                body: isGifAttachment(att) ? "GIF" : (att.original_filename || "Photo"),
+                sender: message.sender,
+              },
+            });
+          }}
+          onError={(e) => {
+            if (!e.currentTarget.dataset.fallback && att.url) {
+              e.currentTarget.dataset.fallback = "1";
+              e.currentTarget.src = att.url;
+            } else {
+              e.currentTarget.style.display = "none";
+            }
+          }}
+          sx={{
+            maxWidth: "100%", borderRadius: 1.5, maxHeight: isGifAttachment(att) ? 360 : 320,
+            display: "block", cursor: "pointer",
+            filter: showBlur ? "blur(28px)" : "none",
+            transition: "filter 0.2s ease",
+          }}
+        />
+      ) : null}
+      {showBlur && (
+        <Box
+          onClick={(e) => { e.stopPropagation(); setSpoilerOpen(true); }}
+          sx={{
+            position: "absolute", inset: 0, displayRadius: 1.5,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            bgcolor: "rgba(0,0,0,0.25)", cursor: "pointer",
+          }}
+        >
+          <Chip label="Spoiler · Tap to reveal" size="small"
+            sx={{ bgcolor: "rgba(0,0,0,0.65)", color: "#fff", fontWeight: 700 }} />
+        </Box>
+      )}
+      {isViewOnce && (
+        <Chip
+          label={mine ? "View once" : (viewOnceState === "opened" ? "Opened" : "View once")}
+          size="small"
+          sx={{
+            position: "absolute", right: 8, top: 8, height: 22, fontWeight: 800, fontSize: 11,
+            bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
+          }}
+        />
+      )}
+      {isGifAttachment(att) && (
+        <Chip
+          label="GIF"
+          size="small"
+          sx={{
+            position: "absolute", left: 8, bottom: 8,
+            height: 22, fontWeight: 800, fontSize: 11,
+            bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
+            "& .MuiChip-label": { px: 0.75 },
+          }}
+        />
+      )}
+    </Box>
+  );
+}
+
 export default function MessageBubble({
   m, meId, activeConv,
   onContextOpen, onReact, onReactAnchor, onReply, onEditCode,
@@ -1393,55 +1555,14 @@ export default function MessageBubble({
           return (
             <Box key={a.id} sx={{ mt: 0.6, minWidth: (k === "audio" || voice) ? 240 : undefined }}>
               {k === "image" ? (
-                <Box sx={{ position: "relative", display: "inline-block", maxWidth: "100%" }}>
-                  <Box
-                    component="img"
-                    src={url}
-                    alt={a.original_filename}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenPreview({ ...a, url, message: m });
-                    }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onReply?.({
-                        ...m,
-                        body: m.body || "",
-                        _replyAttachment: a,
-                        reply_to_preview: {
-                          id: m.id,
-                          body: isGifAttachment(a) ? "GIF" : (a.original_filename || "Photo"),
-                          sender: m.sender,
-                        },
-                      });
-                    }}
-                    onError={(e) => {
-                      if (!e.currentTarget.dataset.fallback) {
-                        e.currentTarget.dataset.fallback = "1";
-                        e.currentTarget.src = a.url;
-                      } else {
-                        e.currentTarget.style.display = "none";
-                      }
-                    }}
-                    sx={{
-                      maxWidth: "100%", borderRadius: 1.5, maxHeight: isGifAttachment(a) ? 360 : 320,
-                      display: "block", cursor: "pointer",
-                    }}
-                  />
-                  {isGifAttachment(a) && (
-                    <Chip
-                      label="GIF"
-                      size="small"
-                      sx={{
-                        position: "absolute", left: 8, bottom: 8,
-                        height: 22, fontWeight: 800, fontSize: 11,
-                        bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
-                        "& .MuiChip-label": { px: 0.75 },
-                      }}
-                    />
-                  )}
-                </Box>
+                <ProtectedImageAttachment
+                  att={a}
+                  url={url}
+                  message={m}
+                  mine={mine}
+                  onOpenPreview={onOpenPreview}
+                  onReply={onReply}
+                />
               ) : videoMsg || k === "video" ? (
                 <ChatVideo
                   src={a.url}
