@@ -3,12 +3,12 @@ import { MSG_API } from "../api";
 import React, { useMemo } from "react";
 import CheckIcon from "@mui/icons-material/Check";
 import {
-  Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem, Dialog, CircularProgress,
-  alpha, Slider, Tooltip, Button,
+  Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem, Dialog, CircularProgress, alpha, Slider, Tooltip, Button, LinearProgress
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import ReplyIcon from "@mui/icons-material/Reply";
 import ForwardIcon from "@mui/icons-material/Forward";
+import CloseIcon from "@mui/icons-material/Close";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -988,83 +988,225 @@ function FileAttachmentCard({ att, url, mine, onOpen, authHeaders }) {
  * Image attachment with spoiler blur + view-once handling.
  */
 function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onReply }) {
+  const VIEW_SECS = 15;
   const [spoilerOpen, setSpoilerOpen] = React.useState(false);
-  const [viewOnceUrl, setViewOnceUrl] = React.useState(null);
-  const [viewOnceState, setViewOnceState] = React.useState(att.view_once_state || (att.is_view_once ? "pending" : "none"));
+  const [viewOnceState, setViewOnceState] = React.useState(() => {
+    if (att.is_purged || att.view_once_state === "purged") return "purged";
+    if (!att.is_view_once) return att.view_once_state || "none";
+    // Cache may send view_once_state:"none" — treat as pending for recipients
+    const s = att.view_once_state;
+    if (s === "opened" || s === "own" || s === "pending" || s === "purged") return s;
+    return "pending";
+  });
   const [opening, setOpening] = React.useState(false);
+  const [viewerOpen, setViewerOpen] = React.useState(false);
+  const [viewerUrl, setViewerUrl] = React.useState(null);
+  const [remaining, setRemaining] = React.useState(VIEW_SECS);
+  const timerRef = React.useRef(null);
+  const tickRef = React.useRef(null);
   const isSpoiler = Boolean(att.is_spoiler);
   const isViewOnce = Boolean(att.is_view_once);
   const showBlur = isSpoiler && !spoilerOpen && !mine;
-  const effectiveUrl = viewOnceUrl || url;
+
+  const closeViewer = React.useCallback(() => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+    setViewerOpen(false);
+    setViewerUrl(null);
+    setRemaining(VIEW_SECS);
+  }, []);
+
+  React.useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (tickRef.current) clearInterval(tickRef.current);
+  }, []);
+
+  React.useEffect(() => {
+    if (!att?.is_view_once) return;
+    if (att.is_purged || att.view_once_state === "purged") setViewOnceState("purged");
+    else if (att.view_once_state === "opened") setViewOnceState("opened");
+    else if (att.view_once_state === "own") setViewOnceState("own");
+    else if (att.view_once_state === "pending") setViewOnceState("pending");
+  }, [att?.id, att?.view_once_state, att?.is_purged, att?.is_view_once]);
+
+  const startViewer = (absUrl, secs, { consume = true } = {}) => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
+    if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
+    setViewerUrl(absUrl);
+    setViewerOpen(true);
+    if (consume && secs != null && secs > 0) {
+      setRemaining(secs);
+      tickRef.current = setInterval(() => {
+        setRemaining((r) => (r > 0 ? r - 1 : 0));
+      }, 1000);
+      timerRef.current = setTimeout(() => {
+        closeViewer();
+      }, secs * 1000);
+    } else {
+      setRemaining(null);
+    }
+  };
 
   const openViewOnce = async () => {
-    if (opening) return;
+    if (opening || viewOnceState === "purged") return;
+    // Recipient already used their one view
+    if (!mine && (viewOnceState === "opened")) return;
     setOpening(true);
     try {
+      // Sender: open own media without consuming a view-once token window
+      if (mine) {
+        const raw = att.url || url || `/api/messenger/attachments/${att.id}/download/`;
+        startViewer(withTokenQuery(raw), null, { consume: false });
+        return;
+      }
       const res = await apiRequest({
         method: "POST",
         url: `${MSG_API}/attachments/${att.id}/view-once/`,
       });
-      const data = res?.data?.data || res?.data || {};
-      const raw = data.url;
+      // support {data:{url}} and flat {url}
+      const data = res?.data?.data ?? res?.data ?? res ?? {};
+      const raw = data.url || data.download_url;
+      const secs = Number(data.expires_in) > 0 ? Number(data.expires_in) : VIEW_SECS;
       if (raw) {
-        setViewOnceUrl(withTokenQuery(raw));
-        setViewOnceState(data.view_once_state || "opened");
-        setSpoilerOpen(true);
-        onOpenPreview?.({ ...att, url: withTokenQuery(raw), message, _viewOnce: true });
+        setViewOnceState("opened");
+        // withTokenQuery must keep ?once= token
+        startViewer(withTokenQuery(raw), secs, { consume: true });
       } else {
+        console.warn("view-once open: no url in response", data);
         setViewOnceState("opened");
       }
     } catch (e) {
       const st = e?.response?.status;
-      if (st === 410) setViewOnceState("opened");
+      console.warn("view-once open failed", st, e?.response?.data || e?.message);
+      if (st === 410) setViewOnceState(att.is_purged ? "purged" : "opened");
     } finally {
       setOpening(false);
     }
   };
 
-  // View-once pending for recipient: locked card
-  if (isViewOnce && !mine && viewOnceState === "pending" && !viewOnceUrl) {
+  // View-once: NEVER show the image inside the message bubble
+  if (isViewOnce) {
+    const label = (() => {
+      if (viewOnceState === "purged") return "Photo deleted";
+      if (!mine && viewOnceState === "opened") return "Opened";
+      if (mine) return "View once · sent";
+      return opening ? "Opening…" : "View once photo";
+    })();
+    // Recipient: only while pending. Sender: can re-open their own copy anytime (until purged).
+    const canOpen = viewOnceState !== "purged" && (
+      mine || viewOnceState === "pending" || viewOnceState === "own"
+    );
     return (
-      <Box
-        onClick={(e) => { e.stopPropagation(); openViewOnce(); }}
-        sx={{
-          position: "relative", width: 220, height: 160, borderRadius: 1.5,
-          bgcolor: "action.hover", display: "flex", alignItems: "center",
-          justifyContent: "center", cursor: "pointer", userSelect: "none",
-          border: "1px dashed", borderColor: "divider",
-        }}
-      >
-        <Stack alignItems="center" spacing={0.5}>
-          <Typography variant="caption" fontWeight={700}>
-            {opening ? "Opening…" : "View once photo"}
-          </Typography>
-          <Typography variant="caption" sx={{ opacity: 0.7 }}>Tap to view</Typography>
-        </Stack>
-      </Box>
+      <>
+        <Box
+          onClick={(e) => {
+            e.stopPropagation();
+            if (canOpen) openViewOnce();
+          }}
+          sx={{
+            position: "relative", width: 220, height: 120, borderRadius: 1.5,
+            bgcolor: "action.hover", display: "flex", alignItems: "center",
+            justifyContent: "center", cursor: canOpen ? "pointer" : "default",
+            userSelect: "none", border: "1px dashed", borderColor: "divider",
+          }}
+        >
+          <Stack alignItems="center" spacing={0.5} sx={{ px: 1, textAlign: "center" }}>
+            <Typography variant="caption" fontWeight={700}>{label}</Typography>
+            {canOpen && !mine && (
+              <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                Tap · visible {VIEW_SECS}s · then gone
+              </Typography>
+            )}
+            {mine && viewOnceState !== "purged" && (
+              <Typography variant="caption" sx={{ opacity: 0.65 }}>
+                Tap to preview · peers see it {VIEW_SECS}s once
+              </Typography>
+            )}
+          </Stack>
+        </Box>
+        <Dialog
+          open={viewerOpen}
+          onClose={closeViewer}
+          fullScreen
+          PaperProps={{ sx: { bgcolor: "#000" } }}
+        >
+          <Box sx={{
+            position: "relative", width: "100%", height: "100%",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            overflow: "hidden",
+          }}>
+            {/* Top bar: progress + close */}
+            <Box sx={{
+              position: "absolute", top: 0, left: 0, right: 0, zIndex: 2,
+              display: "flex", alignItems: "center", gap: 1, p: 1.5,
+              background: "linear-gradient(to bottom, rgba(0,0,0,0.65), transparent)",
+            }}>
+              <Box sx={{ flex: 1 }}>
+                {remaining != null && (
+                  <>
+                    <LinearProgress
+                      variant="determinate"
+                      value={Math.min(100, Math.max(0, ((VIEW_SECS - remaining) / VIEW_SECS) * 100))}
+                      sx={{
+                        height: 6, borderRadius: 3, bgcolor: "rgba(255,255,255,0.2)",
+                        "& .MuiLinearProgress-bar": { bgcolor: "#4fc3f7", transition: "transform 0.2s linear" },
+                      }}
+                    />
+                    <Typography variant="caption" sx={{ color: "#fff", mt: 0.75, display: "block", fontWeight: 600 }}>
+                      {remaining}s
+                    </Typography>
+                  </>
+                )}
+                {remaining == null && (
+                  <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.85)" }}>
+                    View once preview
+                  </Typography>
+                )}
+              </Box>
+              <IconButton
+                onClick={(e) => { e.stopPropagation(); closeViewer(); }}
+                aria-label="Close"
+                sx={{
+                  color: "#fff",
+                  bgcolor: "rgba(255,255,255,0.15)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.3)" },
+                }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
+
+            {viewerUrl ? (
+              <Box
+                component="img"
+                src={viewerUrl}
+                alt=""
+                draggable={false}
+                onContextMenu={(e) => e.preventDefault()}
+                sx={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  userSelect: "none",
+                  p: 1,
+                }}
+              />
+            ) : (
+              <CircularProgress sx={{ color: "#fff" }} />
+            )}
+          </Box>
+        </Dialog>
+      </>
     );
   }
 
-  // View-once already opened (and no live URL)
-  if (isViewOnce && !mine && viewOnceState === "opened" && !viewOnceUrl) {
-    return (
-      <Box
-        sx={{
-          width: 180, height: 72, borderRadius: 1.5, bgcolor: "action.selected",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}
-      >
-        <Typography variant="caption" sx={{ opacity: 0.8 }}>Photo opened</Typography>
-      </Box>
-    );
-  }
-
+  // Normal / spoiler image
   return (
     <Box sx={{ position: "relative", display: "inline-block", maxWidth: "100%" }}>
-      {effectiveUrl ? (
+      {url ? (
         <Box
           component="img"
-          src={effectiveUrl}
+          src={url}
           alt={att.original_filename}
           onClick={(e) => {
             e.stopPropagation();
@@ -1072,7 +1214,7 @@ function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onRe
               setSpoilerOpen(true);
               return;
             }
-            onOpenPreview?.({ ...att, url: effectiveUrl, message });
+            onOpenPreview?.({ ...att, url, message });
           }}
           onContextMenu={(e) => {
             e.preventDefault();
@@ -1108,7 +1250,7 @@ function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onRe
         <Box
           onClick={(e) => { e.stopPropagation(); setSpoilerOpen(true); }}
           sx={{
-            position: "absolute", inset: 0, displayRadius: 1.5,
+            position: "absolute", inset: 0, borderRadius: 1.5,
             display: "flex", alignItems: "center", justifyContent: "center",
             bgcolor: "rgba(0,0,0,0.25)", cursor: "pointer",
           }}
@@ -1116,16 +1258,6 @@ function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onRe
           <Chip label="Spoiler · Tap to reveal" size="small"
             sx={{ bgcolor: "rgba(0,0,0,0.65)", color: "#fff", fontWeight: 700 }} />
         </Box>
-      )}
-      {isViewOnce && (
-        <Chip
-          label={mine ? "View once" : (viewOnceState === "opened" ? "Opened" : "View once")}
-          size="small"
-          sx={{
-            position: "absolute", right: 8, top: 8, height: 22, fontWeight: 800, fontSize: 11,
-            bgcolor: "rgba(0,0,0,0.55)", color: "#fff",
-          }}
-        />
       )}
       {isGifAttachment(att) && (
         <Chip
