@@ -1461,6 +1461,7 @@ export default function MessageBubble({
     }
   };
 
+  const longPressFired = React.useRef(false);
   const onPointerDownMsg = (e) => {
     if (e.button != null && e.button !== 0) return;
     // Already selecting: toggle this message (do NOT force single-select)
@@ -1469,22 +1470,16 @@ export default function MessageBubble({
       return;
     }
     longPressMoved.current = false;
+    longPressFired.current = false;
     clearLongPress();
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
-      // Mobile long-press → context menu (right-click equivalent), not selection
+      longPressFired.current = true;
+      // Mobile long-press → enter selection mode (select this message)
       try {
         if (navigator.vibrate) navigator.vibrate(12);
       } catch { /* */ }
-      onContextOpen?.(
-        {
-          preventDefault() {},
-          stopPropagation() {},
-          clientX: e.clientX || (e.touches?.[0]?.clientX) || window.innerWidth / 2,
-          clientY: e.clientY || (e.touches?.[0]?.clientY) || window.innerHeight / 2,
-        },
-        m,
-      );
+      onToggleSelect?.(m, true);
     }, 420);
   };
   const onPointerMoveMsg = (e) => {
@@ -1494,7 +1489,30 @@ export default function MessageBubble({
       clearLongPress();
     }
   };
-  const onPointerUpMsg = () => clearLongPress();
+  const onPointerUpMsg = (e) => {
+    const wasLong = longPressFired.current;
+    clearLongPress();
+    // Short tap on the row gutter (outside the bubble content) → context menu
+    // (right-click equivalent). Long-press already entered selection.
+    if (wasLong || longPressMoved.current || selectionMode) return;
+    const target = e?.target;
+    if (!target) return;
+    // If the press landed on the bubble body / interactive controls, don't open context
+    const inBubble = target.closest?.("[data-msg-bubble]");
+    if (inBubble) return;
+    // Gutter / row area → open context menu
+    try {
+      onContextOpen?.(
+        {
+          preventDefault() {},
+          stopPropagation() {},
+          clientX: e.clientX || window.innerWidth / 2,
+          clientY: e.clientY || window.innerHeight / 2,
+        },
+        m,
+      );
+    } catch { /* */ }
+  };
 
   return (
     <Box
@@ -1577,6 +1595,7 @@ export default function MessageBubble({
         </Box>
       )}
       <Box
+        data-msg-bubble="1"
         sx={{
           maxWidth: isCircularVideoMsg
             ? 320

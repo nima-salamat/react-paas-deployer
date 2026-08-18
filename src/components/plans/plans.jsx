@@ -22,6 +22,8 @@ import {
   Paper,
   Skeleton,
   Stack,
+  Tab,
+  Tabs,
   Typography,
   useMediaQuery,
   useTheme,
@@ -32,11 +34,16 @@ import CloseIcon from "@mui/icons-material/Close";
 import LaunchIcon from "@mui/icons-material/Launch";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
+import AppsIcon from "@mui/icons-material/Apps";
+import StorageIcon from "@mui/icons-material/Storage";
+import PlatformIcon from "./PlatformIcon";
 
 const CreateDeploymentModal = lazy(() => import("./CreateDeploymentModal"));
 
 const PLATFORMS_API = `https://${import.meta.env.VITE_API_BASE}/plans/platforms/`;
 const PLANS_API = `https://${import.meta.env.VITE_API_BASE}/plans/`;
+
+/* ─── helpers ─────────────────────────────────────────────────────────── */
 
 const getKey = (p) => {
   if (!p) return "null";
@@ -101,16 +108,20 @@ const getErrorMessage = (error, fallback = "Something went wrong.") => {
   return error?.message || fallback;
 };
 
+/** Classify platform as database vs application */
+const DB_RE =
+  /postgres|postgresql|mysql|mariadb|mongo|mongodb|redis|sqlite|elastic|elasticsearch|cassandra|cockroach|memcached|neo4j|influx|clickhouse|timescale|rabbitmq|kafka/i;
+
+const isDatabasePlatform = (key, label) =>
+  DB_RE.test(String(key || "")) || DB_RE.test(String(label || ""));
+
+/* ─── Plan card ───────────────────────────────────────────────────────── */
+
 const PlanCard = memo(function PlanCard({ plan, onCreate }) {
+  const pKey = plan.platform ?? "";
   return (
     <Paper
       elevation={0}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") onCreate(plan);
-      }}
-      onClick={() => onCreate(plan)}
       sx={(theme) => ({
         width: "100%",
         boxSizing: "border-box",
@@ -121,92 +132,62 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
         border: "1px solid",
         borderColor: "divider",
         bgcolor: "background.paper",
-        cursor: "pointer",
-        transition: "border-color 120ms ease, background-color 120ms ease",
+        transition: "border-color 180ms ease, background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
         "&:hover": {
           borderColor: "primary.main",
+          transform: "translateY(-3px)",
+          boxShadow: theme.palette.mode === "dark"
+            ? `0 8px 24px ${alpha(theme.palette.common.black, 0.35)}`
+            : `0 8px 24px ${alpha(theme.palette.primary.main, 0.12)}`,
           bgcolor:
             theme.palette.mode === "dark"
               ? alpha(theme.palette.primary.main, 0.06)
               : alpha(theme.palette.primary.main, 0.03),
         },
-        "&:focus-visible": {
-          outline: `2px solid ${theme.palette.primary.main}`,
-          outlineOffset: 1,
-        },
       })}
     >
       <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
-              {plan.platform ?? "Platform"}
-            </Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
-              {plan.name ?? "Unnamed"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" noWrap>
-              {plan.plan_type
-                ? `${plan.plan_type}${plan.storage_type ? ` · ${plan.storage_type}` : ""}`
-                : plan.platform}
-            </Typography>
-          </Box>
-          <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: "success.main" }}>
-              {plan.price_per_hour ?? "—"}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              /hr
-            </Typography>
+          <Box sx={{ minWidth: 0, display: "flex", gap: 1, alignItems: "flex-start" }}>
+            <PlatformIcon platformKey={pKey} label={pKey} size={28} />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
+                {plan.platform ?? "Platform"}
+              </Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
+                {plan.name ?? "Unnamed"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" noWrap>
+                {plan.plan_type
+                  ? `${plan.plan_type}${plan.storage_type ? ` · ${plan.storage_type}` : ""}`
+                  : plan.platform}
+              </Typography>
+            </Box>
           </Box>
         </Stack>
       </Box>
-
-      <Box sx={{ p: 2, flex: 1, display: "flex", flexDirection: "column", gap: 1.5 }}>
-        <Stack direction="row" spacing={1}>
-          {[
-            { label: "CPU", value: plan.max_cpu },
-            { label: "RAM", value: plan.max_ram, unit: "MB" },
-            { label: "Disk", value: plan.max_storage, unit: "GB" },
-          ].map((m) => (
-            <Box
-              key={m.label}
-              sx={{
-                flex: 1,
-                py: 1,
-                px: 0.75,
-                textAlign: "center",
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
-              }}
-            >
-              <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
-                {m.value ?? "—"}
-                {m.unit && m.value != null ? ` ${m.unit}` : ""}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {m.label}
-              </Typography>
-            </Box>
-          ))}
+      <Box sx={{ p: 2, flex: 1 }}>
+        <Stack spacing={0.75}>
+          {(plan.max_cpu != null || plan.cpu != null) && (
+            <Typography variant="body2" color="text.secondary">
+              CPU: <b>{plan.max_cpu ?? plan.cpu}</b>
+            </Typography>
+          )}
+          {(plan.max_ram != null || plan.ram != null) && (
+            <Typography variant="body2" color="text.secondary">
+              RAM: <b>{plan.max_ram ?? plan.ram}</b>
+            </Typography>
+          )}
+          {(plan.price_per_hour != null || plan.price != null) && (
+            <Typography variant="body2" color="text.secondary">
+              Price: <b>{plan.price_per_hour ?? plan.price}</b>
+            </Typography>
+          )}
         </Stack>
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{
-            flex: 1,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
-          {plan.description ?? "—"}
-        </Typography>
-
+      </Box>
+      <Box sx={{ p: 1.5, pt: 0 }}>
         <Button
+          fullWidth
           size="small"
           variant="contained"
           startIcon={<AddIcon />}
@@ -214,7 +195,7 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
             e.stopPropagation();
             onCreate(plan);
           }}
-          sx={{ borderRadius: 1, alignSelf: "flex-start" }}
+          sx={{ borderRadius: 1 }}
         >
           Create
         </Button>
@@ -222,6 +203,8 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
     </Paper>
   );
 });
+
+/* ─── Main ────────────────────────────────────────────────────────────── */
 
 export default function PlatformPlans() {
   const theme = useTheme();
@@ -232,26 +215,45 @@ export default function PlatformPlans() {
   const [plans, setPlans] = useState([]);
   const [loadingPlatforms, setLoadingPlatforms] = useState(false);
   const [loadingPlans, setLoadingPlans] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [fetchError, setFetchError] = useState(null);
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalInitial, setModalInitial] = useState({});
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  /** 0 = Apps, 1 = Databases */
+  const [filterTab, setFilterTab] = useState(0);
 
   const fetchIdRef = useRef(0);
   const lastPlansSig = useRef(null);
   const lastPlatformsSig = useRef(null);
+  const sentinelRef = useRef(null);
+  const loadingMoreRef = useRef(false);
+
+  const appPlatforms = useMemo(
+    () => platforms.filter(([k, l]) => !isDatabasePlatform(k, l)),
+    [platforms]
+  );
+  const dbPlatforms = useMemo(
+    () => platforms.filter(([k, l]) => isDatabasePlatform(k, l)),
+    [platforms]
+  );
+  const visiblePlatforms = filterTab === 0 ? appPlatforms : dbPlatforms;
+  const visibleKeys = useMemo(
+    () => visiblePlatforms.map(([k]) => String(k)),
+    [visiblePlatforms]
+  );
 
   const selectedLabels = useMemo(() => {
     const map = new Map(platforms.map(([k, l]) => [String(k), l]));
     return selectedPlatforms.map((k) => map.get(String(k)) ?? String(k));
   }, [platforms, selectedPlatforms]);
 
-  const allKeys = useMemo(() => platforms.map(([k]) => String(k)), [platforms]);
-  const allSelected = platforms.length > 0 && selectedPlatforms.length === platforms.length;
+  const allSelectedInTab =
+    visibleKeys.length > 0 && visibleKeys.every((k) => selectedPlatforms.includes(k));
 
-  const fetchPlatforms = useCallback(async (signal) => {
+  const fetchPlatforms = useCallback(async (signal, { force = false } = {}) => {
     setLoadingPlatforms(true);
     setFetchError(null);
     try {
@@ -261,7 +263,7 @@ export default function PlatformPlans() {
         (i) => i[0]
       );
       const sig = JSON.stringify(normalized);
-      if (lastPlatformsSig.current !== sig) {
+      if (force || lastPlatformsSig.current !== sig) {
         lastPlatformsSig.current = sig;
         setPlatforms(normalized);
       }
@@ -280,21 +282,33 @@ export default function PlatformPlans() {
   }, []);
 
   const fetchPlans = useCallback(
-    async (signal) => {
+    async (signal, { force = false, appendPage } = {}) => {
+      const targetPage = appendPage ?? page;
       const id = ++fetchIdRef.current;
-      setLoadingPlans(true);
+      if (appendPage && appendPage > 1) {
+        setLoadingMore(true);
+        loadingMoreRef.current = true;
+      } else {
+        setLoadingPlans(true);
+      }
       setFetchError(null);
       const filtered = selectedPlatforms.length > 0;
 
       try {
         if (!filtered) {
-          const res = await axios.get(PLANS_API, { params: { page }, signal });
+          const res = await axios.get(PLANS_API, { params: { page: targetPage }, signal });
           if (fetchIdRef.current !== id) return;
           const results = normalizeArray(res.data);
-          const prev = lastPlansSig.current?.raw ? JSON.parse(lastPlansSig.current.raw) : [];
-          const merged = uniqueBy(page === 1 ? results : [...prev, ...results], getKey);
+          const prev =
+            targetPage > 1 && lastPlansSig.current?.raw
+              ? JSON.parse(lastPlansSig.current.raw)
+              : [];
+          const merged = uniqueBy(
+            targetPage === 1 ? results : [...prev, ...results],
+            getKey
+          );
           const sig = JSON.stringify(merged.map(getKey));
-          if (lastPlansSig.current?.sig !== sig) {
+          if (force || lastPlansSig.current?.sig !== sig) {
             lastPlansSig.current = { sig, raw: JSON.stringify(merged) };
             setPlans(merged);
           }
@@ -317,7 +331,7 @@ export default function PlatformPlans() {
           });
           const unique = uniqueBy(merged, getKey);
           const sig = JSON.stringify(unique.map(getKey));
-          if (lastPlansSig.current?.sig !== sig) {
+          if (force || lastPlansSig.current?.sig !== sig) {
             lastPlansSig.current = { sig, raw: JSON.stringify(unique) };
             setPlans(unique);
           }
@@ -326,9 +340,13 @@ export default function PlatformPlans() {
       } catch (e) {
         if (axios.isCancel?.(e) || e?.name === "CanceledError") return;
         setFetchError(getErrorMessage(e, "Failed to load plans."));
-        setPlans([]);
+        if (targetPage === 1) setPlans([]);
       } finally {
-        if (fetchIdRef.current === id) setLoadingPlans(false);
+        if (fetchIdRef.current === id) {
+          setLoadingPlans(false);
+          setLoadingMore(false);
+          loadingMoreRef.current = false;
+        }
       }
     },
     [page, selectedPlatforms]
@@ -346,11 +364,35 @@ export default function PlatformPlans() {
     return () => c.abort();
   }, [fetchPlans]);
 
+  // Infinite scroll sentinel
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return undefined;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((e) => e.isIntersecting);
+        if (
+          hit &&
+          hasNext &&
+          selectedPlatforms.length === 0 &&
+          !loadingPlans &&
+          !loadingMoreRef.current
+        ) {
+          setPage((p) => p + 1);
+        }
+      },
+      { root: null, rootMargin: "240px", threshold: 0 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasNext, selectedPlatforms.length, loadingPlans, plans.length]);
+
   const togglePlatform = (code) => {
     const key = String(code);
     setSelectedPlatforms((prev) => {
       const next = prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key];
       setPage(1);
+      lastPlansSig.current = null;
       return next;
     });
   };
@@ -358,12 +400,23 @@ export default function PlatformPlans() {
   const clearFilters = () => {
     setSelectedPlatforms([]);
     setPage(1);
+    lastPlansSig.current = null;
   };
 
-  const toggleSelectAll = () => {
+  const toggleSelectAllInTab = () => {
     setSelectedPlatforms((prev) => {
-      const next = prev.length === platforms.length ? [] : allKeys;
+      let next;
+      if (allSelectedInTab) {
+        // deselect only current tab keys
+        const drop = new Set(visibleKeys);
+        next = prev.filter((k) => !drop.has(k));
+      } else {
+        const set = new Set(prev);
+        visibleKeys.forEach((k) => set.add(k));
+        next = Array.from(set);
+      }
       setPage(1);
+      lastPlansSig.current = null;
       return next;
     });
   };
@@ -395,39 +448,83 @@ export default function PlatformPlans() {
   };
 
   const retryAll = () => {
-    fetchPlatforms();
-    fetchPlans();
+    lastPlatformsSig.current = null;
+    lastPlansSig.current = null;
+    setPage(1);
+    setFetchError(null);
+    fetchPlatforms(undefined, { force: true });
+    // fetchPlans will re-run via effect when page resets; force immediate:
+    fetchPlans(undefined, { force: true });
   };
+
+  const filterTabs = (
+    <Tabs
+      value={filterTab}
+      onChange={(_, v) => setFilterTab(v)}
+      variant="fullWidth"
+      sx={{
+        minHeight: 36,
+        mb: 1.25,
+        "& .MuiTab-root": { minHeight: 36, py: 0.5, fontWeight: 700, fontSize: 13 },
+      }}
+    >
+      <Tab
+        icon={<AppsIcon sx={{ fontSize: 16 }} />}
+        iconPosition="start"
+        label={`Apps (${appPlatforms.length})`}
+      />
+      <Tab
+        icon={<StorageIcon sx={{ fontSize: 16 }} />}
+        iconPosition="start"
+        label={`Databases (${dbPlatforms.length})`}
+      />
+    </Tabs>
+  );
 
   const filterContent = (
     <Stack spacing={1.5}>
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+      {filterTabs}
+
+      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+        <Typography
+          variant="subtitle2"
+          sx={{
+            fontWeight: 800,
+            background: (t) =>
+              `linear-gradient(90deg, ${t.palette.primary.main}, ${t.palette.secondary.main}, ${t.palette.primary.main})`,
+            backgroundSize: "200% auto",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            transition: "background-position 0.6s ease",
+            backgroundPosition: "0% center",
+            cursor: "default",
+            "&:hover": {
+              backgroundPosition: "100% center",
+            },
+          }}
+        >
           Platforms
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          Filter the plan list
-        </Typography>
-      </Box>
-
-      <Stack direction="row" spacing={1}>
-        <Button
-          size="small"
-          variant="outlined"
-          onClick={toggleSelectAll}
-          disabled={!platforms.length || loadingPlatforms}
-          sx={{ borderRadius: 1 }}
-        >
-          {allSelected ? "Deselect all" : "Select all"}
-        </Button>
-        <Button
-          size="small"
-          onClick={clearFilters}
-          disabled={!selectedPlatforms.length}
-          sx={{ borderRadius: 1 }}
-        >
-          Clear
-        </Button>
+        <Stack direction="row" spacing={0.75}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={toggleSelectAllInTab}
+            disabled={!visiblePlatforms.length || loadingPlatforms}
+            sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 11 }}
+          >
+            {allSelectedInTab ? "Deselect" : "Select all"}
+          </Button>
+          <Button
+            size="small"
+            onClick={clearFilters}
+            disabled={!selectedPlatforms.length}
+            sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 11 }}
+          >
+            Clear
+          </Button>
+        </Stack>
       </Stack>
 
       <Divider />
@@ -438,13 +535,13 @@ export default function PlatformPlans() {
           <Skeleton height={32} />
           <Skeleton height={32} />
         </Stack>
-      ) : platforms.length === 0 ? (
+      ) : visiblePlatforms.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No platforms
+          {filterTab === 0 ? "No app platforms" : "No database platforms"}
         </Typography>
       ) : (
-        <Stack spacing={0.75}>
-          {platforms.map(([key, label]) => {
+        <Stack spacing={0.75} sx={{ maxHeight: { md: "calc(100vh - 280px)" }, overflow: "auto", pr: 0.5 }}>
+          {visiblePlatforms.map(([key, label]) => {
             const selected = selectedPlatforms.includes(String(key));
             return (
               <Button
@@ -453,10 +550,12 @@ export default function PlatformPlans() {
                 size="small"
                 variant={selected ? "contained" : "outlined"}
                 onClick={() => togglePlatform(key)}
+                startIcon={<PlatformIcon platformKey={key} label={label} size={20} />}
                 sx={{
                   borderRadius: 1,
                   justifyContent: "flex-start",
                   fontWeight: selected ? 700 : 500,
+                  textTransform: "none",
                 }}
               >
                 {label}
@@ -540,26 +639,40 @@ export default function PlatformPlans() {
         sx={{
           display: { xs: "flex", md: "grid" },
           flexDirection: "column",
-          gridTemplateColumns: { md: "240px 1fr" },
+          gridTemplateColumns: { md: "260px 1fr" },
           gap: 2,
           alignItems: "start",
           width: "100%",
+          // sticky children need a non-overflowing ancestor chain
+          overflow: "visible",
         }}
       >
-        <Paper
-          elevation={0}
+        {/* Desktop sticky filter sidebar — moves with scroll */}
+        {/* Sticky filter: sticks under navbar while scrolling; returns to flow when scrolling back up */}
+        <Box
           sx={{
             display: { xs: "none", md: "block" },
-            p: 2,
-            borderRadius: 2,
-            border: "1px solid",
-            borderColor: "divider",
             position: "sticky",
             top: 88,
+            zIndex: 3,
+            alignSelf: "start",
+            maxHeight: "calc(100vh - 104px)",
           }}
         >
-          {filterContent}
-        </Paper>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              maxHeight: "calc(100vh - 104px)",
+              overflow: "auto",
+            }}
+          >
+            {filterContent}
+          </Paper>
+        </Box>
 
         <Box sx={{ width: "100%", minWidth: 0 }}>
           <Stack
@@ -577,7 +690,11 @@ export default function PlatformPlans() {
               Filters
               {selectedPlatforms.length > 0 ? ` (${selectedPlatforms.length})` : ""}
             </Button>
-            <IconButton onClick={retryAll} sx={{ borderRadius: 1, border: "1px solid", borderColor: "divider" }}>
+            <IconButton
+              onClick={retryAll}
+              disabled={loadingPlatforms || loadingPlans}
+              sx={{ borderRadius: 1, border: "1px solid", borderColor: "divider" }}
+            >
               <RefreshIcon />
             </IconButton>
           </Stack>
@@ -635,7 +752,7 @@ export default function PlatformPlans() {
               </Box>
             )}
 
-            {loadingPlans ? (
+            {loadingPlans && plans.length === 0 ? (
               <Box
                 sx={{
                   display: "grid",
@@ -675,16 +792,13 @@ export default function PlatformPlans() {
               </Box>
             )}
 
+            {/* Infinite-scroll sentinel (replaces Load more button) */}
             {hasNext && selectedPlatforms.length === 0 && (
-              <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={loadingPlans}
-                  sx={{ borderRadius: 1 }}
-                >
-                  {loadingPlans ? "Loading…" : "Load more"}
-                </Button>
+              <Box
+                ref={sentinelRef}
+                sx={{ display: "flex", justifyContent: "center", py: 3, minHeight: 48 }}
+              >
+                {(loadingMore || loadingPlans) && <CircularProgress size={24} />}
               </Box>
             )}
           </Paper>
@@ -699,7 +813,7 @@ export default function PlatformPlans() {
           sx: {
             borderTopLeftRadius: 16,
             borderTopRightRadius: 16,
-            maxHeight: "80vh",
+            maxHeight: "85vh",
             p: 2,
           },
         }}

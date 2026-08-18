@@ -34,7 +34,8 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.1",
     "video.js": "^8.24.0",
-    "wavesurfer.js": "^7.12.11"
+    "wavesurfer.js": "^7.12.11",
+    "react-devicons": "2.16.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

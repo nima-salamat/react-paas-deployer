@@ -587,6 +587,8 @@ export default function MessageComposer({
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const videoPreviewRef = useRef(null);
+  const recordingCanvasRef = useRef(null);
+  const recordingDrawRafRef = useRef(null);
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
   const micRafRef = useRef(null);
@@ -646,7 +648,15 @@ export default function MessageComposer({
     } catch { /* */ }
   };
 
+  const stopRecordingCanvas = () => {
+    if (recordingDrawRafRef.current) {
+      cancelAnimationFrame(recordingDrawRafRef.current);
+      recordingDrawRafRef.current = null;
+    }
+  };
+
   const stopAllTracks = () => {
+    stopRecordingCanvas();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => {
         try { t.stop(); } catch { /* */ }
@@ -676,6 +686,48 @@ export default function MessageComposer({
         v.play().catch(() => {});
       }
     }
+  }, [recPhase, recKind]);
+
+  // Draw the active camera into one persistent video track. Camera flips now
+  // change only the input video element, so the MediaRecorder keeps a single
+  // continuous track and the final file contains the whole recording.
+  useEffect(() => {
+    if (recPhase !== "holding" && recPhase !== "locked") return;
+    if (recKind !== "video") return;
+    const video = videoPreviewRef.current;
+    const canvas = recordingCanvasRef.current;
+    const source = streamRef.current;
+    if (!video || !canvas || !source) return;
+    const width = 480;
+    const height = 480;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+
+    const draw = () => {
+      if (video.readyState >= 2) {
+        ctx.save();
+        ctx.clearRect(0, 0, width, height);
+        if (cameraFacingRef.current === "user") {
+          ctx.translate(width, 0);
+          ctx.scale(-1, 1);
+        }
+        const vw = video.videoWidth || width;
+        const vh = video.videoHeight || height;
+        const scale = Math.max(width / vw, height / vh);
+        const dw = vw * scale;
+        const dh = vh * scale;
+        ctx.drawImage(video, (width - dw) / 2, (height - dh) / 2, dw, dh);
+        ctx.restore();
+      }
+      recordingDrawRafRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+      try { startMediaRecorderOnStream(source, "video"); } catch (e) { setRecordError(e?.message || "Could not start video recording"); }
+    }
+    return () => stopRecordingCanvas();
   }, [recPhase, recKind]);
 
   // Selfie by default for video messages; flip switches to environment (rear).
@@ -748,23 +800,32 @@ export default function MessageComposer({
   const startMediaRecorderOnStream = (stream, mode) => {
     const mimeType = mode === "video" ? "video/webm" : "audio/webm";
     const options = MediaRecorder.isTypeSupported(mimeType) ? { mimeType } : {};
-    // If an old recorder is still alive (e.g. during flip), flush remaining data then
-    // stop it without running finalization so chunks stay in chunksRef.
+
+    // Video notes are recorded from one stable canvas track. The live camera
+    // can switch underneath it without changing the recorder's track, which
+    // keeps the final WebM valid and includes both cameras.
+    let recorderStream = stream;
+    if (mode === "video") {
+      const canvas = recordingCanvasRef.current;
+      if (!canvas || !canvas.captureStream) throw new Error("Video recording is not supported");
+      const canvasStream = canvas.captureStream(30);
+      const audioTracks = stream.getAudioTracks().filter((t) => t.readyState === "live");
+      recorderStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioTracks]);
+    }
+
     const prev = mediaRecorderRef.current;
     if (prev && prev.state !== "inactive") {
       try {
         prev.onstop = null;
-        try { prev.requestData(); } catch { /* */ }
         prev.stop();
       } catch { /* */ }
     }
 
-    const mr = new MediaRecorder(stream, options);
+    const mr = new MediaRecorder(recorderStream, options);
     mr.ondataavailable = (e) => {
       if (e.data && e.data.size) chunksRef.current.push(e.data);
     };
     mr.onstop = () => {
-      // Ignore intermediate stops from camera-flip restarts
       if (mediaRecorderRef.current !== mr) return;
       mediaRecorderRef.current = null;
 
@@ -789,16 +850,13 @@ export default function MessageComposer({
       const finish = (finalBlob, finalType) => {
         const filename = mode === "video" ? `video_message_${ts}.webm` : `voice_${ts}.webm`;
         const file = new File([finalBlob], filename, { type: finalType || recordedType });
-        flushSync(() => {
-          setFiles((prev) => [...prev, file]);
-        });
+        flushSync(() => setFiles((prev) => [...prev, file]));
         try { onSend?.(); } catch { /* */ }
       };
       if (mode === "video") {
-        // Center-crop to the circular view (square content only — no white padding)
-        cropVideoMessageToSquare(blob).then((cropped) => {
-          finish(cropped, cropped.type || recordedType);
-        }).catch(() => finish(blob, recordedType));
+        cropVideoMessageToSquare(blob)
+          .then((cropped) => finish(cropped, cropped.type || recordedType))
+          .catch(() => finish(blob, recordedType));
       } else {
         finish(blob, recordedType);
       }
@@ -838,64 +896,34 @@ export default function MessageComposer({
           const other = cams.find((c) => c.deviceId && c.deviceId !== currentId);
           const byLabel = cams.find((c) => {
             const lab = (c.label || "").toLowerCase();
-            if (nextFacing === "user") {
-              return /front|user|face|selfie|\u062c\u0644\u0648/.test(lab);
-            }
-            return /back|rear|environment|world|\u0639\u0642\u0628|\u067e\u0634\u062a/.test(lab);
+            return nextFacing === "user"
+              ? /front|user|face|selfie|\u062c\u0644\u0648/.test(lab)
+              : /back|rear|environment|world|\u0639\u0642\u0628|\u067e\u0634\u062a/.test(lab);
           });
           const pick = byLabel || other;
-          if (pick?.deviceId) {
-            videoConstraints = {
-              deviceId: { ideal: pick.deviceId },
-              facingMode: { ideal: nextFacing },
-              width: { ideal: 480 },
-              height: { ideal: 480 },
-            };
-          }
+          if (pick?.deviceId) videoConstraints.deviceId = { ideal: pick.deviceId };
         }
       } catch { /* enumerate optional */ }
 
-      newVideoStream = await navigator.mediaDevices.getUserMedia({
-        video: videoConstraints,
-        audio: false,
-      });
+      newVideoStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio: false });
       const newTrack = newVideoStream.getVideoTracks()[0];
-      if (!newTrack) {
-        newVideoStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
-        throw new Error("No video track from new camera");
-      }
+      if (!newTrack) throw new Error("No video track from new camera");
 
-      // Keep existing live audio tracks
       const audioTracks = oldStream.getAudioTracks().filter((t) => t.readyState === "live");
       const combined = new MediaStream([newTrack, ...audioTracks]);
-
-      // Restart recorder on the new stream BEFORE stopping the old video track
-      startMediaRecorderOnStream(combined, "video");
       streamRef.current = combined;
-
-      // Release previous camera
-      oldStream.getVideoTracks().forEach((t) => {
-        try { oldStream.removeTrack(t); } catch { /* */ }
-        try { t.stop(); } catch { /* */ }
-      });
-      newVideoStream.getTracks().forEach((t) => {
-        if (t !== newTrack) {
-          try { t.stop(); } catch { /* */ }
-        }
-      });
-
-      setCameraFacing(nextFacing);
-      cameraFacingRef.current = nextFacing;
-      try { localStorage.setItem("messenger.videoFacing", nextFacing); } catch { /* */ }
 
       if (videoPreviewRef.current) {
         videoPreviewRef.current.srcObject = combined;
-        videoPreviewRef.current.play().catch(() => {});
+        await videoPreviewRef.current.play().catch(() => {});
       }
+
+      oldStream.getVideoTracks().forEach((t) => { try { t.stop(); } catch { /* */ } });
+      setCameraFacing(nextFacing);
+      cameraFacingRef.current = nextFacing;
+      try { localStorage.setItem("messenger.videoFacing", nextFacing); } catch { /* */ }
     } catch (e) {
-      if (newVideoStream) {
-        newVideoStream.getTracks().forEach((t) => { try { t.stop(); } catch {} });
-      }
+      if (newVideoStream) newVideoStream.getTracks().forEach((t) => { try { t.stop(); } catch { /* */ } });
       setRecordError(e?.message || "Could not switch camera");
     } finally {
       setFlippingCam(false);
@@ -952,10 +980,10 @@ export default function MessageComposer({
       }
 
       chunksRef.current = [];
-      startMediaRecorderOnStream(stream, mode);
       setRecKind(mode);
       setRecPhase("holding");
       setRecordSeconds(0);
+      if (mode !== "video") startMediaRecorderOnStream(stream, mode);
       timerRef.current = setInterval(() => {
         setRecordSeconds((s) => {
           if (mode === "video" && s + 1 >= 60) {
@@ -1502,6 +1530,8 @@ export default function MessageComposer({
           zIndex: 20,
         }}
       >
+        <canvas ref={recordingCanvasRef} style={{ display: "none" }} />
+
         {/* Video preview sits ABOVE the composer only (chat pane), not fullscreen */}
         {recKind === "video" && (
           <Box
@@ -1519,8 +1549,8 @@ export default function MessageComposer({
               {/* Fixed circle frame: white outside the record area (Telegram-style) */}
               <Box
                 sx={{
-                  width: { xs: 196, sm: 232 },
-                  height: { xs: 196, sm: 232 },
+                  width: { xs: 244, sm: 268 },
+                  height: { xs: 244, sm: 268 },
                   borderRadius: "50%",
                   bgcolor: "#fff",
                   display: "flex",
@@ -1531,8 +1561,8 @@ export default function MessageComposer({
               >
               <Box
                 sx={{
-                  width: { xs: 168, sm: 200 },
-                  height: { xs: 168, sm: 200 },
+                  width: { xs: 214, sm: 232 },
+                  height: { xs: 214, sm: 232 },
                   borderRadius: "50%",
                   overflow: "hidden",
                   border: "3px solid",

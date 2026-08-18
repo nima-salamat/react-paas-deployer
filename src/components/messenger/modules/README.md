@@ -1,16 +1,29 @@
 # Messenger modules
 
-Progressive split of `MessengerApp.jsx` into maintainable pieces.
+Code extracted from `MessengerApp.jsx` to keep the shell maintainable.
 
-| Module | Role |
-|--------|------|
-| `mergeConversations.js` | Stable list merge (no avatar remount) |
-| `components/AddToContactsBanner.jsx` | Private-chat contact prompt |
-| `components/GroupDescriptionBanner.jsx` | Group description strip |
-| `components/JitsiCallModal.jsx` | Call UI (full / mini bar) |
-| `components/Sidebar.jsx` | Chat list |
-| `components/MessageBubble.jsx` | Bubbles |
-| `components/MessageComposer.jsx` | Composer |
+## Layout
 
-`MessengerApp.jsx` remains the orchestrator (WS, routing, state). Further extractions
-hooks (`useMessengerWs`, `useMessengerCalls`) can move here without changing UI.
+```
+messenger/
+  MessengerApp.jsx              — shell + orchestration (state, handlers, layout)
+  messengerUtils.js             — shared pure helpers
+  api.js                        — API base URLs / unwrap helpers
+  modules/
+    composerDrafts.js           — localStorage drafts per conversation
+    groupDescDismiss.js         — dismissed group-description banner state
+    fileHelpers.js              — attachment / original-file helpers
+    mergeConversations.js       — stable merge for chat list
+  hooks/
+    useKeyboardLayout.js        — visualViewport → shell size on mobile
+    useMessengerWebSocket.js    — WS connect / reconnect / event dispatch
+  components/
+    MessengerDialogs.jsx        — forward / group / join / confirms / toasts
+    CallChoiceDialog.jsx        — mobile voice|video call picker
+    Sidebar.jsx, MessageBubble.jsx, MessageComposer.jsx, …
+```
+
+## Goal
+
+Keep `MessengerApp.jsx` focused on wiring. Prefer new behavior in a module/hook/component
+rather than growing the shell further.

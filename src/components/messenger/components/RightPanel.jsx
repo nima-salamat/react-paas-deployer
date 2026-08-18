@@ -374,6 +374,7 @@ export default function RightPanel({
           onMessage={onMessage}
           onAddContact={onAddContact}
           onBlock={onBlockUser}
+          onUnblock={onUnblock}
           onVoiceCall={onVoiceCall}
           onVideoCall={onVideoCall}
         />

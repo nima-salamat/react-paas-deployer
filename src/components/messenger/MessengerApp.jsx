@@ -65,100 +65,36 @@ import ImageCropDialog from "./components/ImageCropDialog";
 import ReadReceiptsDialog from "./components/ReadReceiptsDialog";
 import RightPanel from "./components/RightPanel";
 import MessengerProfileEditor from "./MessengerProfileEditor";
-import ConfirmDialog from "./components/ConfirmDialog";
 import ContextMenu from "./components/ContextMenu";
 import AudioPlayerBar from "./components/AudioPlayerBar";
 import MediaGalleryDialog from "./components/MediaGalleryDialog";
 import ChatMediaLibraryDialog from "./components/ChatMediaLibraryDialog";
-import MediaSettingsDialog from "./components/MediaSettingsDialog";
 import VideoEditDialog from "./components/VideoEditDialog";
 import PinnedMessageBar from "./components/PinnedMessageBar";
 import JitsiCallModal from "./components/JitsiCallModal";
 import IncomingCallBanner from "./components/IncomingCallBanner";
 import AddToContactsBanner from "./components/AddToContactsBanner";
 import GroupDescriptionBanner from "./components/GroupDescriptionBanner";
-import DayJumpDialog from "./components/DayJumpDialog";
 import MessageSearchDialog from "./components/MessageSearchDialog";
-import AuthRequiredDialog from "./components/AuthRequiredDialog";
 import PreviewTextBody from "./components/PreviewTextBody";
 import { attachMessengerOriginal, messengerOriginalOf, guessLangFromName } from "./modules/fileHelpers";
 import { mergeConversations } from "./modules/mergeConversations";
+import { writeComposerDraft, readComposerDraft } from "./modules/composerDrafts";
+import { isGroupDescDismissed, persistGroupDescDismiss } from "./modules/groupDescDismiss";
+import useKeyboardLayout from "./hooks/useKeyboardLayout";
+import useMessengerWebSocket from "./hooks/useMessengerWebSocket";
+import MessengerDialogs from "./components/MessengerDialogs";
 
 import CallIcon from "@mui/icons-material/Call";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import SearchIcon from "@mui/icons-material/Search";
-import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
 
 
 
-
-/* ── Composer text drafts (per conversation, localStorage) ── */
-const DRAFTS_LS_KEY = "messenger.composerDrafts";
-function readComposerDrafts() {
-  try {
-    const raw = localStorage.getItem(DRAFTS_LS_KEY);
-    const obj = raw ? JSON.parse(raw) : {};
-    return obj && typeof obj === "object" ? obj : {};
-  } catch {
-    return {};
-  }
-}
-function writeComposerDraft(convId, text) {
-  if (convId == null) return;
-  const key = String(convId);
-  try {
-    const all = readComposerDrafts();
-    const t = String(text || "");
-    if (!t.trim()) delete all[key];
-    else all[key] = t;
-    localStorage.setItem(DRAFTS_LS_KEY, JSON.stringify(all));
-  } catch { /* quota / private mode */ }
-}
-function readComposerDraft(convId) {
-  if (convId == null) return "";
-  try {
-    const all = readComposerDrafts();
-    return typeof all[String(convId)] === "string" ? all[String(convId)] : "";
-  } catch {
-    return "";
-  }
-}
-
-/* ── Group description dismissals (persist; re-show if text changes) ── */
-const DESC_DISMISS_LS_KEY = "messenger.dismissedGroupDesc";
-function readDismissedGroupDesc() {
-  try {
-    const raw = localStorage.getItem(DESC_DISMISS_LS_KEY);
-    const obj = raw ? JSON.parse(raw) : {};
-    return obj && typeof obj === "object" ? obj : {};
-  } catch {
-    return {};
-  }
-}
-function isGroupDescDismissed(convId, description) {
-  if (convId == null) return false;
-  try {
-    const map = readDismissedGroupDesc();
-    const entry = map[String(convId)];
-    if (!entry) return false;
-    // If description text changed since dismiss, show again
-    return entry === String(description || "");
-  } catch {
-    return false;
-  }
-}
-function persistGroupDescDismiss(convId, description) {
-  if (convId == null) return;
-  try {
-    const map = readDismissedGroupDesc();
-    map[String(convId)] = String(description || "");
-    localStorage.setItem(DESC_DISMISS_LS_KEY, JSON.stringify(map));
-  } catch { /* */ }
-}
 
 export default function MessengerApp() {
   const theme = useTheme();
@@ -167,36 +103,8 @@ export default function MessengerApp() {
   // Narrow desktop windows must NOT be treated as mobile for Enter / keyboard.
   const isMobileDevice = getIsMobileDevice();
 
-  // Mobile virtual keyboard: pin the shell to the visual viewport so the chat
-  // header stays visible at the top and the composer stays above the keyboard.
-  const [kbLayout, setKbLayout] = useState({ top: 0, height: typeof window !== "undefined" ? window.innerHeight : 0 });
-  useEffect(() => {
-    // Only real mobile devices have a soft keyboard that shrinks visualViewport.
-    if (!isMobileDevice) {
-      setKbLayout({ top: 0, height: window.innerHeight });
-      return undefined;
-    }
-    const vv = window.visualViewport;
-    const update = () => {
-      if (!vv) {
-        setKbLayout({ top: 0, height: window.innerHeight });
-        return;
-      }
-      setKbLayout({
-        top: Math.max(0, vv.offsetTop || 0),
-        height: Math.max(0, vv.height || window.innerHeight),
-      });
-    };
-    update();
-    vv?.addEventListener("resize", update);
-    vv?.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
-    return () => {
-      vv?.removeEventListener("resize", update);
-      vv?.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, [isMobileDevice]);
+  // Mobile virtual keyboard — visualViewport binding
+  const kbLayout = useKeyboardLayout(isMobileDevice);
 
   const navigate = useNavigate();
   const meId = useAuthUserId();
@@ -212,6 +120,7 @@ export default function MessengerApp() {
   // Conversations & messages
   const [conversations, setConversations] = useState([]);
   const [activeId, setActiveId] = useState(null);
+  const [chatOpening, setChatOpening] = useState(false);
   const [activeDetail, setActiveDetail] = useState(null);
   const [messages, setMessages] = useState([]);
   const messagesRef = useRef([]);
@@ -303,6 +212,7 @@ export default function MessengerApp() {
   const [ctx, setCtx] = useState(null);            // message right-click { x, y, message }
   const [reactAnchor, setReactAnchor] = useState(null);
   const [headerMenu, setHeaderMenu] = useState(null);
+  const [callChoiceOpen, setCallChoiceOpen] = useState(false);
 
   // Dialogs
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
@@ -603,6 +513,49 @@ export default function MessengerApp() {
   useEffect(() => { profileDataRef.current = profileData; }, [profileData]);
 
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+
+  // Pinned messages loader must be initialized before useMessengerWebSocket
+  // is invoked during render; otherwise the websocket hook sees a TDZ error.
+  const loadPinnedMessages = useCallback(async (convId) => {
+    if (!convId) return;
+    try {
+      const res = await apiRequest({ method: "GET", url: `${MSG_API}/conversations/${convId}/pinned-messages/` });
+      const data = unwrapData(res);
+      const pins = Array.isArray(data) ? [...data].reverse() : [];
+      setPinnedMessages(pins);
+      setCurrentPinIndex((prev) => (prev >= pins.length ? 0 : prev));
+    } catch {
+      setPinnedMessages([]);
+      setCurrentPinIndex(0);
+    }
+  }, []);
+
+  // Join-request loaders must be initialized before useMessengerWebSocket is
+  // invoked during render; keeping them here avoids temporal-dead-zone errors.
+  const loadMyJoinRequests = useCallback(async () => {
+    try {
+      const res = await apiRequest({ method: "GET", url: `${MSG_API}/me/join-requests/` });
+      const list = unwrapData(res) || [];
+      setMyJoinRequests(list);
+      setMyRequestsBadge(list.filter((r) => r.status === "pending").length);
+      return list;
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const loadConvJoinRequests = useCallback(async (convId) => {
+    if (!convId) return;
+    try {
+      const res = await apiRequest({
+        method: "GET",
+        url: `${MSG_API}/conversations/${convId}/join-requests/`,
+      });
+      setConvJoinRequests(unwrapData(res) || []);
+    } catch {
+      setConvJoinRequests([]);
+    }
+  }, []);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   /**
@@ -824,6 +777,17 @@ export default function MessengerApp() {
       // Merge by id: keep previous object reference when payload is unchanged so
       // Sidebar Avatars do not remount / re-download on every silent refresh.
       setConversations((prev) => mergeConversations(prev, next));
+      // Seed online presence from conversation peers (backend may include is_online)
+      setOnlineUsers((prev) => {
+        const nextSet = new Set(prev);
+        for (const c of next) {
+          if (c?.type === "private" && c.peer?.id != null) {
+            const online = c.peer.is_online ?? c.peer.online;
+            if (online) nextSet.add(Number(c.peer.id));
+          }
+        }
+        return nextSet;
+      });
       return next;
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load chats");
@@ -1074,6 +1038,7 @@ export default function MessengerApp() {
   const openChat = useCallback(async (c, { hashUser, jumpToMessageId } = {}) => {
     if (!c?.id) return;
     const cid = String(c.id);
+    setChatOpening(true);
     // Persist scroll position of the chat we are leaving
     if (activeIdRef.current && String(activeIdRef.current) !== cid) {
       const el = listRef.current;
@@ -1238,6 +1203,7 @@ export default function MessengerApp() {
         requestAnimationFrame(() => { restoringScrollRef.current = false; });
       });
     }
+    setChatOpening(false);
     // Viewport seen after open. force_all only when landing near the latest messages
     // so mid-history open does not silently mark everything below as read.
     setTimeout(() => {
@@ -1422,353 +1388,35 @@ export default function MessengerApp() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* WebSocket — with token refresh on expired-token disconnect.
-   *
-   * The backend closes the socket with code 4401 when the JWT is invalid/expired.
-   * When that happens we attempt to refresh the access token and reconnect once.
-   * If refresh fails, the user is redirected to /signin_or_signup by
-   * refreshAccessToken().
-   *
-   * We also proactively refresh the token shortly before it expires so that
-   * the WS connection doesn't drop in the first place.
-   */
-  useEffect(() => {
-    let cancelled = false;
-    let pingTimer = null;
-    let reconnectTimer = null;
-    let refreshing = false;
+  useMessengerWebSocket({
+    meId,
+    wsRef,
+    activeIdRef,
+    callConfigRef,
+    panelHistoryRef,
+    messagesCacheRef,
+    nearBottomRef,
+    pendingNewIdsRef,
+    seenRingIdsRef,
+    bottomRef,
+    loadConversations,
+    loadMessages,
+    loadConversationDetail,
+    loadPinnedMessages,
+    loadConvJoinRequests,
+    loadMyJoinRequests,
+    closeChat,
+    openChat,
+    flash,
+    setMessages,
+    setOnlineUsers,
+    setTypingUsers,
+    setIncomingCall,
+    setCallConfig,
+    setActiveCallInfo,
+    setNewBelowCount,
+  });
 
-    const buildUrl = (tok) => `${WS_URL}?token=${encodeURIComponent(tok)}`;
-
-    const handleOnMessage = (ev) => {
-      let data;
-      try { data = JSON.parse(ev.data); } catch { return; }
-      if (data.type === "message.deleted") {
-        const mid = data.message_id || data.id;
-        const cid = String(data.conversation_id || "");
-        if (mid && cid === String(activeIdRef.current)) {
-          setMessages((prev) => prev.filter((m) => String(m.id) !== String(mid)));
-          // patch cache
-          const cached = messagesCacheRef.current.get(cid);
-          if (cached?.messages) {
-            messagesCacheRef.current.set(cid, {
-              ...cached,
-              messages: cached.messages.filter((m) => String(m.id) !== String(mid)),
-            });
-          }
-          // Refresh pinned messages list — the deleted message may have been pinned
-          loadPinnedMessages(Number(cid));
-        }
-        loadConversations({ silent: true });
-      }
-      if (data.type === "call.started") {
-        // Incoming call from another participant
-        if (String(data.initiator?.id) !== String(meId)) {
-          // Already in another call → busy (auto-decline)
-          if (callConfigRef.current) {
-            const cid = data.conversation_id;
-            const callId = data.call_id;
-            (async () => {
-              try {
-                await apiRequest({
-                  method: "POST",
-                  url: `${MSG_API}/conversations/${cid}/call/end/`,
-                  data: { call_id: callId, reason: "busy" },
-                });
-              } catch { /* */ }
-            })();
-            return;
-          }
-          const rid = data.call_id || `${data.conversation_id}:${data.initiator?.id}`;
-          if (seenRingIdsRef.current.has(String(rid))) return;
-          seenRingIdsRef.current.add(String(rid));
-          setIncomingCall({ ...data, _receivedAt: data._receivedAt || Date.now() });
-          // If this is the open chat, show in-chat join bar too
-          if (String(data.conversation_id) === String(activeIdRef.current)) {
-            setActiveCallInfo({
-              call_id: data.call_id,
-              status: "ringing",
-              is_video: !!(data.media?.video || data.is_video),
-              initiator: data.initiator,
-              conversation_id: data.conversation_id,
-            });
-          }
-        }
-      }
-      if (data.type === "call.answered") {
-        // Someone else answered — stop our ringing UI if still showing
-        setIncomingCall((prev) =>
-          prev && String(prev.call_id) === String(data.call_id) ? null : prev
-        );
-      }
-      if (data.type === "call.ended") {
-        setIncomingCall((prev) => {
-          if (!prev) return null;
-          if (data.call_id && String(prev.call_id) === String(data.call_id)) return null;
-          if (String(prev.conversation_id) === String(data.conversation_id)) return null;
-          return prev;
-        });
-        // If we are in this call, close modal (remote hangup / timeout)
-        setCallConfig((prev) => {
-          if (!prev) return null;
-          if (data.call_id && prev.call_id && String(prev.call_id) === String(data.call_id)) {
-            return null;
-          }
-          if (String(prev.conversation_id) === String(data.conversation_id)) return null;
-          return prev;
-        });
-        if (data.status === "busy") {
-          try { flash("User is busy on another call"); } catch { /* */ }
-        }
-        if (data.call_id) {
-          seenRingIdsRef.current.delete(String(data.call_id));
-        }
-        setActiveCallInfo((prev) => {
-          if (!prev) return null;
-          if (data.call_id && String(prev.call_id) === String(data.call_id)) return null;
-          if (String(prev.conversation_id) === String(data.conversation_id)) return null;
-          return prev;
-        });
-      }
-      if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
-        if (String(data.conversation_id) === String(activeIdRef.current)) {
-          if (data.type === "message.new") {
-            const mid = data.message?.id || data.message_id || data.id;
-            if (mid && !nearBottomRef.current) {
-              const sid = String(mid);
-              if (!pendingNewIdsRef.current.includes(sid)) {
-                pendingNewIdsRef.current = [...pendingNewIdsRef.current, sid];
-                setNewBelowCount(pendingNewIdsRef.current.length);
-              }
-            } else if (nearBottomRef.current) {
-              setTimeout(() => {
-                bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-                // New inbound message while watching → mark seen shortly after it lands
-                setTimeout(() => {
-                  try { markVisibleMessagesRead(); } catch { /* */ }
-                }, 350);
-              }, 40);
-            }
-          }
-          if (data.type === "message.read") {
-            // Peer (or self on another device) marked messages read → update ticks on my messages
-            const idsRaw = data.message_ids || data.read_ids || data.ids || [];
-            const idSet = new Set(
-              (Array.isArray(idsRaw) ? idsRaw : [data.message_id || data.last_read_id])
-                .filter((x) => x != null)
-                .map((x) => String(x))
-            );
-            const readerId = data.user_id ?? data.reader_id ?? data.read_by;
-            // If server only sends last_read_id, mark all of my earlier msgs as read
-            const lastRead = data.last_read_id != null ? Number(data.last_read_id) : null;
-            setMessages((prev) => prev.map((m) => {
-              if (String(m.sender?.id) !== String(meId)) return m;
-              if (m.read_state === "read") return m;
-              if (idSet.has(String(m.id))) return { ...m, read_state: "read" };
-              if (lastRead != null && Number(m.id) <= lastRead) return { ...m, read_state: "read" };
-              // Some backends only emit conversation-level read without ids
-              if (!idSet.size && lastRead == null && readerId != null && String(readerId) !== String(meId)) {
-                return { ...m, read_state: "read" };
-              }
-              return m;
-            }));
-          }
-          if (data.type !== "message.read") {
-            loadMessages(activeIdRef.current, { silent: true });
-          } else {
-            // Still soft-refresh to stay consistent with server
-            loadMessages(activeIdRef.current, { silent: true });
-          }
-        }
-        loadConversations({ silent: true });
-      }
-      if (data.type === "typing" && String(data.conversation_id) === String(activeIdRef.current)) {
-        const uid = Number(data.user_id);
-        if (!uid || String(uid) === String(meId)) return;
-        setTypingUsers((prev) => {
-          const next = { ...prev };
-          if (data.is_typing) {
-            next[uid] = {
-              username: data.username || "Someone",
-              until: Date.now() + 4000,
-            };
-          } else {
-            delete next[uid];
-          }
-          return next;
-        });
-      }
-      if (data.type === "presence.update" && data.user_id != null) {
-        setOnlineUsers((prev) => {
-          const next = new Set(prev);
-          if (data.online) next.add(Number(data.user_id));
-          else next.delete(Number(data.user_id));
-          return next;
-        });
-        loadConversations({ silent: true });
-      }
-      if ([
-        "member.left", "member.removed", "member.role_changed",
-        "ownership.transferred", "conversation.deleted", "member.joined",
-        "messages.cleared",
-      ].includes(data.type)) {
-        if (
-          (data.type === "member.removed" || data.type === "conversation.deleted")
-          && String(data.user_id) === String(meId)
-        ) {
-          flash(data.type === "conversation.deleted"
-            ? "The group was deleted"
-            : "You were removed from the group");
-          closeChat();
-          loadConversations({ silent: false });
-          return;
-        }
-        if (
-          data.type === "member.left"
-          && String(data.user_id) === String(meId)
-        ) {
-          flash("You left the group");
-          closeChat();
-          loadConversations({ silent: false });
-          return;
-        }
-        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
-          loadConversationDetail(data.conversation_id);
-          loadMessages(data.conversation_id, { silent: data.type !== "messages.cleared" });
-          if (panelHistoryRef.current.includes("join-requests")) {
-            loadConvJoinRequests(data.conversation_id);
-          }
-        }
-        loadConversations({ silent: true });
-      }
-      if (data.type === "profile.update") {
-        loadConversations({ silent: true });
-        if (activeIdRef.current) {
-          loadConversationDetail(activeIdRef.current);
-          // Do not reload messages on profile updates — that used to wipe
-          // older pages the user had already scrolled in.
-        }
-        if (profileDataRef.current?.id && String(profileDataRef.current.id) === String(data.user_id)) {
-          refreshProfileData(profileDataRef.current.id);
-        }
-      }
-      if (data.type === "group.settings_changed") {
-        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
-          loadConversationDetail(data.conversation_id);
-          loadMessages(data.conversation_id, { silent: false });
-        }
-        loadConversations({ silent: true });
-      }
-      if ([
-        "join_request.new", "join_request.approved",
-        "join_request.rejected", "join_request.cancelled",
-      ].includes(data.type)) {
-        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
-          loadConvJoinRequests(data.conversation_id);
-        }
-        if (panelHistoryRef.current.includes("my-requests")) {
-          loadMyJoinRequests();
-        }
-        if (data.type === "join_request.approved" && String(data.user_id) === String(meId)) {
-          flash("Your join request was approved!");
-          loadConversations({ silent: false }).then((list) => {
-            const conv = list.find((c) => String(c.id) === String(data.conversation_id));
-            if (conv) openChat(conv);
-          });
-        }
-        if (data.type === "join_request.rejected" && String(data.user_id) === String(meId)) {
-          flash("Your join request was rejected");
-          loadMyJoinRequests();
-        }
-      }
-      // Pin/unpin message events — refresh the pinned bar in real-time
-      if (data.type === "message.pinned" || data.type === "message.unpinned") {
-        if (data.conversation_id && String(data.conversation_id) === String(activeIdRef.current)) {
-          loadPinnedMessages(data.conversation_id);
-        }
-      }
-    };
-
-    const connect = async () => {
-      let token = localStorage.getItem("access");
-      if (!token) {
-        // Not logged in — abort. The auth-changed listener will reconnect
-        // after the user logs in.
-        return;
-      }
-      // Proactively refresh the token if it's about to expire.
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-        const exp = Number(payload.exp || 0) * 1000;
-        if (exp && exp - Date.now() < 10000) {
-          if (!refreshing) {
-            refreshing = true;
-            try { token = await refreshAccessToken(); }
-            catch { refreshing = false; return; }
-            finally { refreshing = false; }
-          }
-        }
-      } catch { /* not a JWT — fall through */ }
-
-      if (cancelled) return;
-      const ws = new WebSocket(buildUrl(token));
-      wsRef.current = ws;
-      ws.onmessage = handleOnMessage;
-      ws.onclose = (ev) => {
-        clearInterval(pingTimer);
-        if (cancelled) return;
-        // 4401 = our backend's "auth failed" close code (see consumers.py).
-        // Try to refresh the token and reconnect once.
-        if (ev.code === 4401) {
-          if (!refreshing) {
-            refreshing = true;
-            refreshAccessToken()
-              .then(() => {
-                refreshing = false;
-                if (!cancelled) reconnectTimer = setTimeout(connect, 300);
-              })
-              .catch(() => {
-                refreshing = false;
-                // refreshAccessToken already redirected to /signin_or_signup
-              });
-          }
-          return;
-        }
-        // Other close codes — try to reconnect with exponential backoff.
-        // The token might still be valid (network blip, server restart, etc.).
-        if (!localStorage.getItem("access")) return;
-        reconnectTimer = setTimeout(connect, 3000);
-      };
-      ws.onerror = () => {
-        try { ws.close(); } catch { /* */ }
-      };
-      pingTimer = setInterval(() => {
-        try { ws.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
-      }, 25000);
-    };
-
-    connect();
-
-    // Listen for auth changes (login / logout / token refresh) so we reconnect
-    // immediately after the user logs in.
-    const onAuth = () => {
-      clearTimeout(reconnectTimer);
-      clearInterval(pingTimer);
-      try { wsRef.current?.close(); } catch { /* */ }
-      reconnectTimer = setTimeout(connect, 200);
-    };
-    window.addEventListener("auth-changed", onAuth);
-    window.addEventListener("storage", onAuth);
-
-    return () => {
-      cancelled = true;
-      clearInterval(pingTimer);
-      clearTimeout(reconnectTimer);
-      window.removeEventListener("auth-changed", onAuth);
-      window.removeEventListener("storage", onAuth);
-      try { wsRef.current?.close(); } catch { /* */ }
-    };
-  }, [loadConversations, loadMessages]);
 
   /* Esc global — closes dialogs/panels in priority order */
   useEffect(() => {
@@ -2334,11 +1982,49 @@ export default function MessengerApp() {
   };
 
   const unblockUser = async (userId) => {
+    const id = Number(userId);
     try {
-      await apiRequest({ method: "POST", url: `${MSG_API}/blocks/${userId}/unblock/` });
-      flash("Unblocked");
-      setBlocks((prev) => prev.filter((u) => u.id !== userId));
-    } catch { /* */ }
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/blocks/${encodeURIComponent(id)}/unblock/`,
+      });
+
+      // The backend is the source of truth. Update every in-memory representation
+      // immediately so stale conversation/profile snapshots cannot re-show Block.
+      flash(res?.data?.message || "Unblocked");
+      setBlocks((prev) => prev.filter((u) => String(u.id) !== String(id)));
+      setProfileData((p) => (p && String(p.id) === String(id)
+        ? { ...p, is_blocked: false }
+        : p));
+      setActiveDetail((d) => (d?.peer?.id && String(d.peer.id) === String(id)
+        ? { ...d, peer: { ...d.peer, is_blocked: false } }
+        : d));
+      setConversations((prev) => prev.map((c) => (
+        c.type === "private" && c.peer?.id && String(c.peer.id) === String(id)
+          ? { ...c, peer: { ...c.peer, is_blocked: false } }
+          : c
+      )));
+
+      // Re-fetch the authoritative profile state. This also guards against an
+      // old object captured before the block/unblock transition.
+      try {
+        const profileRes = await apiRequest({
+          method: "GET",
+          url: `${MSG_API}/users/${encodeURIComponent(id)}/profile/`,
+        });
+        const freshProfile = unwrapData(profileRes);
+        if (freshProfile && String(freshProfile.id) === String(id)) {
+          setProfileData((p) => (p && String(p.id) === String(id) ? freshProfile : p));
+          setActiveDetail((d) => (d?.peer?.id && String(d.peer.id) === String(id)
+            ? { ...d, peer: { ...d.peer, is_blocked: !!freshProfile.is_blocked } }
+            : d));
+        }
+      } catch { /* optimistic state is already correct */ }
+
+      await loadConversations({ silent: true });
+    } catch (e) {
+      setError(e?.response?.data?.message || "Unblock failed");
+    }
   };
 
   const leaveChat = async () => {
@@ -2399,21 +2085,6 @@ export default function MessengerApp() {
   };
 
   /* ---- Pinned Messages (per-message pin) ---- */
-
-  const loadPinnedMessages = useCallback(async (convId) => {
-    if (!convId) return;
-    try {
-      const res = await apiRequest({ method: "GET", url: `${MSG_API}/conversations/${convId}/pinned-messages/` });
-      const data = unwrapData(res);
-      const pins = Array.isArray(data) ? [...data].reverse() : [];
-      setPinnedMessages(pins);
-      // Reset index if it's out of range
-      setCurrentPinIndex((prev) => (prev >= pins.length ? 0 : prev));
-    } catch {
-      setPinnedMessages([]);
-      setCurrentPinIndex(0);
-    }
-  }, []);
 
   const pinMessage = useCallback(async (msg) => {
     if (!msg?.id) return;
@@ -2690,6 +2361,17 @@ export default function MessengerApp() {
     setJumpHighlightId(null);
   }, []);
 
+  const openMsgSearch = useCallback(() => {
+    // Hide composer contents: clear pending attachments / reply / edit
+    setFiles([]);
+    setReplyTo(null);
+    setEditingMsg(null);
+    setSendFilesTogether(false);
+    setMediaSpoiler(false);
+    setMediaViewOnce(false);
+    setMsgSearchOpen(true);
+  }, []);
+
 
   const sendTypingSignal = useCallback((isTyping) => {
     const cid = activeIdRef.current;
@@ -2900,32 +2582,6 @@ export default function MessengerApp() {
       searchPublicGroups(publicSearchQRef.current || "");
     } catch (e) {
       setError(e?.response?.data?.message || "Cancel failed");
-    }
-  };
-
-  // Load the current user's outgoing join requests (any status).
-  const loadMyJoinRequests = async () => {
-    try {
-      const res = await apiRequest({ method: "GET", url: `${MSG_API}/me/join-requests/` });
-      const list = unwrapData(res) || [];
-      setMyJoinRequests(list);
-      setMyRequestsBadge(list.filter((r) => r.status === "pending").length);
-      return list;
-    } catch {
-      return [];
-    }
-  };
-
-  // Load pending join requests for a specific group (admin view).
-  const loadConvJoinRequests = async (convId) => {
-    if (!convId) return;
-    try {
-      const res = await apiRequest({
-        method: "GET", url: `${MSG_API}/conversations/${convId}/join-requests/`,
-      });
-      setConvJoinRequests(unwrapData(res) || []);
-    } catch {
-      setConvJoinRequests([]);
     }
   };
 
@@ -3965,6 +3621,20 @@ export default function MessengerApp() {
       onDragLeave={onChatDragLeave}
       onDrop={onDropFilesToChat}
     >
+      {chatOpening && isMobile && (
+        <Box sx={{
+          position: "absolute", inset: 0, zIndex: 55, display: "flex", alignItems: "center", justifyContent: "center",
+          bgcolor: "background.default",
+          backdropFilter: "blur(8px)",
+          animation: "chatLoadingFade 160ms ease-out",
+          '@keyframes chatLoadingFade': { from: { opacity: 0 }, to: { opacity: 1 } },
+        }}>
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1.2 }}>
+            <Box sx={{ width: 42, height: 42, borderRadius: "50%", border: "3px solid", borderColor: "divider", borderTopColor: "primary.main", animation: "chatSpin .75s linear infinite", '@keyframes chatSpin': { to: { transform: "rotate(360deg)" } } }} />
+            <Typography variant="caption" color="text.secondary">Opening chat…</Typography>
+          </Box>
+        </Box>
+      )}
       {!activeId ? (
         <Box sx={{
           flex: 1, display: { xs: "none", md: "flex" },
@@ -4045,7 +3715,7 @@ export default function MessengerApp() {
                 {drawerOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
               </IconButton>
             )}
-            {msgSearchOpen ? (
+            {msgSearchOpen && !isMobile ? (
               <>
                 <TextField
                   autoFocus
@@ -4058,7 +3728,6 @@ export default function MessengerApp() {
                     if (e.key === "Escape") { e.preventDefault(); closeMsgSearch(); }
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      // First Enter: search (or re-focus current). Shift not used here.
                       if (!msgSearchResults.length || msgSearchLastQRef.current !== msgSearchQ.trim()) {
                         runMessageSearch(msgSearchQ);
                       } else {
@@ -4101,22 +3770,21 @@ export default function MessengerApp() {
                       runMessageSearch(msgSearchQ);
                     }
                   }}
-                  sx={{ p: isMobile ? 0.45 : 1, flexShrink: 0 }}
+                  sx={{ p: 1, flexShrink: 0 }}
                 >
-                  {msgSearchLoading ? <CircularProgress size={18} /> : <SearchIcon fontSize={isMobile ? "small" : "medium"} />}
+                  {msgSearchLoading ? <CircularProgress size={18} /> : <SearchIcon />}
                 </IconButton>
                 <Typography
                   variant="caption"
                   color="text.secondary"
                   onClick={focusCurrentSearchResult}
                   sx={{
-                    minWidth: isMobile ? 28 : 48,
+                    minWidth: 48,
                     textAlign: "center",
-                    px: isMobile ? 0 : 0.25,
+                    px: 0.25,
                     flexShrink: 0,
                     cursor: msgSearchResults.length ? "pointer" : "default",
                     userSelect: "none",
-                    fontSize: isMobile ? 11 : undefined,
                   }}
                   title="Go to current result"
                 >
@@ -4131,7 +3799,7 @@ export default function MessengerApp() {
                   disabled={!msgSearchResults.length}
                   onClick={() => goMsgSearchResult(-1)}
                   title="Previous result"
-                  sx={{ p: isMobile ? 0.35 : 1, flexShrink: 0 }}
+                  sx={{ p: 1, flexShrink: 0 }}
                 >
                   <KeyboardArrowUpIcon fontSize="small" />
                 </IconButton>
@@ -4140,17 +3808,15 @@ export default function MessengerApp() {
                   disabled={!msgSearchResults.length}
                   onClick={() => goMsgSearchResult(1)}
                   title="Next result"
-                  sx={{ p: isMobile ? 0.35 : 1, flexShrink: 0 }}
+                  sx={{ p: 1, flexShrink: 0 }}
                 >
                   <KeyboardArrowDownIcon fontSize="small" />
                 </IconButton>
-                {!isMobile && (
-                  <IconButton onClick={closeMsgSearch} size="small" title="Close search">
-                    <CloseIcon />
-                  </IconButton>
-                )}
+                <IconButton onClick={closeMsgSearch} size="small" title="Close search">
+                  <CloseIcon />
+                </IconButton>
               </>
-            ) : (
+            ) : !msgSearchOpen ? (
               <>
             <Box sx={{ position: "relative" }}>
               <Avatar src={convAvatar(activeConv, meId)} sx={{ width: 40, height: 40, cursor: "pointer" }}
@@ -4191,55 +3857,88 @@ export default function MessengerApp() {
                       : "tap for info"}
               </Typography>
             </Box>
-            <Tooltip title="Voice call">
-              <IconButton
-                onClick={() => startCall({ video: false, audio: true })}
-                sx={{
-                  color: "text.secondary",
-                  "&:hover": { bgcolor: (t) => alpha(t.palette.success.main, 0.12), color: "success.main" },
-                }}
-              >
-                <CallIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Video call">
-              <IconButton
-                onClick={() => startCall({ video: true, audio: true })}
-                sx={{
-                  color: "text.secondary",
-                  "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.12), color: "primary.main" },
-                }}
-              >
-                <VideocamIcon />
-              </IconButton>
-            </Tooltip>
-            <IconButton onClick={() => pushPanel("info")}>
-              <InfoOutlinedIcon />
-            </IconButton>
-            <IconButton size="small" title="Search messages" onClick={() => setMsgSearchOpen(true)}>
-              <SearchIcon fontSize="small" />
-            </IconButton>
+            {/* Mobile: keep a single call icon → popup with voice/video; rest in ⋮ menu */}
+            {isMobile ? (
+              <Tooltip title="Call">
+                <IconButton
+                  onClick={() => setCallChoiceOpen(true)}
+                  sx={{
+                    color: "text.secondary",
+                    "&:hover": { bgcolor: (t) => alpha(t.palette.success.main, 0.12), color: "success.main" },
+                  }}
+                >
+                  <CallIcon />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <>
+                <Tooltip title="Voice call">
+                  <IconButton
+                    onClick={() => startCall({ video: false, audio: true })}
+                    sx={{
+                      color: "text.secondary",
+                      "&:hover": { bgcolor: (t) => alpha(t.palette.success.main, 0.12), color: "success.main" },
+                    }}
+                  >
+                    <CallIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Video call">
+                  <IconButton
+                    onClick={() => startCall({ video: true, audio: true })}
+                    sx={{
+                      color: "text.secondary",
+                      "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.12), color: "primary.main" },
+                    }}
+                  >
+                    <VideocamIcon />
+                  </IconButton>
+                </Tooltip>
+                <IconButton onClick={() => pushPanel("info")}>
+                  <InfoOutlinedIcon />
+                </IconButton>
+                <IconButton size="small" title="Search messages" onClick={() => openMsgSearch()}>
+                  <SearchIcon fontSize="small" />
+                </IconButton>
+              </>
+            )}
             <IconButton onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
             <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
-              {peer && (
+              {isMobile && (
+                <MenuItem onClick={() => { openMsgSearch(); setHeaderMenu(null); }}>
+                  <ListItemIcon><SearchIcon fontSize="small" /></ListItemIcon> Search messages
+                </MenuItem>
+              )}
+              {isMobile && (
+                <MenuItem onClick={() => {
+                  pushPanel("info");
+                  setHeaderMenu(null);
+                }}>
+                  <ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon>
+                  Chat info
+                </MenuItem>
+              )}
+              {!isMobile && peer && (
                 <MenuItem onClick={() => { loadUserProfile(peer.id); setHeaderMenu(null); }}>
                   <ListItemIcon><InfoOutlinedIcon fontSize="small" /></ListItemIcon> View profile
                 </MenuItem>
               )}
-              {peer && (
+              {peer && !peer.is_contact && !peer.is_blocked && (
                 <MenuItem onClick={() => { addContact(peer.id); setHeaderMenu(null); }}>
                   <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Add contact
                 </MenuItem>
               )}
-              <MenuItem onClick={() => { pushPanel("info"); setHeaderMenu(null); setTimeout(() => { try { document.querySelector("[data-shared-media-btn]")?.click(); } catch {} }, 80); }}>
-                <ListItemIcon><PhotoLibraryIcon fontSize="small" /></ListItemIcon> Shared media
-              </MenuItem>
               <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
                 <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon> Clear messages
               </MenuItem>
-              {peer && (
+              {peer && !peer.is_blocked && (
                 <MenuItem onClick={() => { setConfirmBlock({ user: peer }); setHeaderMenu(null); }}>
                   <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon> Block
+                </MenuItem>
+              )}
+              {peer && peer.is_blocked && (
+                <MenuItem onClick={() => { unblockUser(peer.id); setHeaderMenu(null); }}>
+                  <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon> Unblock
                 </MenuItem>
               )}
               {activeConv?.type === "private" && (
@@ -4258,10 +3957,22 @@ export default function MessengerApp() {
                   <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete group
                 </MenuItem>
               )}
-              <MenuItem onClick={() => { setConfirmLeave({ conv: activeConv }); setHeaderMenu(null); }}>
-                <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon> Leave
-              </MenuItem>
+              {activeConv?.type === "group" && (
+                <MenuItem onClick={() => { setConfirmLeave({ conv: activeConv }); setHeaderMenu(null); }}>
+                  <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon> Leave
+                </MenuItem>
+              )}
             </Menu>
+              </>
+            ) : (
+              /* Mobile search mode: minimal header — search UI is at the bottom */
+              <>
+                <Typography fontWeight={600} noWrap fontSize={15} sx={{ flex: 1 }}>
+                  Search messages
+                </Typography>
+                <IconButton onClick={closeMsgSearch} size="small" title="Close search">
+                  <CloseIcon />
+                </IconButton>
               </>
             )}
 
@@ -4683,7 +4394,111 @@ export default function MessengerApp() {
               the call surface takes over the chat pane. When the call is
               minimised to the thin bar, the composer stays available. */}
           {callIsExpanded ? null : (
-            activeConv?.type === "group"
+            isMobile && msgSearchOpen ? (
+              /* Mobile: search bar replaces the composer at the bottom */
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.5}
+                sx={{
+                  px: 1,
+                  py: 0.85,
+                  bgcolor: "background.paper",
+                  borderTop: "1px solid",
+                  borderColor: "divider",
+                  minHeight: 56,
+                }}
+              >
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  placeholder="Search messages…"
+                  value={msgSearchQ}
+                  onChange={(e) => setMsgSearchQ(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") { e.preventDefault(); closeMsgSearch(); }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!msgSearchResults.length || msgSearchLastQRef.current !== msgSearchQ.trim()) {
+                        runMessageSearch(msgSearchQ);
+                      } else {
+                        goMsgSearchResult(1);
+                      }
+                    }
+                    if (e.key === "Enter" && e.shiftKey) {
+                      e.preventDefault();
+                      goMsgSearchResult(-1);
+                    }
+                  }}
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    "& .MuiOutlinedInput-root": {
+                      borderRadius: 2,
+                      bgcolor: "action.hover",
+                      minHeight: 40,
+                      fontSize: 16,
+                    },
+                    "& .MuiOutlinedInput-input": { py: 1, px: 1 },
+                  }}
+                />
+                <IconButton
+                  color="primary"
+                  size="small"
+                  title="Search"
+                  disabled={msgSearchLoading || !msgSearchQ.trim()}
+                  onClick={() => {
+                    if (msgSearchLastQRef.current === msgSearchQ.trim() && msgSearchResults.length) {
+                      focusCurrentSearchResult();
+                    } else {
+                      runMessageSearch(msgSearchQ);
+                    }
+                  }}
+                  sx={{ p: 0.45, flexShrink: 0 }}
+                >
+                  {msgSearchLoading ? <CircularProgress size={18} /> : <SearchIcon fontSize="small" />}
+                </IconButton>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  onClick={focusCurrentSearchResult}
+                  sx={{
+                    minWidth: 28,
+                    textAlign: "center",
+                    flexShrink: 0,
+                    cursor: msgSearchResults.length ? "pointer" : "default",
+                    userSelect: "none",
+                    fontSize: 11,
+                  }}
+                  title="Go to current result"
+                >
+                  {msgSearchLoading
+                    ? "…"
+                    : msgSearchResults.length
+                      ? `${msgSearchIdx + 1}/${msgSearchResults.length}`
+                      : (msgSearchLastQRef.current ? "0/0" : "")}
+                </Typography>
+                <IconButton
+                  size="small"
+                  disabled={!msgSearchResults.length}
+                  onClick={() => goMsgSearchResult(-1)}
+                  title="Previous result"
+                  sx={{ p: 0.35, flexShrink: 0 }}
+                >
+                  <KeyboardArrowUpIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  disabled={!msgSearchResults.length}
+                  onClick={() => goMsgSearchResult(1)}
+                  title="Next result"
+                  sx={{ p: 0.35, flexShrink: 0 }}
+                >
+                  <KeyboardArrowDownIcon fontSize="small" />
+                </IconButton>
+              </Stack>
+            ) : activeConv?.type === "group"
               && Boolean(activeConv.only_admins_send)
               && role !== "owner" && role !== "admin" ? (
             <Box sx={{
@@ -4933,6 +4748,9 @@ export default function MessengerApp() {
           bgcolor: "background.paper",
           visibility: (!activeId || !mobileShowChat) ? "visible" : "hidden",
           pointerEvents: (!activeId || !mobileShowChat) ? "auto" : "none",
+          opacity: (!activeId || !mobileShowChat) ? 1 : 0,
+          transform: (!activeId || !mobileShowChat) ? "translateX(0)" : "translateX(-12px)",
+          transition: "opacity 180ms ease, transform 220ms ease, visibility 0s linear 220ms",
         }}>
           {sidebarEl}
         </Box>
@@ -4958,6 +4776,11 @@ export default function MessengerApp() {
         width: isMobile && (!activeId || !mobileShowChat) && !callConfig ? 0 : "auto",
         overflow: callConfig ? "visible" : "hidden",
         zIndex: callConfig && isMobile ? 3 : "auto",
+        animation: activeId && mobileShowChat ? "messengerChatIn 220ms cubic-bezier(.2,.75,.25,1)" : "none",
+        '@keyframes messengerChatIn': {
+          from: { opacity: 0, transform: isMobile ? "translateX(16px)" : "translateY(5px)" },
+          to: { opacity: 1, transform: "translate3d(0,0,0)" },
+        },
       }}>
         {chatPane}
       </Box>
@@ -5404,237 +5227,64 @@ export default function MessengerApp() {
         </DialogContent>
       </Dialog>
 
-      {/* Forward dialog */}
-      <Dialog open={Boolean(forwardOpen)} onClose={() => setForwardOpen(null)} fullWidth maxWidth="xs">
-        <DialogTitle>Forward to…</DialogTitle>
-        <DialogContent dividers sx={{ maxHeight: 360 }}>
-          <List dense>
-            {conversations.map((c) => (
-              <ListItemButton key={c.id} onClick={() => forwardTo(c.id)}>
-                <ListItemAvatar>
-                  <Avatar src={convAvatar(c, meId)}>{convTitle(c, meId)[0]}</Avatar>
-                </ListItemAvatar>
-                <ListItemText primary={convTitle(c, meId)} />
-              </ListItemButton>
-            ))}
-          </List>
-        </DialogContent>
-        <DialogActions><Button onClick={() => setForwardOpen(null)}>Cancel</Button></DialogActions>
-      </Dialog>
-
-      {/* Create group dialog */}
-      <Dialog open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>New group</DialogTitle>
-        <DialogContent>
-          <TextField fullWidth label="Group title" value={groupTitle}
-            onChange={(e) => setGroupTitle(e.target.value)} sx={{ mt: 1 }} />
-          <FormControlLabel sx={{ mt: 1.5 }}
-            control={<Switch checked={groupPublic} onChange={(e) => setGroupPublic(e.target.checked)} />}
-            label="Public (appears in search)" />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateGroupOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={createGroup} disabled={!groupTitle.trim()}>Create</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Join invite dialog */}
-      <Dialog open={joinOpen} onClose={() => setJoinOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Join with invite code</DialogTitle>
-        <DialogContent>
-          <TextField fullWidth label="Invite code" value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value)} sx={{ mt: 1 }} />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setJoinOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={joinByCode} disabled={!joinCode.trim()}>Join</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* "Join this public group?" confirmation dialog — shown when the user
-          clicks a non-member public group row in the search results. */}
-      <Dialog
-        open={Boolean(joinConfirm)}
-        onClose={() => setJoinConfirm(null)}
-        fullWidth
-        maxWidth="xs"
-        PaperProps={{ sx: { borderRadius: 1.25 } }}
-      >
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          {joinConfirm?.group?.avatar_url ? (
-            <Avatar src={withTokenQuery(joinConfirm.group.avatar_url)} sx={{ width: 40, height: 40 }} />
-          ) : (
-            <Avatar sx={{ width: 40, height: 40 }}>{joinConfirm?.group?.title?.[0]?.toUpperCase()}</Avatar>
-          )}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography fontWeight={700} noWrap>{joinConfirm?.group?.title || "Group"}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {(joinConfirm?.group?.participants?.length || 0)} members
-              {joinConfirm?.group?.requires_approval ? " · approval required" : ""}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          {joinConfirm?.group?.description ? (
-            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-              {joinConfirm.group.description}
-            </Typography>
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              No description provided.
-            </Typography>
-          )}
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
-            {joinConfirm?.group?.requires_approval
-              ? "An admin will need to approve your request before you can join."
-              : "You will be added as a member immediately."}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
-          <Button onClick={() => setJoinConfirm(null)} color="inherit">Cancel</Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={onConfirmJoin}
-          >
-            {joinConfirm?.group?.requires_approval ? "Send request" : "Join group"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Add members dialog */}
-      <Dialog open={addMemberOpen} onClose={() => setAddMemberOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle>Add members from contacts</DialogTitle>
-        <DialogContent dividers sx={{ maxHeight: 360 }}>
-          <List dense>
-            {contacts.map((c) => {
-              const u = c.contact;
-              if (!u) return null;
-              const checked = addMemberSelected.includes(u.id);
-              const already = (activeConv?.participants || []).some((p) => String(p.user?.id) === String(u.id));
-              return (
-                <ListItemButton
-                  key={u.id} disabled={already}
-                  onClick={() => {
-                    setAddMemberSelected((prev) =>
-                      checked ? prev.filter((x) => x !== u.id) : [...prev, u.id]
-                    );
-                  }}
-                >
-                  <ListItemAvatar>
-                    <Avatar src={withTokenQuery(u.avatar) || undefined}>{u.username?.[0]}</Avatar>
-                  </ListItemAvatar>
-                  <ListItemText
-                    primary={u.username}
-                    secondary={already ? "Already in group" : (checked ? "Selected" : "")}
-                  />
-                </ListItemButton>
-              );
-            })}
-            {!contacts.length && (
-              <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-                No contacts. Add contacts from search first.
-              </Typography>
-            )}
-          </List>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddMemberOpen(false)}>Cancel</Button>
-          <Button variant="contained" disabled={!addMemberSelected.length} onClick={addMembersToGroup}>
-            Add ({addMemberSelected.length})
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Sensitive-operation confirmation dialogs */}
-      <ConfirmDialog
-        open={Boolean(confirmDelete)}
-        title={confirmDelete?.type === "group" ? "Delete group?" : "Delete chat?"}
-        message={confirmDelete?.type === "group"
-          ? "This permanently deletes the group and all messages for everyone. This cannot be undone."
-          : "This deletes the conversation for both sides. This cannot be undone."}
-        confirmLabel="Delete"
-        confirmColor="error"
-        onConfirm={deleteConversation}
-        onClose={() => setConfirmDelete(null)}
-      />
-      <ConfirmDialog
-        open={Boolean(confirmCleanup)}
-        title="Clear messages?"
-        message="This clears all messages in this conversation for you. Other participants will still see their copies. This cannot be undone."
-        confirmLabel="Clear"
-        confirmColor="warning"
-        onConfirm={cleanupConversation}
-        onClose={() => setConfirmCleanup(null)}
-      />
-      <ConfirmDialog
-        open={Boolean(confirmBlock)}
-        title="Block user?"
-        message={confirmBlock?.user?.username
-          ? `@${confirmBlock.user.username} will no longer be able to message you. They'll be removed from your contacts.`
-          : "This user will no longer be able to message you. They'll be removed from your contacts."}
-        confirmLabel="Block"
-        confirmColor="error"
-        onConfirm={() => confirmBlock?.user?.id && blockUser(confirmBlock.user.id)}
-        onClose={() => setConfirmBlock(null)}
-      />
-      <ConfirmDialog
-        open={Boolean(confirmLeave)}
-        title="Leave chat?"
-        message="You will no longer receive messages from this chat. Other members will see that you left."
-        confirmLabel="Leave"
-        confirmColor="warning"
-        onConfirm={leaveChat}
-        onClose={() => setConfirmLeave(null)}
-      />
-
-      {/* Media settings — camera/microphone picker for voice & video messages */}
-      <MediaSettingsDialog
-        open={mediaSettingsOpen}
-        onClose={() => setMediaSettingsOpen(false)}
-      />
-
-
-      {/* Toasts */}
-      {toast && (
-        <Fade in>
-          <Chip label={toast} color="success"
-            sx={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1400 }} />
-        </Fade>
-      )}
-      {error && (
-        <Fade in>
-          <Chip label={error} color="error" onDelete={() => setError("")}
-            sx={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1400 }} />
-        </Fade>
-      )}
-      <Snackbar
-        open={exitHint}
-        message="Press back again to leave Messenger"
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        sx={{ bottom: { xs: 24, sm: 24 } }}
-      />
-      {!hashReady && !showAuthPopup && (
-        <Box sx={{
-          position: "fixed", inset: 0, bgcolor: "background.default",
-          zIndex: 1500, display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <CircularProgress />
-        </Box>
-      )}
-
-      <DayJumpDialog
-        open={dayJumpOpen}
-        onClose={() => setDayJumpOpen(false)}
+      <MessengerDialogs
+        meId={meId}
+        conversations={conversations}
+        contacts={contacts}
+        activeConv={activeConv}
+        forwardOpen={forwardOpen}
+        setForwardOpen={setForwardOpen}
+        forwardTo={forwardTo}
+        createGroupOpen={createGroupOpen}
+        setCreateGroupOpen={setCreateGroupOpen}
+        groupTitle={groupTitle}
+        setGroupTitle={setGroupTitle}
+        groupPublic={groupPublic}
+        setGroupPublic={setGroupPublic}
+        createGroup={createGroup}
+        joinOpen={joinOpen}
+        setJoinOpen={setJoinOpen}
+        joinCode={joinCode}
+        setJoinCode={setJoinCode}
+        joinByCode={joinByCode}
+        joinConfirm={joinConfirm}
+        setJoinConfirm={setJoinConfirm}
+        onConfirmJoin={onConfirmJoin}
+        addMemberOpen={addMemberOpen}
+        setAddMemberOpen={setAddMemberOpen}
+        addMemberSelected={addMemberSelected}
+        setAddMemberSelected={setAddMemberSelected}
+        addMembersToGroup={addMembersToGroup}
+        callChoiceOpen={callChoiceOpen}
+        setCallChoiceOpen={setCallChoiceOpen}
+        startCall={startCall}
+        confirmDelete={confirmDelete}
+        setConfirmDelete={setConfirmDelete}
+        deleteConversation={deleteConversation}
+        confirmCleanup={confirmCleanup}
+        setConfirmCleanup={setConfirmCleanup}
+        cleanupConversation={cleanupConversation}
+        confirmBlock={confirmBlock}
+        setConfirmBlock={setConfirmBlock}
+        blockUser={blockUser}
+        confirmLeave={confirmLeave}
+        setConfirmLeave={setConfirmLeave}
+        leaveChat={leaveChat}
+        mediaSettingsOpen={mediaSettingsOpen}
+        setMediaSettingsOpen={setMediaSettingsOpen}
+        toast={toast}
+        error={error}
+        setError={setError}
+        exitHint={exitHint}
+        hashReady={hashReady}
+        showAuthPopup={showAuthPopup}
+        setShowAuthPopup={setShowAuthPopup}
+        navigate={navigate}
+        dayJumpOpen={dayJumpOpen}
+        setDayJumpOpen={setDayJumpOpen}
         messagesWithDays={messagesWithDays}
         messages={messages}
-        onJumpToDay={jumpToDayInChat}
-      />
-      {/* Message search is inline in the chat header (Telegram-style) */}
-      <AuthRequiredDialog
-        open={showAuthPopup}
-        onClose={() => setShowAuthPopup(false)}
-        onSignIn={() => navigate("/signin_or_signup")}
+        jumpToDayInChat={jumpToDayInChat}
       />
     </Box>
   );
