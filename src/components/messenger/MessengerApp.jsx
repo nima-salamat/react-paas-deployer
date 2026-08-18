@@ -3337,33 +3337,59 @@ export default function MessengerApp() {
   }, [messages]);
 
   const openCtx = (e, message) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setCtx({ x: e.clientX, y: e.clientY, message });
+    e.preventDefault?.();
+    e.stopPropagation?.();
+
+    if (!message?.id || message?.type === "day" || message?.is_system) return;
+
+    // A context menu belongs to the message that was actually right-clicked.
+    setCtx({
+      x: Number.isFinite(e?.clientX) ? e.clientX : window.innerWidth / 2,
+      y: Number.isFinite(e?.clientY) ? e.clientY : window.innerHeight / 2,
+      message,
+    });
   };
 
   const selectionAnchorRef = useRef(null); // message id where selection drag started
   const selectingRef = useRef(false);
 
-  const toggleSelectMessage = (message, forceEnter = false) => {
-    if (!message?.id) return;
+  const toggleSelectMessage = (message, forceEnter = false, event = null) => {
+    if (!message?.id || message?.type === "day" || message?.is_system) return;
+
     const id = String(message.id);
+
     if (forceEnter) {
-      // Long-press: select ONLY this message. Range starts after real drag.
+      // Long-press: select only the pressed message, exactly as Telegram does.
       setSelectionMode(true);
       selectingRef.current = false;
       selectionAnchorRef.current = id;
+      selectionDragStartRef.current = null;
       setSelectedIds(new Set([id]));
       return;
     }
+
+    // Shift-click selects a contiguous range from the current anchor.
+    if (event?.shiftKey && selectionAnchorRef.current) {
+      selectRangeByIds(selectionAnchorRef.current, id);
+      return;
+    }
+
+    // Ctrl/Cmd-click toggles one message; ordinary click in selection mode does
+    // the same. This keeps the selection predictable on desktop and touch.
     if (!selectionMode) setSelectionMode(true);
+
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      if (next.size === 0) setSelectionMode(false);
+
+      if (next.size === 0) {
+        setSelectionMode(false);
+        selectionAnchorRef.current = null;
+      }
       return next;
     });
+
     selectionAnchorRef.current = id;
   };
 
@@ -3442,7 +3468,32 @@ export default function MessengerApp() {
   const clearSelection = () => {
     setSelectionMode(false);
     setSelectedIds(new Set());
+    selectionAnchorRef.current = null;
+    selectingRef.current = false;
+    selectionDragStartRef.current = null;
   };
+
+  // Telegram-style Escape: leave message-selection mode first; otherwise
+  // close the message context menu.
+  useEffect(() => {
+    const onSelectionKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+
+      if (selectionMode) {
+        e.preventDefault();
+        clearSelection();
+        return;
+      }
+
+      if (ctx) {
+        e.preventDefault();
+        setCtx(null);
+      }
+    };
+
+    window.addEventListener("keydown", onSelectionKeyDown);
+    return () => window.removeEventListener("keydown", onSelectionKeyDown);
+  }, [selectionMode, ctx]);
 
   const bulkDeleteSelected = async () => {
     const ids = Array.from(selectedIds);
@@ -4052,36 +4103,87 @@ export default function MessengerApp() {
             </Box>
           )}
 
-          {/* Multi-select action bar — under header + audio player */}
+          {/* Telegram-style message selection toolbar */}
           {selectionMode && (
             <Box
               sx={{
                 bgcolor: "background.paper",
                 borderBottom: "1px solid",
                 borderColor: "divider",
-                px: 1.5, py: 0.75,
-                display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap",
+                px: { xs: 0.75, sm: 1 },
+                py: 0.5,
+                minHeight: 48,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.25,
                 zIndex: 5,
               }}
             >
-              <Typography variant="body2" fontWeight={700} sx={{ flex: 1, minWidth: 72 }}>
+              <IconButton
+                size="small"
+                onClick={clearSelection}
+                aria-label="Close selection"
+                title="Cancel selection"
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+
+              <Typography
+                variant="body2"
+                fontWeight={700}
+                sx={{ flex: 1, minWidth: 60, px: 0.5 }}
+              >
                 {selectedIds.size} selected
               </Typography>
+
+              <Button
+                size="small"
+                onClick={() => {
+                  const ids = messages
+                    .filter((m) => m?.id && !m.is_system)
+                    .map((m) => String(m.id));
+                  setSelectionMode(true);
+                  setSelectedIds(new Set(ids));
+                  selectionAnchorRef.current = ids[0] || null;
+                }}
+              >
+                Select all
+              </Button>
+
               {selectedIds.size === 1 && (
                 <Button
                   size="small"
                   onClick={() => {
                     const id = Array.from(selectedIds)[0];
                     const m = messages.find((x) => String(x.id) === String(id));
-                    if (m) { setReplyTo(m); setEditingMsg(null); }
+                    if (m) {
+                      setReplyTo(m);
+                      setEditingMsg(null);
+                    }
                     clearSelection();
                     inputRef.current?.focus();
                   }}
-                >Reply</Button>
+                >
+                  Reply
+                </Button>
               )}
-              <Button size="small" onClick={bulkForwardSelected} disabled={!selectedIds.size}>Forward</Button>
-              <Button size="small" color="error" onClick={bulkDeleteSelected} disabled={!selectedIds.size}>Delete</Button>
-              <Button size="small" onClick={clearSelection}>Cancel</Button>
+
+              <Button
+                size="small"
+                onClick={bulkForwardSelected}
+                disabled={!selectedIds.size}
+              >
+                Forward
+              </Button>
+
+              <Button
+                size="small"
+                color="error"
+                onClick={bulkDeleteSelected}
+                disabled={!selectedIds.size}
+              >
+                Delete
+              </Button>
             </Box>
           )}
 
@@ -4927,7 +5029,10 @@ export default function MessengerApp() {
           onReply={(m) => { setReplyTo(m); setEditingMsg(null); setCtx(null); inputRef.current?.focus(); }}
           onReact={(e, m) => { setReactAnchor({ anchorPosition: { top: e.clientY, left: e.clientX }, message: m }); setCtx(null); }}
           onForward={(m) => { setForwardOpen(m); setCtx(null); }}
-          onSelect={(m) => { toggleSelectMessage(m, true); setCtx(null); }}
+          onSelect={(m) => {
+            toggleSelectMessage(m, true);
+            setCtx(null);
+          }}
           onPinMessage={(m) => { pinMessage(m); setCtx(null); }}
           isPinned={ctxMsg ? isMessagePinned(ctxMsg.id) : false}
           onCopy={async (m) => { await copyText(typeof m?.body === "string" ? m.body : ""); flash("Copied"); setCtx(null); }}

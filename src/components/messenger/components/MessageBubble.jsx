@@ -1453,6 +1453,7 @@ export default function MessageBubble({
 
   const longPressTimer = React.useRef(null);
   const longPressMoved = React.useRef(false);
+  const longPressFired = React.useRef(false);
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -1461,57 +1462,50 @@ export default function MessageBubble({
     }
   };
 
-  const longPressFired = React.useRef(false);
   const onPointerDownMsg = (e) => {
+    // Right click is handled by onContextMenu. Never start the long-press timer
+    // for non-primary buttons or for mouse input.
     if (e.button != null && e.button !== 0) return;
-    // Already selecting: toggle this message (do NOT force single-select)
-    if (selectionMode) {
-      // parent list handles range-drag after movement; here just note anchor via toggle without force
-      return;
-    }
+    if (e.pointerType === "mouse") return;
+
+    // In selection mode the parent owns click/drag selection.
+    if (selectionMode) return;
+
     longPressMoved.current = false;
     longPressFired.current = false;
     clearLongPress();
+
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
       longPressFired.current = true;
-      // Mobile long-press → enter selection mode (select this message)
+
       try {
         if (navigator.vibrate) navigator.vibrate(12);
-      } catch { /* */ }
-      onToggleSelect?.(m, true);
+      } catch { /* vibration is optional */ }
+
+      // Mobile long-press → enter Telegram-style message selection mode.
+      onToggleSelect?.(m, true, e);
     }, 420);
   };
+
   const onPointerMoveMsg = (e) => {
-    // Allow slight movement during long-press; only cancel on clear drag
-    if (longPressTimer.current && (Math.abs(e.movementX || 0) > 14 || Math.abs(e.movementY || 0) > 14)) {
+    if (
+      longPressTimer.current
+      && (
+        Math.abs(e.movementX || 0) > 14
+        || Math.abs(e.movementY || 0) > 14
+      )
+    ) {
       longPressMoved.current = true;
       clearLongPress();
     }
   };
-  const onPointerUpMsg = (e) => {
-    const wasLong = longPressFired.current;
+
+  const onPointerUpMsg = () => {
+    // A short touch/click is handled by onClick. There is intentionally no
+    // fake "context menu on the gutter": Telegram only opens the message menu
+    // for an actual context-menu gesture (right click / long press).
     clearLongPress();
-    // Short tap on the row gutter (outside the bubble content) → context menu
-    // (right-click equivalent). Long-press already entered selection.
-    if (wasLong || longPressMoved.current || selectionMode) return;
-    const target = e?.target;
-    if (!target) return;
-    // If the press landed on the bubble body / interactive controls, don't open context
-    const inBubble = target.closest?.("[data-msg-bubble]");
-    if (inBubble) return;
-    // Gutter / row area → open context menu
-    try {
-      onContextOpen?.(
-        {
-          preventDefault() {},
-          stopPropagation() {},
-          clientX: e.clientX || window.innerWidth / 2,
-          clientY: e.clientY || window.innerHeight / 2,
-        },
-        m,
-      );
-    } catch { /* */ }
   };
 
   return (
@@ -1537,21 +1531,27 @@ export default function MessageBubble({
       }}
       onContextMenu={(e) => {
         e.preventDefault();
-        if (selectionMode) {
-          onToggleSelect?.(m);
-          return;
-        }
-        onContextOpen(e, m);
+        e.stopPropagation();
+
+        // In selection mode a right click should not silently toggle the
+        // message. Keep the selection and suppress the browser menu.
+        if (selectionMode) return;
+
+        onContextOpen?.(e, m);
       }}
       onPointerDown={onPointerDownMsg}
       onPointerMove={onPointerMoveMsg}
       onPointerUp={onPointerUpMsg}
       onPointerCancel={onPointerUpMsg}
       onClick={(e) => {
-        if (selectionMode) {
-          e.stopPropagation();
-          onToggleSelect?.(m);
-        }
+        if (!selectionMode) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Shift-click = select a contiguous range.
+        // Ctrl/Cmd-click = toggle one item without leaving selection mode.
+        onToggleSelect?.(m, false, e);
       }}
     >
       {(selectionMode || selected) && (
@@ -1913,7 +1913,7 @@ export function MessageContextMenuItems({
   const hasText = Boolean(typeof ctxMsg?.body === "string" ? ctxMsg.body.trim() : ctxMsg?.body);
   return (
     <>
-      {onSelect && hasText && (
+      {onSelect && ctxMsg?.id && !ctxMsg?.is_system && (
         <MenuItem onClick={() => onSelect(ctxMsg)}>
           <ListItemIcon><DoneAllIcon fontSize="small" /></ListItemIcon> Select
         </MenuItem>
