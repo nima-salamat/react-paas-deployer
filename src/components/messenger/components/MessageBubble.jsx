@@ -1,6 +1,7 @@
 import apiRequest from "../../customHooks/apiRequest";
 import { MSG_API } from "../api";
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
+import Lottie from "lottie-react";
 import CheckIcon from "@mui/icons-material/Check";
 import {
   Box, Typography, Stack, Avatar, Chip, IconButton, ListItemIcon, MenuItem, Dialog, CircularProgress, alpha, Slider, Tooltip, Button, LinearProgress
@@ -1275,6 +1276,113 @@ function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onRe
   );
 }
 
+
+/** In-memory cache for Noto Animated Emoji Lottie JSON */
+const _emojiLottieCache = new Map();
+
+/** Convert an emoji grapheme to Noto codepoint path segments (e.g. "1f602", "2764_fe0f"). */
+function emojiToNotoKeys(emoji) {
+  const s = String(emoji || "").trim();
+  if (!s) return [];
+  const cps = [];
+  for (const ch of s) {
+    const cp = ch.codePointAt(0);
+    if (cp == null) continue;
+    // skip pure text
+    cps.push(cp.toString(16).toLowerCase());
+  }
+  if (!cps.length) return [];
+  const full = cps.join("_");
+  // also try without VS16 (fe0f) — some assets omit it
+  const noVs = cps.filter((c) => c !== "fe0f").join("_");
+  const keys = [full];
+  if (noVs && noVs !== full) keys.push(noVs);
+  return keys;
+}
+
+function notoLottieUrl(key) {
+  return `https://fonts.gstatic.com/s/e/notoemoji/latest/${key}/lottie.json`;
+}
+
+async function loadEmojiLottie(emoji) {
+  const keys = emojiToNotoKeys(emoji);
+  for (const key of keys) {
+    if (_emojiLottieCache.has(key)) {
+      const hit = _emojiLottieCache.get(key);
+      if (hit) return hit;
+      continue;
+    }
+    try {
+      const res = await fetch(notoLottieUrl(key));
+      if (!res.ok) {
+        _emojiLottieCache.set(key, null);
+        continue;
+      }
+      const data = await res.json();
+      _emojiLottieCache.set(key, data);
+      return data;
+    } catch {
+      _emojiLottieCache.set(key, null);
+    }
+  }
+  return null;
+}
+
+/**
+ * Plays Noto Animated Emoji Lottie centered exactly on the single-emoji glyph.
+ * If no Lottie asset exists: do nothing (no duplicate static emoji).
+ */
+function EmojiLottieBurst({ emoji, playId, size = 96, onDone }) {
+  const [data, setData] = useState(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  useEffect(() => {
+    if (!emoji || !playId) return undefined;
+    let cancelled = false;
+    setData(null);
+    loadEmojiLottie(emoji).then((json) => {
+      if (cancelled) return;
+      if (json) setData(json);
+      else onDoneRef.current?.(); // should be rare (parent pre-checks cache)
+    });
+    return () => { cancelled = true; };
+  }, [emoji, playId]);
+
+  if (!playId || !emoji || !data) return null;
+
+  const box = Math.max(48, Number(size) || 96);
+
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        pointerEvents: "none",
+        position: "absolute",
+        // Center on the parent emoji glyph box
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        zIndex: 2,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Box sx={{ width: box, height: box, lineHeight: 0 }}>
+        <Lottie
+          animationData={data}
+          loop={false}
+          autoplay
+          style={{ width: "100%", height: "100%" }}
+          onComplete={() => onDoneRef.current?.()}
+        />
+      </Box>
+    </Box>
+  );
+}
+
 export default function MessageBubble({
   m, meId, activeConv,
   onContextOpen, onReact, onReactAnchor, onReply, onEditCode,
@@ -1292,6 +1400,14 @@ export default function MessageBubble({
   isPinnedMessage = false,
 }) {
   const theme = useTheme();
+  // Hooks must run unconditionally (before any early return) — Rules of Hooks.
+  // Single-emoji message: click plays Noto Animated Emoji via lottie-react
+  const [emojiBurstKey, setEmojiBurstKey] = useState(0);
+  const [emojiBurstChar, setEmojiBurstChar] = useState("");
+  const longPressTimer = useRef(null);
+  const longPressMoved = useRef(false);
+  const longPressFired = useRef(false);
+
   if (m.type === "day") {
     const dayActive = Boolean(m._dayHighlight);
     return (
@@ -1450,10 +1566,28 @@ export default function MessageBubble({
     : null;
   const isBigEmoji = emojiCount != null && emojiCount >= 1 && emojiCount <= 3;
   const emojiFontSize = emojiCount === 1 ? 72 : emojiCount === 2 ? 56 : emojiCount === 3 ? 44 : 14.5;
-
-  const longPressTimer = React.useRef(null);
-  const longPressMoved = React.useRef(false);
-  const longPressFired = React.useRef(false);
+  const isSingleEmoji = emojiCount === 1;
+  let singleEmojiChar = "";
+  if (isSingleEmoji) {
+    try {
+      const mEmoji = String(bodyStr || "").match(/\p{Extended_Pictographic}(?:\uFE0F)?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F)?)*/u);
+      singleEmojiChar = (mEmoji && mEmoji[0]) || String(bodyStr || "").trim();
+    } catch {
+      singleEmojiChar = String(bodyStr || "").trim();
+    }
+  }
+  const playEmojiBurst = (em) => {
+    if (!em) return;
+    // Ignore clicks while an animation is already on screen
+    if (emojiBurstKey > 0) return;
+    // Only flip UI after we confirm a Lottie asset exists — otherwise the
+    // static emoji would flash transparent and come back (no-animation case).
+    loadEmojiLottie(em).then((json) => {
+      if (!json) return;
+      setEmojiBurstChar(em);
+      setEmojiBurstKey((k) => k + 1);
+    });
+  };
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -1601,7 +1735,9 @@ export default function MessageBubble({
             ? 320
             : (bodySegments.some((s) => s.type === "codeblock") ? { xs: "96%", sm: "85%" } : { xs: "82%", sm: "70%" }),
           minWidth: 0,
-          overflow: "hidden",
+          position: "relative",
+          // visible for big-emoji Lottie overlay; hidden otherwise to clip long content
+          overflow: isBigEmoji ? "visible" : "hidden",
           px: isBigEmoji || isCircularVideoMsg ? 0.5 : 1.35,
           py: isBigEmoji || isCircularVideoMsg ? 0.35 : 0.85,
           borderRadius: isBigEmoji || isCircularVideoMsg ? 2 : (mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px"),
@@ -1765,6 +1901,10 @@ export default function MessageBubble({
           <Typography
             component="div"
             dir="auto"
+            onClick={isSingleEmoji ? (e) => {
+              e.stopPropagation();
+              playEmojiBurst(singleEmojiChar || bodyStr.trim());
+            } : undefined}
             sx={{
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
@@ -1773,9 +1913,16 @@ export default function MessageBubble({
               mt: hasAttachments ? 0.75 : 0,
               textAlign: isBigEmoji ? "center" : "inherit",
               letterSpacing: isBigEmoji ? "0.04em" : undefined,
-              userSelect: "text",
-              WebkitUserSelect: "text",
+              userSelect: isSingleEmoji ? "none" : "text",
+              WebkitUserSelect: isSingleEmoji ? "none" : "text",
               unicodeBidi: "plaintext",
+              cursor: isSingleEmoji ? "pointer" : "inherit",
+              position: "relative",
+              display: isSingleEmoji ? "inline-block" : undefined,
+              // While Lottie plays, hide the static glyph so it does not look duplicated
+              color: (isSingleEmoji && emojiBurstKey > 0) ? "transparent" : "inherit",
+              transition: isSingleEmoji ? "transform 0.12s ease" : undefined,
+              "&:active": isSingleEmoji ? { transform: "scale(0.96)" } : undefined,
             }}
           >
             {bodySegments.map((seg, i) => {
@@ -1844,6 +1991,18 @@ export default function MessageBubble({
               }
               return <React.Fragment key={i}>{seg.value}</React.Fragment>;
             })}
+            {isSingleEmoji && emojiBurstKey > 0 && emojiBurstChar ? (
+              <EmojiLottieBurst
+                key={emojiBurstKey}
+                emoji={emojiBurstChar}
+                playId={emojiBurstKey}
+                size={Math.round((emojiFontSize || 72) * 1.35)}
+                onDone={() => {
+                  setEmojiBurstKey(0);
+                  setEmojiBurstChar("");
+                }}
+              />
+            ) : null}
           </Typography>
         )}
         {(m.reactions || []).length > 0 && (

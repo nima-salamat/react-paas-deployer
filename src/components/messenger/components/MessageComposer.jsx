@@ -41,6 +41,7 @@ import ComposeCodeWorkspace, {
 import Button from "@mui/material/Button";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
+import EmojiPicker, { Theme as EmojiTheme, EmojiStyle } from "emoji-picker-react";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import LockOpenOutlinedIcon from "@mui/icons-material/LockOpenOutlined";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -286,7 +287,7 @@ function normalizeQuery(q) {
 }
 
 function matchEmojis(query, limit = 24) {
-  const q = normalizeQuery(query);
+  const q = normalizeQuery(query).replace(/^:/, "").replace(/:$/, "");
   if (!q || q.length < 1) return [];
   const scored = [];
   for (const item of EMOJI_DICT) {
@@ -294,7 +295,7 @@ function matchEmojis(query, limit = 24) {
     for (const key of item.k) {
       const k = key.toLowerCase();
       if (k === q) best = Math.max(best, 100);
-      else if (k.startsWith(q)) best = Math.max(best, 80 - (k.length - q.length));
+      else if (k.startsWith(q)) best = Math.max(best, 80 - Math.min(40, k.length - q.length));
       else if (k.includes(q)) best = Math.max(best, 40);
     }
     if (best > 0) scored.push({ ...item, score: best });
@@ -311,6 +312,26 @@ function matchEmojis(query, limit = 24) {
   }
   return out;
 }
+
+/** Primary shortcode for tooltip, e.g. :laugh: / :joy: */
+function emojiShortcode(itemOrEmoji) {
+  if (!itemOrEmoji) return "";
+  if (typeof itemOrEmoji === "object" && Array.isArray(itemOrEmoji.k)) {
+    const en = itemOrEmoji.k.find((k) => /^[a-z0-9_+-]+$/i.test(k));
+    const code = en || itemOrEmoji.k[0] || "";
+    return code ? `:${String(code).replace(/\s+/g, "_")}:` : "";
+  }
+  const hit = EMOJI_DICT.find((x) => x.e === itemOrEmoji);
+  return hit ? emojiShortcode(hit) : "";
+}
+
+const EMOJI_BY_CHAR = (() => {
+  const m = new Map();
+  for (const item of EMOJI_DICT) {
+    if (!m.has(item.e)) m.set(item.e, item);
+  }
+  return m;
+})();
 
 function getShortcodeAt(text, cursor) {
   const pos = cursor == null ? text.length : cursor;
@@ -2317,30 +2338,34 @@ export default function MessageComposer({
           onClose={() => setEmojiOpen(false)}
           anchorOrigin={{ vertical: "top", horizontal: "left" }}
           transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-          PaperProps={{ sx: { p: 1.5, maxHeight: 320, overflow: "auto" } }}
+          disableScrollLock
+          PaperProps={{
+            sx: {
+              p: 0,
+              overflow: "hidden",
+              borderRadius: 2,
+              boxShadow: 6,
+              bgcolor: "transparent",
+            },
+          }}
         >
-          {Object.entries(EMOJI_CATEGORIES).map(([cat, emojis]) => (
-            <Box key={cat} sx={{ mb: 1 }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5, fontWeight: 600 }}>
-                {cat}
-              </Typography>
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.25, maxWidth: 280 }}>
-                {emojis.map((em) => (
-                  <IconButton
-                    key={em}
-                    size="small"
-                    onClick={() => {
-                      setText((t) => t + em);
-                      inputRef?.current?.focus();
-                    }}
-                    sx={{ fontSize: 22, width: 36, height: 36 }}
-                  >
-                    {em}
-                  </IconButton>
-                ))}
-              </Box>
-            </Box>
-          ))}
+          <EmojiPicker
+            onEmojiClick={(emojiData) => {
+              const em = emojiData?.emoji;
+              if (!em) return;
+              setText((t) => (t || "") + em);
+              inputRef?.current?.focus();
+              // keep open for multi-pick; user closes via outside click
+            }}
+            theme={theme.palette.mode === "dark" ? EmojiTheme.DARK : EmojiTheme.LIGHT}
+            emojiStyle={EmojiStyle.NATIVE}
+            searchPlaceHolder="Search emoji… / جستجو"
+            width={Math.min(320, typeof window !== "undefined" ? window.innerWidth - 24 : 320)}
+            height={isMobile ? 360 : 400}
+            previewConfig={{ showPreview: true }}
+            skinTonesDisabled={false}
+            lazyLoadEmojis
+          />
         </Popover>
         {editingMsg && (
           <IconButton onClick={() => {

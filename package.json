@@ -35,7 +35,9 @@
     "react-router-dom": "^7.7.1",
     "video.js": "^8.24.0",
     "wavesurfer.js": "^7.12.11",
-    "react-devicons": "2.16.2"
+    "react-devicons": "2.16.2",
+    "emoji-picker-react": "^4.12.2",
+    "lottie-react": "^2.4.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

@@ -35,7 +35,8 @@ export default function ChatComposer({
 
   const handleSend = useCallback((htmlArg) => {
     if (sending || disabled) return;
-    const html = htmlArg != null ? htmlArg : valueRef.current;
+    // onClick passes a React synthetic event — only treat real strings as HTML body
+    const html = typeof htmlArg === "string" ? htmlArg : valueRef.current;
     const fl = filesRef.current || [];
     if (!htmlToPlain(html) && !fl.length) return;
     onSend?.(html);

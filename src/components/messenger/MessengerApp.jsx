@@ -96,6 +96,84 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
 
 
+
+/* ── session message cache (survives route remounts within the tab) ── */
+const MSG_SESSION_CACHE_KEY = "messenger.msgCache.v2";
+const MSG_SESSION_MAX_CONVS = 15;
+const MSG_SESSION_MAX_MSGS = 60;
+
+function slimMessageForCache(m) {
+  if (!m || typeof m !== "object") return m;
+  // Keep fields needed to render; drop heavy nested blobs if any
+  return {
+    id: m.id,
+    body: m.body,
+    created_at: m.created_at,
+    updated_at: m.updated_at,
+    sender: m.sender,
+    attachments: m.attachments,
+    reactions: m.reactions,
+    reply_to: m.reply_to,
+    is_edited: m.is_edited,
+    is_deleted: m.is_deleted,
+    seen_by: m.seen_by,
+    delivered_to: m.delivered_to,
+    type: m.type,
+    metadata: m.metadata,
+    pinned: m.pinned,
+  };
+}
+
+function readMessengerMsgCache() {
+  try {
+    const raw = sessionStorage.getItem(MSG_SESSION_CACHE_KEY);
+    if (!raw) return new Map();
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj !== "object") return new Map();
+    return new Map(Object.entries(obj));
+  } catch {
+    return new Map();
+  }
+}
+
+function writeMessengerMsgCache(map) {
+  try {
+    // Keep only the most recently touched conversations
+    const entries = [...map.entries()];
+    // Prefer entries that have savedAt / more recent activity by keeping tail
+    const trimmed = entries.slice(-MSG_SESSION_MAX_CONVS);
+    const out = {};
+    for (const [k, v] of trimmed) {
+      if (!v || typeof v !== "object") continue;
+      const msgs = Array.isArray(v.messages) ? v.messages.slice(-MSG_SESSION_MAX_MSGS).map(slimMessageForCache) : [];
+      out[k] = {
+        messages: msgs,
+        hasMore: Boolean(v.hasMore),
+        nextBefore: v.nextBefore ?? null,
+        detail: v.detail || null,
+        scrollTop: v.scrollTop,
+        distanceBottom: v.distanceBottom,
+        nearBottom: v.nearBottom,
+        savedAt: v.savedAt || Date.now(),
+      };
+    }
+    sessionStorage.setItem(MSG_SESSION_CACHE_KEY, JSON.stringify(out));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function touchMessengerMsgCache(map, key, patch) {
+  const prev = map.get(key) || {};
+  const next = { ...prev, ...patch, savedAt: Date.now() };
+  map.set(key, next);
+  // Move key to end (LRU-ish)
+  map.delete(key);
+  map.set(key, next);
+  writeMessengerMsgCache(map);
+  return next;
+}
+
 export default function MessengerApp() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -130,8 +208,12 @@ export default function MessengerApp() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
-  // Per-conversation message cache — switching chats restores instantly, no flicker
-  const messagesCacheRef = useRef(new Map()); // cid -> { messages, hasMore, nextBefore, detail, scroll }
+  // Per-conversation message cache — switching chats restores instantly, no flicker.
+  // Also hydrated from sessionStorage so leaving /messenger and coming back is fast.
+  const messagesCacheRef = useRef(null);
+  if (messagesCacheRef.current == null) {
+    messagesCacheRef.current = readMessengerMsgCache();
+  }
   const pendingScrollRestoreRef = useRef(null); // chat-switch viewport restore
   const olderScrollPinRef = useRef(null); // { el, prevH, prevTop } after loadOlder
   const scrollVelRef = useRef({ lastTop: 0, lastTs: 0, velocity: 0 });
@@ -806,7 +888,7 @@ export default function MessengerApp() {
       if (data?.id) {
         const key = String(data.id);
         const prev = messagesCacheRef.current.get(key) || {};
-        messagesCacheRef.current.set(key, { ...prev, detail: data });
+        touchMessengerMsgCache(messagesCacheRef.current, key, { ...prev, detail: data });
       }
       return data;
     } catch {
@@ -881,7 +963,7 @@ export default function MessengerApp() {
       const mergedForCache = (silent || preserveOlder)
         ? mergeLists(cached?.messages || [], items)
         : items;
-      messagesCacheRef.current.set(key, {
+      touchMessengerMsgCache(messagesCacheRef.current, key, {
         messages: mergedForCache,
         hasMore: (silent || preserveOlder) ? Boolean(cached?.hasMore || hm) : hm,
         nextBefore: (silent || preserveOlder) ? (cached?.nextBefore || nb) : nb,
@@ -970,7 +1052,7 @@ export default function MessengerApp() {
         try {
           const key = String(cid);
           const cached = messagesCacheRef.current.get(key) || {};
-          messagesCacheRef.current.set(key, { ...cached, messages: next, hasMore: Boolean(data?.has_more), nextBefore: data?.next_before_id || older[0]?.id || null });
+          touchMessengerMsgCache(messagesCacheRef.current, key, { ...cached, messages: next, hasMore: Boolean(data?.has_more), nextBefore: data?.next_before_id || older[0]?.id || null });
           messagesRef.current = next;
         } catch { /* */ }
         return next;
@@ -1038,7 +1120,11 @@ export default function MessengerApp() {
   const openChat = useCallback(async (c, { hashUser, jumpToMessageId } = {}) => {
     if (!c?.id) return;
     const cid = String(c.id);
-    setChatOpening(true);
+    // Only show the full-screen "Opening chat…" overlay on a cold open (no cache).
+    // Cached chats paint instantly — never block the UI on network.
+    const earlyCached = messagesCacheRef.current.get(cid);
+    const hasEarlyCache = Boolean(earlyCached?.messages?.length);
+    setChatOpening(!hasEarlyCache);
     // Persist scroll position of the chat we are leaving
     if (activeIdRef.current && String(activeIdRef.current) !== cid) {
       const el = listRef.current;
@@ -1052,7 +1138,7 @@ export default function MessengerApp() {
           nearBottom: distBottom < 140,
           savedAt: Date.now(),
         };
-        messagesCacheRef.current.set(prevKey, { ...prev, ...snapshot });
+        touchMessengerMsgCache(messagesCacheRef.current, prevKey, { ...prev, ...snapshot });
       }
     }
 
@@ -1144,32 +1230,41 @@ export default function MessengerApp() {
     else if (c.type === "private" && c.peer?.username) setHash("u", c.peer.username);
     else setHash("c", c.id);
 
-    // Background merge refresh when cached; full load when cold
+    // Cached: paint already done — refresh in background, never block UI.
+    // Cold: load messages first so the thread appears ASAP, then detail/pins.
     if (cached?.messages?.length) {
+      setChatOpening(false);
       const keepAtBottomAfterRefresh = cached.nearBottom === true;
-      await Promise.all([
+      void Promise.all([
         loadMessages(c.id, { silent: true, preserveOlder: true }),
         loadConversationDetail(c.id),
         loadPinnedMessages(c.id),
-      ]);
-      // If the cached viewport was at the bottom, keep it there when the
-      // background merge appends newer messages. If the user moved meanwhile,
-      // onScroll flips nearBottomRef and we leave their viewport untouched.
-      if (keepAtBottomAfterRefresh) {
-        requestAnimationFrame(() => {
-          const box = listRef.current;
-          if (
-            box
-            && String(activeIdRef.current) === String(c.id)
-            && nearBottomRef.current
-            && !restoringScrollRef.current
-          ) {
-            box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
-          }
-        });
-      }
+      ]).then(() => {
+        if (keepAtBottomAfterRefresh) {
+          requestAnimationFrame(() => {
+            const box = listRef.current;
+            if (
+              box
+              && String(activeIdRef.current) === String(c.id)
+              && nearBottomRef.current
+              && !restoringScrollRef.current
+            ) {
+              box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
+            }
+          });
+        }
+      });
     } else {
-      await Promise.all([loadMessages(c.id), loadConversationDetail(c.id), loadPinnedMessages(c.id)]);
+      try {
+        await loadMessages(c.id);
+      } finally {
+        // Drop overlay as soon as messages are on screen (don't wait for pins/detail)
+        if (String(activeIdRef.current) === String(c.id)) setChatOpening(false);
+      }
+      void Promise.all([
+        loadConversationDetail(c.id),
+        loadPinnedMessages(c.id),
+      ]);
     }
 
     // After load, jump if requested
@@ -1203,7 +1298,8 @@ export default function MessengerApp() {
         requestAnimationFrame(() => { restoringScrollRef.current = false; });
       });
     }
-    setChatOpening(false);
+    // Ensure overlay is gone even if loadMessages was skipped / failed early
+    if (String(activeIdRef.current) === String(c.id)) setChatOpening(false);
     // Viewport seen after open. force_all only when landing near the latest messages
     // so mid-history open does not silently mark everything below as read.
     setTimeout(() => {
@@ -3672,7 +3768,7 @@ export default function MessengerApp() {
       onDragLeave={onChatDragLeave}
       onDrop={onDropFilesToChat}
     >
-      {chatOpening && isMobile && (
+      {chatOpening && isMobile && !messages.length && (
         <Box sx={{
           position: "absolute", inset: 0, zIndex: 55, display: "flex", alignItems: "center", justifyContent: "center",
           bgcolor: "background.default",
