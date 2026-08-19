@@ -128,12 +128,25 @@ export default function TicketDetail() {
   }, [ticket?.messages?.length]);
 
   const sendReply = async (bodyOverride) => {
-    const body = bodyOverride != null ? bodyOverride : reply;
+    let body = bodyOverride != null ? bodyOverride : reply;
+    // Always force a string so FormData never serializes an object as "[object Object]"
+    if (body != null && typeof body !== "string") {
+      if (typeof body === "object") {
+        body =
+          (typeof body.html === "string" && body.html) ||
+          (typeof body.body === "string" && body.body) ||
+          (typeof body.text === "string" && body.text) ||
+          "";
+      } else {
+        body = String(body);
+      }
+    }
     if (!htmlToPlain(body) && !files.length) return;
     setSending(true);
     try {
       const form = new FormData();
-      form.append("body", htmlToPlain(body) ? body : "<p></p>");
+      const bodyStr = typeof body === "string" && htmlToPlain(body) ? body : "<p></p>";
+      form.append("body", bodyStr);
       files.forEach((f) => form.append("attachments", f));
       const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${id}/messages/`, data: form });
       const created = res.data?.data || res.data;

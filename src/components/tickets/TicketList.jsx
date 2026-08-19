@@ -144,68 +144,139 @@ export default function TicketList() {
       {initialLoading ? (
         <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
       ) : (
-        <Paper variant="outlined" sx={{ position: "relative", opacity: refreshing ? 0.85 : 1, transition: "opacity .2s" }}>
+        <Paper variant="outlined" sx={{ position: "relative", opacity: refreshing ? 0.85 : 1, transition: "opacity .2s", overflow: "hidden" }}>
           {refreshing && (
             <Box sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
               <CircularProgress size={18} />
             </Box>
           )}
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell width={28} />
-                <TableCell>ID</TableCell>
-                <TableCell>Subject</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Priority</TableCell>
-                <TableCell>Updated</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tickets.length === 0 ? (
+
+          {/* Desktop / tablet table */}
+          <Box sx={{ display: { xs: "none", md: "block" }, overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={6}>
-                    <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
-                  </TableCell>
+                  <TableCell width={28} />
+                  <TableCell>ID</TableCell>
+                  <TableCell>Subject</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Priority</TableCell>
+                  <TableCell>Updated</TableCell>
                 </TableRow>
-              ) : tickets.map((t) => {
-                const hasUnread = unreadIds.has(String(t.id));
-                return (
-                  <TableRow
-                    key={t.id}
-                    hover
-                    sx={{ cursor: "pointer", bgcolor: hasUnread ? "action.selected" : undefined }}
-                    onClick={() => openTicket(t.id)}
-                  >
-                    <TableCell sx={{ px: 1 }}>
-                      {hasUnread ? (
-                        <Badge color="error" variant="dot" overlap="circular">
-                          <FiberManualRecordIcon sx={{ fontSize: 12, color: "error.main" }} />
-                        </Badge>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={hasUnread ? 700 : 400}>{t.public_id}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight={hasUnread ? 700 : 400} noWrap sx={{ maxWidth: 320 }}>
-                        {t.subject}
-                      </Typography>
-                    </TableCell>
-                    <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
-                    <TableCell><Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
-                    <TableCell>
-                      <Typography variant="caption">
-                        {t.last_message_at || t.updated_at
-                          ? new Date(t.last_message_at || t.updated_at).toLocaleString()
-                          : "—"}
-                      </Typography>
+              </TableHead>
+              <TableBody>
+                {tickets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6}>
+                      <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                ) : tickets.map((t) => {
+                  const hasUnread = unreadIds.has(String(t.id));
+                  return (
+                    <TableRow
+                      key={t.id}
+                      hover
+                      sx={{ cursor: "pointer", bgcolor: hasUnread ? "action.selected" : undefined }}
+                      onClick={() => openTicket(t.id)}
+                    >
+                      <TableCell sx={{ px: 1 }}>
+                        {hasUnread ? (
+                          <Badge color="error" variant="dot" overlap="circular">
+                            <FiberManualRecordIcon sx={{ fontSize: 12, color: "error.main" }} />
+                          </Badge>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={hasUnread ? 700 : 400}>{t.public_id}</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={hasUnread ? 700 : 400} noWrap sx={{ maxWidth: 320 }}>
+                          {t.subject}
+                        </Typography>
+                      </TableCell>
+                      <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
+                      <TableCell><Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {t.last_message_at || t.updated_at
+                            ? new Date(t.last_message_at || t.updated_at).toLocaleString()
+                            : "—"}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Box>
+
+          {/* Mobile card list */}
+          <Box sx={{ display: { xs: "block", md: "none" } }}>
+            {tickets.length === 0 ? (
+              <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
+            ) : (
+              <Stack divider={<Box sx={{ borderBottom: 1, borderColor: "divider" }} />}>
+                {tickets.map((t) => {
+                  const hasUnread = unreadIds.has(String(t.id));
+                  return (
+                    <Box
+                      key={t.id}
+                      onClick={() => openTicket(t.id)}
+                      sx={{
+                        px: 1.5,
+                        py: 1.5,
+                        cursor: "pointer",
+                        bgcolor: hasUnread ? "action.selected" : undefined,
+                        "&:active": { bgcolor: "action.hover" },
+                      }}
+                    >
+                      <Stack direction="row" alignItems="flex-start" gap={1}>
+                        <Box sx={{ width: 14, pt: 0.5, flexShrink: 0 }}>
+                          {hasUnread ? (
+                            <Badge color="error" variant="dot" overlap="circular">
+                              <FiberManualRecordIcon sx={{ fontSize: 12, color: "error.main" }} />
+                            </Badge>
+                          ) : null}
+                        </Box>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1} mb={0.5}>
+                            <Typography variant="caption" color="text.secondary" fontWeight={hasUnread ? 700 : 400}>
+                              {t.public_id}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap>
+                              {t.last_message_at || t.updated_at
+                                ? new Date(t.last_message_at || t.updated_at).toLocaleString()
+                                : "—"}
+                            </Typography>
+                          </Stack>
+                          <Typography
+                            variant="body2"
+                            fontWeight={hasUnread ? 700 : 600}
+                            sx={{
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              mb: 0.75,
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {t.subject}
+                          </Typography>
+                          <Stack direction="row" gap={0.75} flexWrap="wrap">
+                            <Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} />
+                            <Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
+                          </Stack>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+
           {Math.ceil((count || 0) / 10) > 1 && (
             <Box display="flex" justifyContent="center" py={1.5}>
               <Pagination
@@ -215,6 +286,8 @@ export default function TicketList() {
                 color="primary"
                 showFirstButton
                 showLastButton
+                size="small"
+                siblingCount={0}
               />
             </Box>
           )}

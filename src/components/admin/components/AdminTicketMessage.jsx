@@ -336,7 +336,20 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
     (mine ? "Staff" : "User");
 
   const avatarSrc = authorAvatarSrc(author);
-  const bodyHtml = typeof m?.body === "string" ? m.body : m?.body != null ? String(m.body) : "";
+  const bodyHtml = (() => {
+    const body = m?.body;
+    if (body == null) return "";
+    if (typeof body === "string") return body;
+    if (typeof body === "number" || typeof body === "boolean") return String(body);
+    if (typeof body === "object") {
+      if (typeof body.html === "string") return body.html;
+      if (typeof body.body === "string") return body.body;
+      if (typeof body.text === "string") return body.text;
+      if (typeof body.content === "string") return body.content;
+      try { const s = JSON.stringify(body); return s === "{}" ? "" : s; } catch { return ""; }
+    }
+    return String(body);
+  })();
   const bodyText = bodyHtml.replace(/<[^>]+>/g, "").trim();
   const hasBody = Boolean(bodyText);
   const hasHtml = /<[a-z][\s\S]*>/i.test(bodyHtml);

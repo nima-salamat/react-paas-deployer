@@ -153,8 +153,23 @@ export default function SimpleHtmlEditor({
 }
 
 export function htmlToPlain(html) {
-  if (!html) return "";
+  if (html == null || html === "") return "";
+  // Guard against objects (avoids innerHTML becoming "[object Object]")
+  let s = html;
+  if (typeof html !== "string") {
+    if (typeof html === "object") {
+      s =
+        (typeof html.html === "string" && html.html) ||
+        (typeof html.body === "string" && html.body) ||
+        (typeof html.text === "string" && html.text) ||
+        (typeof html.content === "string" && html.content) ||
+        "";
+    } else {
+      s = String(html);
+    }
+  }
+  if (!s) return "";
   const d = document.createElement("div");
-  d.innerHTML = html;
+  d.innerHTML = s;
   return (d.textContent || d.innerText || "").trim();
 }

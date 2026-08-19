@@ -74,10 +74,18 @@ export default function CreateTicket() {
       const form = new FormData();
       form.append("department_id", departmentId);
       form.append("subject", subject.trim());
-      // Keep rich HTML when present; otherwise wrap plain text
-      const htmlBody = body && /<[a-z][\s\S]*>/i.test(body)
-        ? body
-        : `<p>${String(body || "").replace(/\n/g, "<br>")}</p>`;
+      // Keep rich HTML when present; otherwise wrap plain text (always a string)
+      let raw = body;
+      if (raw != null && typeof raw !== "string") {
+        if (typeof raw === "object") {
+          raw = (typeof raw.html === "string" && raw.html) || (typeof raw.body === "string" && raw.body) || (typeof raw.text === "string" && raw.text) || "";
+        } else {
+          raw = String(raw);
+        }
+      }
+      const htmlBody = raw && /<[a-z][\s\S]*>/i.test(raw)
+        ? raw
+        : `<p>${String(raw || "").replace(/\n/g, "<br>")}</p>`;
       form.append("body", htmlBody);
       form.append("priority", priority);
       if (serviceId) form.append("service_id", serviceId);

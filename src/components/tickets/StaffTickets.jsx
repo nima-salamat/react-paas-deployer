@@ -166,13 +166,25 @@ export default function StaffTickets() {
   };
 
   const sendReply = async (bodyOverride) => {
-    const body = bodyOverride != null ? bodyOverride : reply;
+    let body = bodyOverride != null ? bodyOverride : reply;
+    if (body != null && typeof body !== "string") {
+      if (typeof body === "object") {
+        body =
+          (typeof body.html === "string" && body.html) ||
+          (typeof body.body === "string" && body.body) ||
+          (typeof body.text === "string" && body.text) ||
+          "";
+      } else {
+        body = String(body);
+      }
+    }
     if ((!htmlToPlain(body) && !files.length) || !selectedId) return;
     setSending(true);
     setActionError("");
     try {
       const form = new FormData();
-      form.append("body", htmlToPlain(body) ? body : "<p></p>");
+      const bodyStr = typeof body === "string" && htmlToPlain(body) ? body : "<p></p>";
+      form.append("body", bodyStr);
       files.forEach((f) => form.append("attachments", f));
       const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/${selectedId}/messages/`, data: form });
       const created = res.data?.data || res.data;
@@ -241,35 +253,68 @@ export default function StaffTickets() {
       {loading ? (
         <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
       ) : (
-        <Paper variant="outlined" sx={{ opacity: refreshing ? 0.85 : 1 }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>ID</TableCell>
-                <TableCell>Subject</TableCell>
-                <TableCell>User</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Priority</TableCell>
-                <TableCell>Updated</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {tickets.map((t) => (
-                <TableRow key={t.id} hover selected={selectedId === t.id} sx={{ cursor: "pointer" }} onClick={() => openDetail(t.id)}>
-                  <TableCell>{t.public_id}</TableCell>
-                  <TableCell>{t.subject}</TableCell>
-                  <TableCell>{t.user?.username || "—"}</TableCell>
-                  <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
-                  <TableCell><Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
-                  <TableCell>
-                    <Typography variant="caption">
-                      {t.last_message_at || t.updated_at ? new Date(t.last_message_at || t.updated_at).toLocaleString() : "—"}
-                    </Typography>
-                  </TableCell>
+        <Paper variant="outlined" sx={{ opacity: refreshing ? 0.85 : 1, overflow: "hidden" }}>
+          {/* Desktop table */}
+          <Box sx={{ display: { xs: "none", md: "block" }, overflowX: "auto" }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>ID</TableCell>
+                  <TableCell>Subject</TableCell>
+                  <TableCell>User</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell>Priority</TableCell>
+                  <TableCell>Updated</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHead>
+              <TableBody>
+                {tickets.map((t) => (
+                  <TableRow key={t.id} hover selected={selectedId === t.id} sx={{ cursor: "pointer" }} onClick={() => openDetail(t.id)}>
+                    <TableCell>{t.public_id}</TableCell>
+                    <TableCell>{t.subject}</TableCell>
+                    <TableCell>{t.user?.username || "—"}</TableCell>
+                    <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
+                    <TableCell><Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
+                    <TableCell>
+                      <Typography variant="caption">
+                        {t.last_message_at || t.updated_at ? new Date(t.last_message_at || t.updated_at).toLocaleString() : "—"}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
+          {/* Mobile cards */}
+          <Box sx={{ display: { xs: "block", md: "none" } }}>
+            {tickets.length === 0 ? (
+              <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
+            ) : tickets.map((t) => (
+              <Box
+                key={t.id}
+                onClick={() => openDetail(t.id)}
+                sx={{
+                  px: 1.5, py: 1.5, cursor: "pointer",
+                  borderBottom: 1, borderColor: "divider",
+                  bgcolor: selectedId === t.id ? "action.selected" : undefined,
+                  "&:active": { bgcolor: "action.hover" },
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" gap={1} mb={0.5}>
+                  <Typography variant="caption" color="text.secondary">{t.public_id}</Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {t.last_message_at || t.updated_at ? new Date(t.last_message_at || t.updated_at).toLocaleString() : "—"}
+                  </Typography>
+                </Stack>
+                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5, wordBreak: "break-word" }}>{t.subject}</Typography>
+                <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>{t.user?.username || "—"}</Typography>
+                <Stack direction="row" gap={0.75} flexWrap="wrap">
+                  <Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} />
+                  <Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
+                </Stack>
+              </Box>
+            ))}
+          </Box>
           {Math.ceil((count || 0) / 15) > 1 && (
             <Box display="flex" justifyContent="center" py={1.5}>
               <Pagination page={page} count={Math.max(1, Math.ceil((count || 0) / 15))} onChange={(_, p) => setPage(p)} color="primary" showFirstButton showLastButton />

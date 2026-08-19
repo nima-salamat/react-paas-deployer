@@ -480,6 +480,27 @@ function AttachmentBlock({ a, mine }) {
   );
 }
 
+/** Normalize message body so we never render "[object Object]". */
+function normalizeMessageBody(body) {
+  if (body == null) return "";
+  if (typeof body === "string") return body;
+  if (typeof body === "number" || typeof body === "boolean") return String(body);
+  if (typeof body === "object") {
+    if (typeof body.html === "string") return body.html;
+    if (typeof body.body === "string") return body.body;
+    if (typeof body.text === "string") return body.text;
+    if (typeof body.content === "string") return body.content;
+    if (typeof body.message === "string") return body.message;
+    try {
+      const s = JSON.stringify(body);
+      return s === "{}" ? "" : s;
+    } catch {
+      return "";
+    }
+  }
+  return String(body);
+}
+
 export default function MessageBubble({
   message: m,
   mine = false,
@@ -495,7 +516,7 @@ export default function MessageBubble({
     ? new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
   // Coerce body to string to avoid "[object Object]" when API returns non-string
-  const bodyHtml = typeof m.body === "string" ? m.body : (m.body != null ? String(m.body) : "");
+  const bodyHtml = normalizeMessageBody(m?.body);
   const bodyText = bodyHtml.replace(/<[^>]+>/g, "").trim();
   const hasBody = Boolean(bodyText);
   const attachments = m.attachments || [];

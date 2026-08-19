@@ -81,6 +81,63 @@ const ICON_MAP = {
   linux: LinuxOriginal,
 };
 
+/** Soft contrasting backgrounds so brand icons stay readable on any theme */
+const ICON_BG = {
+  django: "#0C4B33",
+  flask: "#E8E8E8",
+  fastapi: "#059669",
+  node: "#E8F5E9",
+  nodejs: "#E8F5E9",
+  next: "#111111",
+  nextjs: "#111111",
+  react: "#0B1A2A",
+  vue: "#E8F8F0",
+  vuejs: "#E8F8F0",
+  nuxt: "#E8F8F0",
+  nuxtjs: "#E8F8F0",
+  python: "#1E3A5F",
+  go: "#E3F2FD",
+  golang: "#E3F2FD",
+  rust: "#F5E6D3",
+  java: "#FFF3E0",
+  spring: "#E8F5E9",
+  php: "#EDE7F6",
+  laravel: "#FDECEA",
+  rails: "#FDECEA",
+  ruby: "#FDECEA",
+  docker: "#E3F2FD",
+  postgres: "#E3F2FD",
+  postgresql: "#E3F2FD",
+  mysql: "#FFF8E1",
+  mariadb: "#FFF8E1",
+  mongo: "#E8F5E9",
+  mongodb: "#E8F5E9",
+  redis: "#FDECEA",
+  sqlite: "#E3F2FD",
+  elasticsearch: "#FFF3E0",
+  elastic: "#FFF3E0",
+  angular: "#FDECEA",
+  svelte: "#FDECEA",
+  typescript: "#E3F2FD",
+  javascript: "#FFF8E1",
+  js: "#FFF8E1",
+  ts: "#E3F2FD",
+  csharp: "#EDE7F6",
+  kafka: "#F5F5F5",
+  apachekafka: "#F5F5F5",
+  linux: "#FFF8E1",
+};
+
+function resolveBg(key, label) {
+  const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const k = norm(key);
+  const l = norm(label);
+  if (ICON_BG[k]) return ICON_BG[k];
+  if (ICON_BG[l]) return ICON_BG[l];
+  const hit = Object.keys(ICON_BG).find((id) => k.includes(id) || l.includes(id));
+  return hit ? ICON_BG[hit] : "rgba(128,128,128,0.18)";
+}
+
 function resolveIcon(key, label) {
   const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const k = norm(key);
@@ -97,18 +154,25 @@ function resolveIcon(key, label) {
  */
 const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 }) {
   const Icon = resolveIcon(platformKey, label);
+  const pad = Math.max(4, Math.round(size * 0.22));
+  const box = size + pad * 2;
+  const bg = resolveBg(platformKey, label);
+
   if (Icon) {
     return (
       <Box
         component="span"
         sx={{
-          width: size,
-          height: size,
+          width: box,
+          height: box,
+          borderRadius: 1.25,
+          bgcolor: bg,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
           lineHeight: 0,
+          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
           "& svg": { display: "block" },
         }}
         title={label || platformKey}
@@ -123,10 +187,10 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
     <Box
       component="span"
       sx={{
-        width: size,
-        height: size,
-        borderRadius: 0.75,
-        bgcolor: "primary.main",
+        width: box,
+        height: box,
+        borderRadius: 1.25,
+        bgcolor: bg,
         color: "#fff",
         fontSize: Math.max(10, size * 0.38),
         fontWeight: 800,
@@ -136,6 +200,7 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
         flexShrink: 0,
         letterSpacing: -0.3,
         lineHeight: 1,
+        boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
       }}
       title={label || platformKey}
     >
