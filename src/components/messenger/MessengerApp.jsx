@@ -856,13 +856,15 @@ export default function MessengerApp() {
       // Merge by id: keep previous object reference when payload is unchanged so
       // Sidebar Avatars do not remount / re-download on every silent refresh.
       setConversations((prev) => mergeConversations(prev, next));
-      // Seed online presence from conversation peers (backend may include is_online)
+      // Sync presence from API: add online peers AND drop offline ones
       setOnlineUsers((prev) => {
         const nextSet = new Set(prev);
         for (const c of next) {
           if (c?.type === "private" && c.peer?.id != null) {
-            const online = c.peer.is_online ?? c.peer.online;
-            if (online) nextSet.add(Number(c.peer.id));
+            const id = Number(c.peer.id);
+            const online = Boolean(c.peer.is_online ?? c.peer.online);
+            if (online) nextSet.add(id);
+            else nextSet.delete(id);
           }
         }
         return nextSet;

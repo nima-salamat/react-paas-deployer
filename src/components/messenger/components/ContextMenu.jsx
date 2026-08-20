@@ -1,14 +1,26 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Paper } from "@mui/material";
 
 /**
- * Reusable right-click context menu.
- * Closes on outside click, Escape, viewport resize, or scroll *outside* the menu.
- * Scrolling inside the menu (when it has a scrollbar) keeps it open.
+ * Reusable right-click / long-press context menu.
+ * After open, pointer-events stay off briefly so the finger-up that opened
+ * the menu cannot activate a MenuItem under the touch point.
  */
 export default function ContextMenu({ ctx, children, onClose, minWidth = 200 }) {
   const menuRef = useRef(null);
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!ctx) {
+      setArmed(false);
+      return undefined;
+    }
+    setArmed(false);
+    // Arm only after the opening gesture has fully ended
+    const t = setTimeout(() => setArmed(true), 320);
+    return () => clearTimeout(t);
+  }, [ctx]);
 
   useEffect(() => {
     if (!ctx) return undefined;
@@ -20,13 +32,10 @@ export default function ContextMenu({ ctx, children, onClose, minWidth = 200 }) 
       }
     };
 
-    // Close only when scroll happens outside the menu panel
-    // (scrolling the menu's own overflow must NOT dismiss it).
     const onScroll = (e) => {
       const menu = menuRef.current;
       const t = e.target;
       if (menu && t && (menu === t || menu.contains(t))) return;
-      // Also ignore scroll on the menu's portal subtree
       if (menu && t?.nodeType === 1 && t.closest?.("[data-messenger-ctx-menu]")) return;
       onClose?.();
     };
@@ -45,11 +54,12 @@ export default function ContextMenu({ ctx, children, onClose, minWidth = 200 }) 
 
   if (!ctx) return null;
 
-  // Keep menu fully on-screen on mobile (avoid clipping outside viewport)
   const menuH = Math.min(360, Math.floor(window.innerHeight * 0.7));
   const pad = 12;
   let top = ctx.y;
   let left = ctx.x;
+  // Prefer opening slightly above the touch so the first items are not under the finger
+  top = Math.max(pad, top - 48);
   if (top + menuH > window.innerHeight - pad) top = Math.max(pad, window.innerHeight - menuH - pad);
   if (top < pad) top = pad;
   if (left + minWidth > window.innerWidth - pad) left = Math.max(pad, window.innerWidth - minWidth - pad);
@@ -57,15 +67,16 @@ export default function ContextMenu({ ctx, children, onClose, minWidth = 200 }) 
 
   return createPortal(
     <>
-      {/* Transparent full-screen backdrop — captures outside clicks and right-clicks */}
       <div
-        onClick={onClose}
+        onClick={() => { if (armed) onClose?.(); }}
         onContextMenu={(e) => { e.preventDefault(); onClose?.(); }}
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 9998,
           background: "transparent",
+          // Block ghost clicks on the chat underneath while gesture settles
+          pointerEvents: armed ? "auto" : "none",
         }}
       />
       <Paper
@@ -88,9 +99,11 @@ export default function ContextMenu({ ctx, children, onClose, minWidth = 200 }) 
           overflowX: "hidden",
           py: 0.5,
           bgcolor: "background.paper",
-          // Prevent scroll chaining to the chat list underneath
           overscrollBehavior: "contain",
           WebkitOverflowScrolling: "touch",
+          // Critical: ignore the lift that opened the menu
+          pointerEvents: armed ? "auto" : "none",
+          opacity: armed ? 1 : 0.96,
         }}
       >
         {children}

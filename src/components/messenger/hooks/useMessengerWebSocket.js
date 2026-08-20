@@ -264,13 +264,27 @@ useEffect(() => {
       }
     }
     if (data.type === "presence.update" && data.user_id != null) {
+      const uid = Number(data.user_id);
+      const online = data.online === true || data.online === "true" || data.online === 1;
       setOnlineUsers((prev) => {
         const next = new Set(prev);
-        if (data.online) next.add(Number(data.user_id));
-        else next.delete(Number(data.user_id));
+        if (online) next.add(uid);
+        else next.delete(uid);
         return next;
       });
-      loadConversations({ silent: true });
+      // Update peer.is_online on matching private chats without a full list reload
+      setConversations?.((prev) => {
+        if (!Array.isArray(prev)) return prev;
+        let changed = false;
+        const mapped = prev.map((c) => {
+          if (c?.type !== "private" || c?.peer?.id == null) return c;
+          if (Number(c.peer.id) !== uid) return c;
+          if (Boolean(c.peer.is_online) === online) return c;
+          changed = true;
+          return { ...c, peer: { ...c.peer, is_online: online } };
+        });
+        return changed ? mapped : prev;
+      });
     }
     if ([
       "member.left", "member.removed", "member.role_changed",

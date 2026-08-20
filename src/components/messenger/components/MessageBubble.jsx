@@ -1536,6 +1536,7 @@ export default function MessageBubble({
   const longPressTimer = useRef(null);
   const longPressMoved = useRef(false);
   const longPressFired = useRef(false);
+  const longPressPos = useRef({ x: 0, y: 0 });
 
   // Auto-play only for *unseen* messages when they enter the viewport (while marking seen).
   // Never on every chat open for already-seen messages.
@@ -1791,55 +1792,63 @@ export default function MessageBubble({
     );
   };
 
+  // Menu opens on finger *release* after long-press so the lift cannot
+  // activate a MenuItem that appeared under the finger.
   const onPointerDownMsg = (e) => {
     // Desktop mouse uses onContextMenu (right-click). Long-press is for touch/pen.
     if (e.button != null && e.button !== 0) return;
     if (e.pointerType === "mouse") return;
     if (selectionMode) return;
-    // Do not steal presses from emoji / voice / code / controls
     if (isInteractiveMsgTarget(e.target)) return;
 
     longPressMoved.current = false;
     longPressFired.current = false;
+    longPressPos.current = { x: e.clientX, y: e.clientY };
     clearLongPress();
-    const cx = e.clientX;
-    const cy = e.clientY;
 
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
+      if (longPressMoved.current) return;
       longPressFired.current = true;
       try {
         if (navigator.vibrate) navigator.vibrate(12);
       } catch { /* optional */ }
-
-      // Telegram-style: long-press opens the message action menu (not multi-select).
-      onContextOpen?.(
-        {
-          preventDefault() {},
-          stopPropagation() {},
-          clientX: cx,
-          clientY: cy,
-        },
-        m,
-      );
+      // Do NOT open the menu here — wait for pointerup (finger lift).
     }, 450);
   };
 
   const onPointerMoveMsg = (e) => {
     if (
-      longPressTimer.current
+      (longPressTimer.current || longPressFired.current)
       && (
         Math.abs(e.movementX || 0) > 12
         || Math.abs(e.movementY || 0) > 12
       )
     ) {
       longPressMoved.current = true;
+      longPressFired.current = false;
       clearLongPress();
     }
   };
 
   const onPointerUpMsg = () => {
     clearLongPress();
+    // Open menu only after the finger is lifted so nothing under the finger is "pressed".
+    if (longPressFired.current && !longPressMoved.current) {
+      const { x, y } = longPressPos.current;
+      longPressFired.current = false;
+      onContextOpen?.(
+        {
+          preventDefault() {},
+          stopPropagation() {},
+          clientX: x,
+          clientY: y,
+        },
+        m,
+      );
+    } else {
+      longPressFired.current = false;
+    }
   };
 
   return (
