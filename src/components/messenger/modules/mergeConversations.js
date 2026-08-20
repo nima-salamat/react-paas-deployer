@@ -23,10 +23,15 @@ export function mergeConversations(prev, next) {
       && (old.peer?.username === c.peer?.username)
       && (old.last_message?.id === c.last_message?.id)
       && (old.last_message?.body === c.last_message?.body)
-      && (old.is_pinned === c.is_pinned);
+      && (old.is_pinned === c.is_pinned)
+      && (old.draft_text || "") === (c.draft_text || "");
     if (same) return old;
     changed = true;
-    return { ...old, ...c };
+    // Never clobber a non-empty local draft with an empty server field
+    const serverDraft = typeof c.draft_text === "string" ? c.draft_text : "";
+    const localDraft = typeof old.draft_text === "string" ? old.draft_text : "";
+    const draft_text = serverDraft.trim() ? serverDraft : (localDraft || serverDraft);
+    return { ...old, ...c, draft_text };
   });
   return changed ? merged : prev;
 }

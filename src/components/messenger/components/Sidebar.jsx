@@ -479,8 +479,12 @@ export default function Sidebar({
                     </Stack>
                   }
                   secondary={
-                    <Typography noWrap variant="body2" color="text.secondary" fontSize={13}>
-                      {formatLastMessagePreview(c.last_message)}
+                    <Typography noWrap variant="body2" color="text.secondary" fontSize={13}
+                      sx={c.draft_text ? { fontStyle: "italic", color: "warning.main" } : undefined}
+                    >
+                      {c.draft_text
+                        ? `Draft: ${String(c.draft_text).slice(0, 80)}`
+                        : formatLastMessagePreview(c.last_message)}
                     </Typography>
                   }
                 />

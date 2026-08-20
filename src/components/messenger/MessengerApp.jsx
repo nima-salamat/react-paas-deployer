@@ -196,6 +196,8 @@ export default function MessengerApp() {
 
   // Composer state
   const [text, setText] = useState("");
+  const textRef = useRef("");
+  useEffect(() => { textRef.current = text; }, [text]);
   const [scheduledFor, setScheduledFor] = useState(null);
   const [dayJumpOpen, setDayJumpOpen] = useState(false);
   const [msgSearchOpen, setMsgSearchOpen] = useState(false);
@@ -1289,6 +1291,12 @@ export default function MessengerApp() {
     const earlyCached = messagesCacheRef.current.get(cid);
     const hasEarlyCache = Boolean(earlyCached?.messages?.length);
     setChatOpening(!hasEarlyCache);
+    // Flush draft of the chat we are leaving (text state still belongs to it)
+    if (activeIdRef.current && String(activeIdRef.current) !== cid) {
+      try {
+        writeComposerDraft(activeIdRef.current, textRef.current);
+      } catch { /* */ }
+    }
     // Persist scroll position of the chat we are leaving
     if (activeIdRef.current && String(activeIdRef.current) !== cid) {
       const el = listRef.current;
@@ -2882,6 +2890,11 @@ export default function MessengerApp() {
   const handleComposerText = useCallback((valueOrFn) => {
     setText((prev) => {
       const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
+      // Persist draft immediately (do not wait for useEffect)
+      const cid = activeIdRef.current;
+      if (cid) {
+        try { writeComposerDraft(cid, next); } catch { /* */ }
+      }
       // Notify peers we're typing (debounced stop)
       if (String(next || "").trim()) {
         if (!typingSentRef.current) {
@@ -2889,7 +2902,6 @@ export default function MessengerApp() {
           sendTypingSignal(true);
         }
         if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
-        // Keep TTL aligned with receiver expiry (see WS handler ~2.8s)
         typingStopTimerRef.current = setTimeout(() => {
           typingSentRef.current = false;
           sendTypingSignal(false);
@@ -2912,22 +2924,34 @@ export default function MessengerApp() {
   useEffect(() => {
     if (!activeId || editingMsg) return;
     writeComposerDraft(activeId, text);
+    // Reflect draft in chat list immediately (local)
+    const cid = String(activeId);
+    setConversations((prev) => {
+      let changed = false;
+      const next = prev.map((c) => {
+        if (String(c.id) !== cid) return c;
+        const d = String(text || "");
+        if ((c.draft_text || "") === d) return c;
+        changed = true;
+        return { ...c, draft_text: d };
+      });
+      return changed ? next : prev;
+    });
     if (draftSyncTimerRef.current) clearTimeout(draftSyncTimerRef.current);
     draftSyncTimerRef.current = setTimeout(() => {
-      const cid = activeIdRef.current;
-      if (!cid || !wsRef.current || wsRef.current.readyState !== 1) return;
-      try {
-        wsRef.current.send(JSON.stringify({
-          type: "draft",
-          conversation_id: Number(cid),
-          text: String(text || ""),
-        }));
-      } catch { /* */ }
-      // Keep conversation list draft in sync
-      setConversations((prev) => prev.map((c) =>
-        String(c.id) === String(cid) ? { ...c, draft_text: String(text || "") } : c
-      ));
-    }, 600);
+      const id = activeIdRef.current;
+      if (!id) return;
+      // WS sync to backend / other devices
+      if (wsRef.current && wsRef.current.readyState === 1) {
+        try {
+          wsRef.current.send(JSON.stringify({
+            type: "draft",
+            conversation_id: Number(id),
+            text: String(textRef.current || ""),
+          }));
+        } catch { /* */ }
+      }
+    }, 450);
     return () => {
       if (draftSyncTimerRef.current) clearTimeout(draftSyncTimerRef.current);
     };
