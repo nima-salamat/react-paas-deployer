@@ -5007,20 +5007,6 @@ export default function MessengerApp() {
                 {selectedIds.size} selected
               </Typography>
 
-              <Button
-                size="small"
-                onClick={() => {
-                  const ids = messages
-                    .filter((m) => m?.id && !m.is_system)
-                    .map((m) => String(m.id));
-                  setSelectionMode(true);
-                  setSelectedIds(new Set(ids));
-                  selectionAnchorRef.current = ids[0] || null;
-                }}
-              >
-                Select all
-              </Button>
-
               {selectedIds.size === 1 && (
                 <Button
                   size="small"
