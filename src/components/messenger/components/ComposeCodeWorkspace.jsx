@@ -14,6 +14,7 @@ import AttachFileIcon from "@mui/icons-material/AttachFile";
 import FormatIndentIncreaseIcon from "@mui/icons-material/FormatIndentIncrease";
 import FormatIndentDecreaseIcon from "@mui/icons-material/FormatIndentDecrease";
 import WrapTextIcon from "@mui/icons-material/WrapText";
+import { loadHljs, highlightCode, HLJS_TOKEN_SX } from "../modules/codeHighlight";
 
 const LANG_PRESETS = [
   "javascript", "typescript", "python", "java", "c", "cpp", "go", "rust",
@@ -179,31 +180,15 @@ export default function ComposeCodeWorkspace({
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const mod = await import("highlight.js");
-        try { await import("highlight.js/styles/github-dark.css"); } catch { /* */ }
-        if (!cancelled) setHljsMod(mod.default || mod);
-      } catch {
-        if (!cancelled) setHljsMod(false);
-      }
-    })();
+    loadHljs().then(() => {
+      if (!cancelled) setHljsMod(true);
+    });
     return () => { cancelled = true; };
   }, []);
 
   const highlighted = useMemo(() => {
-    const raw = code || "";
-    const hljs = hljsMod && hljsMod !== false ? hljsMod : null;
-    try {
-      if (hljs) {
-        if (lang && hljs.getLanguage(lang)) {
-          return hljs.highlight(raw, { language: lang, ignoreIllegals: true }).value;
-        }
-        const auto = hljs.highlightAuto(raw);
-        return auto.value;
-      }
-    } catch { /* */ }
-    return escapeHtml(raw);
+    void hljsMod; // re-run after hljs loads
+    return highlightCode(code, lang).html;
   }, [code, lang, hljsMod]);
 
   const updateActive = useCallback((patch) => {
@@ -722,12 +707,7 @@ export default function ComposeCodeWorkspace({
               tabSize: 2,
               color: "#e6edf3",
               "& code": { fontFamily: "inherit", background: "none", p: 0 },
-              "& .hljs-comment, & .hljs-quote": { color: "#8b949e", fontStyle: "italic" },
-              "& .hljs-keyword, & .hljs-selector-tag": { color: "#ff7b72" },
-              "& .hljs-string, & .hljs-attr": { color: "#a5d6ff" },
-              "& .hljs-number, & .hljs-literal": { color: "#79c0ff" },
-              "& .hljs-title, & .hljs-section": { color: "#d2a8ff" },
-              "& .hljs-built_in, & .hljs-type": { color: "#ffa657" },
+              ...HLJS_TOKEN_SX,
             }}
             dangerouslySetInnerHTML={{ __html: highlighted + ((code || "").endsWith("\n") ? "\n" : "") }}
           />
@@ -873,11 +853,7 @@ export default function ComposeCodeWorkspace({
               lineHeight: 1.55,
               color: "#e6edf3",
               whiteSpace: "pre",
-              "& .hljs-comment": { color: "#8b949e" },
-              "& .hljs-keyword": { color: "#ff7b72" },
-              "& .hljs-string": { color: "#a5d6ff" },
-              "& .hljs-number": { color: "#79c0ff" },
-              "& .hljs-title": { color: "#d2a8ff" },
+              ...HLJS_TOKEN_SX,
             }}
             dangerouslySetInnerHTML={{ __html: highlighted }}
           />

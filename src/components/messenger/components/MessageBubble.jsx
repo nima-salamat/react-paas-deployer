@@ -36,6 +36,7 @@ import {
   emojiOnlyCount, isGifAttachment,
   downloadAttachmentToCache, getCachedAttachment,
 } from "../messengerUtils";
+import { loadHljs, highlightCode, HLJS_TOKEN_SX, langLabel } from "../modules/codeHighlight";
 
 /**
  * Deterministic pseudo-waveform — given an id, produce N peaks in [0..1].
@@ -313,45 +314,20 @@ const LANG_ALIASES = {
 
 function CodeBlock({ code, lang, mine, onEditCode }) {
   const [copied, setCopied] = React.useState(false);
-  const [hljsMod, setHljsMod] = React.useState(null);
+  const [hlReady, setHlReady] = React.useState(Boolean(false));
   React.useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const mod = await import("highlight.js");
-        try { await import("highlight.js/styles/github-dark.css"); } catch { /* style optional */ }
-        if (!cancelled) setHljsMod(mod.default || mod);
-      } catch {
-        if (!cancelled) setHljsMod(false); // not installed — plain text fallback
-      }
-    })();
+    loadHljs().then(() => {
+      if (!cancelled) setHlReady(true);
+    });
     return () => { cancelled = true; };
   }, []);
 
   const detected = React.useMemo(() => {
-    const raw = (code || "").replace(/\n$/, "");
-    let language = (lang || "").toLowerCase().trim();
-    let html = "";
-    const escape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    try {
-      const hljs = hljsMod && hljsMod !== false ? hljsMod : null;
-      if (hljs) {
-        if (language && hljs.getLanguage(language)) {
-          html = hljs.highlight(raw, { language, ignoreIllegals: true }).value;
-        } else {
-          const auto = hljs.highlightAuto(raw);
-          language = auto.language || language || "";
-          html = auto.value;
-        }
-      } else {
-        html = escape(raw);
-      }
-    } catch {
-      html = escape(raw);
-    }
-    const label = LANG_ALIASES[language] || (language ? language.toUpperCase() : "Code");
-    return { html, label, language, raw };
-  }, [code, lang, hljsMod]);
+    // Recompute when hljs finishes loading
+    void hlReady;
+    return highlightCode(code, lang);
+  }, [code, lang, hlReady]);
 
   const onCopy = async (e) => {
     e.stopPropagation();
@@ -378,7 +354,6 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
       sx={{
         display: "block",
         my: 0.6,
-        // slight corner only — not a big pill
         borderRadius: "6px",
         overflow: "hidden",
         border: "1px solid",
@@ -389,71 +364,37 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
         minWidth: 0,
         boxSizing: "border-box",
       }}
-      onClick={(e) => e.stopPropagation()}
     >
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 0.5,
-          px: { xs: 0.75, sm: 1.25 },
+          gap: 1,
+          px: 1,
           py: 0.5,
-          bgcolor: "rgba(255,255,255,0.04)",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
+          bgcolor: "rgba(255,255,255,0.03)",
         }}
       >
-        <Typography
+        <Box
           component="span"
           sx={{
-            fontSize: 11.5,
-            fontWeight: 600,
-            letterSpacing: 0.04,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 0.3,
             color: "rgba(255,255,255,0.55)",
-            textTransform: "none",
-            fontFamily: "ui-sans-serif, system-ui, sans-serif",
+            textTransform: "uppercase",
+            fontFamily: "ui-monospace, Menlo, Consolas, monospace",
           }}
         >
           {detected.label}
-        </Typography>
-        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
-        <Box
-          component="button"
-          type="button"
-          onClick={onCopy}
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 0.5,
-            border: "none",
-            cursor: "pointer",
-            bgcolor: copied ? "rgba(46,160,67,0.2)" : "rgba(255,255,255,0.06)",
-            color: copied ? "#3fb950" : "rgba(255,255,255,0.7)",
-            borderRadius: "4px",
-            px: 1,
-            py: 0.35,
-            fontSize: 11.5,
-            fontWeight: 600,
-            fontFamily: "inherit",
-            transition: "background 0.15s, color 0.15s",
-            "&:hover": {
-              bgcolor: copied ? "rgba(46,160,67,0.28)" : "rgba(255,255,255,0.12)",
-              color: copied ? "#3fb950" : "#fff",
-            },
-          }}
-        >
-          {copied ? <CheckIcon sx={{ fontSize: 14 }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
-          {copied ? "Copied" : "Copy"}
         </Box>
-        {typeof onEditCode === "function" && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Box
             component="button"
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const fence = "```" + (lang || "") + "\n" + (code || "") + "\n```";
-              onEditCode(fence, { code, lang });
-            }}
+            onClick={onCopy}
             sx={{
               display: "inline-flex",
               alignItems: "center",
@@ -468,13 +409,40 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
               fontSize: 11.5,
               fontWeight: 600,
               fontFamily: "inherit",
-              ml: 0.5,
               "&:hover": { bgcolor: "rgba(255,255,255,0.12)", color: "#fff" },
             }}
           >
-            Edit
+            {copied ? "Copied" : "Copy"}
           </Box>
-        )}
+          {typeof onEditCode === "function" && (
+            <Box
+              component="button"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const fence = "```" + (lang || detected.language || "") + "\n" + (code || "") + "\n```";
+                onEditCode(fence, { code, lang: lang || detected.language });
+              }}
+              sx={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 0.4,
+                border: "none",
+                cursor: "pointer",
+                bgcolor: "rgba(255,255,255,0.06)",
+                color: "rgba(255,255,255,0.75)",
+                borderRadius: "4px",
+                px: 1,
+                py: 0.35,
+                fontSize: 11.5,
+                fontWeight: 600,
+                fontFamily: "inherit",
+                "&:hover": { bgcolor: "rgba(255,255,255,0.12)", color: "#fff" },
+              }}
+            >
+              Edit
+            </Box>
+          )}
         </Box>
       </Box>
       <Box
@@ -485,7 +453,6 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
           maxWidth: "100%",
         }}
       >
-        {/* Line numbers */}
         <Box
           aria-hidden
           component="pre"
@@ -535,14 +502,7 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
               display: "block",
               minWidth: "max-content",
             },
-            "& .hljs-comment, & .hljs-quote": { color: "#8b949e", fontStyle: "italic" },
-            "& .hljs-keyword, & .hljs-selector-tag": { color: "#ff7b72" },
-            "& .hljs-string, & .hljs-attr": { color: "#a5d6ff" },
-            "& .hljs-number, & .hljs-literal": { color: "#79c0ff" },
-            "& .hljs-title, & .hljs-section": { color: "#d2a8ff" },
-            "& .hljs-built_in, & .hljs-type": { color: "#ffa657" },
-            "& .hljs-meta": { color: "#79c0ff" },
-            "& .hljs-variable, & .hljs-template-variable": { color: "#ffa198" },
+            ...HLJS_TOKEN_SX,
           }}
         >
           <code dangerouslySetInnerHTML={{ __html: detected.html }} />
@@ -551,7 +511,6 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
     </Box>
   );
 }
-
 
 
 function ChatVideo({ src, filename, contentType, circular = false, attachment, onOpen, conversationId }) {

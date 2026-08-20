@@ -356,16 +356,26 @@ export function parseMentions(body) {
 export function parseFormattedBody(body) {
   if (!body || typeof body !== "string") return [];
 
-  // Extract fenced code blocks first so inner markers stay literal
+  // Extract fenced code blocks first so inner markers stay literal.
+  // Header may be "js", "javascript", or "python:main.py"
   const parts = [];
-  const fenceRe = /```([\w+-]*)\n?([\s\S]*?)```/g;
+  const fenceRe = /```([^\n`]*)\n?([\s\S]*?)```/g;
   let last = 0;
   let m;
   while ((m = fenceRe.exec(body)) !== null) {
     if (m.index > last) parts.push({ kind: "raw", value: body.slice(last, m.index) });
-    const lang = (m[1] || "").trim().toLowerCase();
+    const header = (m[1] || "").trim();
+    let lang = header;
+    let name = "";
+    const colon = header.indexOf(":");
+    if (colon > 0) {
+      lang = header.slice(0, colon).trim().toLowerCase();
+      name = header.slice(colon + 1).trim();
+    } else {
+      lang = header.toLowerCase();
+    }
     const code = m[2].replace(/^\n/, "").replace(/\n$/, "");
-    parts.push({ kind: "codeblock", value: code, lang });
+    parts.push({ kind: "codeblock", value: code, lang, name });
     last = m.index + m[0].length;
   }
   if (last < body.length) parts.push({ kind: "raw", value: body.slice(last) });
