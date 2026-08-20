@@ -351,6 +351,7 @@ function CodeBlock({ code, lang, mine, onEditCode }) {
 
   return (
     <Box
+      data-no-msg-menu="1"
       sx={{
         display: "block",
         my: 0.6,
@@ -1774,38 +1775,62 @@ export default function MessageBubble({
     }
   };
 
+  /**
+   * Interactive targets must keep their own behavior (play emoji / voice / code
+   * select / open media). Context menu is only for the message chrome: bubble
+   * padding, side gutter, text body — same idea as Telegram / WhatsApp.
+   */
+  const isInteractiveMsgTarget = (target) => {
+    if (!target || typeof target.closest !== "function") return false;
+    return Boolean(
+      target.closest("[data-no-msg-menu]")
+      || target.closest("a, button, input, textarea, select, [role='button'], [role='link']")
+      || target.closest("audio, video")
+      || target.closest("pre")
+      || target.closest("code")
+    );
+  };
+
   const onPointerDownMsg = (e) => {
-    // Right click is handled by onContextMenu. Never start the long-press timer
-    // for non-primary buttons or for mouse input.
+    // Desktop mouse uses onContextMenu (right-click). Long-press is for touch/pen.
     if (e.button != null && e.button !== 0) return;
     if (e.pointerType === "mouse") return;
-
-    // In selection mode the parent owns click/drag selection.
     if (selectionMode) return;
+    // Do not steal presses from emoji / voice / code / controls
+    if (isInteractiveMsgTarget(e.target)) return;
 
     longPressMoved.current = false;
     longPressFired.current = false;
     clearLongPress();
+    const cx = e.clientX;
+    const cy = e.clientY;
 
     longPressTimer.current = setTimeout(() => {
       longPressTimer.current = null;
       longPressFired.current = true;
-
       try {
         if (navigator.vibrate) navigator.vibrate(12);
-      } catch { /* vibration is optional */ }
+      } catch { /* optional */ }
 
-      // Mobile long-press → enter Telegram-style message selection mode.
-      onToggleSelect?.(m, true, e);
-    }, 420);
+      // Telegram-style: long-press opens the message action menu (not multi-select).
+      onContextOpen?.(
+        {
+          preventDefault() {},
+          stopPropagation() {},
+          clientX: cx,
+          clientY: cy,
+        },
+        m,
+      );
+    }, 450);
   };
 
   const onPointerMoveMsg = (e) => {
     if (
       longPressTimer.current
       && (
-        Math.abs(e.movementX || 0) > 14
-        || Math.abs(e.movementY || 0) > 14
+        Math.abs(e.movementX || 0) > 12
+        || Math.abs(e.movementY || 0) > 12
       )
     ) {
       longPressMoved.current = true;
@@ -1814,9 +1839,6 @@ export default function MessageBubble({
   };
 
   const onPointerUpMsg = () => {
-    // A short touch/click is handled by onClick. There is intentionally no
-    // fake "context menu on the gutter": Telegram only opens the message menu
-    // for an actual context-menu gesture (right click / long press).
     clearLongPress();
   };
 
@@ -1844,11 +1866,12 @@ export default function MessageBubble({
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-
-        // In selection mode a right click should not silently toggle the
-        // message. Keep the selection and suppress the browser menu.
         if (selectionMode) return;
-
+        // Right-click on interactive media keeps native/control behavior only
+        // when explicitly marked; still open msg menu on bubble chrome.
+        if (isInteractiveMsgTarget(e.target) && e.target?.closest?.("[data-no-msg-menu]")) {
+          return;
+        }
         onContextOpen?.(e, m);
       }}
       onPointerDown={onPointerDownMsg}
@@ -2026,7 +2049,7 @@ export default function MessageBubble({
           const videoMsg = isVideoMessageAttachment(a);
           const isActiveAudio = activeAudioId != null && String(activeAudioId) === String(a.id);
           return (
-            <Box key={a.id} sx={{ mt: 0.6, minWidth: (k === "audio" || voice) ? 240 : undefined }}>
+            <Box key={a.id} data-no-msg-menu="1" sx={{ mt: 0.6, minWidth: (k === "audio" || voice) ? 240 : undefined }}>
               {k === "image" ? (
                 <ProtectedImageAttachment
                   att={a}
@@ -2086,6 +2109,7 @@ export default function MessageBubble({
         {bodyStr && isSingleEmoji ? (
           <Box
             ref={emojiRootRef}
+            data-no-msg-menu="1"
             sx={{
               mt: hasAttachments ? 0.75 : 0,
               textAlign: "center",
