@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import apiRequest, { refreshAccessToken } from "../../customHooks/apiRequest.jsx";
 import { MSG_API, WS_URL } from "../api";
+import { writeComposerDraft } from "../modules/composerDrafts";
 
 /**
  * Messenger WebSocket connection + event dispatch.
@@ -33,6 +34,9 @@ export default function useMessengerWebSocket({
   setCallConfig,
   setActiveCallInfo,
   setNewBelowCount,
+  setText,
+  setConversations,
+  onRemoteEmojiPlay,
 }) {
 useEffect(() => {
   let cancelled = false;
@@ -135,6 +139,20 @@ useEffect(() => {
     if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
       if (String(data.conversation_id) === String(activeIdRef.current)) {
         if (data.type === "message.new") {
+          // Message implies they stopped typing — drop indicator immediately
+          const senderId = data.message?.sender?.id ?? data.sender_id ?? data.user_id;
+          if (senderId != null) {
+            setTypingUsers((prev) => {
+              if (!prev[senderId] && !prev[String(senderId)] && !prev[Number(senderId)]) {
+                return prev;
+              }
+              const next = { ...prev };
+              delete next[senderId];
+              delete next[String(senderId)];
+              delete next[Number(senderId)];
+              return next;
+            });
+          }
           const mid = data.message?.id || data.message_id || data.id;
           if (mid && !nearBottomRef.current) {
             const sid = String(mid);
@@ -143,13 +161,32 @@ useEffect(() => {
               setNewBelowCount(pendingNewIdsRef.current.length);
             }
           } else if (nearBottomRef.current) {
+            // Scroll may race loadMessages paint — several passes so the new
+            // bubble (and typing row) end up in view without a second gesture.
+            const pin = () => {
+              try {
+                const root = bottomRef.current?.parentElement;
+                if (root && typeof root.scrollHeight === "number") {
+                  try {
+                    root.scrollTo({ top: root.scrollHeight, behavior: "smooth" });
+                  } catch {
+                    root.scrollTop = root.scrollHeight;
+                  }
+                }
+              } catch { /* */ }
+              try {
+                bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+              } catch {
+                try { bottomRef.current?.scrollIntoView?.(); } catch { /* */ }
+              }
+            };
+            pin();
+            setTimeout(pin, 50);
+            setTimeout(pin, 150);
+            setTimeout(pin, 320);
             setTimeout(() => {
-              bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-              // New inbound message while watching → mark seen shortly after it lands
-              setTimeout(() => {
-                try { markVisibleMessagesRead(); } catch { /* */ }
-              }, 350);
-            }, 40);
+              try { markVisibleMessagesRead(); } catch { /* */ }
+            }, 400);
           }
         }
         if (data.type === "message.read") {
@@ -192,13 +229,39 @@ useEffect(() => {
         if (data.is_typing) {
           next[uid] = {
             username: data.username || "Someone",
-            until: Date.now() + 4000,
+            // Slightly above sender debounce (2.2s) so a single laggy packet doesn't flicker
+            until: Date.now() + 2800,
           };
         } else {
           delete next[uid];
         }
         return next;
       });
+    }
+    if (data.type === "draft" && data.user_id != null && String(data.user_id) === String(meId)) {
+      const cid = data.conversation_id;
+      const draft = typeof data.text === "string" ? data.text : "";
+      try { writeComposerDraft(cid, draft); } catch { /* */ }
+      if (setConversations) {
+        setConversations((prev) => prev.map((c) =>
+          String(c.id) === String(cid) ? { ...c, draft_text: draft } : c
+        ));
+      }
+      // Apply to open composer only if this chat is active and user isn't mid-edit
+      if (String(cid) === String(activeIdRef.current) && setText) {
+        setText((cur) => {
+          // Don't stomp if user is actively typing something different and longer
+          if (String(cur || "") === draft) return cur;
+          // Prefer remote if local empty, or remote is newer-looking
+          if (!String(cur || "").trim()) return draft;
+          return cur;
+        });
+      }
+    }
+    if (data.type === "emoji_play" && String(data.conversation_id) === String(activeIdRef.current)) {
+      if (onRemoteEmojiPlay && data.message_id) {
+        onRemoteEmojiPlay(data.message_id, data.user_id);
+      }
     }
     if (data.type === "presence.update" && data.user_id != null) {
       setOnlineUsers((prev) => {

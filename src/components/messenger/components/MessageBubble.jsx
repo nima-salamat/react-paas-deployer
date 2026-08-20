@@ -1,4 +1,5 @@
 import apiRequest from "../../customHooks/apiRequest";
+import { parseCallSystemBody, formatCallSystemLabel, callSystemIcon, isCallSystemBody } from "../modules/callSystemMessage";
 import { MSG_API } from "../api";
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import Lottie from "lottie-react";
@@ -26,6 +27,9 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import PauseIcon from "@mui/icons-material/Pause";
 import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import CallIcon from "@mui/icons-material/Call";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import PhoneMissedIcon from "@mui/icons-material/PhoneMissed";
 import {
   attachmentKind, formatTime, formatDuration, withTokenQuery, REACTIONS,
   parseFormattedBody, isVoiceAttachment, isVideoMessageAttachment,
@@ -1304,6 +1308,14 @@ function notoLottieUrl(key) {
   return `https://fonts.gstatic.com/s/e/notoemoji/latest/${key}/lottie.json`;
 }
 
+/** Static Noto Color Emoji (same family as the Lottie) — correct “pose” / meaning. */
+function notoStaticSvgUrl(key) {
+  return `https://fonts.gstatic.com/s/e/notoemoji/latest/${key}/emoji.svg`;
+}
+function notoStaticPngUrl(key, size = 128) {
+  return `https://fonts.gstatic.com/s/e/notoemoji/latest/${key}/${size}.png`;
+}
+
 async function loadEmojiLottie(emoji) {
   const keys = emojiToNotoKeys(emoji);
   for (const key of keys) {
@@ -1328,60 +1340,211 @@ async function loadEmojiLottie(emoji) {
   return null;
 }
 
-/**
- * Plays Noto Animated Emoji Lottie centered exactly on the single-emoji glyph.
- * If no Lottie asset exists: do nothing (no duplicate static emoji).
- */
-function EmojiLottieBurst({ emoji, playId, size = 96, onDone }) {
-  const [data, setData] = useState(null);
-  const onDoneRef = useRef(onDone);
-  onDoneRef.current = onDone;
+/** Resolve first Noto key that has a static asset (for <img> src). */
+function resolveNotoStaticUrls(emoji) {
+  const keys = emojiToNotoKeys(emoji);
+  return keys.map((key) => ({
+    key,
+    svg: notoStaticSvgUrl(key),
+    png: notoStaticPngUrl(key, 128),
+  }));
+}
 
+/** Session: which single-emoji message ids already auto-played (unseen → seen). */
+const _emojiSeenPlayed = new Set();
+try {
+  const raw = sessionStorage.getItem("messenger.emojiSeenPlayed");
+  if (raw) JSON.parse(raw).forEach((id) => _emojiSeenPlayed.add(String(id)));
+} catch { /* */ }
+function markEmojiSeenPlayed(id) {
+  if (id == null) return;
+  const k = String(id);
+  if (_emojiSeenPlayed.has(k)) return;
+  _emojiSeenPlayed.add(k);
+  try {
+    sessionStorage.setItem(
+      "messenger.emojiSeenPlayed",
+      JSON.stringify(Array.from(_emojiSeenPlayed).slice(-400))
+    );
+  } catch { /* */ }
+}
+
+/**
+ * Single-emoji message display:
+ *  - Idle: static Noto Color Emoji SVG (correct expression / meaning)
+ *  - Playing: same-family Noto Animated Lottie on top (then back to static)
+ * First frame of Lottie is often a neutral/mid pose — never use it as the idle glyph.
+ */
+function SingleEmojiLottie({ emoji, size = 72, playing = false, onPlayDone, onClick }) {
+  const [lottieData, setLottieData] = useState(null);
+  const [staticSrc, setStaticSrc] = useState(null);
+  const [staticFailed, setStaticFailed] = useState(false);
+  const lottieRef = useRef(null);
+  const onPlayDoneRef = useRef(onPlayDone);
+  onPlayDoneRef.current = onPlayDone;
+  const wasPlayingRef = useRef(false);
+
+  // Resolve static Noto asset (SVG preferred, PNG fallback chain)
   useEffect(() => {
-    if (!emoji || !playId) return undefined;
+    if (!emoji) return undefined;
+    setStaticFailed(false);
+    const candidates = resolveNotoStaticUrls(emoji);
+    if (!candidates.length) {
+      setStaticFailed(true);
+      return undefined;
+    }
+    // Prefer SVG; browsers load via <img>. On error we try next key / png.
+    setStaticSrc(candidates[0].svg);
+    return undefined;
+  }, [emoji]);
+
+  // Prefetch Lottie so click/auto-play is instant
+  useEffect(() => {
+    if (!emoji) return undefined;
     let cancelled = false;
-    setData(null);
     loadEmojiLottie(emoji).then((json) => {
-      if (cancelled) return;
-      if (json) setData(json);
-      else onDoneRef.current?.(); // should be rare (parent pre-checks cache)
+      if (!cancelled && json) setLottieData(json);
     });
     return () => { cancelled = true; };
-  }, [emoji, playId]);
+  }, [emoji]);
 
-  if (!playId || !emoji || !data) return null;
+  // Drive play / stop
+  useEffect(() => {
+    if (!playing) {
+      wasPlayingRef.current = false;
+      return;
+    }
+    wasPlayingRef.current = true;
+    const api = lottieRef.current;
+    if (api && lottieData) {
+      try {
+        api.goToAndPlay?.(0, true);
+      } catch {
+        try { api.play?.(); } catch { /* */ }
+      }
+    } else if (!lottieData) {
+      // No animation asset — still notify done so UI doesn't stick in "playing"
+      loadEmojiLottie(emoji).then((json) => {
+        if (json) setLottieData(json);
+        else {
+          wasPlayingRef.current = false;
+          onPlayDoneRef.current?.();
+        }
+      });
+    }
+  }, [playing, lottieData, emoji]);
 
-  const box = Math.max(48, Number(size) || 96);
+  const box = Math.max(40, Number(size) || 72);
+
+  const onStaticError = () => {
+    const candidates = resolveNotoStaticUrls(emoji);
+    const cur = staticSrc;
+    // Try PNG for same key, then next keys
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      if (cur === c.svg) {
+        setStaticSrc(c.png);
+        return;
+      }
+      if (cur === c.png && i + 1 < candidates.length) {
+        setStaticSrc(candidates[i + 1].svg);
+        return;
+      }
+    }
+    setStaticFailed(true);
+  };
+
+  const showAnim = Boolean(playing && lottieData);
 
   return (
     <Box
-      aria-hidden
+      component="span"
+      onClick={onClick}
       sx={{
-        pointerEvents: "none",
-        position: "absolute",
-        // Center on the parent emoji glyph box
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-        zIndex: 2,
-        display: "flex",
+        position: "relative",
+        display: "inline-flex",
+        width: box,
+        height: box,
+        lineHeight: 0,
+        cursor: onClick ? "pointer" : "default",
+        userSelect: "none",
+        verticalAlign: "middle",
         alignItems: "center",
         justifyContent: "center",
+        "&:active": onClick ? { transform: "scale(0.96)" } : undefined,
+        transition: "transform 0.12s ease",
       }}
     >
-      <Box sx={{ width: box, height: box, lineHeight: 0 }}>
-        <Lottie
-          animationData={data}
-          loop={false}
-          autoplay
-          style={{ width: "100%", height: "100%" }}
-          onComplete={() => onDoneRef.current?.()}
+      {/* Idle glyph: static Noto (meaningful pose) */}
+      {!staticFailed && staticSrc ? (
+        <Box
+          component="img"
+          src={staticSrc}
+          alt={emoji}
+          draggable={false}
+          onError={onStaticError}
+          sx={{
+            width: box,
+            height: box,
+            objectFit: "contain",
+            // Hide under Lottie while playing so frames don't double
+            opacity: showAnim ? 0 : 1,
+            transition: "opacity 0.08s ease",
+            pointerEvents: "none",
+            position: "absolute",
+            inset: 0,
+          }}
         />
-      </Box>
+      ) : (
+        <Box
+          component="span"
+          sx={{
+            fontSize: box * 0.88,
+            lineHeight: 1,
+            opacity: showAnim ? 0 : 1,
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          {emoji}
+        </Box>
+      )}
+
+      {/* Animation overlay — same Noto family, only while playing */}
+      {showAnim && (
+        <Box
+          aria-hidden
+          sx={{
+            position: "absolute",
+            inset: 0,
+            width: box,
+            height: box,
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        >
+          <Lottie
+            lottieRef={lottieRef}
+            animationData={lottieData}
+            loop={false}
+            autoplay
+            style={{ width: "100%", height: "100%" }}
+            onComplete={() => {
+              if (!wasPlayingRef.current) return;
+              wasPlayingRef.current = false;
+              onPlayDoneRef.current?.();
+            }}
+          />
+        </Box>
+      )}
     </Box>
   );
 }
+
 
 export default function MessageBubble({
   m, meId, activeConv,
@@ -1398,15 +1561,73 @@ export default function MessageBubble({
   isUnread = false,
   onToggleSelect,
   isPinnedMessage = false,
+  isFirstInSenderGroup = true,
+  isLastInSenderGroup = true,
+  remoteEmojiPlay = 0,
+  onEmojiPlay,
 }) {
   const theme = useTheme();
   // Hooks must run unconditionally (before any early return) — Rules of Hooks.
-  // Single-emoji message: click plays Noto Animated Emoji via lottie-react
-  const [emojiBurstKey, setEmojiBurstKey] = useState(0);
-  const [emojiBurstChar, setEmojiBurstChar] = useState("");
+  const [emojiPlaying, setEmojiPlaying] = useState(false);
+  const emojiRootRef = useRef(null);
+  const emojiAutoPlayedRef = useRef(
+    m?.id != null ? _emojiSeenPlayed.has(String(m.id)) : false
+  );
   const longPressTimer = useRef(null);
   const longPressMoved = useRef(false);
   const longPressFired = useRef(false);
+
+  // Auto-play only for *unseen* messages when they enter the viewport (while marking seen).
+  // Never on every chat open for already-seen messages.
+  useEffect(() => {
+    if (m?.type === "day" || m?.is_system) return undefined;
+    if (!isUnread) return undefined;
+    if (emojiAutoPlayedRef.current) return undefined;
+    if (String(m?.sender?.id) === String(meId)) return undefined; // only when I receive/see
+    const body = typeof m?.body === "string" ? m.body : String(m?.body || "");
+    if (emojiOnlyCount(body) !== 1) return undefined;
+
+    const el = emojiRootRef.current;
+    // Prefer the message row as root for IO — fall back after paint
+    const target = el?.closest?.("[data-msg-id]") || el;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      // Fallback: if already marked unread and mounted, play once shortly
+      const t = setTimeout(() => {
+        if (emojiAutoPlayedRef.current || !isUnread) return;
+        emojiAutoPlayedRef.current = true;
+        markEmojiSeenPlayed(m?.id);
+        setEmojiPlaying(true);
+      }, 280);
+      return () => clearTimeout(t);
+    }
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((e) => e.isIntersecting && e.intersectionRatio >= 0.35);
+        if (!hit) return;
+        if (emojiAutoPlayedRef.current) return;
+        emojiAutoPlayedRef.current = true;
+        markEmojiSeenPlayed(m?.id);
+        setEmojiPlaying(true);
+        try { io.disconnect(); } catch { /* */ }
+      },
+      { threshold: [0.35, 0.6, 1], root: null }
+    );
+    io.observe(target);
+    return () => {
+      try { io.disconnect(); } catch { /* */ }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m?.id, isUnread, meId]);
+
+  // Remote peer clicked the emoji → play here too
+  useEffect(() => {
+    if (!remoteEmojiPlay || m?.type === "day") return;
+    const body = typeof m?.body === "string" ? m.body : String(m?.body || "");
+    if (emojiOnlyCount(body) !== 1) return;
+    setEmojiPlaying(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remoteEmojiPlay]);
 
   if (m.type === "day") {
     const dayActive = Boolean(m._dayHighlight);
@@ -1470,65 +1691,68 @@ export default function MessageBubble({
   const mine = String(m.sender?.id) === String(meId);
   const bodyStr = typeof m.body === "string" ? m.body : String(m.body || "");
 
-  if (m.is_system) {
-    let callInfo = null;
-    if (bodyStr.startsWith("__call__:")) {
-      try {
-        callInfo = JSON.parse(bodyStr.slice(9));
-      } catch { /* ignore */ }
+  // Call / system messages — never show raw __call__:{…} JSON; never throw (Opera-safe)
+  let looksLikeCall = false;
+  let callInfo = null;
+  try {
+    looksLikeCall = Boolean(m._call_label) || isCallSystemBody(bodyStr) || isCallSystemBody(m.body);
+    if (looksLikeCall) {
+      callInfo = parseCallSystemBody(bodyStr) || parseCallSystemBody(m.body);
     }
-    if (callInfo && callInfo.v) {
-      const isVideo = !!callInfo.is_video;
-      const dur = Number(callInfo.duration || 0);
-      const fmt = (s) => {
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        return `${m}:${String(sec).padStart(2, "0")}`;
-      };
-      let label = "";
-      const who = callInfo.initiator_username || "Someone";
-      if (callInfo.event === "started") {
-        label = isVideo ? `${who} started a video call` : `${who} started a voice call`;
-      } else {
-        const st = callInfo.status || "ended";
-        if (st === "missed" || st === "no_answer") {
-          label = isVideo ? `Missed video call` : `Missed voice call`;
-        } else if (st === "declined") {
-          label = isVideo ? `Declined video call` : `Declined voice call`;
-        } else if (dur > 0) {
-          label = isVideo
-            ? `Video call · ${fmt(dur)}`
-            : `Voice call · ${fmt(dur)}`;
-        } else {
-          label = isVideo ? `Video call ended` : `Voice call ended`;
-        }
-      }
+  } catch {
+    looksLikeCall = typeof bodyStr === "string" && bodyStr.indexOf("__call__:") >= 0;
+  }
+  if (looksLikeCall || m.is_system) {
+    let label = "System";
+    try {
+      label =
+        m._call_label
+        || formatCallSystemLabel(callInfo || bodyStr)
+        || (looksLikeCall ? "Call" : null)
+        || (typeof bodyStr === "string" && bodyStr.indexOf("__call__:") < 0 ? bodyStr : "System")
+        || "System";
+    } catch {
+      label = looksLikeCall ? "Call" : "System";
+    }
+    const kind = (m._call_icon || callSystemIcon(callInfo || bodyStr) || "phone");
+    const st = String((callInfo && callInfo.status) || "");
+    const isMissed = st === "missed" || st === "no_answer";
+    const IconCmp = kind === "cam"
+      ? VideocamIcon
+      : (isMissed ? PhoneMissedIcon : CallIcon);
+    if (looksLikeCall || callInfo) {
       return (
-        <Box sx={{ textAlign: "center", my: 1.25 }}>
+        <Box sx={{ textAlign: "center", my: 1.25, width: "100%" }}>
           <Chip
             label={label}
             size="small"
-            icon={
-              <Box component="span" sx={{ display: "inline-flex", pl: 0.5, fontSize: 14 }}>
-                {isVideo ? "📹" : "📞"}
-              </Box>
-            }
+            icon={<IconCmp sx={{ fontSize: "16px !important" }} />}
             sx={{
-              bgcolor: alpha(theme.palette.background.paper, 0.95),
+              bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)"),
               fontSize: 12,
               fontWeight: 500,
               border: "1px solid",
               borderColor: "divider",
-              "& .MuiChip-icon": { ml: 0.5 },
+              maxWidth: "92%",
+              color: isMissed ? "error.main" : "text.secondary",
+              "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" },
+              "& .MuiChip-icon": { ml: 0.75, color: isMissed ? "error.main" : "text.secondary" },
             }}
           />
         </Box>
       );
     }
     return (
-      <Box sx={{ textAlign: "center", my: 1 }}>
-        <Chip label={bodyStr} size="small"
-          sx={{ bgcolor: alpha(theme.palette.background.paper, 0.9), fontSize: 12 }} />
+      <Box sx={{ textAlign: "center", my: 1, width: "100%" }}>
+        <Chip
+          label={label}
+          size="small"
+          sx={{
+            bgcolor: (t) => (t.palette.mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)"),
+            fontSize: 12,
+            maxWidth: "92%",
+          }}
+        />
       </Box>
     );
   }
@@ -1576,18 +1800,13 @@ export default function MessageBubble({
       singleEmojiChar = String(bodyStr || "").trim();
     }
   }
-  const playEmojiBurst = (em) => {
+  const playEmojiBurst = (em, { notify = false } = {}) => {
     if (!em) return;
-    // Ignore clicks while an animation is already on screen
-    if (emojiBurstKey > 0) return;
-    // Only flip UI after we confirm a Lottie asset exists — otherwise the
-    // static emoji would flash transparent and come back (no-animation case).
-    loadEmojiLottie(em).then((json) => {
-      if (!json) return;
-      setEmojiBurstChar(em);
-      setEmojiBurstKey((k) => k + 1);
-    });
+    if (emojiPlaying) return;
+    setEmojiPlaying(true);
+    if (notify) onEmojiPlay?.(m);
   };
+
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -1651,12 +1870,12 @@ export default function MessageBubble({
       sx={{
         display: "flex",
         justifyContent: mine ? "flex-end" : "flex-start",
-        mb: 0.6,
+        mb: isLastInSenderGroup ? 0.7 : 0.15,
         px: 0.5,
-        py: 0.15,
+        py: 0.1,
         // Full row is the hit-target (side gutter counts as the message zone)
         width: "100%",
-        alignItems: "center",
+        alignItems: "flex-end",
         bgcolor: selected ? (t) => t.palette.mode === "dark" ? "rgba(25,118,210,0.18)" : "rgba(25,118,210,0.1)" : "transparent",
         borderRadius: 2,
         transition: "background-color 0.15s",
@@ -1703,30 +1922,34 @@ export default function MessageBubble({
         </Box>
       )}
       {!mine && (
-        <Box sx={{ position: "relative", mr: 0.75, mt: 0.5, flexShrink: 0 }}>
-          <Avatar
-            src={withTokenQuery(m.sender?.avatar) || undefined}
-            sx={{ width: 28, height: 28, cursor: "pointer" }}
-            onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
-          >
-            {m.sender?.username?.[0]?.toUpperCase()}
-          </Avatar>
-          {m.sender?.is_online && (
-            <Box
-              sx={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                bgcolor: "#4caf50",
-                border: "1.5px solid",
-                borderColor: "background.default",
-              }}
-            />
-          )}
-        </Box>
+        isLastInSenderGroup ? (
+          <Box sx={{ position: "relative", mr: 0.75, mt: 0.15, flexShrink: 0, alignSelf: "flex-end", mb: 0.15 }}>
+            <Avatar
+              src={withTokenQuery(m.sender?.avatar) || undefined}
+              sx={{ width: 28, height: 28, cursor: "pointer" }}
+              onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
+            >
+              {m.sender?.username?.[0]?.toUpperCase()}
+            </Avatar>
+            {m.sender?.is_online && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  bottom: 0,
+                  right: 0,
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  bgcolor: "#4caf50",
+                  border: "1.5px solid",
+                  borderColor: "background.default",
+                }}
+              />
+            )}
+          </Box>
+        ) : (
+          <Box sx={{ width: 28, mr: 0.75, flexShrink: 0 }} />
+        )
       )}
       <Box
         data-msg-bubble="1"
@@ -1740,7 +1963,11 @@ export default function MessageBubble({
           overflow: isBigEmoji ? "visible" : "hidden",
           px: isBigEmoji || isCircularVideoMsg ? 0.5 : 1.35,
           py: isBigEmoji || isCircularVideoMsg ? 0.35 : 0.85,
-          borderRadius: isBigEmoji || isCircularVideoMsg ? 2 : (mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px"),
+          borderRadius: isBigEmoji || isCircularVideoMsg
+            ? 2
+            : (mine
+              ? (isLastInSenderGroup ? "14px 14px 4px 14px" : "14px 14px 14px 14px")
+              : (isLastInSenderGroup ? "14px 14px 14px 4px" : "14px 14px 14px 14px")),
           bgcolor: isBigEmoji || isCircularVideoMsg
             ? "transparent"
             : (mine
@@ -1897,14 +2124,32 @@ export default function MessageBubble({
             </Box>
           );
         })}
-        {bodyStr && (
+        {bodyStr && isSingleEmoji ? (
+          <Box
+            ref={emojiRootRef}
+            sx={{
+              mt: hasAttachments ? 0.75 : 0,
+              textAlign: "center",
+              display: "flex",
+              justifyContent: "center",
+              py: 0.25,
+            }}
+          >
+            <SingleEmojiLottie
+              emoji={singleEmojiChar || bodyStr.trim()}
+              size={Math.round((emojiFontSize || 72) * 1.15)}
+              playing={emojiPlaying}
+              onPlayDone={() => setEmojiPlaying(false)}
+              onClick={(e) => {
+                e?.stopPropagation?.();
+                playEmojiBurst(singleEmojiChar || bodyStr.trim(), { notify: true });
+              }}
+            />
+          </Box>
+        ) : bodyStr ? (
           <Typography
             component="div"
             dir="auto"
-            onClick={isSingleEmoji ? (e) => {
-              e.stopPropagation();
-              playEmojiBurst(singleEmojiChar || bodyStr.trim());
-            } : undefined}
             sx={{
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
@@ -1913,16 +2158,10 @@ export default function MessageBubble({
               mt: hasAttachments ? 0.75 : 0,
               textAlign: isBigEmoji ? "center" : "inherit",
               letterSpacing: isBigEmoji ? "0.04em" : undefined,
-              userSelect: isSingleEmoji ? "none" : "text",
-              WebkitUserSelect: isSingleEmoji ? "none" : "text",
+              userSelect: "text",
+              WebkitUserSelect: "text",
               unicodeBidi: "plaintext",
-              cursor: isSingleEmoji ? "pointer" : "inherit",
               position: "relative",
-              display: isSingleEmoji ? "inline-block" : undefined,
-              // While Lottie plays, hide the static glyph so it does not look duplicated
-              color: (isSingleEmoji && emojiBurstKey > 0) ? "transparent" : "inherit",
-              transition: isSingleEmoji ? "transform 0.12s ease" : undefined,
-              "&:active": isSingleEmoji ? { transform: "scale(0.96)" } : undefined,
             }}
           >
             {bodySegments.map((seg, i) => {
@@ -1991,20 +2230,8 @@ export default function MessageBubble({
               }
               return <React.Fragment key={i}>{seg.value}</React.Fragment>;
             })}
-            {isSingleEmoji && emojiBurstKey > 0 && emojiBurstChar ? (
-              <EmojiLottieBurst
-                key={emojiBurstKey}
-                emoji={emojiBurstChar}
-                playId={emojiBurstKey}
-                size={Math.round((emojiFontSize || 72) * 1.35)}
-                onDone={() => {
-                  setEmojiBurstKey(0);
-                  setEmojiBurstChar("");
-                }}
-              />
-            ) : null}
           </Typography>
-        )}
+        ) : null}
         {(m.reactions || []).length > 0 && (
           <Stack direction="row" spacing={0.35} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
             {(m.reactions || []).map((r) => {

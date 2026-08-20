@@ -322,7 +322,13 @@ export default function RightPanel({
         {header}
         <List dense sx={{ overflow: "auto", flex: 1 }}>
           {contacts.map((c) => (
-            <ListItemButton key={c.id} onClick={() => c.contact && onStartDm(c.contact)}>
+            <ListItemButton
+              key={c.id}
+              onClick={() => {
+                if (c.contact?.id && onViewProfile) onViewProfile(c.contact.id);
+                else if (c.contact) onStartDm?.(c.contact);
+              }}
+            >
               <ListItemAvatar>
                 <Box sx={{ position: "relative" }}>
                   <Avatar src={withTokenQuery(c.contact?.avatar) || undefined}>{c.contact?.username?.[0]}</Avatar>

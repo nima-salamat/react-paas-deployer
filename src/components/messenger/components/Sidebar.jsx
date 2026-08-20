@@ -14,6 +14,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import GroupsIcon from "@mui/icons-material/Groups";
+import { formatCallSystemLabel, parseCallSystemBody } from "../modules/callSystemMessage";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import MarkChatReadIcon from "@mui/icons-material/MarkChatRead";
@@ -60,27 +61,10 @@ import AudioPlayerBar from "./AudioPlayerBar";
 
 function formatLastMessagePreview(lm) {
   if (!lm) return "No messages yet";
-  const body = typeof lm.body === "string" ? lm.body : "";
-  if (body.startsWith("__call__:")) {
-    try {
-      const d = JSON.parse(body.slice(9));
-      const kind = d.is_video ? "Video call" : "Voice call";
-      const st = d.status || "";
-      const dur = Number(d.duration || 0);
-      if (d.event === "started") return `${kind} started`;
-      if (st === "missed" || st === "no_answer") return `Missed ${kind.toLowerCase()}`;
-      if (st === "declined") return `Declined ${kind.toLowerCase()}`;
-      if (st === "busy") return `Line busy`;
-      if (dur > 0) {
-        const m = Math.floor(dur / 60);
-        const s = dur % 60;
-        return `${kind} · ${m}:${String(s).padStart(2, "0")}`;
-      }
-      return `${kind} ended`;
-    } catch {
-      return "Call";
-    }
-  }
+  const body = typeof lm.body === "string" ? lm.body : (lm.body != null ? String(lm.body) : "");
+  const callLabel = formatCallSystemLabel(body);
+  if (callLabel) return callLabel;
+  if (body.includes("__call__:")) return "Call";
   if (body) return body;
   if (lm.has_attachments) return "📎 Attachment";
   return "No messages yet";

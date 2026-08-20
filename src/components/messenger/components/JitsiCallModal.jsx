@@ -19,6 +19,7 @@
  * flashes a clear toast instead of silently doing nothing.
  */
 
+import { formatCallSystemLabel as formatCallSystemLabelShared, parseCallSystemBody, callSystemIcon } from "../modules/callSystemMessage";
 import React, {
   useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo,
 } from "react";
@@ -746,39 +747,16 @@ function CallChatSpoiler({ children }) {
 }
 
 function formatCallSystemLabel(bodyStr) {
-  if (!bodyStr || typeof bodyStr !== "string") return null;
-  if (!bodyStr.startsWith("__call__:")) return null;
-  try {
-    const callInfo = JSON.parse(bodyStr.slice(9));
-    if (!callInfo || !callInfo.v) return bodyStr;
-    const isVideo = !!callInfo.is_video;
-    const dur = Number(callInfo.duration || 0);
-    const fmt = (s) => {
-      const m = Math.floor(s / 60);
-      const sec = s % 60;
-      return `${m}:${String(sec).padStart(2, "0")}`;
-    };
-    const who = callInfo.initiator_username || "Someone";
-    if (callInfo.event === "started") {
-      return isVideo ? `📹 ${who} started a video call` : `📞 ${who} started a voice call`;
-    }
-    const st = callInfo.status || "ended";
-    if (st === "missed" || st === "no_answer") {
-      return isVideo ? "📹 Missed video call" : "📞 Missed voice call";
-    }
-    if (st === "declined") {
-      return isVideo ? "📹 Declined video call" : "📞 Declined voice call";
-    }
-    if (st === "ringing") {
-      return isVideo ? `📹 ${who} is calling…` : `📞 ${who} is calling…`;
-    }
-    if (dur > 0) {
-      return isVideo ? `📹 Video call · ${fmt(dur)}` : `📞 Voice call · ${fmt(dur)}`;
-    }
-    return isVideo ? "📹 Video call ended" : "📞 Voice call ended";
-  } catch {
-    return bodyStr;
+  const info = parseCallSystemBody(bodyStr);
+  if (!info) {
+    // Never leak raw __call__ JSON into the in-call chat
+    try {
+      const s = String(bodyStr || "");
+      if (s.indexOf("__call__:") >= 0) return formatCallSystemLabelShared(bodyStr) || "Call";
+    } catch { /* */ }
+    return null;
   }
+  return formatCallSystemLabelShared(info) || "Call";
 }
 
 function renderCallChatSegments(bodyStr) {
@@ -2751,19 +2729,6 @@ export default function JitsiCallModal({
           </IconButton>
           <IconButton
             size="small"
-            onClick={goFull}
-            sx={{
-              color: "#fff",
-              bgcolor: "rgba(255,255,255,0.12)",
-              width: 36, height: 36,
-              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
-            }}
-            aria-label="Expand call"
-          >
-            <OpenInFullIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
             onClick={hangup}
             sx={{
               color: "#fff",
@@ -2775,6 +2740,19 @@ export default function JitsiCallModal({
             aria-label="Hang up"
           >
             <CallEndIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={goFull}
+            sx={{
+              color: "#fff",
+              bgcolor: "rgba(255,255,255,0.12)",
+              width: 36, height: 36,
+              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+            }}
+            aria-label="Expand call"
+          >
+            <OpenInFullIcon fontSize="small" />
           </IconButton>
         </Stack>
       ) : (

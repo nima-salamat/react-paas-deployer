@@ -1,4 +1,4 @@
-/** Composer text drafts (per conversation, localStorage) */
+/** Composer text drafts — local cache + backend/WS sync */
 
 const DRAFTS_LS_KEY = "messenger.composerDrafts";
 
@@ -34,4 +34,10 @@ export function readComposerDraft(convId) {
   } catch {
     return "";
   }
+}
+
+/** Prefer server draft when present, then fall back to localStorage. */
+export function resolveComposerDraft(convId, serverDraft) {
+  if (typeof serverDraft === "string" && serverDraft.length) return serverDraft;
+  return readComposerDraft(convId);
 }

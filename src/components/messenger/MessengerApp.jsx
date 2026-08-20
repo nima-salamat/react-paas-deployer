@@ -79,7 +79,7 @@ import MessageSearchDialog from "./components/MessageSearchDialog";
 import PreviewTextBody from "./components/PreviewTextBody";
 import { attachMessengerOriginal, messengerOriginalOf, guessLangFromName } from "./modules/fileHelpers";
 import { mergeConversations } from "./modules/mergeConversations";
-import { writeComposerDraft, readComposerDraft } from "./modules/composerDrafts";
+import { writeComposerDraft, readComposerDraft, resolveComposerDraft } from "./modules/composerDrafts";
 import { isGroupDescDismissed, persistGroupDescDismiss } from "./modules/groupDescDismiss";
 import useKeyboardLayout from "./hooks/useKeyboardLayout";
 import useMessengerWebSocket from "./hooks/useMessengerWebSocket";
@@ -97,82 +97,17 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
 
 
-/* ── session message cache (survives route remounts within the tab) ── */
-const MSG_SESSION_CACHE_KEY = "messenger.msgCache.v2";
-const MSG_SESSION_MAX_CONVS = 15;
-const MSG_SESSION_MAX_MSGS = 60;
-
-function slimMessageForCache(m) {
-  if (!m || typeof m !== "object") return m;
-  // Keep fields needed to render; drop heavy nested blobs if any
-  return {
-    id: m.id,
-    body: m.body,
-    created_at: m.created_at,
-    updated_at: m.updated_at,
-    sender: m.sender,
-    attachments: m.attachments,
-    reactions: m.reactions,
-    reply_to: m.reply_to,
-    is_edited: m.is_edited,
-    is_deleted: m.is_deleted,
-    seen_by: m.seen_by,
-    delivered_to: m.delivered_to,
-    type: m.type,
-    metadata: m.metadata,
-    pinned: m.pinned,
-  };
-}
-
-function readMessengerMsgCache() {
-  try {
-    const raw = sessionStorage.getItem(MSG_SESSION_CACHE_KEY);
-    if (!raw) return new Map();
-    const obj = JSON.parse(raw);
-    if (!obj || typeof obj !== "object") return new Map();
-    return new Map(Object.entries(obj));
-  } catch {
-    return new Map();
-  }
-}
-
-function writeMessengerMsgCache(map) {
-  try {
-    // Keep only the most recently touched conversations
-    const entries = [...map.entries()];
-    // Prefer entries that have savedAt / more recent activity by keeping tail
-    const trimmed = entries.slice(-MSG_SESSION_MAX_CONVS);
-    const out = {};
-    for (const [k, v] of trimmed) {
-      if (!v || typeof v !== "object") continue;
-      const msgs = Array.isArray(v.messages) ? v.messages.slice(-MSG_SESSION_MAX_MSGS).map(slimMessageForCache) : [];
-      out[k] = {
-        messages: msgs,
-        hasMore: Boolean(v.hasMore),
-        nextBefore: v.nextBefore ?? null,
-        detail: v.detail || null,
-        scrollTop: v.scrollTop,
-        distanceBottom: v.distanceBottom,
-        nearBottom: v.nearBottom,
-        savedAt: v.savedAt || Date.now(),
-      };
-    }
-    sessionStorage.setItem(MSG_SESSION_CACHE_KEY, JSON.stringify(out));
-  } catch {
-    /* quota / private mode */
-  }
-}
-
-function touchMessengerMsgCache(map, key, patch) {
-  const prev = map.get(key) || {};
-  const next = { ...prev, ...patch, savedAt: Date.now() };
-  map.set(key, next);
-  // Move key to end (LRU-ish)
-  map.delete(key);
-  map.set(key, next);
-  writeMessengerMsgCache(map);
-  return next;
-}
+import {
+  slimMessageForCache,
+  readMessengerMsgCache,
+  writeMessengerMsgCache,
+  touchMessengerMsgCache,
+  MSG_SESSION_MAX_MSGS,
+} from "./modules/msgCache";
+import { parseCallSystemBody, formatCallSystemLabel, normalizeMessage, normalizeMessages } from "./modules/callSystemMessage";
+import { getSenderGroupFlags } from "./modules/messageGrouping";
+import { getScrollPrefetchPlan, shouldChainLoadOlder, shouldChainLoadNewer } from "./modules/scrollPrefetch";
+import { MSG_SCROLL_CLASS, MSG_SCROLL_STYLE_TEXT, updateScrollbarGutterVisibility } from "./modules/msgScrollStyles";
 
 export default function MessengerApp() {
   const theme = useTheme();
@@ -203,6 +138,9 @@ export default function MessengerApp() {
   const [messages, setMessages] = useState([]);
   const messagesRef = useRef([]);
   const [hasMoreMsgs, setHasMoreMsgs] = useState(false);
+  const [hasMoreNewer, setHasMoreNewer] = useState(false);
+  const hasMoreNewerRef = useRef(false);
+  const nextAfterRef = useRef(null);
   const [nextBefore, setNextBefore] = useState(null);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
@@ -223,6 +161,14 @@ export default function MessengerApp() {
   const nextBeforeRef = useRef(null);
   const pendingJumpRef = useRef(null); // messageId to scroll to after load
   const nearBottomRef = useRef(true);
+  /** Last known viewport for active chat — survives message prepend/paint races */
+  const scrollAnchorRef = useRef(null); // { convId, scrollTop, distanceBottom, nearBottom }
+  /** Re-apply restore until this time (ms) or until user scrolls */
+  const scrollRestoreUntilRef = useRef(0);
+  const stickGenRef = useRef(0);
+  const stickTimersRef = useRef([]);
+  /** px from bottom still treated as following the live chat (keep tight for cache accuracy) */
+  const NEAR_BOTTOM_PX = 120;
   const pendingNewIdsRef = useRef([]); // ids arrived while scrolled up
   const [newBelowCount, setNewBelowCount] = useState(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -721,29 +667,69 @@ export default function MessengerApp() {
     });
   }, [activeId, messages, hasMoreMsgs, nextBefore, activeDetail]);
 
-  // Restore a cached viewport only after the message DOM has been painted.
-  // Never guess "top": when there is no saved viewport, the only safe default
-  // is the bottom of the conversation.
+  // Restore / hold viewport after paint. Prefer distance-from-bottom (stable when
+  // older messages prepend). Re-apply while scrollRestoreUntilRef is active so a
+  // short first paint cannot pin the user at scrollTop 0.
   useLayoutEffect(() => {
-    const restore = pendingScrollRestoreRef.current;
-    // Ignore loadOlder pin objects (they use olderScrollPinRef)
-    if (!restore || restore.prevH != null || restore.el) return;
     if (!activeId || !messages?.length || !listRef.current) return;
 
     const box = listRef.current;
+    const cid = String(activeId);
+
+    // Prefer explicit pending restore, else lasting anchor for this conv
+    let r = pendingScrollRestoreRef.current;
+    if (r && (r.prevH != null || r.el)) r = null; // loadOlder pin
+    if (!r && scrollAnchorRef.current && String(scrollAnchorRef.current.convId) === cid) {
+      r = scrollAnchorRef.current;
+    }
+    if (!r) return;
+
+    const stillHolding = Date.now() < scrollRestoreUntilRef.current
+      || pendingScrollRestoreRef.current === r
+      || (pendingScrollRestoreRef.current
+        && pendingScrollRestoreRef.current.distanceBottom === r.distanceBottom);
+
+    // Only force restore when holding or first pending apply
+    if (!stillHolding && !pendingScrollRestoreRef.current) return;
+
     restoringScrollRef.current = true;
     const apply = () => {
-      if (!listRef.current || String(activeIdRef.current) !== String(activeId)) return;
-      const r = pendingScrollRestoreRef.current;
-      if (!r) return;
-      if (r.nearBottom) {
+      if (!listRef.current || String(activeIdRef.current) !== cid) return;
+      const anchor = pendingScrollRestoreRef.current || scrollAnchorRef.current;
+      if (!anchor || (anchor.convId && String(anchor.convId) !== cid)) return;
+      if (anchor.nearBottom) {
         box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
-      } else if (Number.isFinite(r.distanceBottom)) {
-        box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - r.distanceBottom);
-      } else if (Number.isFinite(r.scrollTop)) {
-        box.scrollTop = Math.max(0, Math.min(r.scrollTop, box.scrollHeight - box.clientHeight));
+      } else if (anchor.anchorMsgId) {
+        const el = document.getElementById(`msg-${anchor.anchorMsgId}`);
+        if (el) {
+          el.scrollIntoView({ block: "center" });
+        } else {
+          // Message deleted from DOM/cache — stay near that history region
+          if (Number.isFinite(anchor.distanceBottom)) {
+            box.scrollTop = Math.max(
+              0,
+              box.scrollHeight - box.clientHeight - Number(anchor.distanceBottom)
+            );
+          } else if (Number.isFinite(anchor.scrollTop)) {
+            box.scrollTop = Math.max(
+              0,
+              Math.min(Number(anchor.scrollTop), box.scrollHeight - box.clientHeight)
+            );
+          } else {
+            box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) * 0.35);
+          }
+        }
+      } else if (Number.isFinite(anchor.distanceBottom)) {
+        box.scrollTop = Math.max(
+          0,
+          box.scrollHeight - box.clientHeight - Number(anchor.distanceBottom)
+        );
+      } else if (Number.isFinite(anchor.scrollTop)) {
+        box.scrollTop = Math.max(
+          0,
+          Math.min(Number(anchor.scrollTop), box.scrollHeight - box.clientHeight)
+        );
       } else {
-        // Unknown position: start where useful, not at the oldest message.
         box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
       }
     };
@@ -751,17 +737,27 @@ export default function MessengerApp() {
     apply();
     requestAnimationFrame(() => {
       apply();
-      pendingScrollRestoreRef.current = null;
-      restoringScrollRef.current = false;
       const restoredDistance = Math.max(0, box.scrollHeight - box.scrollTop - box.clientHeight);
-      const restoredNearBottom = restoredDistance < 140;
-      nearBottomRef.current = restoredDistance < 120;
-      // Re-enable the jump-to-bottom control based on the actual restored
-      // viewport. Do not leave it hidden merely because the chat was just
-      // opened/restored from cache.
+      nearBottomRef.current = restoredDistance < NEAR_BOTTOM_PX;
+      restoringScrollRef.current = false;
+
+      // Keep anchor in sync with what we applied
+      const prevAnchor = scrollAnchorRef.current;
+      scrollAnchorRef.current = {
+        convId: cid,
+        scrollTop: box.scrollTop,
+        distanceBottom: restoredDistance,
+        nearBottom: restoredDistance < NEAR_BOTTOM_PX,
+        anchorMsgId: prevAnchor?.anchorMsgId || null,
+      };
+
+      // Clear one-shot pending after first successful paint; hold window may re-use anchor
+      if (pendingScrollRestoreRef.current && !pendingScrollRestoreRef.current.el) {
+        pendingScrollRestoreRef.current = null;
+      }
+
       const restoredShouldShow = restoredDistance > 180;
       scrollDownDismissedRef.current = false;
-      userScrollIntentRef.current = false;
       if (scrollDownFadeTimerRef.current) {
         clearTimeout(scrollDownFadeTimerRef.current);
         scrollDownFadeTimerRef.current = null;
@@ -769,8 +765,6 @@ export default function MessengerApp() {
       if (restoredShouldShow) {
         setShowScrollDown(true);
         setScrollDownOpacity(1);
-        // Same idle-fade as live scrolling so the control does not stick forever
-        // after opening a chat that was left mid-history.
         scrollDownFadeTimerRef.current = setTimeout(() => {
           setScrollDownOpacity(0);
           scrollDownFadeTimerRef.current = setTimeout(() => {
@@ -782,20 +776,21 @@ export default function MessengerApp() {
         setShowScrollDown(false);
         setScrollDownOpacity(0);
       }
-      if (restoredNearBottom) {
+      if (restoredDistance < NEAR_BOTTOM_PX) {
         pendingNewIdsRef.current = [];
         setNewBelowCount(0);
       }
-      scrollPositionKnownRef.current.add(String(activeId));
-      // Critical: opening a chat without scrolling used to never send seen.
-      setTimeout(() => {
-        try { markVisibleMessagesRead(); } catch { /* */ }
-      }, 120);
-      setTimeout(() => {
-        try { markVisibleMessagesRead(); } catch { /* */ }
-      }, 500);
+      scrollPositionKnownRef.current.add(cid);
+      setTimeout(() => { try { markVisibleMessagesRead(); } catch { /* */ } }, 120);
+      // Only a couple of pages if we landed flush against the top edge
+      if (box.scrollTop < Math.max(320, box.clientHeight * 0.5) && hasMoreMsgsRef.current) {
+        setTimeout(() => {
+          try { fillOlderNearTop({ convId: cid, maxPages: 2 }); } catch { /* */ }
+        }, 100);
+      }
     });
   }, [activeId, messages]);
+
 
   // Auto-load join requests when the active group requires approval and the
   // current user is an admin (so the "Join requests (N)" badge is up-to-date).
@@ -896,12 +891,15 @@ export default function MessengerApp() {
     }
   }, []);
 
-  const loadMessages = useCallback(async (cid, { silent = false, preserveOlder = false } = {}) => {
+  const loadMessages = useCallback(async (cid, { silent = false, preserveOlder = false, replace = false } = {}) => {
     if (!cid) return;
     const key = String(cid);
     const cached = messagesCacheRef.current.get(key);
     const hasCachedMsgs = Boolean(cached?.messages?.length);
     const isActive = () => String(activeIdRef.current) === key;
+    // replace: drop mid-history window and keep only the latest server page
+    // (used by "jump to bottom" so we never download the entire gap)
+    const doReplace = Boolean(replace) && !preserveOlder;
 
     // Spinner only for cold open of active chat (no cache, nothing on screen)
     if (!silent && !hasCachedMsgs && isActive()) {
@@ -960,21 +958,25 @@ export default function MessengerApp() {
         });
       };
 
-      const mergedForCache = (silent || preserveOlder)
+      const mergedForCache = (!doReplace && (silent || preserveOlder))
         ? mergeLists(cached?.messages || [], items)
         : items;
       touchMessengerMsgCache(messagesCacheRef.current, key, {
         messages: mergedForCache,
-        hasMore: (silent || preserveOlder) ? Boolean(cached?.hasMore || hm) : hm,
-        nextBefore: (silent || preserveOlder) ? (cached?.nextBefore || nb) : nb,
+        hasMore: doReplace ? hm : ((silent || preserveOlder) ? Boolean(cached?.hasMore || hm) : hm),
+        nextBefore: doReplace ? nb : ((silent || preserveOlder) ? (cached?.nextBefore || nb) : nb),
+        hasMoreNewer: false,
+        nextAfter: items.length ? items[items.length - 1]?.id : null,
+        nearBottom: doReplace ? true : (messagesCacheRef.current.get(key)?.nearBottom),
+        anchorMsgId: doReplace ? null : (messagesCacheRef.current.get(key)?.anchorMsgId),
         detail: messagesCacheRef.current.get(key)?.detail || null,
       });
 
       // Don't update UI if user already switched away
       if (!isActive()) return;
 
-      if (silent || preserveOlder) {
-        setMessages((prev) => mergeLists(prev, items));
+      if (!doReplace && (silent || preserveOlder)) {
+        setMessages((prev) => normalizeMessages(mergeLists(prev, items)));
         messagesConvIdRef.current = cid;
         if (!nextBeforeRef.current && nb) {
           setNextBefore(nb);
@@ -984,13 +986,23 @@ export default function MessengerApp() {
           setHasMoreMsgs(true);
           hasMoreMsgsRef.current = true;
         }
+        if (items.length) {
+          hasMoreNewerRef.current = false;
+          setHasMoreNewer(false);
+          nextAfterRef.current = items[items.length - 1]?.id || nextAfterRef.current;
+        }
       } else {
-        setMessages(items);
+        // Full replace — live edge only (cheap jump-to-bottom)
+        setMessages(normalizeMessages(items));
+        messagesRef.current = normalizeMessages(items);
         messagesConvIdRef.current = cid;
         setHasMoreMsgs(hm);
         setNextBefore(nb);
         hasMoreMsgsRef.current = hm;
         nextBeforeRef.current = nb;
+        hasMoreNewerRef.current = false;
+        setHasMoreNewer(false);
+        nextAfterRef.current = items.length ? items[items.length - 1]?.id : null;
       }
 
       try {
@@ -1012,13 +1024,14 @@ export default function MessengerApp() {
     // Resolve cursor: prefer ref/state, fall back to oldest loaded message id
     let cursor = nextBeforeRef.current || nextBefore;
     if (!cursor) {
-      // Derive from current messages (oldest id)
-      // messages state may be stale in closure — read from cache
       const cached = messagesCacheRef.current.get(String(cid));
-      const list = cached?.messages || [];
+      const list = (messagesRef.current?.length ? messagesRef.current : null)
+        || cached?.messages
+        || [];
       if (list.length) cursor = list[0]?.id;
     }
-    if (!cursor && !hasMoreMsgsRef.current && !hasMoreMsgs) return;
+    // Always attempt when we have a cursor — server decides if more exist.
+    // (cached hasMore:false can be stale after restore mid-history)
     if (!cursor) return;
 
     loadingMoreRef.current = true;
@@ -1071,14 +1084,165 @@ export default function MessengerApp() {
       // Prefetch next page if still near top after this batch
       requestAnimationFrame(() => {
         const box = listRef.current;
-        if (!box || !hasMoreMsgsRef.current || loadingMoreRef.current) return;
-        const h = box.clientHeight || 1;
-        if (box.scrollTop < Math.max(360, h * 0.75)) {
-          loadOlder();
-        }
+        if (!box || loadingMoreRef.current) return;
+        if (!hasMoreMsgsRef.current) return;
+        if (shouldChainLoadOlder(box, isMobile)) loadOlder();
       });
     }
   }, [hasMoreMsgs, nextBefore]);
+
+  /**
+   * Load a window centered on a message id — one request restores mid-history
+   * without climbing from the live edge page-by-page.
+   */
+  /**
+   * Load a window around an id. If that message was deleted, the API still
+   * returns neighbouring messages (id ≤ / > around_id). Returns:
+   *   { ok, exactFound, focusId }
+   * focusId = original id if still present, else closest neighbour.
+   */
+  const loadAroundMessage = useCallback(async (cid, aroundId) => {
+    if (!cid || aroundId == null) {
+      return { ok: false, exactFound: false, focusId: null };
+    }
+    try {
+      const token = localStorage.getItem("access") || "";
+      const url = `${MSG_API}/conversations/${cid}/messages/?around_id=${encodeURIComponent(aroundId)}&limit=50`
+        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const res = await apiRequest({ method: "GET", url });
+      const data = unwrapData(res);
+      const items = normalizeMessages(data?.results || []);
+      if (!items.length) {
+        // Truly nothing around that point → caller should fall back to latest
+        return { ok: false, exactFound: false, focusId: null };
+      }
+      if (String(activeIdRef.current) !== String(cid)) {
+        return { ok: false, exactFound: false, focusId: null };
+      }
+      const hm = Boolean(data?.has_more);
+      const hmn = Boolean(data?.has_more_newer);
+      const nb = data?.next_before_id || items[0]?.id || null;
+      const na = data?.next_after_id || items[items.length - 1]?.id || null;
+      setMessages(items);
+      messagesRef.current = items;
+      messagesConvIdRef.current = cid;
+      setHasMoreMsgs(hm);
+      hasMoreMsgsRef.current = hm;
+      setNextBefore(nb);
+      nextBeforeRef.current = nb;
+      setHasMoreNewer(hmn);
+      hasMoreNewerRef.current = hmn;
+      nextAfterRef.current = na;
+      touchMessengerMsgCache(messagesCacheRef.current, String(cid), {
+        messages: items,
+        hasMore: hm,
+        hasMoreNewer: hmn,
+        nextBefore: nb,
+        nextAfter: na,
+      });
+      const exactFound = items.some((m) => String(m.id) === String(aroundId));
+      let focusId = exactFound ? aroundId : null;
+      if (!focusId) {
+        // Pick closest id to the deleted anchor (numeric when possible)
+        const target = Number(aroundId);
+        if (Number.isFinite(target)) {
+          let best = items[0]?.id;
+          let bestDist = Infinity;
+          for (const m of items) {
+            const n = Number(m.id);
+            if (!Number.isFinite(n)) continue;
+            const d = Math.abs(n - target);
+            if (d < bestDist) {
+              bestDist = d;
+              best = m.id;
+            }
+          }
+          focusId = best;
+        } else {
+          focusId = items[Math.floor(items.length / 2)]?.id;
+        }
+      }
+      return { ok: true, exactFound, focusId };
+    } catch {
+      return { ok: false, exactFound: false, focusId: null };
+    }
+  }, []);
+
+  /** Scroll to a message id, or center the list if the node is gone. */
+  const scrollToMessageIdOrFallback = (msgId) => {
+    const box = listRef.current;
+    if (!box) return;
+    restoringScrollRef.current = true;
+    const el = msgId ? document.getElementById(`msg-${msgId}`) : null;
+    if (el) {
+      el.scrollIntoView({ block: "center" });
+    } else if (box.scrollHeight > box.clientHeight) {
+      // Mid-window fallback — better than jumping to live edge by accident
+      box.scrollTop = Math.max(0, (box.scrollHeight - box.clientHeight) * 0.35);
+    }
+    requestAnimationFrame(() => {
+      restoringScrollRef.current = false;
+    });
+  };
+
+  /** Append newer messages when the user scrolls down through a mid-history window. */
+  const loadNewer = useCallback(async () => {
+    const cid = activeIdRef.current;
+    if (!cid || loadingMoreRef.current) return;
+    if (!hasMoreNewerRef.current) return;
+    let cursor = nextAfterRef.current;
+    if (!cursor) {
+      const list = messagesRef.current || [];
+      if (list.length) cursor = list[list.length - 1]?.id;
+    }
+    if (!cursor) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const token = localStorage.getItem("access") || "";
+      const url = `${MSG_API}/conversations/${cid}/messages/?after_id=${encodeURIComponent(cursor)}&limit=${LOAD_OLDER_SIZE}`
+        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const res = await apiRequest({ method: "GET", url });
+      const data = unwrapData(res);
+      const newer = normalizeMessages(data?.results || []);
+      if (!newer.length) {
+        hasMoreNewerRef.current = false;
+        setHasMoreNewer(false);
+        return;
+      }
+      setMessages((prev) => {
+        const ids = new Set(prev.map((m) => String(m.id)));
+        const unique = newer.filter((m) => m?.id != null && !ids.has(String(m.id)));
+        const next = [...prev, ...unique];
+        messagesRef.current = next;
+        try {
+          const key = String(cid);
+          const cached = messagesCacheRef.current.get(key) || {};
+          touchMessengerMsgCache(messagesCacheRef.current, key, {
+            ...cached,
+            messages: next,
+            hasMoreNewer: Boolean(data?.has_more_newer),
+            nextAfter: data?.next_after_id || unique[unique.length - 1]?.id || cursor,
+          });
+        } catch { /* */ }
+        return next;
+      });
+      const hmn = Boolean(data?.has_more_newer);
+      hasMoreNewerRef.current = hmn;
+      setHasMoreNewer(hmn);
+      nextAfterRef.current = data?.next_after_id || newer[newer.length - 1]?.id || cursor;
+    } catch { /* */ }
+    finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+      // Keep filling toward the live edge while still near the window bottom
+      requestAnimationFrame(() => {
+        const box = listRef.current;
+        if (!box || loadingMoreRef.current || !hasMoreNewerRef.current) return;
+        if (shouldChainLoadNewer(box, isMobile)) loadNewer();
+      });
+    }
+  }, []);
 
   const stopAllMedia = useCallback(() => {
     try {
@@ -1132,13 +1296,21 @@ export default function MessengerApp() {
       const prev = messagesCacheRef.current.get(prevKey) || {};
       if (el && !restoringScrollRef.current) {
         const distBottom = Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight);
+        const atBottom = distBottom < NEAR_BOTTOM_PX;
         const snapshot = {
           scrollTop: Math.max(0, el.scrollTop),
-          distanceBottom: distBottom,
-          nearBottom: distBottom < 140,
+          distanceBottom: atBottom ? 0 : distBottom,
+          nearBottom: atBottom,
           savedAt: Date.now(),
         };
+        scrollAnchorRef.current = { convId: prevKey, ...snapshot };
         touchMessengerMsgCache(messagesCacheRef.current, prevKey, { ...prev, ...snapshot });
+        try {
+          sessionStorage.setItem(
+            "messenger.scrollAnchor." + prevKey,
+            JSON.stringify(snapshot)
+          );
+        } catch { /* */ }
       }
     }
 
@@ -1151,8 +1323,8 @@ export default function MessengerApp() {
     setMsgSearchIdx(-1);
     setReplyTo(null);
     setEditingMsg(null);
-    // Restore any unsent text draft for this conversation
-    setText(readComposerDraft(c.id));
+    // Restore unsent draft (server-synced preferred, else localStorage)
+    setText(resolveComposerDraft(c.id, c.draft_text));
     setCtx(null);
     if (isMobile) setDrawerOpen(false);
 
@@ -1178,21 +1350,91 @@ export default function MessengerApp() {
     setCurrentPinIndex(0);
     if (cached?.messages?.length) {
       messagesConvIdRef.current = c.id;
-      setMessages(cached.messages);
-      setHasMoreMsgs(Boolean(cached.hasMore));
-      setNextBefore(cached.nextBefore || null);
-      hasMoreMsgsRef.current = Boolean(cached.hasMore);
-      nextBeforeRef.current = cached.nextBefore || null;
+      setMessages(normalizeMessages(cached.messages || []));
+      // Prefer cached flags; if missing, assume there may be older history so
+      // loadOlder can probe (server returns empty → hasMore false).
+      const oldestId = cached.messages?.[0]?.id || null;
+      const newestId = cached.messages?.[cached.messages.length - 1]?.id || null;
+      const nb = cached.nextBefore || oldestId || null;
+      const hm = cached.hasMore == null ? true : Boolean(cached.hasMore);
+      const hmn = cached.hasMoreNewer == null
+        ? Boolean(cached.nearBottom !== true)
+        : Boolean(cached.hasMoreNewer);
+      setHasMoreMsgs(hm);
+      setNextBefore(nb);
+      hasMoreMsgsRef.current = hm;
+      nextBeforeRef.current = nb;
+      setHasMoreNewer(hmn);
+      hasMoreNewerRef.current = hmn;
+      nextAfterRef.current = cached.nextAfter || newestId || null;
       if (cached.detail) setActiveDetail(cached.detail);
       setLoadingMsgs(false);
       // Queue a single deterministic viewport restore. Unknown/legacy caches
       // intentionally fall back to bottom rather than jumping to the top.
       if (!jumpToMessageId) {
-        pendingScrollRestoreRef.current = {
-          scrollTop: Number.isFinite(cached.scrollTop) ? cached.scrollTop : null,
-          distanceBottom: Number.isFinite(cached.distanceBottom) ? cached.distanceBottom : null,
-          nearBottom: cached.nearBottom === true,
+        // Cancel any delayed stick-to-bottom from the previous chat
+        try {
+          for (const t of stickTimersRef.current || []) clearTimeout(t);
+          stickTimersRef.current = [];
+          stickGenRef.current += 1;
+        } catch { /* */ }
+
+        let scrollTop = Number.isFinite(cached.scrollTop) ? cached.scrollTop : null;
+        let distanceBottom = Number.isFinite(cached.distanceBottom) ? cached.distanceBottom : null;
+        let nearBottom = cached.nearBottom === true;
+        let anchorMsgId = cached.anchorMsgId || null;
+        try {
+          const raw = sessionStorage.getItem("messenger.scrollAnchor." + cid);
+          if (raw) {
+            const s = JSON.parse(raw);
+            const cacheSaved = Number(cached.savedAt) || 0;
+            const sessSaved = Number(s.savedAt) || 0;
+            const preferSession = sessSaved >= cacheSaved;
+            if (preferSession) {
+              if (s.nearBottom === true) {
+                nearBottom = true;
+                distanceBottom = 0;
+                scrollTop = null;
+                anchorMsgId = null;
+              } else {
+                if (s.nearBottom === false) nearBottom = false;
+                if (Number.isFinite(s.distanceBottom)) distanceBottom = s.distanceBottom;
+                if (Number.isFinite(s.scrollTop)) scrollTop = s.scrollTop;
+                if (s.anchorMsgId) anchorMsgId = s.anchorMsgId;
+              }
+            } else {
+              if (Number.isFinite(s.distanceBottom) && distanceBottom == null) {
+                distanceBottom = s.distanceBottom;
+              }
+              if (Number.isFinite(s.scrollTop) && scrollTop == null) {
+                scrollTop = s.scrollTop;
+              }
+              if (cached.nearBottom == null && (s.nearBottom === true || s.nearBottom === false)) {
+                nearBottom = !!s.nearBottom;
+              }
+              if (!anchorMsgId && s.anchorMsgId) anchorMsgId = s.anchorMsgId;
+            }
+          }
+        } catch { /* */ }
+
+        if (nearBottom) {
+          distanceBottom = 0;
+          scrollTop = null;
+          anchorMsgId = null;
+        }
+
+        const restore = {
+          convId: cid,
+          scrollTop,
+          distanceBottom,
+          nearBottom: !!nearBottom,
+          anchorMsgId: anchorMsgId || null,
         };
+        pendingScrollRestoreRef.current = restore;
+        scrollAnchorRef.current = restore;
+        // Short hold only for paint — we no longer climb pages for 1s+
+        scrollRestoreUntilRef.current = Date.now() + 400;
+        nearBottomRef.current = !!nearBottom;
       } else {
         pendingScrollRestoreRef.current = null;
       }
@@ -1235,11 +1477,24 @@ export default function MessengerApp() {
     if (cached?.messages?.length) {
       setChatOpening(false);
       const keepAtBottomAfterRefresh = cached.nearBottom === true;
+      const anchorId = scrollAnchorRef.current?.anchorMsgId
+        || cached.anchorMsgId
+        || null;
+      const cachedIds = new Set((cached.messages || []).map((m) => String(m.id)));
+      const needAround = Boolean(
+        anchorId
+        && !keepAtBottomAfterRefresh
+        && !cachedIds.has(String(anchorId))
+      );
+
       void Promise.all([
-        loadMessages(c.id, { silent: true, preserveOlder: true }),
+        needAround
+          ? loadAroundMessage(c.id, anchorId)
+          : loadMessages(c.id, { silent: true, preserveOlder: true }),
         loadConversationDetail(c.id),
         loadPinnedMessages(c.id),
-      ]).then(() => {
+      ]).then(async (results) => {
+        if (String(activeIdRef.current) !== String(c.id)) return;
         if (keepAtBottomAfterRefresh) {
           requestAnimationFrame(() => {
             const box = listRef.current;
@@ -1252,7 +1507,64 @@ export default function MessengerApp() {
               box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
             }
           });
+          return;
         }
+        if (!anchorId) return;
+        let focusId = anchorId;
+        if (needAround) {
+          const aroundRes = results?.[0];
+          if (!aroundRes || aroundRes.ok === false) {
+            // Deleted + empty neighbourhood → latest page at bottom
+            await loadMessages(c.id, { silent: true, preserveOlder: false });
+            requestAnimationFrame(() => {
+              const box = listRef.current;
+              if (box) box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
+              nearBottomRef.current = true;
+              persistViewportSnapshot(true);
+            });
+            return;
+          }
+          focusId = aroundRes.focusId || anchorId;
+          // Refresh stored anchor to a message that still exists
+          if (focusId && String(focusId) !== String(anchorId)) {
+            try {
+              const key = String(c.id);
+              const prev = messagesCacheRef.current.get(key) || {};
+              const snap = {
+                ...prev,
+                anchorMsgId: focusId,
+                nearBottom: false,
+                savedAt: Date.now(),
+              };
+              messagesCacheRef.current.set(key, snap);
+              scrollAnchorRef.current = { convId: key, ...snap };
+              sessionStorage.setItem(
+                "messenger.scrollAnchor." + key,
+                JSON.stringify({
+                  anchorMsgId: focusId,
+                  nearBottom: false,
+                  distanceBottom: prev.distanceBottom,
+                  scrollTop: prev.scrollTop,
+                  savedAt: Date.now(),
+                })
+              );
+            } catch { /* */ }
+          }
+        }
+        requestAnimationFrame(() => {
+          scrollToMessageIdOrFallback(focusId);
+          // Warm newer pages so scrolling down is ready immediately
+          if (hasMoreNewerRef.current) {
+            setTimeout(() => {
+              try { loadNewer(); } catch { /* */ }
+            }, 80);
+            setTimeout(() => {
+              try {
+                if (hasMoreNewerRef.current && !loadingMoreRef.current) loadNewer();
+              } catch { /* */ }
+            }, 220);
+          }
+        });
       });
     } else {
       try {
@@ -1484,6 +1796,11 @@ export default function MessengerApp() {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [remoteEmojiPlay, setRemoteEmojiPlay] = useState(null); // { messageId, key }
+  const onRemoteEmojiPlay = useCallback((messageId) => {
+    setRemoteEmojiPlay({ messageId: String(messageId), key: Date.now() });
+  }, []);
+
   useMessengerWebSocket({
     meId,
     wsRef,
@@ -1511,6 +1828,9 @@ export default function MessengerApp() {
     setCallConfig,
     setActiveCallInfo,
     setNewBelowCount,
+    setText,
+    setConversations,
+    onRemoteEmojiPlay,
   });
 
 
@@ -1526,10 +1846,28 @@ export default function MessengerApp() {
       if (videoEditFile) { setVideoEditFile(null); return; }
       if (cropFile) { setCropFile(null); return; }
       if (mediaSettingsOpen) { setMediaSettingsOpen(false); return; }
-      if (msgSearchOpen) { closeMsgSearch(); return; }
+      if (msgSearchOpen) {
+        setMsgSearchOpen(false);
+        setMsgSearchQ("");
+        setMsgSearchResults([]);
+        setMsgSearchIdx(-1);
+        setJumpHighlightId(null);
+        return;
+      }
       if (dayJumpOpen) { setDayJumpOpen(false); return; }
       if (ctx) { setCtx(null); return; }
       if (reactAnchor) { setReactAnchor(null); return; }
+      if (confirmDelete) { setConfirmDelete(null); return; }
+      if (confirmBlock) { setConfirmBlock(null); return; }
+      if (confirmLeave) { setConfirmLeave(null); return; }
+      if (confirmCleanup) { setConfirmCleanup(null); return; }
+      if (joinConfirm) { setJoinConfirm(null); return; }
+      if (forwardOpen) { setForwardOpen(null); return; }
+      if (selectionMode) {
+        setSelectionMode(false);
+        setSelectedIds(new Set());
+        return;
+      }
       if (editingMsg) {
         setEditingMsg(null);
         setText(activeId ? readComposerDraft(activeId) : "");
@@ -1558,6 +1896,8 @@ export default function MessengerApp() {
     preview, galleryState, mediaLibraryOpen, readersMessage, videoEditFile, cropFile,
     mediaSettingsOpen, msgSearchOpen, dayJumpOpen, ctx, reactAnchor, editingMsg, replyTo,
     panelHistory, activeId, mobileShowChat, closeChat, closePanel, drawerOpen, isMobile,
+    confirmDelete, confirmBlock, confirmLeave, confirmCleanup, joinConfirm, forwardOpen,
+    selectionMode,
   ]);
 
   /**
@@ -1578,34 +1918,74 @@ export default function MessengerApp() {
     } catch { /* */ }
 
     const onPopState = () => {
-      if (preview) { setPreview(null); window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href); return; }
-      if (galleryState) { setGalleryState(null); window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href); return; }
-      if (readersMessage) { setReadersMessage(null); window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href); return; }
-      if (videoEditFile) { setVideoEditFile(null); window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href); return; }
-      if (cropFile) { setCropFile(null); window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href); return; }
-      if (mediaSettingsOpen) { setMediaSettingsOpen(false); window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href); return; }
+      const pushRoot = () => {
+        try {
+          window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href);
+        } catch { /* */ }
+      };
+
+      // Close overlays / selection first (never leave the page)
+      if (preview) { setPreview(null); pushRoot(); return; }
+      if (galleryState) { setGalleryState(null); pushRoot(); return; }
+      if (readersMessage) { setReadersMessage(null); pushRoot(); return; }
+      if (videoEditFile) { setVideoEditFile(null); pushRoot(); return; }
+      if (cropFile) { setCropFile(null); pushRoot(); return; }
+      if (mediaSettingsOpen) { setMediaSettingsOpen(false); pushRoot(); return; }
+      if (msgSearchOpen) {
+        setMsgSearchOpen(false);
+        setMsgSearchQ("");
+        setMsgSearchResults([]);
+        setMsgSearchIdx(-1);
+        setJumpHighlightId(null);
+        pushRoot();
+        return;
+      }
+      if (dayJumpOpen) { setDayJumpOpen(false); pushRoot(); return; }
+      if (ctx) { setCtx(null); pushRoot(); return; }
+      if (reactAnchor) { setReactAnchor(null); pushRoot(); return; }
+      if (confirmDelete) { setConfirmDelete(null); pushRoot(); return; }
+      if (confirmBlock) { setConfirmBlock(null); pushRoot(); return; }
+      if (confirmLeave) { setConfirmLeave(null); pushRoot(); return; }
+      if (confirmCleanup) { setConfirmCleanup(null); pushRoot(); return; }
+      if (joinConfirm) { setJoinConfirm(null); pushRoot(); return; }
+      if (forwardOpen) { setForwardOpen(null); pushRoot(); return; }
+      if (joinOpen) { setJoinOpen(false); pushRoot(); return; }
+      if (addMemberOpen) { setAddMemberOpen(false); pushRoot(); return; }
+      if (createGroupOpen) { setCreateGroupOpen(false); pushRoot(); return; }
+      if (selectionMode) {
+        setSelectionMode(false);
+        setSelectedIds(new Set());
+        pushRoot();
+        return;
+      }
+      if (editingMsg) {
+        setEditingMsg(null);
+        setText(activeId ? readComposerDraft(activeId) : "");
+        pushRoot();
+        return;
+      }
+      if (replyTo) { setReplyTo(null); pushRoot(); return; }
+
+      // Right panel stack (profile, settings, contacts, …)
       if (panelHistory.length) {
         popPanel();
-        window.history.pushState({ ...(window.history.state || {}), messengerRoot: true }, "", window.location.href);
+        pushRoot();
         return;
       }
 
       if (activeId || mobileShowChat) {
         closeChat();
-        try {
-          window.history.pushState({ messengerRoot: true }, "", window.location.href);
-        } catch { /* */ }
+        pushRoot();
         exitConfirmRef.current = false;
         setExitHint(false);
         return;
       }
 
+      // Conversation list: require second back to leave messenger (all tabs)
       if (!exitConfirmRef.current) {
         exitConfirmRef.current = true;
         setExitHint(true);
-        try {
-          window.history.pushState({ messengerRoot: true }, "", window.location.href);
-        } catch { /* */ }
+        pushRoot();
         if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
         exitToastTimerRef.current = setTimeout(() => {
           exitConfirmRef.current = false;
@@ -1628,6 +2008,9 @@ export default function MessengerApp() {
   }, [
     activeId, mobileShowChat, closeChat, popPanel, panelHistory, preview, galleryState,
     readersMessage, videoEditFile, cropFile, mediaSettingsOpen, stopAllMedia, navigate,
+    msgSearchOpen, dayJumpOpen, ctx, reactAnchor, confirmDelete, confirmBlock, confirmLeave,
+    confirmCleanup, joinConfirm, forwardOpen, joinOpen, addMemberOpen, createGroupOpen,
+    selectionMode, editingMsg, replyTo,
   ]);
 
   // Stop media when Messenger unmounts
@@ -1833,6 +2216,8 @@ export default function MessengerApp() {
           loaded: 0, total: totalBytes, progress: 0, status: "uploading",
         }]);
       }
+      // Stop typing indicator for peers immediately on send
+      stopTypingSignal();
       setText(""); setFiles([]);
       setMediaSpoiler(false);
       setMediaViewOnce(false);
@@ -1900,6 +2285,7 @@ export default function MessengerApp() {
 
     // "Send separately": each selected file becomes its own message.
     const rep = replyTo;
+    stopTypingSignal();
     setText(""); setFiles([]); setReplyTo(null);
     writeComposerDraft(activeId, "");
     setScheduledFor(null);
@@ -2481,6 +2867,18 @@ export default function MessengerApp() {
     } catch { /* */ }
   }, []);
 
+  /** Immediately tell peers we stopped typing (e.g. after send). */
+  const stopTypingSignal = useCallback(() => {
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
+    }
+    if (typingSentRef.current) {
+      typingSentRef.current = false;
+      sendTypingSignal(false);
+    }
+  }, [sendTypingSignal]);
+
   const handleComposerText = useCallback((valueOrFn) => {
     setText((prev) => {
       const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
@@ -2491,22 +2889,48 @@ export default function MessengerApp() {
           sendTypingSignal(true);
         }
         if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+        // Keep TTL aligned with receiver expiry (see WS handler ~2.8s)
         typingStopTimerRef.current = setTimeout(() => {
           typingSentRef.current = false;
           sendTypingSignal(false);
-        }, 2500);
+          typingStopTimerRef.current = null;
+        }, 2200);
       } else if (typingSentRef.current) {
         typingSentRef.current = false;
+        if (typingStopTimerRef.current) {
+          clearTimeout(typingStopTimerRef.current);
+          typingStopTimerRef.current = null;
+        }
         sendTypingSignal(false);
       }
       return next;
     });
   }, [sendTypingSignal]);
 
-  // Persist draft whenever composer text changes (skip while editing a message)
+  // Persist draft locally + sync to backend via WS (other devices)
+  const draftSyncTimerRef = useRef(null);
   useEffect(() => {
     if (!activeId || editingMsg) return;
     writeComposerDraft(activeId, text);
+    if (draftSyncTimerRef.current) clearTimeout(draftSyncTimerRef.current);
+    draftSyncTimerRef.current = setTimeout(() => {
+      const cid = activeIdRef.current;
+      if (!cid || !wsRef.current || wsRef.current.readyState !== 1) return;
+      try {
+        wsRef.current.send(JSON.stringify({
+          type: "draft",
+          conversation_id: Number(cid),
+          text: String(text || ""),
+        }));
+      } catch { /* */ }
+      // Keep conversation list draft in sync
+      setConversations((prev) => prev.map((c) =>
+        String(c.id) === String(cid) ? { ...c, draft_text: String(text || "") } : c
+      ));
+    }, 600);
+    return () => {
+      if (draftSyncTimerRef.current) clearTimeout(draftSyncTimerRef.current);
+    };
   }, [text, activeId, editingMsg]);
 
   const formatTypingLabel = useCallback((map, isGroup) => {
@@ -3170,7 +3594,6 @@ export default function MessengerApp() {
 
   const armScrollDownButton = () => {
     scrollDownDismissedRef.current = false;
-    userScrollIntentRef.current = false;
     setShowScrollDown(true);
     setScrollDownOpacity(1);
     scheduleScrollDownFade();
@@ -3188,7 +3611,7 @@ export default function MessengerApp() {
       markVisibleMessagesRead();
       recountNewBelow();
       const distBottom = Math.max(0, root.scrollHeight - root.scrollTop - root.clientHeight);
-      nearBottomRef.current = distBottom < 120;
+      nearBottomRef.current = distBottom < NEAR_BOTTOM_PX;
       if (distBottom > 180 || pendingNewIdsRef.current.length > 0) {
         // Allow the control to stay usable for the next tap without requiring
         // a manual wheel/touch first.
@@ -3306,13 +3729,327 @@ export default function MessengerApp() {
     afterStepScrollSettle(400);
   };
 
+  /** Message id currently near the upper-third of the viewport (stable restore key). */
+  const findAnchorMessageId = (root) => {
+    if (!root) return null;
+    try {
+      const nodes = root.querySelectorAll("[id^='msg-']");
+      if (!nodes.length) return null;
+      const rootRect = root.getBoundingClientRect();
+      const targetY = rootRect.top + Math.min(root.clientHeight * 0.28, 160);
+      let bestId = null;
+      let bestDist = Infinity;
+      for (let i = 0; i < nodes.length; i += 1) {
+        const el = nodes[i];
+        const r = el.getBoundingClientRect();
+        if (r.bottom < rootRect.top - 20 || r.top > rootRect.bottom + 20) continue;
+        const dist = Math.abs(r.top - targetY);
+        if (dist < bestDist) {
+          bestDist = dist;
+          const id = el.id.startsWith("msg-") ? el.id.slice(4) : null;
+          if (id && !String(id).startsWith("temp-")) bestId = id;
+        }
+      }
+      return bestId;
+    } catch {
+      return null;
+    }
+  };
+
+  /** Write current (or forced-bottom) viewport into memory + sessionStorage. */
+  const persistViewportSnapshot = (forceBottom = false) => {
+    const cid = activeIdRef.current;
+    if (!cid) return;
+    const key = String(cid);
+    const root = listRef.current;
+    let distBottom = 0;
+    let scrollTop = 0;
+    let anchorMsgId = null;
+    if (forceBottom) {
+      distBottom = 0;
+      nearBottomRef.current = true;
+      if (root) scrollTop = Math.max(0, root.scrollHeight - root.clientHeight);
+      // Live edge — no mid-history anchor
+      anchorMsgId = null;
+    } else if (root) {
+      distBottom = Math.max(0, root.scrollHeight - root.scrollTop - root.clientHeight);
+      scrollTop = Math.max(0, root.scrollTop);
+      nearBottomRef.current = distBottom < NEAR_BOTTOM_PX;
+      if (!nearBottomRef.current) anchorMsgId = findAnchorMessageId(root);
+    } else {
+      return;
+    }
+    const atBottom = forceBottom || distBottom < NEAR_BOTTOM_PX;
+    const snapshot = {
+      scrollTop: atBottom
+        ? Math.max(0, (root?.scrollHeight || 0) - (root?.clientHeight || 0))
+        : scrollTop,
+      distanceBottom: atBottom ? 0 : distBottom,
+      nearBottom: atBottom,
+      anchorMsgId: atBottom ? null : (anchorMsgId || null),
+      savedAt: Date.now(),
+    };
+    const prev = messagesCacheRef.current.get(key) || {};
+    messagesCacheRef.current.set(key, { ...prev, ...snapshot });
+    try { writeMessengerMsgCache(messagesCacheRef.current); } catch { /* */ }
+    scrollAnchorRef.current = { convId: key, ...snapshot };
+    try {
+      sessionStorage.setItem("messenger.scrollAnchor." + key, JSON.stringify(snapshot));
+    } catch { /* */ }
+  };
+
+  const measureDistBottom = () => {
+    const root = listRef.current;
+    if (!root) return 0;
+    return Math.max(0, root.scrollHeight - root.scrollTop - root.clientHeight);
+  };
+
+  const isNearBottomNow = () => {
+    // During restore window, trust the anchor — don't auto-stick to bottom
+    if (Date.now() < scrollRestoreUntilRef.current) return false;
+    if (restoringScrollRef.current) return false;
+    if (nearBottomRef.current) return true;
+    return measureDistBottom() <= NEAR_BOTTOM_PX;
+  };
+
+  const clearStickTimers = () => {
+    const arr = stickTimersRef.current || [];
+    for (const t of arr) {
+      try { clearTimeout(t); } catch { /* */ }
+    }
+    stickTimersRef.current = [];
+    stickGenRef.current += 1;
+  };
+
+  /**
+   * Pin to latest content only when the user is following the chat.
+   * Cancellable — chat switch / restore must not be overwritten by late timers.
+   */
+  const stickToBottom = useCallback((opts = {}) => {
+    if (restoringScrollRef.current) return;
+    if (Date.now() < scrollRestoreUntilRef.current) return;
+    if (!nearBottomRef.current && measureDistBottom() > NEAR_BOTTOM_PX) return;
+
+    const smooth = opts.smooth !== false;
+    const passes = Number.isFinite(opts.passes) ? opts.passes : 3;
+    const gen = ++stickGenRef.current;
+    // Drop previous pending sticks
+    for (const t of stickTimersRef.current || []) {
+      try { clearTimeout(t); } catch { /* */ }
+    }
+    stickTimersRef.current = [];
+
+    const run = () => {
+      if (gen !== stickGenRef.current) return;
+      if (restoringScrollRef.current) return;
+      if (Date.now() < scrollRestoreUntilRef.current) return;
+      const root = listRef.current;
+      if (root) {
+        const top = root.scrollHeight;
+        if (smooth) {
+          try {
+            root.scrollTo({ top, behavior: "smooth" });
+          } catch {
+            root.scrollTop = top;
+          }
+        } else {
+          root.scrollTop = top;
+        }
+      }
+      try {
+        bottomRef.current?.scrollIntoView({
+          behavior: smooth ? "smooth" : "auto",
+          block: "end",
+        });
+      } catch {
+        try { bottomRef.current?.scrollIntoView?.(); } catch { /* */ }
+      }
+    };
+    run();
+    requestAnimationFrame(() => {
+      if (gen !== stickGenRef.current) return;
+      run();
+      for (let i = 1; i <= passes; i += 1) {
+        const id = setTimeout(run, 40 + i * 60);
+        stickTimersRef.current.push(id);
+      }
+      // After layout settles, persist "at bottom" so reload does not jump mid-history
+      const idPersist = setTimeout(() => {
+        if (gen !== stickGenRef.current) return;
+        persistViewportSnapshot(true);
+      }, 120);
+      stickTimersRef.current.push(idPersist);
+    });
+    nearBottomRef.current = true;
+    persistViewportSnapshot(true);
+  }, []);
+
   const scrollToBottom = () => {
-    dismissScrollDownButton();
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    /**
+     * Jump to live edge — smart, not destructive:
+     *
+     * A) Continuous history already in memory (user scrolled up via loadOlder
+     *    from the live edge; hasMoreNewer=false): KEEP all messages, only scroll.
+     *    Wiping them would be wasteful and jarring.
+     *
+     * B) Real gap (opened mid-history / around_id window; hasMoreNewer=true):
+     *    REPLACE with the latest server page in one request. Do not page through
+     *    the unloaded gap with loadNewer.
+     */
+    scrollRestoreUntilRef.current = 0;
+    nearBottomRef.current = true;
     pendingNewIdsRef.current = [];
     setNewBelowCount(0);
+    dismissScrollDownButton();
+    const cid = activeIdRef.current;
+
+    const pinHard = (smooth = false) => {
+      const root = listRef.current;
+      if (root) {
+        const top = root.scrollHeight;
+        if (smooth) {
+          try { root.scrollTo({ top, behavior: "smooth" }); }
+          catch { root.scrollTop = top; }
+        } else {
+          root.scrollTop = top;
+        }
+      }
+      try {
+        bottomRef.current?.scrollIntoView({
+          behavior: smooth ? "smooth" : "auto",
+          block: "end",
+        });
+      } catch {
+        try { bottomRef.current?.scrollIntoView?.(); } catch { /* */ }
+      }
+      nearBottomRef.current = true;
+      persistViewportSnapshot(true);
+    };
+
+    // ONLY a gap of unloaded newer messages justifies dropping the window.
+    // Distance-from-bottom alone must NOT clear history the user already paid for.
+    const hasUnloadedGap = hasMoreNewerRef.current === true;
+
+    if (!cid) {
+      pinHard(true);
+      setTimeout(() => markVisibleMessagesRead(), 400);
+      return;
+    }
+
+    if (hasUnloadedGap) {
+      hasMoreNewerRef.current = false;
+      setHasMoreNewer(false);
+      loadingMoreRef.current = false;
+      Promise.resolve(loadMessages(cid, { silent: true, preserveOlder: false, replace: true }))
+        .then(() => {
+          try {
+            prevMsgLenRef.current = (messagesRef.current || []).length;
+          } catch { /* */ }
+          pinHard(false);
+          requestAnimationFrame(() => pinHard(false));
+          setTimeout(() => pinHard(false), 40);
+          setTimeout(() => pinHard(true), 100);
+        })
+        .catch(() => { pinHard(true); });
+    } else {
+      // Full continuous thread in memory — preserve it, just go to the end
+      pinHard(true);
+      Promise.resolve(loadMessages(cid, { silent: true, preserveOlder: true }))
+        .then(() => {
+          pinHard(true);
+          setTimeout(() => pinHard(false), 60);
+        })
+        .catch(() => {});
+    }
     setTimeout(() => markVisibleMessagesRead(), 400);
   };
+
+  /**
+   * After opening mid-history (or landing near the top of the loaded window),
+   * keep pulling older pages until there is comfortable padding above the
+   * viewport — or the server says there is nothing older.
+   */
+  const fillOlderNearTop = useCallback(async (opts = {}) => {
+    const maxPages = Number.isFinite(opts.maxPages) ? opts.maxPages : 10;
+    const padPx = Number.isFinite(opts.padPx) ? opts.padPx : null;
+    for (let i = 0; i < maxPages; i += 1) {
+      if (String(activeIdRef.current) !== String(opts.convId || activeIdRef.current)) return;
+      if (loadingMoreRef.current) {
+        await new Promise((r) => setTimeout(r, 80));
+        continue;
+      }
+      const box = listRef.current;
+      if (!box) return;
+      const h = box.clientHeight || 1;
+      const need = padPx != null ? padPx : Math.max(900, h * 1.8);
+      // Stop when we have enough content above the viewport, or server exhausted
+      if (box.scrollTop > need) return;
+      if (!hasMoreMsgsRef.current && i > 0) return;
+      const beforeLen = (messagesRef.current || []).length;
+      await loadOlder();
+      await new Promise((r) => setTimeout(r, 40));
+      const afterLen = (messagesRef.current || []).length;
+      if (afterLen <= beforeLen) return; // nothing new prepended
+    }
+  }, [loadOlder]);
+
+  // Flush viewport before tab close / reload so "was at bottom" survives refresh
+  useEffect(() => {
+    const flush = () => {
+      try { persistViewportSnapshot(!!nearBottomRef.current); } catch { /* */ }
+    };
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
+
+  // After inbound messages land (WS → loadMessages), stick to bottom if the user
+  // was already following the chat. Fixes race where scroll ran before paint.
+  const prevMsgLenRef = useRef(0);
+  const prevTypingCountRef = useRef(0);
+  useEffect(() => {
+    // Chat switch: reset counters and cancel delayed stick-to-bottom
+    prevMsgLenRef.current = 0;
+    prevTypingCountRef.current = 0;
+    try {
+      for (const t of stickTimersRef.current || []) clearTimeout(t);
+      stickTimersRef.current = [];
+      stickGenRef.current += 1;
+    } catch { /* */ }
+  }, [activeId]);
+
+  useEffect(() => {
+    const len = messages.length;
+    const prev = prevMsgLenRef.current;
+    prevMsgLenRef.current = len;
+    if (!activeId || len <= prev) return;
+    // Initial hydrate for this chat (prev === 0) → openChat owns scroll restore
+    if (prev === 0) return;
+    if (!isNearBottomNow()) return;
+    stickToBottom({ smooth: true, passes: 5 });
+    setTimeout(() => {
+      try { markVisibleMessagesRead(); } catch { /* */ }
+    }, 380);
+  }, [messages, activeId, stickToBottom]);
+
+  // Typing indicator adds height below the last message — keep it in view.
+  useEffect(() => {
+    const n = Object.keys(typingUsers || {}).length;
+    const prev = prevTypingCountRef.current;
+    prevTypingCountRef.current = n;
+    if (!activeId) return;
+    if (n <= prev) return; // only when someone starts typing / more typers
+    if (!isNearBottomNow()) return;
+    stickToBottom({ smooth: true, passes: 5 });
+  }, [typingUsers, activeId, stickToBottom]);
 
   const rearmScrollDownByUser = () => {
     // Only a real user gesture clears the programmatic-dismiss flag.
@@ -3326,18 +4063,41 @@ export default function MessengerApp() {
     const distBottom = Math.max(0, el.scrollHeight - el.scrollTop - h);
     const cid = activeIdRef.current;
     if (cid && !restoringScrollRef.current) {
+      // Real user scroll ends the restore-hold window
+      if (Date.now() < scrollRestoreUntilRef.current) {
+        // Only end hold once the delta is intentional (not our own apply)
+        const anchor = scrollAnchorRef.current;
+        const expected = anchor && Number.isFinite(anchor.distanceBottom)
+          ? anchor.distanceBottom
+          : null;
+        if (expected == null || Math.abs(distBottom - expected) > 40) {
+          scrollRestoreUntilRef.current = 0;
+        }
+      }
       const key = String(cid);
+      const atBottom = distBottom < NEAR_BOTTOM_PX;
+      const snapshot = {
+        scrollTop: Math.max(0, el.scrollTop),
+        distanceBottom: atBottom ? 0 : distBottom,
+        nearBottom: atBottom,
+        anchorMsgId: atBottom ? null : findAnchorMessageId(el),
+        savedAt: Date.now(),
+      };
       const prev = messagesCacheRef.current.get(key) || {};
       messagesCacheRef.current.set(key, {
         ...prev,
-        scrollTop: Math.max(0, el.scrollTop),
-        distanceBottom: distBottom,
-        nearBottom: distBottom < 140,
-        savedAt: Date.now(),
+        ...snapshot,
       });
+      scrollAnchorRef.current = { convId: key, ...snapshot };
       scrollPositionKnownRef.current.add(key);
+      try {
+        sessionStorage.setItem(
+          "messenger.scrollAnchor." + key,
+          JSON.stringify(snapshot)
+        );
+      } catch { /* */ }
     }
-    nearBottomRef.current = distBottom < 120;
+    nearBottomRef.current = distBottom < NEAR_BOTTOM_PX;
 
     // Scroll velocity (px/ms). Positive => toward newer msgs (down the list).
     // Negative => toward older msgs (up).
@@ -3353,12 +4113,11 @@ export default function MessengerApp() {
     const scrollingUp = sv.velocity < -0.05;    // toward top / older
     const speedUp = sv.velocity < 0 ? -sv.velocity : 0;
 
-    // Jump-to-bottom FAB:
-    //  - hide at bottom
-    //  - show when the user scrolls DOWN while away from bottom (or has new msgs below)
-    //  - hide when the user scrolls UP through history (not useful then)
-    //  - stay suppressed during programmatic smooth-scroll until a real gesture
-    const awayFromBottom = distBottom > 180;
+    // Jump-to-bottom FAB — position-based (not velocity-based).
+    // Velocity thresholds missed slow/touch scrolls; if the user is away from
+    // the live edge, the control must be available.
+    // Suppress only during programmatic scroll until a real gesture rearms.
+    const awayFromBottom = distBottom > Math.max(NEAR_BOTTOM_PX, 160);
     const hasNewBelow = (pendingNewIdsRef.current?.length || 0) > 0 || newBelowCount > 0;
 
     if (!awayFromBottom) {
@@ -3373,35 +4132,25 @@ export default function MessengerApp() {
       pendingNewIdsRef.current = [];
       setNewBelowCount(0);
     } else if (scrollDownDismissedRef.current && !userScrollIntentRef.current) {
+      // Programmatic scroll in progress — stay hidden
       setShowScrollDown(false);
       setScrollDownOpacity(0);
-    } else if (scrollingUp && !hasNewBelow) {
-      // Reading older history — tuck the control away
-      if (scrollDownFadeTimerRef.current) {
-        clearTimeout(scrollDownFadeTimerRef.current);
-        scrollDownFadeTimerRef.current = null;
-      }
-      setScrollDownOpacity(0);
-      setShowScrollDown(false);
-    } else if (scrollingDown || hasNewBelow) {
+    } else {
+      // Away from bottom: always arm (any direction / idle mid-chat)
       armScrollDownButton();
-      recountNewBelow();
+      if (hasNewBelow) recountNewBelow();
     }
-    // else: idle mid-chat — leave current visibility as-is (fade timer handles hide)
 
     markVisibleMessagesRead();
 
-    // Base prefetch window + expand aggressively when flinging upward.
-    // speedUp ~0.5+ is a quick flick; ~1.5+ is a hard fling.
-    // Prefetch older messages earlier for smoother upward scroll
-    let threshold = isMobile ? Math.max(720, h * 1.35) : Math.max(560, h * 1.15);
-    if (speedUp > 0.25) threshold = Math.max(threshold, h * 1.6);
-    if (speedUp > 0.6) threshold = Math.max(threshold, h * 2.2);
-    if (speedUp > 1.1) threshold = Math.max(threshold, h * 3.0);
-
-    if (el.scrollTop < threshold && (hasMoreMsgs || hasMoreMsgsRef.current) && !loadingMoreRef.current) {
-      loadOlder();
-    }
+    // Prefetch before hard edges (module: scrollPrefetch)
+    const plan = getScrollPrefetchPlan(el, {
+      isMobile,
+      hasMoreNewer: hasMoreNewerRef.current,
+      loading: loadingMoreRef.current,
+    });
+    if (plan.loadOlder) loadOlder();
+    if (plan.loadNewer) loadNewer();
   };
 
   // Pin viewport after prepending older messages (separate from chat-switch restore).
@@ -3427,7 +4176,7 @@ export default function MessengerApp() {
         out.push({ type: "day", id: `day-${day}-${m.id}`, label: day });
         lastDay = day;
       }
-      out.push({ type: "msg", ...m });
+      out.push({ ...normalizeMessage(m), type: "msg" });
     }
     return out;
   }, [messages]);
@@ -4379,7 +5128,15 @@ export default function MessengerApp() {
               </Paper>
             )}
           <Box
-            ref={listRef} className="messenger-msg-scroll" onScroll={onScrollMsgs}
+            ref={listRef} className={MSG_SCROLL_CLASS} onScroll={onScrollMsgs}
+            onMouseMove={(e) => {
+              if (isMobile) return;
+              updateScrollbarGutterVisibility(listRef.current, e.clientX, true);
+            }}
+            onMouseLeave={() => {
+              if (isMobile) return;
+              updateScrollbarGutterVisibility(listRef.current, null, false);
+            }}
             sx={{
               position: "relative",
               flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, py: 1,
@@ -4445,7 +5202,7 @@ export default function MessengerApp() {
             {loadingMsgs && !messages.length && (
               <Box sx={{ textAlign: "center", py: 6 }}><CircularProgress /></Box>
             )}
-            {messagesWithDays.map((m) => {
+            {messagesWithDays.map((m, msgIdx) => {
               const isMsg = m.type === "msg";
               const isDay = m.type === "day";
               const msgHl = isMsg && jumpHighlightId != null && String(jumpHighlightId) === String(m.id);
@@ -4453,6 +5210,7 @@ export default function MessengerApp() {
                 String(jumpHighlightDayId) === String(m.id)
                 || String(jumpHighlightDayId) === String(m.label)
               );
+              const { isFirstInSenderGroup, isLastInSenderGroup } = getSenderGroupFlags(messagesWithDays, msgIdx);
               return (
               <Box
                 key={m.id}
@@ -4483,6 +5241,24 @@ export default function MessengerApp() {
                 }
               >
                 <MessageBubble
+                  isFirstInSenderGroup={isFirstInSenderGroup}
+                  isLastInSenderGroup={isLastInSenderGroup}
+                  remoteEmojiPlay={
+                    remoteEmojiPlay && String(remoteEmojiPlay.messageId) === String(m.id)
+                      ? remoteEmojiPlay.key
+                      : 0
+                  }
+                  onEmojiPlay={(msg) => {
+                    const cid = activeIdRef.current;
+                    if (!cid || !wsRef.current || wsRef.current.readyState !== 1 || !msg?.id) return;
+                    try {
+                      wsRef.current.send(JSON.stringify({
+                        type: "emoji_play",
+                        conversation_id: Number(cid),
+                        message_id: Number(msg.id),
+                      }));
+                    } catch { /* */ }
+                  }}
                   onDayClick={() => setDayJumpOpen(true)}
                   onCancelSchedule={async (msg) => {
                     if (!msg?.id) return;
@@ -4582,6 +5358,53 @@ export default function MessengerApp() {
                   </Box>
                 </Box>
               ))}
+            {/* iMessage-style typing bubble */}
+            {Object.keys(typingUsers).length > 0 && (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-start",
+                  alignItems: "flex-end",
+                  mb: 0.7,
+                  px: 0.5,
+                  py: 0.1,
+                }}
+              >
+                <Box sx={{ width: 28, mr: 0.75, flexShrink: 0 }} />
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 1.1,
+                    borderRadius: "14px 14px 14px 4px",
+                    bgcolor: (t) => t.palette.mode === "dark" ? "background.paper" : "background.paper",
+                    boxShadow: (t) => t.palette.mode === "dark" ? "none" : 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.45,
+                    minWidth: 52,
+                    minHeight: 28,
+                  }}
+                >
+                  {[0, 1, 2].map((i) => (
+                    <Box
+                      key={i}
+                      sx={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: "50%",
+                        bgcolor: "text.secondary",
+                        animation: "typingDotPulse 1.2s ease-in-out infinite",
+                        animationDelay: `${i * 0.2}s`,
+                        "@keyframes typingDotPulse": {
+                          "0%, 60%, 100%": { opacity: 0.35, transform: "translateY(0)" },
+                          "30%": { opacity: 1, transform: "translateY(-2px)" },
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+            )}
             <div ref={bottomRef} />
 
           </Box>
@@ -4772,7 +5595,7 @@ export default function MessengerApp() {
                 flexDirection: "column",
                 gap: 1,
                 alignItems: "flex-end",
-                visibility: scrollDownOpacity > 0.05 ? "visible" : "hidden",
+                visibility: showScrollDown ? "visible" : "hidden",
               }}
             >
               <Button
@@ -4782,7 +5605,7 @@ export default function MessengerApp() {
                 aria-label={newBelowCount > 0 ? `Go to new messages (${newBelowCount})` : "Scroll to bottom"}
                 title={newBelowCount > 0 ? `${newBelowCount} new` : "Scroll to bottom"}
                 sx={{
-                  pointerEvents: scrollDownOpacity > 0.05 ? "auto" : "none",
+                  pointerEvents: showScrollDown ? "auto" : "none",
                   borderRadius: "50%",
                   minWidth: 48,
                   width: 48,
@@ -4891,21 +5714,7 @@ export default function MessengerApp() {
       }}
       onClick={() => { if (ctx) setCtx(null); }}
     >
-      <style>{`
-        .messenger-msg-scroll {
-          scrollbar-width: thin;
-          scrollbar-color: rgba(120,120,120,0.45) transparent;
-        }
-        .messenger-msg-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-        .messenger-msg-scroll::-webkit-scrollbar-thumb {
-          background: rgba(120,120,120,0.45);
-          border-radius: 8px;
-        }
-        .messenger-msg-scroll::-webkit-scrollbar-thumb:hover {
-          background: rgba(120,120,120,0.7);
-        }
-        .messenger-msg-scroll::-webkit-scrollbar-track { background: transparent; }
-      `}</style>
+      <style>{MSG_SCROLL_STYLE_TEXT}</style>
 
       {/* Ongoing-call mini strip — directly under the top of the messenger shell
           (settings header lives inside Sidebar below this when on the list;
