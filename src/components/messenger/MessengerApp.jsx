@@ -30,7 +30,7 @@ import {
   ListItemText, Divider, Fade, Chip, Popover, Tooltip, useMediaQuery, LinearProgress,
   Snackbar, Paper,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, ThemeProvider, createTheme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
@@ -106,10 +106,11 @@ import {
 } from "./modules/msgCache";
 import { parseCallSystemBody, formatCallSystemLabel, normalizeMessage, normalizeMessages } from "./modules/callSystemMessage";
 import { getSenderGroupFlags } from "./modules/messageGrouping";
+import { readAppearance, writeAppearance, getPalette, normalizeColorThemeId } from "./modules/appearance";
 import { getScrollPrefetchPlan, shouldChainLoadOlder, shouldChainLoadNewer } from "./modules/scrollPrefetch";
 import { MSG_SCROLL_CLASS, MSG_SCROLL_STYLE_TEXT, updateScrollbarGutterVisibility } from "./modules/msgScrollStyles";
 
-export default function MessengerApp() {
+export default function MessengerApp({ themeMode = "system", onThemeModeChange }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   // Real phone/tablet (UA/OS/pointer) — independent of window width.
@@ -194,11 +195,77 @@ export default function MessengerApp() {
   const [pinnedMessages, setPinnedMessages] = useState([]); // [{ id, message, pinned_at }]
   const [currentPinIndex, setCurrentPinIndex] = useState(0); // which pin is shown in the bar
 
-  // Composer state
-  const [text, setText] = useState("");
+  // Composer state — text lives in MessageComposer local state so typing does not
+  // re-render the whole shell (message list, sidebar). textRef is source of truth
+  // for send / draft flush. forceComposerText only for rare external updates.
   const textRef = useRef("");
-  useEffect(() => { textRef.current = text; }, [text]);
+  const [composerExternalText, setComposerExternalText] = useState("");
+  const [composerTextVersion, setComposerTextVersion] = useState(0);
+  const forceComposerText = useCallback((valueOrFn) => {
+    const prev = textRef.current;
+    const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
+    const v = next == null ? "" : String(next);
+    textRef.current = v;
+    setComposerExternalText(v);
+    setComposerTextVersion((n) => n + 1);
+  }, []);
   const [scheduledFor, setScheduledFor] = useState(null);
+  const [appearance, setAppearance] = useState(() => readAppearance());
+  const updateAppearance = useCallback((partial) => {
+    setAppearance((prev) => writeAppearance({ ...prev, ...partial }));
+  }, []);
+
+  // Messenger-only theme (color palette does NOT affect the rest of the site)
+  const parentTheme = useTheme();
+  const parentMode = parentTheme.palette.mode === "dark" ? "dark" : "light";
+  const messengerTheme = useMemo(() => {
+    const mode = parentMode;
+    const colorId = normalizeColorThemeId(appearance?.colorTheme);
+    const pal = getPalette(colorId, mode);
+    const isDark = mode === "dark";
+    return createTheme({
+      palette: {
+        mode,
+        primary: {
+          main: pal.primary,
+          dark: isDark ? pal.primarySoft : pal.primaryHover,
+          light: isDark ? pal.primaryHover : pal.primarySoft,
+          contrastText: "#ffffff",
+        },
+        secondary: parentTheme.palette.secondary,
+        success: { main: pal.success },
+        warning: { main: pal.warning },
+        error: { main: pal.danger },
+        background: {
+          default: pal.background,
+          paper: pal.surface,
+        },
+        text: {
+          primary: pal.text,
+          secondary: pal.textSecondary,
+          disabled: pal.textMuted,
+        },
+        divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)",
+        action: parentTheme.palette.action,
+      },
+      shape: parentTheme.shape,
+      typography: parentTheme.typography,
+      breakpoints: parentTheme.breakpoints,
+      spacing: parentTheme.spacing,
+      transitions: parentTheme.transitions,
+      zIndex: parentTheme.zIndex,
+      customColors: {
+        surfaceElevated: pal.surfaceElevated,
+        surfaceHover: pal.surfaceHover,
+        border: pal.border,
+        borderStrong: pal.borderStrong,
+        textMuted: pal.textMuted,
+        primarySoft: pal.primarySoft,
+        bubbleMine: pal.bubbleMine || pal.primary,
+        colorThemeId: colorId,
+      },
+    });
+  }, [parentMode, parentTheme, appearance?.colorTheme]);
   const [dayJumpOpen, setDayJumpOpen] = useState(false);
   const [msgSearchOpen, setMsgSearchOpen] = useState(false);
   const [msgSearchQ, setMsgSearchQ] = useState("");
@@ -228,6 +295,8 @@ export default function MessengerApp() {
 
   const [replyTo, setReplyTo] = useState(null);
   const [editingMsg, setEditingMsg] = useState(null);
+  const editingMsgRef = useRef(null);
+  useEffect(() => { editingMsgRef.current = editingMsg; }, [editingMsg]);
   useEffect(() => {
     try { localStorage.setItem("messenger.sendFilesTogether", String(sendFilesTogether)); } catch { /* */ }
   }, [sendFilesTogether]);
@@ -1275,7 +1344,7 @@ export default function MessengerApp() {
     setSelectedIds(new Set());
     setReplyTo(null);
     setEditingMsg(null);
-    setText("");
+    forceComposerText("");
     setPinnedMessages([]);
     setCurrentPinIndex(0);
     closePanel();
@@ -1334,7 +1403,7 @@ export default function MessengerApp() {
     setReplyTo(null);
     setEditingMsg(null);
     // Restore unsent draft (server-synced preferred, else localStorage)
-    setText(resolveComposerDraft(c.id, c.draft_text));
+    forceComposerText(resolveComposerDraft(c.id, c.draft_text));
     setCtx(null);
     if (isMobile) setDrawerOpen(false);
 
@@ -1838,7 +1907,7 @@ export default function MessengerApp() {
     setCallConfig,
     setActiveCallInfo,
     setNewBelowCount,
-    setText,
+    setText: forceComposerText,
     setConversations,
     onRemoteEmojiPlay,
   });
@@ -1880,7 +1949,7 @@ export default function MessengerApp() {
       }
       if (editingMsg) {
         setEditingMsg(null);
-        setText(activeId ? readComposerDraft(activeId) : "");
+        forceComposerText(activeId ? readComposerDraft(activeId) : "");
         return;
       }
       if (replyTo) { setReplyTo(null); return; }
@@ -1970,7 +2039,7 @@ export default function MessengerApp() {
       }
       if (editingMsg) {
         setEditingMsg(null);
-        setText(activeId ? readComposerDraft(activeId) : "");
+        forceComposerText(activeId ? readComposerDraft(activeId) : "");
         pushRoot();
         return;
       }
@@ -2142,7 +2211,7 @@ export default function MessengerApp() {
 
   const sendOrEdit = async () => {
     if (!activeId) return;
-    const body = text.trim();
+    const body = String(textRef.current || "").trim();
     if (editingMsg) {
       if (!body) return;
       try {
@@ -2154,7 +2223,7 @@ export default function MessengerApp() {
         setMessages((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)));
         setEditingMsg(null);
         // After edit, restore any remaining draft for this chat (or empty)
-        setText(readComposerDraft(activeId));
+        forceComposerText(readComposerDraft(activeId));
         flash("Edited");
       } catch (e) {
         setError(e?.response?.data?.message || "Edit failed");
@@ -2228,7 +2297,7 @@ export default function MessengerApp() {
       }
       // Stop typing indicator for peers immediately on send
       stopTypingSignal();
-      setText(""); setFiles([]);
+      forceComposerText(""); setFiles([]);
       setMediaSpoiler(false);
       setMediaViewOnce(false);
       writeComposerDraft(activeId, "");
@@ -2296,7 +2365,7 @@ export default function MessengerApp() {
     // "Send separately": each selected file becomes its own message.
     const rep = replyTo;
     stopTypingSignal();
-    setText(""); setFiles([]); setReplyTo(null);
+    forceComposerText(""); setFiles([]); setReplyTo(null);
     writeComposerDraft(activeId, "");
     setScheduledFor(null);
     let firstError = null;
@@ -2343,7 +2412,7 @@ export default function MessengerApp() {
   const startEdit = (m) => {
     setEditingMsg(m);
     setReplyTo(null);
-    setText(typeof m.body === "string" ? m.body : String(m.body || ""));
+    forceComposerText(typeof m.body === "string" ? m.body : String(m.body || ""));
     setCtx(null);
     setTimeout(() => inputRef.current?.focus(), 40);
   };
@@ -2359,7 +2428,7 @@ export default function MessengerApp() {
       && !e.metaKey
       && !editingMsg
       && !replyTo
-      && text === ""
+      && textRef.current === ""
     ) {
       const lastMine = [...messages].reverse().find(
         (m) => String(m.sender?.id) === String(meId) && !m.is_deleted && !m.is_system
@@ -2889,75 +2958,82 @@ export default function MessengerApp() {
     }
   }, [sendTypingSignal]);
 
-  const handleComposerText = useCallback((valueOrFn) => {
-    setText((prev) => {
-      const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
-      // Persist draft immediately (do not wait for useEffect)
-      const cid = activeIdRef.current;
-      if (cid) {
-        try { writeComposerDraft(cid, next); } catch { /* */ }
-      }
-      // Notify peers we're typing (debounced stop)
-      if (String(next || "").trim()) {
-        if (!typingSentRef.current) {
-          typingSentRef.current = true;
-          sendTypingSignal(true);
-        }
-        if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
-        typingStopTimerRef.current = setTimeout(() => {
-          typingSentRef.current = false;
-          sendTypingSignal(false);
-          typingStopTimerRef.current = null;
-        }, 2200);
-      } else if (typingSentRef.current) {
-        typingSentRef.current = false;
-        if (typingStopTimerRef.current) {
-          clearTimeout(typingStopTimerRef.current);
-          typingStopTimerRef.current = null;
-        }
-        sendTypingSignal(false);
-      }
-      return next;
-    });
-  }, [sendTypingSignal]);
-
-  // Persist draft locally + sync to backend via WS (other devices)
+  // Called on every keystroke from MessageComposer — MUST NOT set React state for the
+  // text itself (that would re-render message list + sidebar). Only refs + debounced side effects.
   const draftSyncTimerRef = useRef(null);
-  useEffect(() => {
-    if (!activeId || editingMsg) return;
-    writeComposerDraft(activeId, text);
-    // Reflect draft in chat list immediately (local)
-    const cid = String(activeId);
-    setConversations((prev) => {
-      let changed = false;
-      const next = prev.map((c) => {
-        if (String(c.id) !== cid) return c;
-        const d = String(text || "");
-        if ((c.draft_text || "") === d) return c;
-        changed = true;
-        return { ...c, draft_text: d };
+  const draftListTimerRef = useRef(null);
+  const lastDraftSyncedRef = useRef({ convId: null, text: null });
+  const handleComposerText = useCallback((valueOrFn) => {
+    const prev = textRef.current;
+    const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
+    const nextStr = next == null ? "" : String(next);
+    textRef.current = nextStr;
+
+    const cid = activeIdRef.current;
+    if (cid) {
+      try { writeComposerDraft(cid, nextStr); } catch { /* */ }
+    }
+
+    // Typing indicator
+    if (String(nextStr || "").trim()) {
+      if (!typingSentRef.current) {
+        typingSentRef.current = true;
+        sendTypingSignal(true);
+      }
+      if (typingStopTimerRef.current) clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = setTimeout(() => {
+        typingSentRef.current = false;
+        sendTypingSignal(false);
+        typingStopTimerRef.current = null;
+      }, 2200);
+    } else if (typingSentRef.current) {
+      typingSentRef.current = false;
+      if (typingStopTimerRef.current) {
+        clearTimeout(typingStopTimerRef.current);
+        typingStopTimerRef.current = null;
+      }
+      sendTypingSignal(false);
+    }
+
+    // Debounced chat-list draft preview + WS sync (no per-keystroke React text state)
+    if (editingMsgRef.current) return;
+    if (!cid) return;
+    const cidStr = String(cid);
+
+    if (draftListTimerRef.current) clearTimeout(draftListTimerRef.current);
+    draftListTimerRef.current = setTimeout(() => {
+      const d = String(textRef.current || "");
+      setConversations((prev) => {
+        let changed = false;
+        const mapped = prev.map((c) => {
+          if (String(c.id) !== cidStr) return c;
+          if ((c.draft_text || "") === d) return c;
+          changed = true;
+          return { ...c, draft_text: d };
+        });
+        return changed ? mapped : prev;
       });
-      return changed ? next : prev;
-    });
+    }, 400);
+
     if (draftSyncTimerRef.current) clearTimeout(draftSyncTimerRef.current);
     draftSyncTimerRef.current = setTimeout(() => {
       const id = activeIdRef.current;
       if (!id) return;
-      // WS sync to backend / other devices
+      const payload = String(textRef.current || "");
+      const last = lastDraftSyncedRef.current;
+      if (last.convId === String(id) && last.text === payload) return;
       if (wsRef.current && wsRef.current.readyState === 1) {
         try {
           wsRef.current.send(JSON.stringify({
             type: "draft",
             conversation_id: Number(id),
-            text: String(textRef.current || ""),
+            text: payload,
           }));
+          lastDraftSyncedRef.current = { convId: String(id), text: payload };
         } catch { /* */ }
       }
-    }, 450);
-    return () => {
-      if (draftSyncTimerRef.current) clearTimeout(draftSyncTimerRef.current);
-    };
-  }, [text, activeId, editingMsg]);
+    }, 2500);
+  }, [sendTypingSignal]);
 
   const formatTypingLabel = useCallback((map, isGroup) => {
     const list = Object.values(map || {});
@@ -4533,7 +4609,7 @@ export default function MessengerApp() {
       sx={{
         flex: 1, height: "100%",
         display: "flex", flexDirection: "column",
-        bgcolor: theme.palette.mode === "dark" ? "#0e1621" : "#e7ebf0",
+        bgcolor: "background.default",
         minWidth: 0, width: "100%",
         position: "relative",
       }}
@@ -5151,7 +5227,7 @@ export default function MessengerApp() {
             }}
             sx={{
               position: "relative",
-              flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, py: 1,
+              flex: 1, overflow: "auto", px: { xs: 0.75, sm: 1.5 }, pt: 1.5, pb: 1,
               // Soften visual jank when older messages prepend
               scrollBehavior: "auto",
               "& > *": { transition: "opacity 0.2s ease" },
@@ -5255,6 +5331,9 @@ export default function MessengerApp() {
                 <MessageBubble
                   isFirstInSenderGroup={isFirstInSenderGroup}
                   isLastInSenderGroup={isLastInSenderGroup}
+                  showOwnAvatar={appearance?.showOwnAvatar !== false}
+                  showOthersAvatar={appearance?.showOthersAvatar !== false}
+                  bubbleStyle={appearance?.bubbleStyle || "modern"}
                   remoteEmojiPlay={
                     remoteEmojiPlay && String(remoteEmojiPlay.messageId) === String(m.id)
                       ? remoteEmojiPlay.key
@@ -5302,7 +5381,7 @@ export default function MessengerApp() {
                   onForward={(message) => setForwardOpen(message)}
                   onOpenPreview={openPreview}
                   onEditCode={(fence) => {
-                    setText((prev) => {
+                    forceComposerText((prev) => {
                       const p = (prev || "").trim();
                       return p ? `${p}\n\n${fence}` : fence;
                     });
@@ -5546,7 +5625,7 @@ export default function MessengerApp() {
             </Box>
           ) : (
             <MessageComposer
-              text={text} setText={handleComposerText}
+              text={composerExternalText} textVersion={composerTextVersion} setText={handleComposerText}
               files={files} setFiles={(v) => {
                 const next = typeof v === "function" ? v(files) : v;
                 setFiles(next);
@@ -5562,7 +5641,7 @@ export default function MessengerApp() {
                 setReplyTo(null);
                 setEditingMsg(null);
                 // Restore draft after canceling edit/reply
-                setText(activeId ? readComposerDraft(activeId) : "");
+                forceComposerText(activeId ? readComposerDraft(activeId) : "");
               }}
               onSend={sendOrEdit}
               scheduledFor={scheduledFor}
@@ -5708,6 +5787,7 @@ export default function MessengerApp() {
   const panelIsOpen = Boolean(rightPanel) && rightPanel !== "my-profile";
 
   return (
+    <ThemeProvider theme={messengerTheme}>
     <Box
       sx={{
         position: "fixed",
@@ -5846,6 +5926,13 @@ export default function MessengerApp() {
             onOpenJoin={() => setJoinOpen(true)}
             onNavigateHome={() => navigate("/")}
             onOpenMediaSettings={() => setMediaSettingsOpen(true)}
+            themeMode={themeMode}
+            onThemeModeChange={onThemeModeChange}
+            appearance={appearance}
+            onAppearanceChange={updateAppearance}
+            colorThemeId={appearance?.colorTheme || "default"}
+            onColorThemeChange={(id) => updateAppearance({ colorTheme: id })}
+            onOpenAppearance={() => pushPanel("appearance")}
             onOpenSharedMedia={() => setMediaLibraryOpen(true)}
             conversationId={activeId}
             onMediaShowInChat={(att) => {
@@ -6309,5 +6396,6 @@ export default function MessengerApp() {
         jumpToDayInChat={jumpToDayInChat}
       />
     </Box>
+    </ThemeProvider>
   );
 }

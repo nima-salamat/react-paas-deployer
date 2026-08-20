@@ -554,9 +554,9 @@ async function cropVideoMessageToSquare(blob) {
   }
 }
 
-export default function MessageComposer({
+function MessageComposer({
 
-  text, setText, files, setFiles,
+  text, setText, textVersion = 0, files, setFiles,
   replyTo, editingMsg, onCancelReplyOrEdit,
   onSend, onPickImage, onPickVideo, onEditAttachment, inputRef, onKeyDown,
   sendFilesTogether = true, setSendFilesTogether,
@@ -568,6 +568,26 @@ export default function MessageComposer({
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // Local text — typing re-renders only this component, not the whole messenger shell.
+  // Parent forces value via text + textVersion (open draft, edit, clear after send).
+  const [localText, setLocalText] = useState(() => text || "");
+  const lastAppliedVersionRef = useRef(textVersion);
+  useEffect(() => {
+    if (lastAppliedVersionRef.current === textVersion) return;
+    lastAppliedVersionRef.current = textVersion;
+    setLocalText(text || "");
+  }, [textVersion, text]);
+
+  const updateText = useCallback((valueOrFn) => {
+    setLocalText((prev) => {
+      const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
+      const v = next == null ? "" : String(next);
+      if (typeof setText === "function") setText(v);
+      return v;
+    });
+  }, [setText]);
+
   const fileRef = useRef(null);
   const emojiBtnRef = useRef(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -1216,8 +1236,8 @@ export default function MessageComposer({
   const applyShortcodeEmoji = (emoji) => {
     if (!scQuery) return;
     const { start, end } = scQuery;
-    const next = `${text.slice(0, start)}${emoji}${text.slice(end)}`;
-    setText(next);
+    const next = `${localText.slice(0, start)}${emoji}${localText.slice(end)}`;
+    updateText(next);
     setScQuery(null);
     setScIndex(0);
     // restore caret after emoji
@@ -1235,9 +1255,9 @@ export default function MessageComposer({
     if (!mentionQuery || !user?.username) return;
     const { start, end } = mentionQuery;
     const mention = `@${String(user.username).replace(/^@/, "")}`;
-    const next = `${text.slice(0, start)}${mention} ${text.slice(end)}`;
+    const next = `${localText.slice(0, start)}${mention} ${localText.slice(end)}`;
     const nextCursor = start + mention.length + 1;
-    setText(next);
+    updateText(next);
     setMentionQuery(null);
     setMentionIndex(0);
     requestAnimationFrame(() => {
@@ -1252,7 +1272,7 @@ export default function MessageComposer({
   const onTextChange = (e) => {
     const value = e.target.value;
     const cursor = e.target.selectionStart;
-    setText(value);
+    updateText(value);
     updateSuggestionsFromText(value, cursor);
   };
 
@@ -1429,7 +1449,7 @@ export default function MessageComposer({
   /** Wrap current selection (or insert at cursor) with formatting markers. */
   const applyTextFormat = (kind) => {
     const ta = getComposerTextarea();
-    const value = text || "";
+    const value = localText || "";
     let start = selectionRef.current?.start ?? 0;
     let end = selectionRef.current?.end ?? 0;
     if (ta && typeof ta.selectionStart === "number") {
@@ -1476,7 +1496,7 @@ export default function MessageComposer({
       setFmtMenu(null);
       return;
     }
-    setText(next);
+    updateText(next);
     setFmtMenu(null);
     selectionRef.current = { start: selFrom, end: selTo };
     requestAnimationFrame(() => {
@@ -1534,7 +1554,7 @@ export default function MessageComposer({
     return `${m}:${r.toString().padStart(2, "0")}`;
   };
 
-  const canSend = Boolean(text.trim() || files.length || editingMsg);
+  const canSend = Boolean(localText.trim() || files.length || editingMsg);
   const primaryMode = mediaMode; // "voice" | "video"
 
   /* ---------- locked / holding recording UI ---------- */
@@ -2102,11 +2122,11 @@ export default function MessageComposer({
 
       {/* Multi-file code workspace + quote editors */}
       {(() => {
-        const blocks = extractComposeBlocks(text);
+        const blocks = extractComposeBlocks(localText);
         const codeBlocks = blocks.filter((b) => b.type === "codeblock");
         const quoteBlocks = blocks.filter((b) => b.type === "quote");
         if (!codeBlocks.length && !quoteBlocks.length) return null;
-        const split = splitMarkdownCode(text);
+        const split = splitMarkdownCode(localText);
         return (
           <Box
             sx={{
@@ -2126,13 +2146,13 @@ export default function MessageComposer({
                 <ComposeCodeWorkspace
                   files={split.files}
                   onChangeFiles={(nextFiles) => {
-                    setText(joinMarkdownCode(split.prefix, nextFiles, split.suffix));
+                    updateText(joinMarkdownCode(split.prefix, nextFiles, split.suffix));
                   }}
                   onAttachFile={(file) => {
                     setFiles((prev) => [...prev, file]);
                   }}
                   onRemoveAll={() => {
-                    setText([split.prefix, split.suffix].filter(Boolean).join("\n\n"));
+                    updateText([split.prefix, split.suffix].filter(Boolean).join("\n\n"));
                   }}
                 />
               )}
@@ -2140,8 +2160,8 @@ export default function MessageComposer({
                 <ComposeQuoteEditor
                   key={`q-${b.start}`}
                   text={b.text}
-                  onChange={(q) => setText(replaceQuoteBlock(text, b.start, b.end, q))}
-                  onRemove={() => setText((text || "").slice(0, b.start) + (text || "").slice(b.end))}
+                  onChange={(q) => updateText(replaceQuoteBlock(localText, b.start, b.end, q))}
+                  onRemove={() => updateText((localText || "").slice(0, b.start) + (localText || "").slice(b.end))}
                 />
               ))}
             </Stack>
@@ -2353,7 +2373,7 @@ export default function MessageComposer({
             onEmojiClick={(emojiData) => {
               const em = emojiData?.emoji;
               if (!em) return;
-              setText((t) => (t || "") + em);
+              updateText((t) => (t || "") + em);
               inputRef?.current?.focus();
               // keep open for multi-pick; user closes via outside click
             }}
@@ -2369,7 +2389,7 @@ export default function MessageComposer({
         </Popover>
         {editingMsg && (
           <IconButton onClick={() => {
-            setText("");
+            updateText("");
             onCancelReplyOrEdit?.();
           }} title="Cancel edit">
             <CloseIcon color="warning" />
@@ -2385,7 +2405,7 @@ export default function MessageComposer({
           placeholder={editingMsg ? "Edit message…" : "Message"}
           inputProps={{ dir: "auto" }}
           onContextMenu={onTextContextMenu}
-          value={text}
+          value={localText}
           onChange={(e) => {
             onTextChange(e);
             rememberSelection(e.target);
@@ -2759,3 +2779,5 @@ export default function MessageComposer({
     </Box>
   );
 }
+
+export default React.memo(MessageComposer);

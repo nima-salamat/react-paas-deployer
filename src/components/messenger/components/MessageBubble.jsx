@@ -1525,8 +1525,15 @@ export default function MessageBubble({
   isLastInSenderGroup = true,
   remoteEmojiPlay = 0,
   onEmojiPlay,
+  showOwnAvatar = true,
+  showOthersAvatar = true,
+  bubbleStyle = "modern", // modern | overlap | irc
 }) {
   const theme = useTheme();
+  const isIrc = bubbleStyle === "irc";
+  const isOverlap = bubbleStyle === "overlap";
+  const bubbleMineBg = theme.customColors?.bubbleMine
+    || (theme.palette.mode === "dark" ? "#2b5278" : theme.palette.primary.main);
   // Hooks must run unconditionally (before any early return) — Rules of Hooks.
   const [emojiPlaying, setEmojiPlaying] = useState(false);
   const emojiRootRef = useRef(null);
@@ -1650,6 +1657,10 @@ export default function MessageBubble({
     );
   }
   const mine = String(m.sender?.id) === String(meId);
+  const allowAvatar = mine ? showOwnAvatar : showOthersAvatar;
+  const showSideAvatar = allowAvatar && bubbleStyle === "modern";
+  const showOverlapAvatar = allowAvatar && isOverlap;
+  const showIrcAvatar = allowAvatar && isIrc;
   const bodyStr = typeof m.body === "string" ? m.body : String(m.body || "");
 
   // Call / system messages — never show raw __call__:{…} JSON; never throw (Opera-safe)
@@ -1859,10 +1870,13 @@ export default function MessageBubble({
       data-msg-system={m.is_system ? "1" : "0"}
       sx={{
         display: "flex",
-        justifyContent: mine ? "flex-end" : "flex-start",
+        justifyContent: isIrc ? "flex-start" : (mine ? "flex-end" : "flex-start"),
         mb: isLastInSenderGroup ? 0.7 : 0.15,
+        // Overlap avatars stick above the bubble — reserve space so they don't cover previous msg
+        mt: showOverlapAvatar ? 1.25 : 0,
         px: 0.5,
         py: 0.1,
+        overflow: "visible",
         // Full row is the hit-target (side gutter counts as the message zone)
         width: "100%",
         alignItems: "flex-end",
@@ -1912,17 +1926,18 @@ export default function MessageBubble({
           {selected ? "✓" : ""}
         </Box>
       )}
-      {!mine && (
-        isLastInSenderGroup ? (
-          <Box sx={{ position: "relative", mr: 0.75, mt: 0.15, flexShrink: 0, alignSelf: "flex-end", mb: 0.15 }}>
+      {/* Modern: side avatar (others left). IRC: always left for everyone. */}
+      {((showSideAvatar && !mine) || showIrcAvatar) && (
+        (isIrc || isLastInSenderGroup) ? (
+          <Box sx={{ position: "relative", mr: 0.75, mt: 0.15, flexShrink: 0, alignSelf: isIrc ? "flex-start" : "flex-end", mb: 0.15 }}>
             <Avatar
               src={withTokenQuery(m.sender?.avatar) || undefined}
-              sx={{ width: 28, height: 28, cursor: "pointer" }}
+              sx={{ width: isIrc ? 24 : 28, height: isIrc ? 24 : 28, cursor: "pointer" }}
               onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
             >
               {m.sender?.username?.[0]?.toUpperCase()}
             </Avatar>
-            {m.sender?.is_online && (
+            {!isIrc && m.sender?.is_online && (
               <Box
                 sx={{
                   position: "absolute",
@@ -1950,35 +1965,78 @@ export default function MessageBubble({
             : (bodySegments.some((s) => s.type === "codeblock") ? { xs: "96%", sm: "85%" } : { xs: "82%", sm: "70%" }),
           minWidth: 0,
           position: "relative",
-          // visible for big-emoji Lottie overlay; hidden otherwise to clip long content
-          overflow: isBigEmoji ? "visible" : "hidden",
+          // visible for big-emoji Lottie overlay / overlap avatar; hidden otherwise to clip
+          overflow: (isBigEmoji || isOverlap) ? "visible" : "hidden",
           px: isBigEmoji || isCircularVideoMsg ? 0.5 : 1.35,
           py: isBigEmoji || isCircularVideoMsg ? 0.35 : 0.85,
-          borderRadius: isBigEmoji || isCircularVideoMsg
-            ? 2
+          borderRadius: isBigEmoji || isCircularVideoMsg || isIrc
+            ? (isIrc ? 1 : 2)
             : (mine
               ? (isLastInSenderGroup ? "14px 14px 4px 14px" : "14px 14px 14px 14px")
               : (isLastInSenderGroup ? "14px 14px 14px 4px" : "14px 14px 14px 14px")),
           bgcolor: isBigEmoji || isCircularVideoMsg
             ? "transparent"
-            : (mine
-              ? (theme.palette.mode === "dark" ? "#2b5278" : theme.palette.primary.main)
-              : "background.paper"),
-          color: isBigEmoji || isCircularVideoMsg ? "text.primary" : (mine ? "#fff" : "text.primary"),
-          boxShadow: isBigEmoji || isCircularVideoMsg ? "none" : (theme.palette.mode === "dark" ? "none" : 1),
+            : (isIrc
+              ? "transparent"
+              : (mine ? bubbleMineBg : "background.paper")),
+          color: isBigEmoji || isCircularVideoMsg || isIrc
+            ? "text.primary"
+            : (mine ? "#fff" : "text.primary"),
+          boxShadow: isBigEmoji || isCircularVideoMsg || isIrc
+            ? "none"
+            : (theme.palette.mode === "dark" ? "none" : 1),
           display: isCircularVideoMsg ? "flex" : undefined,
           flexDirection: isCircularVideoMsg ? "column" : undefined,
           alignItems: isCircularVideoMsg ? "center" : undefined,
+          // Overlap: lift content so avatar can sit on the top corner
+          pt: showOverlapAvatar && !isBigEmoji && !isCircularVideoMsg ? 2.1 : undefined,
+          pl: isIrc ? 0.25 : undefined,
+          pr: isIrc ? 0.5 : undefined,
+          border: isIrc ? "none" : undefined,
         }}
       >
-        {!mine && activeConv?.type === "group" && (
+        {/* Overlap avatar — top-left (others) / top-right (mine) */}
+        {showOverlapAvatar && !isBigEmoji && !isCircularVideoMsg && (
+          <Avatar
+            src={withTokenQuery(m.sender?.avatar) || undefined}
+            sx={{
+              width: 28,
+              height: 28,
+              cursor: "pointer",
+              position: "absolute",
+              top: -14,
+              ...(mine ? { right: 8 } : { left: 8 }),
+              border: "2.5px solid",
+              borderColor: mine ? bubbleMineBg : "background.paper",
+              boxShadow: (t) => t.palette.mode === "dark"
+                ? "0 2px 8px rgba(0,0,0,0.45)"
+                : "0 2px 8px rgba(0,0,0,0.18)",
+              zIndex: 5,
+              bgcolor: "background.paper",
+            }}
+            onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
+          >
+            {m.sender?.username?.[0]?.toUpperCase()}
+          </Avatar>
+        )}
+        {/* Username: groups (modern/overlap) or always in IRC */}
+        {((!mine && activeConv?.type === "group" && !isIrc) || isIrc) && (
           <Typography
             variant="caption"
             fontWeight={700}
-            sx={{ color: "primary.light", cursor: "pointer", display: "block" }}
+            sx={{
+              color: isIrc
+                ? (mine ? "primary.main" : "primary.light")
+                : "primary.light",
+              cursor: "pointer",
+              display: "block",
+              mb: isIrc ? 0.15 : 0,
+            }}
             onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
           >
-            {m.sender?.username}
+            {isIrc
+              ? `${m.sender?.username || "user"}`
+              : m.sender?.username}
           </Typography>
         )}
         {m.reply_to_preview && (
@@ -2278,6 +2336,36 @@ export default function MessageBubble({
           {tickEl}
         </Stack>
       </Box>
+      {showSideAvatar && mine && (
+        isLastInSenderGroup ? (
+          <Box sx={{ position: "relative", ml: 0.75, mt: 0.15, flexShrink: 0, alignSelf: "flex-end", mb: 0.15 }}>
+            <Avatar
+              src={withTokenQuery(m.sender?.avatar) || undefined}
+              sx={{ width: 28, height: 28, cursor: "pointer" }}
+              onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
+            >
+              {m.sender?.username?.[0]?.toUpperCase()}
+            </Avatar>
+            {m.sender?.is_online && (
+              <Box
+                sx={{
+                  position: "absolute",
+                  bottom: 0,
+                  right: 0,
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  bgcolor: "#4caf50",
+                  border: "1.5px solid",
+                  borderColor: "background.default",
+                }}
+              />
+            )}
+          </Box>
+        ) : (
+          <Box sx={{ width: 28, ml: 0.75, flexShrink: 0 }} />
+        )
+      )}
     </Box>
   );
 }

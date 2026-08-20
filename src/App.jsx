@@ -169,8 +169,8 @@ function App() {
       <TicketNotifyProvider>
       <Router>
         <Routes>
-          <Route path="/messenger" element={<MessengerApp />} />
-          <Route path="/messenger/*" element={<MessengerApp />} />
+          <Route path="/messenger" element={<MessengerApp themeMode={themeMode} onThemeModeChange={setThemeMode} />} />
+          <Route path="/messenger/*" element={<MessengerApp themeMode={themeMode} onThemeModeChange={setThemeMode} />} />
           {/* Standalone admin console — no main Navbar / Footer (messenger-style) */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/*" element={<AdminDashboard />} />

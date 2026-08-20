@@ -3,6 +3,7 @@ import {
   Box, Stack, Typography, IconButton, Divider, List, ListItemButton, ListItemIcon,
   ListItemText, ListItemAvatar, Button, TextField, FormControlLabel, Switch, Paper, Avatar,
   Chip, Menu, MenuItem, alpha, FormControl, Select, InputLabel, CircularProgress,
+  ToggleButton, ToggleButtonGroup,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
@@ -12,6 +13,11 @@ import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import LinkIcon from "@mui/icons-material/Link";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import VideocamIcon from "@mui/icons-material/Videocam";
+import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
+import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightnessOutlined";
+import PaletteOutlinedIcon from "@mui/icons-material/PaletteOutlined";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
@@ -66,6 +72,10 @@ export default function RightPanel({
   canGoBack, onBack, onClose,
   onOpenMyProfile, onOpenContacts, onOpenBlocks, onOpenMyRequests, onOpenConvJoinRequests,
   onOpenCreateGroup, onOpenJoin, onNavigateHome, onOpenMediaSettings,
+  themeMode = "system", onThemeModeChange,
+  appearance, onAppearanceChange,
+  colorThemeId = "default", onColorThemeChange,
+  onOpenAppearance,
   onOpenSharedMedia,
   onOpenChatInfo,
   conversationId,
@@ -96,6 +106,7 @@ export default function RightPanel({
   const headerTitle = (() => {
     switch (kind) {
       case "settings": return "Settings";
+      case "appearance": return "Appearance";
       case "contacts": return "Contacts";
       case "blocks": return "Blocked users";
       case "profile": return "Profile";
@@ -198,6 +209,54 @@ export default function RightPanel({
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
             </ListItemButton>
+            <Box sx={{ px: 2, py: 1.25 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14.5, mb: 0.75 }}>
+                Theme
+              </Typography>
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                fullWidth
+                value={themeMode}
+                onChange={(_, next) => {
+                  if (!next || next === themeMode) return;
+                  if (typeof onThemeModeChange === "function") onThemeModeChange(next);
+                }}
+                aria-label="Theme mode"
+                sx={{
+                  "& .MuiToggleButton-root": {
+                    textTransform: "none",
+                    fontWeight: 600,
+                    fontSize: 12.5,
+                    py: 0.75,
+                    gap: 0.5,
+                  },
+                }}
+              >
+                <ToggleButton value="light" aria-label="Light">
+                  <LightModeOutlinedIcon sx={{ fontSize: 18 }} />
+                  Light
+                </ToggleButton>
+                <ToggleButton value="dark" aria-label="Dark">
+                  <DarkModeOutlinedIcon sx={{ fontSize: 18 }} />
+                  Dark
+                </ToggleButton>
+                <ToggleButton value="system" aria-label="System">
+                  <SettingsBrightnessOutlinedIcon sx={{ fontSize: 18 }} />
+                  System
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+            <ListItemButton onClick={onOpenAppearance} sx={itemSx}>
+              <ListItemIcon><PaletteOutlinedIcon fontSize="small" /></ListItemIcon>
+              <ListItemText
+                primary="Appearance"
+                secondary="Themes, avatars & message style"
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+              <ChevronRightIcon fontSize="small" sx={{ color: "text.secondary", opacity: 0.7 }} />
+            </ListItemButton>
           </List>
 
           <List disablePadding sx={{ mt: 2, bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
@@ -205,6 +264,194 @@ export default function RightPanel({
               <ListItemIcon sx={{ color: "inherit" }}><HomeOutlinedIcon fontSize="small" /></ListItemIcon>
               <ListItemText primary="Back to Deployer" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
             </ListItemButton>
+          </List>
+        </Box>
+      </Box>
+    );
+  }
+
+
+  // Appearance — color themes, avatars, bubble style
+  if (kind === "appearance") {
+    const itemSx = {
+      borderRadius: 1,
+      mx: 1,
+      mb: 0.25,
+      py: 1,
+      "& .MuiListItemIcon-root": { minWidth: 40 },
+    };
+    const showOwnAvatar = appearance?.showOwnAvatar !== false;
+    const showOthersAvatar = appearance?.showOthersAvatar !== false;
+    const bubbleStyle = appearance?.bubbleStyle || "modern";
+    const themes = [
+      { id: "default", label: "Default", emoji: "⚪", tagline: "System default" },
+      { id: "ocean", label: "Ocean Blue", emoji: "🔵", tagline: "Professional" },
+      { id: "indigo", label: "Indigo", emoji: "🟣", tagline: "Premium" },
+      { id: "aurora", label: "Aurora Purple", emoji: "💜", tagline: "Modern / AI" },
+      { id: "emerald", label: "Emerald", emoji: "🟢", tagline: "Fresh / Calm" },
+      { id: "cyan", label: "Cyan", emoji: "🩵", tagline: "Tech / Futuristic" },
+      { id: "rose", label: "Rose", emoji: "🩷", tagline: "Social / Friendly" },
+      { id: "amber", label: "Amber", emoji: "🟠", tagline: "Warm / Unique" },
+    ];
+    const bubbleOpts = [
+      { id: "modern", label: "Modern", desc: "Side avatars · grouped bubbles (Telegram-like)" },
+      { id: "overlap", label: "Message bubble", desc: "Avatar sits on the top corner of each bubble" },
+      { id: "irc", label: "IRC", desc: "Linear left-aligned · avatars always on the left" },
+    ];
+    const sectionTitle = (label) => (
+      <Typography
+        variant="overline"
+        color="text.secondary"
+        sx={{ display: "block", px: 2, pt: 1.5, pb: 0.5, letterSpacing: 0.6, fontWeight: 700 }}
+      >
+        {label}
+      </Typography>
+    );
+    return (
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.default", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}>
+          {header}
+        </Box>
+        <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
+          {sectionTitle("Mode")}
+          <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider", px: 2, py: 1.25 }}>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              fullWidth
+              value={themeMode}
+              onChange={(_, next) => {
+                if (!next || next === themeMode) return;
+                onThemeModeChange?.(next);
+              }}
+              aria-label="Theme mode"
+              sx={{
+                "& .MuiToggleButton-root": {
+                  textTransform: "none",
+                  fontWeight: 600,
+                  fontSize: 12.5,
+                  py: 0.75,
+                  gap: 0.5,
+                },
+              }}
+            >
+              <ToggleButton value="light" aria-label="Light">
+                <LightModeOutlinedIcon sx={{ fontSize: 18 }} />
+                Light
+              </ToggleButton>
+              <ToggleButton value="dark" aria-label="Dark">
+                <DarkModeOutlinedIcon sx={{ fontSize: 18 }} />
+                Dark
+              </ToggleButton>
+              <ToggleButton value="system" aria-label="System">
+                <SettingsBrightnessOutlinedIcon sx={{ fontSize: 18 }} />
+                System
+              </ToggleButton>
+            </ToggleButtonGroup>
+          </List>
+
+          {sectionTitle("Color theme")}
+          <Box sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider", px: 1.5, py: 1.25 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 1,
+              }}
+            >
+              {themes.map((t) => {
+                const selected = (colorThemeId || "default") === t.id;
+                return (
+                  <Box
+                    key={t.id}
+                    onClick={() => onColorThemeChange?.(t.id)}
+                    sx={{
+                      cursor: "pointer",
+                      borderRadius: 2,
+                      border: "2px solid",
+                      borderColor: selected ? "primary.main" : "divider",
+                      bgcolor: selected ? (th) => alpha(th.palette.primary.main, 0.08) : "background.default",
+                      px: 1.25,
+                      py: 1,
+                      transition: "border-color 120ms, background-color 120ms",
+                      "&:hover": {
+                        borderColor: selected ? "primary.main" : "text.disabled",
+                      },
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
+                      {t.emoji} {t.label}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                      {t.tagline}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {sectionTitle("Profile photos")}
+          <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
+            <ListItemButton
+              onClick={() => onAppearanceChange?.({ showOwnAvatar: !showOwnAvatar })}
+              sx={itemSx}
+            >
+              <ListItemText
+                primary="My profile photo"
+                secondary={showOwnAvatar ? "Shown on your messages" : "Hidden on your messages"}
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+              <Switch
+                edge="end"
+                checked={showOwnAvatar}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(_, checked) => onAppearanceChange?.({ showOwnAvatar: checked })}
+              />
+            </ListItemButton>
+            <ListItemButton
+              onClick={() => onAppearanceChange?.({ showOthersAvatar: !showOthersAvatar })}
+              sx={itemSx}
+            >
+              <ListItemText
+                primary="Others' profile photos"
+                secondary={showOthersAvatar ? "Shown on their messages" : "Hidden on their messages"}
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+              <Switch
+                edge="end"
+                checked={showOthersAvatar}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(_, checked) => onAppearanceChange?.({ showOthersAvatar: checked })}
+              />
+            </ListItemButton>
+          </List>
+
+          {sectionTitle("Message style")}
+          <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
+            {bubbleOpts.map((opt) => {
+              const selected = bubbleStyle === opt.id;
+              return (
+                <ListItemButton
+                  key={opt.id}
+                  onClick={() => onAppearanceChange?.({ bubbleStyle: opt.id })}
+                  sx={{
+                    ...itemSx,
+                    bgcolor: selected ? (th) => alpha(th.palette.primary.main, 0.1) : undefined,
+                  }}
+                >
+                  <ListItemText
+                    primary={opt.label}
+                    secondary={opt.desc}
+                    primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                    secondaryTypographyProps={{ fontSize: 12 }}
+                  />
+                  {selected && <CheckIcon fontSize="small" color="primary" />}
+                </ListItemButton>
+              );
+            })}
           </List>
         </Box>
       </Box>
