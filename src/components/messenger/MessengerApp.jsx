@@ -77,7 +77,7 @@ import AddToContactsBanner from "./components/AddToContactsBanner";
 import GroupDescriptionBanner from "./components/GroupDescriptionBanner";
 import MessageSearchDialog from "./components/MessageSearchDialog";
 import PreviewTextBody from "./components/PreviewTextBody";
-import { attachMessengerOriginal, messengerOriginalOf, guessLangFromName } from "./modules/fileHelpers";
+import { attachMessengerOriginal, messengerOriginalOf, attachMessengerImageEdits, messengerImageEditsOf, attachMessengerVideoEdits, messengerVideoEditsOf, finalizeMessengerFiles, guessLangFromName } from "./modules/fileHelpers";
 import { mergeConversations } from "./modules/mergeConversations";
 import { writeComposerDraft, readComposerDraft, resolveComposerDraft } from "./modules/composerDrafts";
 import { isGroupDescDismissed, persistGroupDescDismiss } from "./modules/groupDescDismiss";
@@ -328,7 +328,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   // Image crop
   const [cropFile, setCropFile] = useState(null);
-  const [cropEditIndex, setCropEditIndex] = useState(null); // replace files[index] when set
+  const [cropEditIndex, setCropEditIndex] = useState(null);
+  const [cropInitialEdits, setCropInitialEdits] = useState(null); // replace files[index] when set
   const [videoEditIndex, setVideoEditIndex] = useState(null);
   const [meAvatar, setMeAvatar] = useState(null);
 
@@ -361,6 +362,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   // Video edit dialog (trim + crop before sending)
   const [videoEditFile, setVideoEditFile] = useState(null);
+  const [videoInitialEdits, setVideoInitialEdits] = useState(null);
 
   // "Join this public group?" confirmation dialog — shown when the user clicks
   // a non-member public group row in the search results (Telegram shows a
@@ -2232,7 +2234,14 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }
     if (!body && !files.length) return;
 
-    const filesToSend = [...files];
+    // Bake deferred image crops/draws right before upload
+    let filesToSend = [...files];
+    try {
+      filesToSend = await finalizeMessengerFiles(filesToSend, { outputSize: 1600 });
+    } catch (e) {
+      setError(e?.message || "Could not process image edits");
+      return;
+    }
     const emptyFile = filesToSend.find((f) => !f || Number(f.size || 0) <= 0);
     if (emptyFile) {
       setError(`${emptyFile?.name || "File"} is empty and was not sent`);
@@ -5646,18 +5655,20 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               onSend={sendOrEdit}
               scheduledFor={scheduledFor}
               setScheduledFor={setScheduledFor}
-              onPickImage={(f) => { attachMessengerOriginal(f, f); setCropFile(f); }}
-              onPickVideo={(f) => setVideoEditFile(f)}
+              onPickImage={(f) => { attachMessengerOriginal(f, f); setCropInitialEdits(null); setCropFile(f); }}
+              onPickVideo={(f) => { attachMessengerOriginal(f, f); setVideoInitialEdits(null); setVideoEditFile(f); }}
               inputRef={inputRef}
               onKeyDown={onComposerKeyDown}
               mentionUsers={mentionUsers}
               onEditAttachment={(file, index) => {
                 if (file?.type?.startsWith("image/")) {
                   setCropEditIndex(index);
+                  setCropInitialEdits(messengerImageEditsOf(file) || null);
                   setCropFile(messengerOriginalOf(file));
-                } else if (file?.type?.startsWith("video/")) {
+                } else if (file?.type?.startsWith("video/") || messengerVideoEditsOf(file)) {
                   setVideoEditIndex(index);
-                  setVideoEditFile(file);
+                  setVideoInitialEdits(messengerVideoEditsOf(file) || null);
+                  setVideoEditFile(messengerOriginalOf(file));
                 }
               }}
             />
@@ -6073,20 +6084,27 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       <ImageCropDialog
         open={Boolean(cropFile)}
         file={cropFile}
-        onClose={() => { setCropFile(null); setCropEditIndex(null); }}
-        onConfirm={(blob, filename) => {
-          const cropped = new File([blob], filename || "image.jpg", { type: blob.type || "image/jpeg" });
-          attachMessengerOriginal(cropped, cropFile);
+        initialEdits={cropInitialEdits}
+        onClose={() => { setCropFile(null); setCropEditIndex(null); setCropInitialEdits(null); }}
+        onConfirm={(blob, filename, edits) => {
+          // Preview shows crop+draw. Edits metadata kept so send can re-bake from original,
+          // and reopening the editor restores crop rectangle + strokes.
+          const preview = new File([blob], filename || "image.jpg", { type: blob.type || "image/jpeg" });
+          attachMessengerOriginal(preview, messengerOriginalOf(cropFile) || cropFile);
+          if (edits) {
+            attachMessengerImageEdits(preview, { ...edits, pending: edits.pending !== false });
+          }
           setFiles((prev) => {
             if (cropEditIndex != null && cropEditIndex >= 0 && cropEditIndex < prev.length) {
               const next = [...prev];
-              next[cropEditIndex] = cropped;
+              next[cropEditIndex] = preview;
               return next;
             }
-            return [...prev, cropped];
+            return [...prev, preview];
           });
           setCropFile(null);
           setCropEditIndex(null);
+          setCropInitialEdits(null);
         }}
         circular={false}
         outputSize={1600}
@@ -6098,19 +6116,26 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       <VideoEditDialog
         open={Boolean(videoEditFile)}
         file={videoEditFile}
-        onClose={() => { setVideoEditFile(null); setVideoEditIndex(null); }}
-        onConfirm={(blob, filename) => {
-          const edited = new File([blob], filename || "video.webm", { type: blob.type || "video/webm" });
+        initialEdits={videoInitialEdits}
+        onClose={() => { setVideoEditFile(null); setVideoEditIndex(null); setVideoInitialEdits(null); }}
+        onConfirm={(carrierFile, filename, edits) => {
+          // carrier is original bytes; edits applied on send via finalizeMessengerFiles
+          const f = carrierFile instanceof File
+            ? carrierFile
+            : new File([carrierFile], filename || "video.mp4", { type: "video/mp4" });
+          attachMessengerOriginal(f, messengerOriginalOf(videoEditFile) || videoEditFile);
+          if (edits) attachMessengerVideoEdits(f, edits);
           setFiles((prev) => {
             if (videoEditIndex != null && videoEditIndex >= 0 && videoEditIndex < prev.length) {
               const next = [...prev];
-              next[videoEditIndex] = edited;
+              next[videoEditIndex] = f;
               return next;
             }
-            return [...prev, edited];
+            return [...prev, f];
           });
           setVideoEditFile(null);
           setVideoEditIndex(null);
+          setVideoInitialEdits(null);
         }}
         confirmLabel="Done"
       />

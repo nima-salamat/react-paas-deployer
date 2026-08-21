@@ -26,7 +26,7 @@ import React, { useCallback, useMemo } from "react";
 import {
   Box, Typography, IconButton, Tooltip, Chip,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { useTheme, alpha } from "@mui/material/styles";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
@@ -72,9 +72,7 @@ export default function PinnedMessageBar({
         height: barHeight,
         minHeight: barHeight,
         maxHeight: barHeight,
-        bgcolor: theme.palette.mode === "dark"
-          ? "rgba(25,118,210,0.12)"
-          : "rgba(25,118,210,0.08)",
+        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.1),
         borderBottom: "1px solid",
         borderColor: "divider",
         cursor: "pointer",
@@ -83,9 +81,7 @@ export default function PinnedMessageBar({
         zIndex: 10,
         transition: "background-color 0.2s ease",
         "&:hover": {
-          bgcolor: theme.palette.mode === "dark"
-            ? "rgba(25,118,210,0.2)"
-            : "rgba(25,118,210,0.14)",
+          bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.24 : 0.16),
         },
       }}
     >

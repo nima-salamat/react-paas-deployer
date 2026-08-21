@@ -2,875 +2,674 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack,
   Typography, Slider, IconButton, ToggleButton, ToggleButtonGroup, CircularProgress,
-  Tooltip, Divider, alpha, Tabs, Tab, useMediaQuery,
+  useMediaQuery,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-import CropIcon from "@mui/icons-material/Crop";
+import { useTheme, alpha } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import RotateLeftIcon from "@mui/icons-material/RotateLeft";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
-import SendIcon from "@mui/icons-material/Send";
+import CropIcon from "@mui/icons-material/Crop";
 import BrushIcon from "@mui/icons-material/Brush";
-import HighlightIcon from "@mui/icons-material/Highlight";
-import EditIcon from "@mui/icons-material/Edit";
-import EraserIcon from "@mui/icons-material/AutoFixOff";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
-import ClearIcon from "@mui/icons-material/Clear";
+import AutoFixOffIcon from "@mui/icons-material/AutoFixOff";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
-import TuneIcon from "@mui/icons-material/Tune";
 
 /**
- * Professional image editor dialog — replaces the old simple crop dialog.
- *
- * Features:
- *  - Crop mode: draggable + resizable rectangle with 8 handles, aspect ratio
- *    lock (1:1 for avatars, or 1:1 / 4:3 / 16:9 / Free for images), circular
- *    mask overlay when `circular=true`.
- *  - Draw mode: freehand drawing with 4 pen types (Solid, Highlighter, Marker,
- *    Eraser), 8 preset colors + custom color picker, thickness slider 1-30px,
- *    undo/redo, clear-all.
- *  - Common: rotate left/right 90°, zoom slider 0.5×-3×, reset.
- *  - Output: composites image + drawings, applies crop, scales to outputSize,
- *    optional circular clip, exports as JPEG blob.
- *
- * Props (backward-compatible with the old ImageCropDialog):
- *  - open, file, onClose, onConfirm(blob, filename)
- *  - circular: boolean (default true) — circular crop + output
- *  - outputSize: number (default 512) — max output dimension in px
- *  - title: string (default "Edit image")
+ * Image editor — free crop with edge handles, draw tools.
+ * Done saves settings (edits); real crop is applied on send unless circular.
  */
-const EDITOR_W = 420;       // canvas display width
-const EDITOR_H = 420;       // canvas display height
-const PEN_COLORS = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#8e24aa", "#000000", "#ffffff"];
+
+const ASPECTS = [
+  { id: "free", label: "Free", value: null },
+  { id: "1:1", label: "1:1", value: 1 },
+  { id: "4:3", label: "4:3", value: 4 / 3 },
+  { id: "16:9", label: "16:9", value: 16 / 9 },
+  { id: "3:4", label: "3:4", value: 3 / 4 },
+  { id: "9:16", label: "9:16", value: 9 / 16 },
+];
+
+const PEN_COLORS = ["#e53935", "#fb8c00", "#fdd835", "#43a047", "#1e88e5", "#8e24aa", "#ffffff", "#000000"];
+const MIN_CROP = 36;
+const HIT = 22; // invisible hit size for edges/corners
+
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.crossOrigin = "anonymous";
+    img.src = url;
+  });
+}
+
+function fitContain(nw, nh, sw, sh) {
+  const scale = Math.min(sw / nw, sh / nh);
+  const dw = nw * scale;
+  const dh = nh * scale;
+  return { scale, x: (sw - dw) / 2, y: (sh - dh) / 2, w: dw, h: dh };
+}
+
+function applyAspectToRect(rect, aspect, bounds) {
+  if (!aspect || aspect <= 0) return rect;
+  let { x, y, w, h } = rect;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  if (w / h > aspect) w = h * aspect;
+  else h = w / aspect;
+  w = Math.min(w, bounds.w);
+  h = Math.min(h, bounds.h);
+  if (w / h > aspect) w = h * aspect;
+  else h = w / aspect;
+  x = clamp(cx - w / 2, bounds.x, bounds.x + bounds.w - w);
+  y = clamp(cy - h / 2, bounds.y, bounds.y + bounds.h - h);
+  return { x, y, w, h };
+}
+
+function paintStrokesOnCtx(ctx, strokes) {
+  for (const s of strokes || []) {
+    if (!s?.points?.length) continue;
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    // Stroke width is stored in natural (rotated) pixels already
+    ctx.lineWidth = Math.max(2, Number(s.width) || 6);
+    ctx.globalAlpha = s.alpha != null ? s.alpha : 1;
+    if (s.eraser) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = s.color || "#e53935";
+    }
+    ctx.beginPath();
+    const pts = s.points;
+    if (pts.length === 1) {
+      // single tap — draw a dot
+      ctx.arc(pts[0].x, pts[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
+      ctx.fillStyle = s.eraser ? "rgba(0,0,0,1)" : (s.color || "#e53935");
+      if (s.eraser) ctx.globalCompositeOperation = "destination-out";
+      ctx.fill();
+    } else {
+      pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
 
 export default function ImageCropDialog({
-  open, file, onClose, onConfirm,
+  open,
+  file,
+  onClose,
+  onConfirm,
   circular = false,
-  outputSize = 512,
+  outputSize = 1600,
   title = "Edit image",
   confirmLabel = "Done",
+  initialEdits = null,
 }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const imgCanvasRef = useRef(null);      // renders image (zoom + rotation)
-  const drawCanvasRef = useRef(null);     // captures drawings
-  const containerRef = useRef(null);
-  const imgRef = useRef(null);            // HTMLImageElement
-  const [imgSrc, setImgSrc] = useState(null);
-  const [mode, setMode] = useState("crop");        // "crop" | "draw" | "adjust"
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);     // degrees
-  const [aspect, setAspect] = useState(circular ? 1 : null); // null = free
-  const [sending, setSending] = useState(false);
-  // Image adjustment filters (CSS-style). Applied at export time too.
-  const [brightness, setBrightness] = useState(100);  // % (100 = no change)
-  const [contrast, setContrast] = useState(100);      // %
-  const [saturate, setSaturate] = useState(100);      // %
-  const [blur, setBlur] = useState(0);                // px
-  const [grayscale, setGrayscale] = useState(0);      // %
-  const [sepia, setSepia] = useState(0);              // %
-  // Crop rect in display coords: {x, y, w, h}
-  const [crop, setCrop] = useState({ x: 60, y: 60, w: 300, h: 300 });
-  const [pan, setPan] = useState({ x: 0, y: 0 }); // image pan under crop
-  const cropDragRef = useRef(null);  // {handle, startX, startY, origCrop}
-  const panDragRef = useRef(null);   // {startX, startY, origPan}
-  const pinchRef = useRef(null);     // {dist, zoom}
-  const editHistoryRef = useRef([]); // snapshots for Undo
-  const [histLen, setHistLen] = useState(0);
-  const pushEditHistory = () => {
-    editHistoryRef.current.push({
-      crop: { ...crop },
-      pan: { ...pan },
-      zoom,
-      rotation,
-    });
-    if (editHistoryRef.current.length > 40) editHistoryRef.current.shift();
-    setHistLen(editHistoryRef.current.length);
-  };
-  const undoEdit = () => {
-    const snap = editHistoryRef.current.pop();
-    if (!snap) return;
-    setCrop(snap.crop);
-    setPan(snap.pan);
-    setZoom(snap.zoom);
-    setRotation(snap.rotation);
-    setHistLen(editHistoryRef.current.length);
-  };
-  // Drawing state
-  const [tool, setTool] = useState("solid");       // solid | highlighter | marker | eraser
-  const [color, setColor] = useState(PEN_COLORS[0]);
-  const [thickness, setThickness] = useState(6);
-  const [strokes, setStrokes] = useState([]);      // history of strokes
+
+  const stageRef = useRef(null);
+  const baseCanvasRef = useRef(null); // shows rotated image + strokes
+  const imgRef = useRef(null);
+  const strokesRef = useRef([]);
+
+  const [src, setSrc] = useState("");
+  const [imgLayout, setImgLayout] = useState(null);
+  const [crop, setCrop] = useState(null);
+  const [aspectId, setAspectId] = useState(circular ? "1:1" : "free");
+  const [rotation, setRotation] = useState(0);
+  const [mode, setMode] = useState("crop");
+  const [penColor, setPenColor] = useState("#e53935");
+  const [penWidth, setPenWidth] = useState(6);
+  const [penTool, setPenTool] = useState("pen");
+  const [strokes, setStrokes] = useState([]);
+  const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
-  const drawingRef = useRef(null);                 // active stroke being drawn
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [tick, setTick] = useState(0); // force base canvas redraw
 
-  // Load file → object URL → image element
-  useEffect(() => {
-    if (!file) { setImgSrc(null); return; }
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      imgRef.current = img;
-      setImgSrc(url);
-      // Crop defaults to the full "contain"-fitted image area so reopening
-      // an already-edited file always starts from a stable full-frame rect.
-      const scale = Math.min(EDITOR_W / img.width, EDITOR_H / img.height);
-      const dw = img.width * scale;
-      const dh = img.height * scale;
-      const ox = (EDITOR_W - dw) / 2;
-      const oy = (EDITOR_H - dh) / 2;
-      if (circular) {
-        const side = Math.min(dw, dh) * 0.92;
-        setCrop({
-          x: ox + (dw - side) / 2,
-          y: oy + (dh - side) / 2,
-          w: side,
-          h: side,
-        });
-      } else {
-        setCrop({ x: ox, y: oy, w: dw, h: dh });
-      }
-    };
-    img.src = url;
-    return () => URL.revokeObjectURL(url);
-  }, [file, circular]);
+  const dragRef = useRef(null);
+  const drawingRef = useRef(null);
 
-  // Reset state when dialog opens
-  useEffect(() => {
-    if (open) {
-      setMode("crop");
-      setZoom(1);
-      setRotation(0);
-      setPan({ x: 0, y: 0 });
-      editHistoryRef.current = [];
-      setHistLen(0);
-      setAspect(circular ? 1 : null);
-      setStrokes([]);
-      setRedoStack([]);
-      setTool("solid");
-      setColor(PEN_COLORS[0]);
-      setThickness(6);
-      setBrightness(100);
-      setContrast(100);
-      setSaturate(100);
-      setBlur(0);
-      setGrayscale(0);
-      setSepia(0);
+  useEffect(() => { strokesRef.current = strokes; }, [strokes]);
+
+  const aspect = circular ? 1 : (ASPECTS.find((a) => a.id === aspectId)?.value ?? null);
+
+  const rebuildBaseCanvas = useCallback((img, rot, strokeList, layout) => {
+    const canvas = baseCanvasRef.current;
+    if (!canvas || !img || !layout) return;
+    const r = ((rot % 360) + 360) % 360;
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    const cw = (r === 90 || r === 270) ? nh : nw;
+    const ch = (r === 90 || r === 270) ? nw : nh;
+    if (canvas.width !== cw || canvas.height !== ch) {
+      canvas.width = cw;
+      canvas.height = ch;
     }
-  }, [open, circular]);
-
-  // Build the CSS filter string from the current filter state.
-  // Applied both to the live preview canvas (via ctx.filter) and at export time.
-  const filterString = useCallback(() => {
-    const parts = [];
-    if (brightness !== 100) parts.push(`brightness(${brightness}%)`);
-    if (contrast !== 100) parts.push(`contrast(${contrast}%)`);
-    if (saturate !== 100) parts.push(`saturate(${saturate}%)`);
-    if (blur > 0) parts.push(`blur(${blur}px)`);
-    if (grayscale > 0) parts.push(`grayscale(${grayscale}%)`);
-    if (sepia > 0) parts.push(`sepia(${sepia}%)`);
-    return parts.length ? parts.join(" ") : "none";
-  }, [brightness, contrast, saturate, blur, grayscale, sepia]);
-
-  // Render the image canvas (zoom + rotation + pan + filters)
-  const renderImage = useCallback(() => {
-    const c = imgCanvasRef.current;
-    if (!c || !imgRef.current) return;
-    const ctx = c.getContext("2d");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, cw, ch);
     ctx.save();
-    ctx.clearRect(0, 0, EDITOR_W, EDITOR_H);
-    ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(0, 0, EDITOR_W, EDITOR_H);
-    ctx.filter = filterString();
-    // Center → pan → rotate → zoom → draw contain-fitted image
-    ctx.translate(EDITOR_W / 2 + pan.x, EDITOR_H / 2 + pan.y);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.scale(zoom, zoom);
-    const img = imgRef.current;
-    const scale = Math.min(EDITOR_W / img.width, EDITOR_H / img.height);
-    const dw = img.width * scale;
-    const dh = img.height * scale;
-    ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
-    ctx.filter = "none";
+    ctx.translate(cw / 2, ch / 2);
+    ctx.rotate((r * Math.PI) / 180);
+    ctx.drawImage(img, -nw / 2, -nh / 2);
     ctx.restore();
-  }, [zoom, rotation, pan, filterString]);
+    paintStrokesOnCtx(ctx, strokeList);
+  }, []);
 
-  // Render drawings on top
-  const renderDrawings = useCallback(() => {
-    const c = drawCanvasRef.current;
-    if (!c) return;
-    const ctx = c.getContext("2d");
-    ctx.clearRect(0, 0, EDITOR_W, EDITOR_H);
-    const drawStroke = (s) => {
-      if (!s.points || s.points.length < 1) return;
-      ctx.save();
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      if (s.tool === "eraser") {
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.strokeStyle = "rgba(0,0,0,1)";
-      } else if (s.tool === "highlighter") {
-        ctx.globalCompositeOperation = "source-over";
-        ctx.globalAlpha = 0.35;
-        ctx.strokeStyle = s.color;
-      } else if (s.tool === "marker") {
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = s.color;
-      } else {
-        // solid
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = s.color;
-      }
-      ctx.lineWidth = s.size;
-      ctx.beginPath();
-      const pts = s.points;
-      ctx.moveTo(pts[0].x, pts[0].y);
-      if (pts.length === 1) {
-        // dot
-        ctx.lineTo(pts[0].x + 0.1, pts[0].y + 0.1);
-      } else {
-        for (let i = 1; i < pts.length; i++) {
-          ctx.lineTo(pts[i].x, pts[i].y);
-        }
-      }
-      ctx.stroke();
-      ctx.restore();
-    };
-    strokes.forEach(drawStroke);
-    if (drawingRef.current) drawStroke(drawingRef.current);
-  }, [strokes]);
+  const measureAndInit = useCallback((img, rot, restore) => {
+    const stage = stageRef.current;
+    if (!stage || !img) return;
+    const sw = stage.clientWidth || 360;
+    const sh = stage.clientHeight || 360;
+    const r = ((rot % 360) + 360) % 360;
+    const nw = (r === 90 || r === 270) ? img.naturalHeight : img.naturalWidth;
+    const nh = (r === 90 || r === 270) ? img.naturalWidth : img.naturalHeight;
+    const fit = fitContain(nw, nh, sw, sh);
+    const layout = { ...fit, nw, nh };
+    setImgLayout(layout);
 
-  useEffect(() => { renderImage(); }, [renderImage, imgSrc]);
-  useEffect(() => { renderDrawings(); }, [renderDrawings]);
-
-  // ============= Crop rectangle interactions =============
-  const onCropPointerDown = (e, handle) => {
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    pushEditHistory();
-    cropDragRef.current = {
-      handle,
-      startX: e.clientX,
-      startY: e.clientY,
-      origCrop: { ...crop },
-    };
-  };
-  const onCropPointerMove = (e) => {
-    const drag = cropDragRef.current;
-    if (!drag) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    let { x, y, w, h } = drag.origCrop;
-    const h_id = drag.handle;
-    const MIN = 40;
-    if (h_id === "body") {
-      x = clamp(drag.origCrop.x + dx, 0, EDITOR_W - w);
-      y = clamp(drag.origCrop.y + dy, 0, EDITOR_H - h);
+    if (restore?.crop && restore.crop.w > 0) {
+      // restore natural crop → stage
+      setCrop({
+        x: layout.x + restore.crop.x * layout.scale,
+        y: layout.y + restore.crop.y * layout.scale,
+        w: restore.crop.w * layout.scale,
+        h: restore.crop.h * layout.scale,
+      });
     } else {
-      if (h_id.includes("e")) w = clamp(drag.origCrop.w + dx, MIN, EDITOR_W - drag.origCrop.x);
-      if (h_id.includes("s")) h = clamp(drag.origCrop.h + dy, MIN, EDITOR_H - drag.origCrop.y);
-      if (h_id.includes("w")) {
-        const newX = clamp(drag.origCrop.x + dx, 0, drag.origCrop.x + drag.origCrop.w - MIN);
-        w = drag.origCrop.w + (drag.origCrop.x - newX);
-        x = newX;
+      let rect = { x: fit.x, y: fit.y, w: fit.w, h: fit.h };
+      if (circular) {
+        const side = Math.min(fit.w, fit.h);
+        rect = { x: fit.x + (fit.w - side) / 2, y: fit.y + (fit.h - side) / 2, w: side, h: side };
       }
-      if (h_id.includes("n")) {
-        const newY = clamp(drag.origCrop.y + dy, 0, drag.origCrop.y + drag.origCrop.h - MIN);
-        h = drag.origCrop.h + (drag.origCrop.y - newY);
-        y = newY;
-      }
-      // Aspect ratio lock
-      if (aspect) {
-        const targetH = w / aspect;
-        if (targetH >= MIN && y + targetH <= EDITOR_H) {
-          h = targetH;
-        } else {
-          const targetW = h * aspect;
-          if (targetW >= MIN && x + targetW <= EDITOR_W) w = targetW;
-        }
-      }
+      setCrop(rect);
     }
-    setCrop({ x, y, w, h });
-  };
-  const onCropPointerUp = (e) => {
-    if (cropDragRef.current) {
-      try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* */ }
-    }
-    cropDragRef.current = null;
-  };
-
-  // Pan image under crop (drag on empty area / image background)
-  const onPanPointerDown = (e) => {
-    if (mode !== "crop") return;
-    if (cropDragRef.current) return;
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    pushEditHistory();
-    panDragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      origPan: { ...pan },
-      pointerId: e.pointerId,
-    };
-  };
-  const onPanPointerMove = (e) => {
-    if (cropDragRef.current) {
-      onCropPointerMove(e);
-      return;
-    }
-    const drag = panDragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const rect = containerRef.current?.getBoundingClientRect();
-    const sx = rect ? rect.width / EDITOR_W : 1;
-    const sy = rect ? rect.height / EDITOR_H : 1;
-    const dx = (e.clientX - drag.startX) / sx;
-    const dy = (e.clientY - drag.startY) / sy;
-    setPan({
-      x: drag.origPan.x + dx,
-      y: drag.origPan.y + dy,
+    requestAnimationFrame(() => {
+      rebuildBaseCanvas(img, rot, strokesRef.current, layout);
     });
-  };
-  const onPanPointerUp = (e) => {
-    if (panDragRef.current) {
-      try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch { /* */ }
+  }, [circular, rebuildBaseCanvas]);
+
+  // Load file + optional restored edits
+  useEffect(() => {
+    if (!open || !file) {
+      setSrc("");
+      return undefined;
     }
-    panDragRef.current = null;
-    onCropPointerUp(e);
+    const url = URL.createObjectURL(file);
+    setSrc(url);
+    setError("");
+    setBusy(false);
+    setMode("crop");
+    setUndoStack([]);
+    setRedoStack([]);
+
+    const restore = initialEdits || null;
+    const rot = restore?.rotation != null ? Number(restore.rotation) : 0;
+    setRotation(rot);
+    setAspectId(circular ? "1:1" : "free");
+    const restoredStrokes = Array.isArray(restore?.strokes) ? restore.strokes : [];
+    setStrokes(restoredStrokes);
+    strokesRef.current = restoredStrokes;
+
+    let cancelled = false;
+    loadImage(url).then((img) => {
+      if (cancelled) return;
+      imgRef.current = img;
+      measureAndInit(img, rot, restore);
+      setTick((t) => t + 1);
+    }).catch(() => setError("Could not load image"));
+
+    return () => {
+      cancelled = true;
+      URL.revokeObjectURL(url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, file, circular, initialEdits]);
+
+  // Redraw base when strokes/rotation change
+  useEffect(() => {
+    if (imgRef.current && imgLayout) {
+      rebuildBaseCanvas(imgRef.current, rotation, strokes, imgLayout);
+    }
+  }, [strokes, rotation, imgLayout, rebuildBaseCanvas, tick]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const ro = new ResizeObserver(() => {
+      if (imgRef.current) measureAndInit(imgRef.current, rotation, null);
+    });
+    ro.observe(stage);
+    return () => ro.disconnect();
+  }, [open, rotation, measureAndInit]);
+
+  useEffect(() => {
+    if (!crop || !imgLayout || !aspect) return;
+    setCrop((c) => applyAspectToRect(c, aspect, imgLayout));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aspectId]);
+
+  const stageToNatural = useCallback((pt) => {
+    if (!imgLayout) return { x: 0, y: 0 };
+    return {
+      x: (pt.x - imgLayout.x) / imgLayout.scale,
+      y: (pt.y - imgLayout.y) / imgLayout.scale,
+    };
+  }, [imgLayout]);
+
+  const naturalCropFromStage = useCallback((rect) => {
+    if (!imgLayout || !rect) return null;
+    return {
+      x: (rect.x - imgLayout.x) / imgLayout.scale,
+      y: (rect.y - imgLayout.y) / imgLayout.scale,
+      w: rect.w / imgLayout.scale,
+      h: rect.h / imgLayout.scale,
+    };
+  }, [imgLayout]);
+
+  const getStagePoint = (e) => {
+    const stage = stageRef.current;
+    const rect = stage.getBoundingClientRect();
+    const cx = e.touches?.[0]?.clientX ?? e.clientX;
+    const cy = e.touches?.[0]?.clientY ?? e.clientY;
+    return { x: cx - rect.left, y: cy - rect.top };
   };
 
-  // Mouse wheel zoom toward cursor
-  const onWheelZoom = (e) => {
+  /* ---- crop drag ---- */
+  const onPointerDownCrop = (e, handle) => {
+    if (mode !== "crop" || !crop) return;
     e.preventDefault();
     e.stopPropagation();
-    const delta = e.deltaY > 0 ? -0.08 : 0.08;
-    setZoom((z) => clamp(Number((z + delta).toFixed(2)), 0.5, 4));
+    const p = getStagePoint(e);
+    dragRef.current = { type: handle || "move", ox: p.x, oy: p.y, start: { ...crop } };
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* */ }
   };
 
-  // Touch pinch zoom
-  const onTouchStartPinch = (e) => {
-    if (e.touches?.length === 2) {
-      const [a, b] = e.touches;
-      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      pinchRef.current = { dist, zoom };
-      panDragRef.current = null;
+  const onPointerMoveCrop = (e) => {
+    const d = dragRef.current;
+    if (!d || !imgLayout) return;
+    const p = getStagePoint(e);
+    const dx = p.x - d.ox;
+    const dy = p.y - d.oy;
+    const b = imgLayout;
+    let { x: cx, y: cy, w, h } = d.start;
+
+    if (d.type === "move") {
+      cx = clamp(d.start.x + dx, b.x, b.x + b.w - w);
+      cy = clamp(d.start.y + dy, b.y, b.y + b.h - h);
+      setCrop({ x: cx, y: cy, w, h });
+      return;
     }
-  };
-  const onTouchMovePinch = (e) => {
-    if (e.touches?.length === 2 && pinchRef.current) {
-      e.preventDefault();
-      const [a, b] = e.touches;
-      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
-      const ratio = dist / Math.max(1, pinchRef.current.dist);
-      setZoom(clamp(Number((pinchRef.current.zoom * ratio).toFixed(2)), 0.5, 4));
+    const t = d.type;
+    if (t.includes("w")) {
+      const nx = clamp(d.start.x + dx, b.x, d.start.x + d.start.w - MIN_CROP);
+      w = d.start.w + (d.start.x - nx);
+      cx = nx;
     }
-  };
-  const onTouchEndPinch = () => {
-    pinchRef.current = null;
-  };
-
-  // ============= Drawing interactions =============
-  const getDrawPos = (e) => {
-    const c = drawCanvasRef.current;
-    if (!c) return { x: 0, y: 0 };
-    const rect = c.getBoundingClientRect();
-    return {
-      x: ((e.clientX - rect.left) / rect.width) * EDITOR_W,
-      y: ((e.clientY - rect.top) / rect.height) * EDITOR_H,
-    };
-  };
-  const onDrawPointerDown = (e) => {
-    if (mode !== "draw") return;
-    e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const pos = getDrawPos(e);
-    drawingRef.current = {
-      tool, color, size: thickness,
-      points: [pos],
-    };
-    renderDrawings();
-  };
-  const onDrawPointerMove = (e) => {
-    if (mode !== "draw" || !drawingRef.current) return;
-    const pos = getDrawPos(e);
-    drawingRef.current.points.push(pos);
-    renderDrawings();
-  };
-  const onDrawPointerUp = (e) => {
-    if (mode !== "draw" || !drawingRef.current) return;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* */ }
-    setStrokes((prev) => [...prev, drawingRef.current]);
-    drawingRef.current = null;
-    setRedoStack([]);
+    if (t.includes("e")) {
+      w = clamp(d.start.w + dx, MIN_CROP, b.x + b.w - d.start.x);
+      cx = d.start.x;
+    }
+    if (t.includes("n")) {
+      const ny = clamp(d.start.y + dy, b.y, d.start.y + d.start.h - MIN_CROP);
+      h = d.start.h + (d.start.y - ny);
+      cy = ny;
+    }
+    if (t.includes("s")) {
+      h = clamp(d.start.h + dy, MIN_CROP, b.y + b.h - d.start.y);
+      cy = d.start.y;
+    }
+    let next = { x: cx, y: cy, w, h };
+    if (aspect) next = applyAspectToRect(next, aspect, b);
+    next.w = clamp(next.w, MIN_CROP, b.w);
+    next.h = clamp(next.h, MIN_CROP, b.h);
+    next.x = clamp(next.x, b.x, b.x + b.w - next.w);
+    next.y = clamp(next.y, b.y, b.y + b.h - next.h);
+    setCrop(next);
   };
 
-  // ============= Toolbar actions =============
-  const undo = () => {
-    if (!strokes.length) return;
+  /* ---- draw ---- */
+  const onPointerDownDraw = (e) => {
+    if (mode !== "draw" || !imgLayout) return;
+    e.preventDefault();
+    const p = getStagePoint(e);
+    if (p.x < imgLayout.x || p.y < imgLayout.y || p.x > imgLayout.x + imgLayout.w || p.y > imgLayout.y + imgLayout.h) return;
+    const nat = stageToNatural(p);
+    const stroke = {
+      points: [nat],
+      color: penColor,
+      width: penWidth / imgLayout.scale,
+      alpha: penTool === "highlight" ? 0.4 : 1,
+      eraser: penTool === "eraser",
+    };
+    drawingRef.current = stroke;
     setStrokes((prev) => {
-      const last = prev[prev.length - 1];
-      setRedoStack((r) => [...r, last]);
-      return prev.slice(0, -1);
+      const next = [...prev, stroke];
+      strokesRef.current = next;
+      return next;
+    });
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* */ }
+  };
+
+  const onPointerMoveDraw = (e) => {
+    if (!drawingRef.current || !imgLayout) return;
+    const p = getStagePoint(e);
+    const nat = stageToNatural(p);
+    drawingRef.current.points.push(nat);
+    const snap = { ...drawingRef.current, points: [...drawingRef.current.points] };
+    setStrokes((prev) => {
+      const next = prev.slice(0, -1).concat([snap]);
+      strokesRef.current = next;
+      return next;
     });
   };
+
+  const onPointerUp = () => {
+    if (drawingRef.current) {
+      const finished = strokesRef.current;
+      setUndoStack((u) => [...u, finished.slice(0, -1)]);
+      setRedoStack([]);
+    }
+    drawingRef.current = null;
+    dragRef.current = null;
+  };
+
+  const undo = () => {
+    setStrokes((cur) => {
+      if (!undoStack.length) return cur;
+      const prev = undoStack[undoStack.length - 1];
+      setUndoStack((u) => u.slice(0, -1));
+      setRedoStack((r) => [...r, cur]);
+      strokesRef.current = prev;
+      return prev;
+    });
+  };
+
   const redo = () => {
-    if (!redoStack.length) return;
-    setRedoStack((prev) => {
-      const last = prev[prev.length - 1];
-      setStrokes((s) => [...s, last]);
-      return prev.slice(0, -1);
+    setStrokes((cur) => {
+      if (!redoStack.length) return cur;
+      const next = redoStack[redoStack.length - 1];
+      setRedoStack((r) => r.slice(0, -1));
+      setUndoStack((u) => [...u, cur]);
+      strokesRef.current = next;
+      return next;
     });
   };
-  const clearDrawings = () => {
+
+  const rotateBy = (delta) => {
+    const next = (((rotation + delta) % 360) + 360) % 360;
+    setRotation(next);
+    // keep strokes in rotated space is hard — clear on rotate
     setStrokes([]);
+    strokesRef.current = [];
+    setUndoStack([]);
     setRedoStack([]);
-  };
-  const reset = () => {
-    editHistoryRef.current = [];
-    setHistLen(0);
-    setZoom(1);
-    setRotation(0);
-    setPan({ x: 0, y: 0 });
-    setStrokes([]);
-    setRedoStack([]);
-    setBrightness(100);
-    setContrast(100);
-    setSaturate(100);
-    setBlur(0);
-    setGrayscale(0);
-    setSepia(0);
-    setAspect(circular ? 1 : null);
-    const img = imgRef.current;
-    if (img) {
-      const scale = Math.min(EDITOR_W / img.width, EDITOR_H / img.height);
-      const dw = img.width * scale;
-      const dh = img.height * scale;
-      const ox = (EDITOR_W - dw) / 2;
-      const oy = (EDITOR_H - dh) / 2;
-      if (circular) {
-        const side = Math.min(dw, dh) * 0.92;
-        setCrop({ x: ox + (dw - side) / 2, y: oy + (dh - side) / 2, w: side, h: side });
-      } else {
-        // Full image frame — no auto-tight crop
-        setCrop({ x: ox, y: oy, w: dw, h: dh });
-      }
+    if (imgRef.current) {
+      requestAnimationFrame(() => measureAndInit(imgRef.current, next, null));
     }
   };
 
-  // ============= Export =============
-  // IMPORTANT: The crop rectangle is expressed in the editor's 420x420
-  // display coordinate space. We first compose the *already edited* image
-  // (zoom, pan, rotation, filters + drawings), then crop that exact display
-  // region. This keeps every other edit and makes crop match what the user
-  // actually sees.
-  const onConfirmClick = async () => {
-    if (!imgRef.current || !imgCanvasRef.current || !drawCanvasRef.current) return;
-    setSending(true);
+  const handleConfirm = async () => {
+    if (!imgRef.current || !crop || !imgLayout) return;
+    setBusy(true);
+    setError("");
     try {
-      const cx = clamp(Math.round(crop.x), 0, EDITOR_W - 1);
-      const cy = clamp(Math.round(crop.y), 0, EDITOR_H - 1);
-      const cw = clamp(Math.round(crop.w), 1, EDITOR_W - cx);
-      const ch = clamp(Math.round(crop.h), 1, EDITOR_H - cy);
+      const naturalCrop = naturalCropFromStage(crop);
+      const strokeList = strokesRef.current || strokes;
+      const edits = {
+        pending: !circular, // chat: defer real crop to send; profile: bake now
+        crop: naturalCrop,
+        rotation,
+        strokes: strokeList,
+        circular: Boolean(circular),
+        outputSize,
+      };
 
-      // Compose exactly what is shown in the editor.
-      const composite = document.createElement("canvas");
-      composite.width = EDITOR_W;
-      composite.height = EDITOR_H;
-      const cctx = composite.getContext("2d");
-      if (!cctx) throw new Error("Unable to create image editor canvas");
-      cctx.drawImage(imgCanvasRef.current, 0, 0, EDITOR_W, EDITOR_H);
-      cctx.drawImage(drawCanvasRef.current, 0, 0, EDITOR_W, EDITOR_H);
+      // Always build preview with strokes + crop so user sees the result
+      const img = imgRef.current;
+      const r = ((rotation % 360) + 360) % 360;
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      const rotCanvas = document.createElement("canvas");
+      if (r === 90 || r === 270) {
+        rotCanvas.width = nh;
+        rotCanvas.height = nw;
+      } else {
+        rotCanvas.width = nw;
+        rotCanvas.height = nh;
+      }
+      const rctx = rotCanvas.getContext("2d");
+      // Draw rotated image, then RESET transform so strokes use natural pixel coords
+      rctx.save();
+      rctx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+      rctx.rotate((r * Math.PI) / 180);
+      rctx.drawImage(img, -nw / 2, -nh / 2);
+      rctx.restore();
+      paintStrokesOnCtx(rctx, strokeList);
 
-      // Crop the selected region. Because this uses the same coordinate
-      // system as the overlay, the exported crop is pixel-for-pixel aligned
-      // with the rectangle the user moved/resized.
-      const outScale = Math.min(outputSize / cw, outputSize / ch, 1);
-      const outW = Math.max(1, Math.round(cw * outScale));
-      const outH = Math.max(1, Math.round(ch * outScale));
-      const out = document.createElement("canvas");
-      out.width = outW;
-      out.height = outH;
-      const octx = out.getContext("2d");
-      if (!octx) throw new Error("Unable to create crop canvas");
+      const sx = Math.max(0, Math.round(naturalCrop.x));
+      const sy = Math.max(0, Math.round(naturalCrop.y));
+      const sw = Math.max(1, Math.min(rotCanvas.width - sx, Math.round(naturalCrop.w)));
+      const sh = Math.max(1, Math.min(rotCanvas.height - sy, Math.round(naturalCrop.h)));
 
-      // JPEG does not support transparency; use white only for the circular
-      // mask edge area while keeping normal rectangular crops unchanged.
-      if (circular) {
-        octx.save();
-        octx.beginPath();
-        octx.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
-        octx.clip();
+      let outW = sw;
+      let outH = sh;
+      const maxOut = circular ? Math.min(outputSize, 512) : Math.min(outputSize, 1600);
+      const maxEdge = Math.max(outW, outH);
+      if (maxEdge > maxOut) {
+        const k = maxOut / maxEdge;
+        outW = Math.max(1, Math.round(outW * k));
+        outH = Math.max(1, Math.round(outH * k));
       }
 
-      octx.drawImage(
-        composite,
-        cx, cy, cw, ch,
-        0, 0, outW, outH,
-      );
+      const preview = document.createElement("canvas");
+      preview.width = outW;
+      preview.height = outH;
+      const pctx = preview.getContext("2d");
+      if (circular) {
+        pctx.beginPath();
+        pctx.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
+        pctx.closePath();
+        pctx.clip();
+      }
+      pctx.drawImage(rotCanvas, sx, sy, sw, sh, 0, 0, outW, outH);
 
-      if (circular) octx.restore();
-
+      const mime = circular ? "image/png" : "image/jpeg";
       const blob = await new Promise((resolve, reject) => {
-        out.toBlob((b) => {
-          if (b) resolve(b);
-          else reject(new Error("Failed to export edited image"));
-        }, "image/jpeg", 0.92);
+        preview.toBlob((b) => (b ? resolve(b) : reject(new Error("export failed"))), mime, 0.92);
       });
+      const base = (file?.name || "image").replace(/\.[^.]+$/, "");
+      const filename = `${base}_edit.${circular ? "png" : "jpg"}`;
 
-      const baseName = (file?.name || "image").replace(/\.[^.]+$/, "");
-      onConfirm(blob, `${baseName}_edit.jpg`);
-    } catch (error) {
-      console.error("Image export failed:", error);
+      // circular (profile): no deferred edits
+      onConfirm?.(blob, filename, circular ? null : edits);
+    } catch (e) {
+      setError(e?.message || "Could not save edits");
     } finally {
-      setSending(false);
+      setBusy(false);
     }
   };
-  const handles = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
-  const handleStyle = (h) => {
-    const map = {
-      nw: { left: 0, top: 0, cursor: "nwse-resize" },
-      n: { left: "50%", top: 0, cursor: "ns-resize", transform: "translateX(-50%)" },
-      ne: { right: 0, top: 0, cursor: "nesw-resize" },
-      e: { right: 0, top: "50%", cursor: "ew-resize", transform: "translateY(-50%)" },
-      se: { right: 0, bottom: 0, cursor: "nwse-resize" },
-      s: { left: "50%", bottom: 0, cursor: "ns-resize", transform: "translateX(-50%)" },
-      sw: { left: 0, bottom: 0, cursor: "nesw-resize" },
-      w: { left: 0, top: "50%", cursor: "ew-resize", transform: "translateY(-50%)" },
-    };
-    return {
-      position: "absolute",
-      width: 14, height: 14,
-      bgcolor: "#fff",
-      border: "2px solid #1976d2",
-      borderRadius: "50%",
-      ...map[h],
-    };
-  };
+
+  const stageH = isMobile
+    ? Math.min(440, typeof window !== "undefined" ? window.innerHeight * 0.5 : 360)
+    : 460;
+
+  const handleDefs = [
+    { id: "nw", cursor: "nwse-resize", left: -HIT / 2, top: -HIT / 2 },
+    { id: "n", cursor: "ns-resize", left: "50%", top: -HIT / 2, ml: -HIT / 2 },
+    { id: "ne", cursor: "nesw-resize", right: -HIT / 2, top: -HIT / 2 },
+    { id: "e", cursor: "ew-resize", right: -HIT / 2, top: "50%", mt: -HIT / 2 },
+    { id: "se", cursor: "nwse-resize", right: -HIT / 2, bottom: -HIT / 2 },
+    { id: "s", cursor: "ns-resize", left: "50%", bottom: -HIT / 2, ml: -HIT / 2 },
+    { id: "sw", cursor: "nesw-resize", left: -HIT / 2, bottom: -HIT / 2 },
+    { id: "w", cursor: "ew-resize", left: -HIT / 2, top: "50%", mt: -HIT / 2 },
+  ];
 
   return (
     <Dialog
       open={Boolean(open)}
-      onClose={onClose}
+      onClose={busy ? undefined : onClose}
+      fullScreen={isMobile}
       fullWidth
       maxWidth="sm"
-      fullScreen={isMobile}
-      PaperProps={{ sx: isMobile ? { m: 0, borderRadius: 0, height: "100%" } : { borderRadius: 3 } }}
+      PaperProps={{
+        sx: {
+          borderRadius: isMobile ? 0 : 2,
+          maxHeight: isMobile ? "100%" : "94vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        },
+      }}
     >
-      <DialogTitle sx={{ display: "flex", alignItems: "center", py: 1, px: 1.5 }}>
-        <Typography fontWeight={700} sx={{ flex: 1 }}>{title}</Typography>
-        <IconButton onClick={onClose} size="small"><CloseIcon /></IconButton>
+      <DialogTitle sx={{ py: 1.25, px: 1.5, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+        <CropIcon fontSize="small" color="primary" />
+        <Typography component="span" variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>{title}</Typography>
+        <IconButton edge="end" onClick={onClose} disabled={busy}><CloseIcon /></IconButton>
       </DialogTitle>
-      <DialogContent dividers sx={{ p: 0, display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-        {/* Compact tools for active tab — Samsung-style secondary bar */}
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider", flexWrap: "wrap", gap: 0.75 }}>
-          <Tooltip title="Rotate left">
-            <IconButton size="small" onClick={() => setRotation((r) => (r - 90 + 360) % 360)}>
-              <RotateLeftIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Rotate right">
-            <IconButton size="small" onClick={() => setRotation((r) => (r + 90) % 360)}>
-              <RotateRightIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Box sx={{ display: "flex", alignItems: "center", flex: 1, minWidth: 120, maxWidth: 220 }}>
-            <Typography variant="caption" sx={{ mr: 1 }}>Zoom</Typography>
-            <Slider size="small" min={0.5} max={4} step={0.05} value={zoom} onChange={(_, v) => setZoom(v)} />
-            <Typography variant="caption" sx={{ ml: 1, minWidth: 32 }}>{zoom.toFixed(1)}×</Typography>
-          </Box>
-          <Tooltip title="Undo last crop/pan/zoom">
-            <span>
-              <IconButton size="small" onClick={undoEdit} disabled={histLen === 0}>
-                <UndoIcon fontSize="small" />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title="Reset all">
-            <IconButton size="small" onClick={reset}><RestartAltIcon fontSize="small" /></IconButton>
-          </Tooltip>
-        </Stack>
 
-        {/* Draw toolbar (only in draw mode) */}
-        {mode === "draw" && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider", flexWrap: "wrap", gap: 1 }}>
-            <ToggleButtonGroup size="small" exclusive value={tool} onChange={(_, v) => v && setTool(v)}>
-              <Tooltip title="Solid pen">
-                <ToggleButton value="solid"><EditIcon sx={{ fontSize: 18 }} /></ToggleButton>
-              </Tooltip>
-              <Tooltip title="Highlighter (translucent)">
-                <ToggleButton value="highlighter"><HighlightIcon sx={{ fontSize: 18 }} /></ToggleButton>
-              </Tooltip>
-              <Tooltip title="Marker (thick rounded)">
-                <ToggleButton value="marker"><BrushIcon sx={{ fontSize: 18 }} /></ToggleButton>
-              </Tooltip>
-              <Tooltip title="Eraser">
-                <ToggleButton value="eraser"><EraserIcon sx={{ fontSize: 18 }} /></ToggleButton>
-              </Tooltip>
-            </ToggleButtonGroup>
-            <Divider orientation="vertical" flexItem />
-            <Stack direction="row" spacing={0.5} alignItems="center">
-              {PEN_COLORS.map((c) => (
-                <IconButton
-                  key={c}
-                  size="small"
-                  onClick={() => setColor(c)}
-                  sx={{
-                    width: 24, height: 24, p: 0,
-                    bgcolor: c,
-                    border: color === c ? "2px solid #1976d2" : "2px solid transparent",
-                    "&:hover": { bgcolor: c, opacity: 0.85 },
-                  }}
-                />
-              ))}
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                style={{ width: 28, height: 28, border: "none", background: "transparent", cursor: "pointer", padding: 0 }}
-                title="Custom color"
-              />
-            </Stack>
-            <Divider orientation="vertical" flexItem />
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: 120, flex: 1, maxWidth: 180 }}>
-              <Typography variant="caption" sx={{ mr: 1 }}>Size</Typography>
-              <Slider
-                size="small" min={1} max={30} step={1}
-                value={thickness} onChange={(_, v) => setThickness(v)}
-              />
-              <Typography variant="caption" sx={{ ml: 1, minWidth: 24 }}>{thickness}</Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            <Tooltip title="Undo"><span><IconButton size="small" onClick={undo} disabled={!strokes.length}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
-            <Tooltip title="Redo"><span><IconButton size="small" onClick={redo} disabled={!redoStack.length}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
-            <Tooltip title="Clear all drawings"><span><IconButton size="small" onClick={clearDrawings} disabled={!strokes.length}><ClearIcon fontSize="small" /></IconButton></span></Tooltip>
-          </Stack>
-        )}
-
-        {/* Adjust toolbar (only in adjust mode) — filters / color grading */}
-        {mode === "adjust" && (
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ p: 1.5, borderBottom: "1px solid", borderColor: "divider", flexWrap: "wrap", gap: 1.5 }}>
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
-              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Brightness</Typography>
-              <Slider
-                size="small" min={0} max={200} step={1}
-                value={brightness} onChange={(_, v) => setBrightness(v)}
-              />
-              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{brightness}%</Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
-              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Contrast</Typography>
-              <Slider
-                size="small" min={0} max={200} step={1}
-                value={contrast} onChange={(_, v) => setContrast(v)}
-              />
-              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{contrast}%</Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
-              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Saturation</Typography>
-              <Slider
-                size="small" min={0} max={200} step={1}
-                value={saturate} onChange={(_, v) => setSaturate(v)}
-              />
-              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{saturate}%</Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
-              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Blur</Typography>
-              <Slider
-                size="small" min={0} max={10} step={0.1}
-                value={blur} onChange={(_, v) => setBlur(v)}
-              />
-              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{blur.toFixed(1)}px</Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
-              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Grayscale</Typography>
-              <Slider
-                size="small" min={0} max={100} step={1}
-                value={grayscale} onChange={(_, v) => setGrayscale(v)}
-              />
-              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{grayscale}%</Typography>
-            </Box>
-            <Box sx={{ display: "flex", alignItems: "center", minWidth: 130, flex: "1 1 130px", maxWidth: 200 }}>
-              <Typography variant="caption" sx={{ mr: 1, minWidth: 70 }}>Sepia</Typography>
-              <Slider
-                size="small" min={0} max={100} step={1}
-                value={sepia} onChange={(_, v) => setSepia(v)}
-              />
-              <Typography variant="caption" sx={{ ml: 1, minWidth: 32, fontVariantNumeric: "tabular-nums" }}>{sepia}%</Typography>
-            </Box>
-            <Divider orientation="vertical" flexItem />
-            {/* Quick presets */}
-            <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="caption" sx={{ mr: 0.5 }}>Presets:</Typography>
-              <ToggleButtonGroup size="small" exclusive>
-                <ToggleButton
-                  value="none"
-                  onClick={() => { setBrightness(100); setContrast(100); setSaturate(100); setBlur(0); setGrayscale(0); setSepia(0); }}
-                  sx={{ py: 0.25, fontSize: 11 }}
-                >Original</ToggleButton>
-                <ToggleButton
-                  value="vivid"
-                  onClick={() => { setBrightness(105); setContrast(115); setSaturate(140); setBlur(0); setGrayscale(0); setSepia(0); }}
-                  sx={{ py: 0.25, fontSize: 11 }}
-                >Vivid</ToggleButton>
-                <ToggleButton
-                  value="bw"
-                  onClick={() => { setBrightness(105); setContrast(115); setSaturate(100); setBlur(0); setGrayscale(100); setSepia(0); }}
-                  sx={{ py: 0.25, fontSize: 11 }}
-                >B&W</ToggleButton>
-                <ToggleButton
-                  value="vintage"
-                  onClick={() => { setBrightness(105); setContrast(95); setSaturate(85); setBlur(0); setGrayscale(0); setSepia(45); }}
-                  sx={{ py: 0.25, fontSize: 11 }}
-                >Vintage</ToggleButton>
-                <ToggleButton
-                  value="warm"
-                  onClick={() => { setBrightness(105); setContrast(105); setSaturate(115); setBlur(0); setGrayscale(0); setSepia(20); }}
-                  sx={{ py: 0.25, fontSize: 11 }}
-                >Warm</ToggleButton>
-                <ToggleButton
-                  value="cool"
-                  onClick={() => { setBrightness(95); setContrast(110); setSaturate(90); setBlur(0); setGrayscale(0); setSepia(0); }}
-                  sx={{ py: 0.25, fontSize: 11 }}
-                >Cool</ToggleButton>
-              </ToggleButtonGroup>
-            </Stack>
-          </Stack>
-        )}
-
-        {/* Crop aspect ratio (only in crop mode) */}
-        {mode === "crop" && !circular && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider" }}>
-            <Typography variant="caption" sx={{ mr: 1 }}>Aspect</Typography>
-            <ToggleButtonGroup
-              size="small" exclusive
-              value={aspect === null ? "free" : String(aspect)}
-              onChange={(_, v) => {
-                if (!v) return;
-                if (v === "free") setAspect(null);
-                else setAspect(parseFloat(v));
-              }}
-            >
-              <ToggleButton value="free">Free</ToggleButton>
-              <ToggleButton value="1">1:1</ToggleButton>
-              <ToggleButton value="1.3333333333333333">4:3</ToggleButton>
-              <ToggleButton value="1.7777777777777777">16:9</ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
-        )}
-
-        {/* Editor canvas area */}
+      <DialogContent sx={{ p: 0, flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <Box
-          ref={containerRef}
+          ref={stageRef}
           sx={{
             position: "relative",
             width: "100%",
-            maxWidth: EDITOR_W,
-            aspectRatio: `${EDITOR_W} / ${EDITOR_H}`,
-            height: "auto",
-            mx: "auto",
-            my: isMobile ? 0.5 : 2,
-            bgcolor: "#1a1a1a",
-            borderRadius: isMobile ? 0 : 1,
-            overflow: "hidden",
-            boxShadow: isMobile ? 0 : 2,
-            cursor: mode === "draw" ? "crosshair" : mode === "crop" ? "grab" : "default",
-            userSelect: "none",
+            height: stageH,
+            bgcolor: "#0a0a0a",
             touchAction: "none",
-            flexShrink: 0,
-          }}
-          onPointerDown={(e) => {
-            if (mode === "crop") onPanPointerDown(e);
+            userSelect: "none",
+            overflow: "hidden",
+            cursor: mode === "draw" ? "crosshair" : "default",
           }}
           onPointerMove={(e) => {
-            onPanPointerMove(e);
-            onDrawPointerMove(e);
+            if (mode === "crop") onPointerMoveCrop(e);
+            else onPointerMoveDraw(e);
           }}
-          onPointerUp={(e) => {
-            onPanPointerUp(e);
-            onDrawPointerUp(e);
-          }}
-          onPointerCancel={(e) => {
-            onPanPointerUp(e);
-            onDrawPointerUp(e);
-          }}
-          onWheel={onWheelZoom}
-          onTouchStart={onTouchStartPinch}
-          onTouchMove={onTouchMovePinch}
-          onTouchEnd={onTouchEndPinch}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onPointerDown={mode === "draw" ? onPointerDownDraw : undefined}
         >
-          {/* Image canvas (bottom) */}
-          <canvas
-            ref={imgCanvasRef}
-            width={EDITOR_W}
-            height={EDITOR_H}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              display: "block",
-            }}
-          />
-          {/* Drawing canvas (top, transparent) — captures pointer events in draw mode */}
-          <canvas
-            ref={drawCanvasRef}
-            width={EDITOR_W}
-            height={EDITOR_H}
-            onPointerDown={onDrawPointerDown}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              display: "block",
-              pointerEvents: mode === "draw" ? "auto" : "none",
-            }}
-          />
-          {/* Crop overlay (only in crop mode) */}
-          {mode === "crop" && (
+          {/* Image + drawings (single canvas) */}
+          {src && imgLayout && (
+            <Box
+              component="canvas"
+              ref={baseCanvasRef}
+              sx={{
+                position: "absolute",
+                left: imgLayout.x,
+                top: imgLayout.y,
+                width: imgLayout.w,
+                height: imgLayout.h,
+                pointerEvents: "none",
+              }}
+            />
+          )}
+
+          {/* Dim outside crop + frame */}
+          {mode === "crop" && crop && (
             <>
-              {/* Dark mask outside the crop rect (4 divs) */}
-              <Box sx={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-                <Box sx={{ position: "absolute", left: 0, top: 0, right: 0, height: crop.y, bgcolor: "rgba(0,0,0,0.55)" }} />
-                <Box sx={{ position: "absolute", left: 0, top: crop.y + crop.h, right: 0, bottom: 0, bgcolor: "rgba(0,0,0,0.55)" }} />
-                <Box sx={{ position: "absolute", left: 0, top: crop.y, width: crop.x, height: crop.h, bgcolor: "rgba(0,0,0,0.55)" }} />
-                <Box sx={{ position: "absolute", left: crop.x + crop.w, top: crop.y, right: 0, height: crop.h, bgcolor: "rgba(0,0,0,0.55)" }} />
-              </Box>
-              {/* Crop rectangle (draggable body) */}
               <Box
-                onPointerDown={(e) => onCropPointerDown(e, "body")}
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  pointerEvents: "none",
+                  boxShadow: `inset ${crop.x}px ${crop.y}px 0 0 ${alpha("#000", 0.55)},
+                    inset -${Math.max(0, (stageRef.current?.clientWidth || 0) - crop.x - crop.w)}px ${crop.y}px 0 0 ${alpha("#000", 0.55)},
+                    inset 0 ${crop.y}px 0 0 transparent`,
+                  // fallback simple overlay using clipPath
+                  background: alpha("#000", 0.5),
+                  clipPath: `polygon(
+                    0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+                    ${crop.x}px ${crop.y}px,
+                    ${crop.x}px ${crop.y + crop.h}px,
+                    ${crop.x + crop.w}px ${crop.y + crop.h}px,
+                    ${crop.x + crop.w}px ${crop.y}px,
+                    ${crop.x}px ${crop.y}px
+                  )`,
+                }}
+              />
+              <Box
+                onPointerDown={(e) => onPointerDownCrop(e, "move")}
                 sx={{
                   position: "absolute",
                   left: crop.x,
                   top: crop.y,
                   width: crop.w,
                   height: crop.h,
-                  border: "2px solid #fff",
-                  boxShadow: "0 0 0 1px rgba(0,0,0,0.5)",
+                  border: circular ? "none" : "1.5px solid rgba(255,255,255,0.95)",
+                  borderRadius: circular ? "50%" : 0,
+                  boxShadow: circular
+                    ? "0 0 0 1.5px rgba(255,255,255,0.95)"
+                    : "0 0 0 1px rgba(0,0,0,0.35)",
                   cursor: "move",
                   boxSizing: "border-box",
                 }}
               >
-                {/* Rule-of-thirds lines */}
-                <Box sx={{ position: "absolute", left: "33.33%", top: 0, bottom: 0, width: 0, borderLeft: "1px solid rgba(255,255,255,0.4)" }} />
-                <Box sx={{ position: "absolute", left: "66.66%", top: 0, bottom: 0, width: 0, borderLeft: "1px solid rgba(255,255,255,0.4)" }} />
-                <Box sx={{ position: "absolute", top: "33.33%", left: 0, right: 0, height: 0, borderTop: "1px solid rgba(255,255,255,0.4)" }} />
-                <Box sx={{ position: "absolute", top: "66.66%", left: 0, right: 0, height: 0, borderTop: "1px solid rgba(255,255,255,0.4)" }} />
-                {/* Circular mask overlay (when circular=true) */}
-                {circular && (
-                  <Box sx={{
-                    position: "absolute", inset: 0,
-                    borderRadius: "50%",
-                    border: "2px dashed rgba(255,255,255,0.7)",
-                    pointerEvents: "none",
-                  }} />
+                {/* subtle rule-of-thirds */}
+                {!circular && (
+                  <>
+                    <Box sx={{ position: "absolute", left: "33.33%", top: 0, bottom: 0, width: "1px", bgcolor: "rgba(255,255,255,0.25)" }} />
+                    <Box sx={{ position: "absolute", left: "66.66%", top: 0, bottom: 0, width: "1px", bgcolor: "rgba(255,255,255,0.25)" }} />
+                    <Box sx={{ position: "absolute", top: "33.33%", left: 0, right: 0, height: "1px", bgcolor: "rgba(255,255,255,0.25)" }} />
+                    <Box sx={{ position: "absolute", top: "66.66%", left: 0, right: 0, height: "1px", bgcolor: "rgba(255,255,255,0.25)" }} />
+                  </>
                 )}
-                {/* Resize handles */}
-                {handles.map((h) => (
+                {/* Invisible hit areas — small corner ticks only (no white squares) */}
+                {!circular && handleDefs.map((h) => (
                   <Box
-                    key={h}
-                    onPointerDown={(e) => onCropPointerDown(e, h)}
-                    sx={handleStyle(h)}
+                    key={h.id}
+                    onPointerDown={(e) => onPointerDownCrop(e, h.id)}
+                    sx={{
+                      position: "absolute",
+                      width: HIT,
+                      height: HIT,
+                      left: h.left,
+                      right: h.right,
+                      top: h.top,
+                      bottom: h.bottom,
+                      ml: h.ml,
+                      mt: h.mt,
+                      cursor: h.cursor,
+                      touchAction: "none",
+                      zIndex: 3,
+                      // corner accent: thin L-shaped mark via borders on a transparent box
+                      ...(h.id.length === 2 ? {
+                        "&::after": {
+                          content: '""',
+                          position: "absolute",
+                          width: 12,
+                          height: 12,
+                          borderStyle: "solid",
+                          borderColor: "#fff",
+                          borderWidth: 0,
+                          ...(h.id === "nw" ? { left: 4, top: 4, borderTopWidth: 2, borderLeftWidth: 2 } : {}),
+                          ...(h.id === "ne" ? { right: 4, top: 4, borderTopWidth: 2, borderRightWidth: 2 } : {}),
+                          ...(h.id === "se" ? { right: 4, bottom: 4, borderBottomWidth: 2, borderRightWidth: 2 } : {}),
+                          ...(h.id === "sw" ? { left: 4, bottom: 4, borderBottomWidth: 2, borderLeftWidth: 2 } : {}),
+                        },
+                      } : {
+                        // edge midpoints: short line
+                        "&::after": {
+                          content: '""',
+                          position: "absolute",
+                          bgcolor: "#fff",
+                          ...(h.id === "n" || h.id === "s"
+                            ? { width: 18, height: 2, left: "50%", top: "50%", ml: "-9px", mt: "-1px" }
+                            : { width: 2, height: 18, left: "50%", top: "50%", ml: "-1px", mt: "-9px" }),
+                        },
+                      }),
+                    }}
                   />
                 ))}
               </Box>
@@ -878,41 +677,107 @@ export default function ImageCropDialog({
           )}
         </Box>
 
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "center", pb: 1, px: 2 }}>
-          {mode === "crop"
-            ? "Drag the rectangle to move. Use the corner/edge handles to resize."
-            : "Draw freely on the image. Use the toolbar to change pen, color, and size."}
-        </Typography>
+        <Box sx={{ px: 1.5, py: 1.25, borderTop: "1px solid", borderColor: "divider" }}>
+          <Stack direction="row" spacing={1} sx={{ mb: 1.25 }} alignItems="center">
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={mode}
+              onChange={(_, v) => v && setMode(v)}
+              sx={{ "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 600, px: 1.5 } }}
+            >
+              <ToggleButton value="crop"><CropIcon sx={{ fontSize: 18, mr: 0.5 }} />Crop</ToggleButton>
+              <ToggleButton value="draw"><BrushIcon sx={{ fontSize: 18, mr: 0.5 }} />Draw</ToggleButton>
+            </ToggleButtonGroup>
+            <Box sx={{ flex: 1 }} />
+            <IconButton onClick={() => rotateBy(-90)} size="small"><RotateLeftIcon /></IconButton>
+            <IconButton onClick={() => rotateBy(90)} size="small"><RotateRightIcon /></IconButton>
+            <IconButton
+              size="small"
+              onClick={() => {
+                setStrokes([]);
+                strokesRef.current = [];
+                setUndoStack([]);
+                setRedoStack([]);
+                if (imgRef.current) measureAndInit(imgRef.current, rotation, null);
+              }}
+            >
+              <RestartAltIcon />
+            </IconButton>
+          </Stack>
+
+          {mode === "crop" && !circular && (
+            <Box sx={{ overflowX: "auto", mb: 0.5, WebkitOverflowScrolling: "touch" }}>
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={aspectId}
+                onChange={(_, v) => v && setAspectId(v)}
+                sx={{ "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 600, fontSize: 12.5, px: 1.25 } }}
+              >
+                {ASPECTS.map((a) => (
+                  <ToggleButton key={a.id} value={a.id}>{a.label}</ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            </Box>
+          )}
+
+          {mode === "draw" && (
+            <Box>
+              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1, flexWrap: "wrap" }}>
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={penTool}
+                  onChange={(_, v) => v && setPenTool(v)}
+                  sx={{ "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 600, fontSize: 12 } }}
+                >
+                  <ToggleButton value="pen">Pen</ToggleButton>
+                  <ToggleButton value="highlight">Marker</ToggleButton>
+                  <ToggleButton value="eraser"><AutoFixOffIcon sx={{ fontSize: 16 }} /></ToggleButton>
+                </ToggleButtonGroup>
+                <IconButton size="small" onClick={undo} disabled={!undoStack.length}><UndoIcon fontSize="small" /></IconButton>
+                <IconButton size="small" onClick={redo} disabled={!redoStack.length}><RedoIcon fontSize="small" /></IconButton>
+              </Stack>
+              <Stack direction="row" spacing={0.75} sx={{ mb: 1 }}>
+                {PEN_COLORS.map((c) => (
+                  <Box
+                    key={c}
+                    onClick={() => setPenColor(c)}
+                    sx={{
+                      width: 28, height: 28, borderRadius: "50%", bgcolor: c, cursor: "pointer",
+                      outline: penColor === c ? `2px solid ${theme.palette.primary.main}` : "2px solid transparent",
+                      outlineOffset: 1,
+                      boxShadow: c === "#ffffff" ? "inset 0 0 0 1px rgba(0,0,0,0.25)" : "none",
+                    }}
+                  />
+                ))}
+              </Stack>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography variant="caption" color="text.secondary">Size</Typography>
+                <Slider value={penWidth} min={2} max={28} onChange={(_, v) => setPenWidth(v)} sx={{ flex: 1 }} size="small" />
+              </Stack>
+            </Box>
+          )}
+
+          {error && (
+            <Typography color="error" variant="caption" sx={{ display: "block", mt: 0.75 }}>{error}</Typography>
+          )}
+        </Box>
       </DialogContent>
-      {/* Samsung-style bottom tabs on mobile / compact mode switcher */}
-      <Box sx={{ borderTop: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}>
-        <Tabs
-          value={mode}
-          onChange={(_, v) => v && setMode(v)}
-          variant="fullWidth"
-          sx={{ minHeight: 48, "& .MuiTab-root": { minHeight: 48, textTransform: "none", fontWeight: 600 } }}
-        >
-          <Tab value="crop" icon={<CropIcon />} iconPosition="start" label="Crop" />
-          <Tab value="draw" icon={<BrushIcon />} iconPosition="start" label="Draw" />
-          <Tab value="adjust" icon={<TuneIcon />} iconPosition="start" label="Adjust" />
-        </Tabs>
-      </Box>
-      <DialogActions sx={{ px: 2, py: 1.25, gap: 1 }}>
-        <Button onClick={onClose} sx={{ textTransform: "none" }}>Cancel</Button>
+
+      <DialogActions sx={{ px: 2, py: 1.5, borderTop: "1px solid", borderColor: "divider", gap: 1 }}>
+        <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none" }}>Cancel</Button>
         <Button
-          variant="contained" color="primary"
-          startIcon={sending ? <CircularProgress size={16} color="inherit" /> : null}
-          onClick={onConfirmClick}
-          disabled={sending || !imgRef.current}
-          sx={{ textTransform: "none", fontWeight: 700, minWidth: 96 }}
+          variant="contained"
+          onClick={handleConfirm}
+          disabled={busy || !crop}
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
+          sx={{ textTransform: "none", fontWeight: 700, minWidth: 110 }}
         >
-          {confirmLabel}
+          {busy ? "Saving…" : confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>
   );
-}
-
-function clamp(v, min, max) {
-  return Math.max(min, Math.min(max, v));
 }

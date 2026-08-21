@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Box, Stack, Typography, IconButton, Menu, MenuItem, ListItemIcon, Switch, alpha,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -81,6 +82,7 @@ async function applyAudioOutput(forceId) {
  * Place ABOVE the chat user header, or ABOVE the list search bar on mobile.
  */
 export default function AudioPlayerBar({ player, onChange, onStateChange, onGoToTrack }) {
+  const theme = useTheme();
   const pendingPlayRef = useRef(false);
   const scrubbingRef = useRef(false);
   const continuousRef = useRef(true);
@@ -482,7 +484,9 @@ export default function AudioPlayerBar({ player, onChange, onStateChange, onGoTo
       sx={{
         flexShrink: 0,
         width: "100%",
-        bgcolor: "background.paper",
+        bgcolor: (t) => t.customColors?.surfaceElevated
+          || alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.1 : 0.05)
+          || t.palette.background.paper,
         borderBottom: "1px solid",
         borderColor: "divider",
         zIndex: 12,

@@ -2635,19 +2635,24 @@ export default function JitsiCallModal({
   if (isMiniBar) {
     // Flow layout — parent (MessengerApp) places this under the settings /
     // chat header. NOT position:fixed so it never covers menus or headers.
+    // Follows messenger color theme (surface / primary soft), not a fixed blue-gray.
     rootSx = {
       position: "relative",
       width: "100%",
       flexShrink: 0,
-      bgcolor: "#1b2836",
-      color: "#fff",
+      bgcolor: (t) => t.customColors?.surfaceElevated
+        || t.palette.background.paper
+        || (t.palette.mode === "dark" ? "#1b2836" : "#e8eef5"),
+      color: "text.primary",
       borderBottom: "1px solid",
       borderColor: "divider",
       display: "flex",
       flexDirection: "column",
       userSelect: "none",
       zIndex: 8,
-      boxShadow: "0 1px 0 rgba(0,0,0,0.12)",
+      boxShadow: (t) => t.palette.mode === "dark"
+        ? "0 1px 0 rgba(0,0,0,0.35)"
+        : "0 1px 0 rgba(0,0,0,0.08)",
     };
   } else if (isFull) {
     rootSx = {
@@ -2718,10 +2723,16 @@ export default function JitsiCallModal({
             size="small"
             onClick={toggleAudio}
             sx={{
-              color: "#fff",
-              bgcolor: audioMuted ? "error.main" : "rgba(255,255,255,0.12)",
+              color: audioMuted ? "#fff" : "text.primary",
+              bgcolor: (t) => audioMuted
+                ? t.palette.error.main
+                : alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.22 : 0.12),
               width: 36, height: 36,
-              "&:hover": { bgcolor: audioMuted ? "error.dark" : "rgba(255,255,255,0.2)" },
+              "&:hover": {
+                bgcolor: (t) => audioMuted
+                  ? t.palette.error.dark
+                  : alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.32 : 0.2),
+              },
             }}
             aria-label={audioMuted ? "Unmute" : "Mute"}
           >
@@ -2745,10 +2756,12 @@ export default function JitsiCallModal({
             size="small"
             onClick={goFull}
             sx={{
-              color: "#fff",
-              bgcolor: "rgba(255,255,255,0.12)",
+              color: "text.primary",
+              bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.22 : 0.12),
               width: 36, height: 36,
-              "&:hover": { bgcolor: "rgba(255,255,255,0.2)" },
+              "&:hover": {
+                bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.32 : 0.2),
+              },
             }}
             aria-label="Expand call"
           >
