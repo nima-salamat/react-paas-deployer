@@ -2,8 +2,20 @@
  * Merge server conversation list into previous state without remounting
  * unchanged rows (preserves Avatar DOM / image cache).
  */
+import { readComposerDraft } from "./composerDrafts";
+
 export function mergeConversations(prev, next) {
-  if (!prev?.length) return next || [];
+  if (!prev?.length) {
+    // First load: still hydrate drafts from localStorage
+    return (next || []).map((c) => {
+      if (!c || c.id == null) return c;
+      const local = readComposerDraft(c.id);
+      if (!local.trim()) return c;
+      // Prefer non-empty local over empty/missing server draft
+      if (!(c.draft_text || "").trim()) return { ...c, draft_text: local };
+      return c;
+    });
+  }
   if (!next?.length) return [];
   const prevMap = new Map(prev.map((c) => [String(c.id), c]));
   let changed = prev.length !== next.length;
@@ -11,6 +23,10 @@ export function mergeConversations(prev, next) {
     const old = prevMap.get(String(c.id));
     if (!old) {
       changed = true;
+      const local = readComposerDraft(c.id);
+      if (local.trim() && !(c.draft_text || "").trim()) {
+        return { ...c, draft_text: local };
+      }
       return c;
     }
     const same =
@@ -27,10 +43,18 @@ export function mergeConversations(prev, next) {
       && (old.draft_text || "") === (c.draft_text || "");
     if (same) return old;
     changed = true;
-    // Never clobber a non-empty local draft with an empty server field
+    // Resolve draft: never clobber non-empty local (React state or localStorage)
+    // with an empty server field. Prefer localStorage if state is also empty.
     const serverDraft = typeof c.draft_text === "string" ? c.draft_text : "";
-    const localDraft = typeof old.draft_text === "string" ? old.draft_text : "";
-    const draft_text = serverDraft.trim() ? serverDraft : (localDraft || serverDraft);
+    const stateDraft = typeof old.draft_text === "string" ? old.draft_text : "";
+    const storedDraft = readComposerDraft(c.id);
+    let draft_text = serverDraft;
+    if (!serverDraft.trim()) {
+      draft_text = stateDraft.trim() ? stateDraft : (storedDraft || serverDraft);
+    } else if (storedDraft.trim() && storedDraft !== serverDraft) {
+      // Local keystrokes are authoritative on this device until server catches up
+      draft_text = storedDraft;
+    }
     return { ...old, ...c, draft_text };
   });
   return changed ? merged : prev;

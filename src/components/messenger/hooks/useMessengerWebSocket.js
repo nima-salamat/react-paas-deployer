@@ -241,18 +241,36 @@ useEffect(() => {
     if (data.type === "draft" && data.user_id != null && String(data.user_id) === String(meId)) {
       const cid = data.conversation_id;
       const draft = typeof data.text === "string" ? data.text : "";
-      try { writeComposerDraft(cid, draft); } catch { /* */ }
+      // Only write localStorage when remote has content or we're clearing —
+      // avoid resetting updatedAt on empty echo while user is typing.
+      try {
+        const localNow = (() => {
+          try {
+            const raw = localStorage.getItem("messenger.composerDrafts.v2");
+            const all = raw ? JSON.parse(raw) : {};
+            const e = all?.[String(cid)];
+            return typeof e === "object" && e && typeof e.text === "string" ? e.text : (typeof e === "string" ? e : "");
+          } catch { return ""; }
+        })();
+        // Don't overwrite a non-empty local draft with empty server echo
+        // (race: local keystroke vs delayed empty ack).
+        if (draft.trim() || !String(localNow || "").trim()) {
+          writeComposerDraft(cid, draft);
+        }
+      } catch { /* */ }
       if (setConversations) {
-        setConversations((prev) => prev.map((c) =>
-          String(c.id) === String(cid) ? { ...c, draft_text: draft } : c
-        ));
+        setConversations((prev) => prev.map((c) => {
+          if (String(c.id) !== String(cid)) return c;
+          // Keep non-empty local list preview if server sent empty
+          if (!draft.trim() && (c.draft_text || "").trim()) return c;
+          return { ...c, draft_text: draft };
+        }));
       }
       // Apply to open composer only if this chat is active and user isn't mid-edit
       if (String(cid) === String(activeIdRef.current) && setText) {
         setText((cur) => {
-          // Don't stomp if user is actively typing something different and longer
           if (String(cur || "") === draft) return cur;
-          // Prefer remote if local empty, or remote is newer-looking
+          // Prefer remote only when local is empty (multi-device / reload sync)
           if (!String(cur || "").trim()) return draft;
           return cur;
         });

@@ -79,7 +79,12 @@ import MessageSearchDialog from "./components/MessageSearchDialog";
 import PreviewTextBody from "./components/PreviewTextBody";
 import { attachMessengerOriginal, messengerOriginalOf, attachMessengerImageEdits, messengerImageEditsOf, attachMessengerVideoEdits, messengerVideoEditsOf, finalizeMessengerFiles, guessLangFromName } from "./modules/fileHelpers";
 import { mergeConversations } from "./modules/mergeConversations";
-import { writeComposerDraft, readComposerDraft, resolveComposerDraft } from "./modules/composerDrafts";
+import {
+  writeComposerDraft,
+  readComposerDraft,
+  resolveComposerDraft,
+  draftPayload,
+} from "./modules/composerDrafts";
 import { isGroupDescDismissed, persistGroupDescDismiss } from "./modules/groupDescDismiss";
 import useKeyboardLayout from "./hooks/useKeyboardLayout";
 import useMessengerWebSocket from "./hooks/useMessengerWebSocket";
@@ -190,6 +195,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const typingStopTimerRef = useRef(null);
   const typingSentRef = useRef(false);
   const selectionAutoScrollRef = useRef(null);
+  // Throttle heavy scroll work (DOM queries + sessionStorage) to prevent UI freezes
+  const scrollWorkRafRef = useRef(null);
+  const lastScrollPersistTsRef = useRef(0);
+  const lastMarkReadTsRef = useRef(0);
 
   // Pinned messages for the active conversation
   const [pinnedMessages, setPinnedMessages] = useState([]); // [{ id, message, pinned_at }]
@@ -208,6 +217,36 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     textRef.current = v;
     setComposerExternalText(v);
     setComposerTextVersion((n) => n + 1);
+  }, []);
+  const draftSyncTimerRef = useRef(null);
+  const draftListTimerRef = useRef(null);
+  const lastDraftSyncedRef = useRef({ convId: null, text: null });
+  /** Immediately persist draft to localStorage + chat list + WebSocket (no debounce). */
+  const flushDraftToServer = useCallback((convId, text, { updateList = true } = {}) => {
+    if (convId == null) return;
+    const cid = String(convId);
+    const payload = text == null ? "" : String(text);
+    try { writeComposerDraft(cid, payload); } catch { /* */ }
+    if (updateList) {
+      setConversations((prev) => {
+        let changed = false;
+        const mapped = prev.map((c) => {
+          if (String(c.id) !== cid) return c;
+          if ((c.draft_text || "") === payload) return c;
+          changed = true;
+          return { ...c, draft_text: payload };
+        });
+        return changed ? mapped : prev;
+      });
+    }
+    const last = lastDraftSyncedRef.current;
+    if (last.convId === cid && last.text === payload) return;
+    if (wsRef.current && wsRef.current.readyState === 1) {
+      try {
+        wsRef.current.send(JSON.stringify(draftPayload(cid, payload)));
+        lastDraftSyncedRef.current = { convId: cid, text: payload };
+      } catch { /* */ }
+    }
   }, []);
   const [scheduledFor, setScheduledFor] = useState(null);
   const [appearance, setAppearance] = useState(() => readAppearance());
@@ -722,6 +761,14 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       clearInterval(interval);
     };
   }, [callConfig, meId]);
+
+  // Cancel pending scroll rAF on unmount
+  useEffect(() => () => {
+    if (scrollWorkRafRef.current != null) {
+      cancelAnimationFrame(scrollWorkRafRef.current);
+      scrollWorkRafRef.current = null;
+    }
+  }, []);
 
   // Keep message/data cache warm without sampling scrollTop during React renders.
   // scrollTop is owned by the scroll handler + explicit chat-switch save/restore.
@@ -1332,6 +1379,13 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   }, []);
 
   const closeChat = useCallback(() => {
+    // Persist draft before clearing composer so Esc / back never loses text
+    const leavingId = activeIdRef.current;
+    if (leavingId != null && !editingMsgRef.current) {
+      try {
+        flushDraftToServer(leavingId, textRef.current);
+      } catch { /* */ }
+    }
     // Cache is kept so reopening is instant
     setActiveId(null);
     activeIdRef.current = null;
@@ -1354,7 +1408,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     setHash(null);
     // Always show the chat-list sidebar after leaving a chat (desktop + mobile)
     setDrawerOpen(true);
-  }, [closePanel]);
+  }, [closePanel, flushDraftToServer]);
 
   const openChat = useCallback(async (c, { hashUser, jumpToMessageId } = {}) => {
     if (!c?.id) return;
@@ -1364,11 +1418,13 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const earlyCached = messagesCacheRef.current.get(cid);
     const hasEarlyCache = Boolean(earlyCached?.messages?.length);
     setChatOpening(!hasEarlyCache);
-    // Flush draft of the chat we are leaving (text state still belongs to it)
+    // Flush draft of the chat we are leaving (local + server, no debounce)
     if (activeIdRef.current && String(activeIdRef.current) !== cid) {
-      try {
-        writeComposerDraft(activeIdRef.current, textRef.current);
-      } catch { /* */ }
+      if (!editingMsgRef.current) {
+        try {
+          flushDraftToServer(activeIdRef.current, textRef.current);
+        } catch { /* */ }
+      }
     }
     // Persist scroll position of the chat we are leaving
     if (activeIdRef.current && String(activeIdRef.current) !== cid) {
@@ -1404,8 +1460,17 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     setMsgSearchIdx(-1);
     setReplyTo(null);
     setEditingMsg(null);
-    // Restore unsent draft (server-synced preferred, else localStorage)
+    // Restore unsent draft: localStorage is source of truth on this device
     forceComposerText(resolveComposerDraft(c.id, c.draft_text));
+    // Keep list preview in sync with what we actually put in the composer
+    try {
+      const restored = readComposerDraft(c.id) || resolveComposerDraft(c.id, c.draft_text);
+      if ((c.draft_text || "") !== restored) {
+        setConversations((prev) => prev.map((row) =>
+          String(row.id) === cid ? { ...row, draft_text: restored } : row
+        ));
+      }
+    } catch { /* */ }
     setCtx(null);
     if (isMobile) setDrawerOpen(false);
 
@@ -1706,7 +1771,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       if (String(activeIdRef.current) !== String(c.id)) return;
       try { markVisibleMessagesRead(); } catch { /* */ }
     }, 900);
-  }, [isMobile, loadMessages, loadConversationDetail, loadOlder]);
+  }, [isMobile, loadMessages, loadConversationDetail, loadOlder, flushDraftToServer]);
 
   /* -------------------- calls -------------------- */
 
@@ -2309,7 +2374,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       forceComposerText(""); setFiles([]);
       setMediaSpoiler(false);
       setMediaViewOnce(false);
-      writeComposerDraft(activeId, "");
+      // Clear draft locally + on server immediately (not debounced)
+      try { flushDraftToServer(activeId, ""); } catch { /* */ }
       setReplyTo(null);
       setScheduledFor(null);
       try {
@@ -2375,7 +2441,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const rep = replyTo;
     stopTypingSignal();
     forceComposerText(""); setFiles([]); setReplyTo(null);
-    writeComposerDraft(activeId, "");
+    try { flushDraftToServer(activeId, ""); } catch { /* */ }
     setScheduledFor(null);
     let firstError = null;
     for (let i = 0; i < filesToSend.length; i += 1) {
@@ -2969,9 +3035,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   // Called on every keystroke from MessageComposer — MUST NOT set React state for the
   // text itself (that would re-render message list + sidebar). Only refs + debounced side effects.
-  const draftSyncTimerRef = useRef(null);
-  const draftListTimerRef = useRef(null);
-  const lastDraftSyncedRef = useRef({ convId: null, text: null });
   const handleComposerText = useCallback((valueOrFn) => {
     const prev = textRef.current;
     const next = typeof valueOrFn === "function" ? valueOrFn(prev) : valueOrFn;
@@ -3022,7 +3085,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         });
         return changed ? mapped : prev;
       });
-    }, 400);
+    }, 350);
 
     if (draftSyncTimerRef.current) clearTimeout(draftSyncTimerRef.current);
     draftSyncTimerRef.current = setTimeout(() => {
@@ -3033,15 +3096,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       if (last.convId === String(id) && last.text === payload) return;
       if (wsRef.current && wsRef.current.readyState === 1) {
         try {
-          wsRef.current.send(JSON.stringify({
-            type: "draft",
-            conversation_id: Number(id),
-            text: payload,
-          }));
+          wsRef.current.send(JSON.stringify(draftPayload(id, payload)));
           lastDraftSyncedRef.current = { convId: String(id), text: payload };
         } catch { /* */ }
       }
-    }, 2500);
+    }, 1200);
   }, [sendTypingSignal]);
 
   const formatTypingLabel = useCallback((map, isGroup) => {
@@ -3634,33 +3693,36 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     if (!cid || !root) return;
     const rootRect = root.getBoundingClientRect();
     let found = false;
-    // Prefer data-msg-id nodes (MessageBubble); also accept #msg-<id> wrappers
+    // Prefer data-msg-id nodes (MessageBubble); also accept #msg-<id> wrappers.
+    // Only walk elements that can intersect the viewport — early-exit once past bottom.
+    // (Full querySelectorAll on every call was a major source of scroll freezes.)
     const nodes = root.querySelectorAll("[data-msg-id], [id^='msg-']");
-    nodes.forEach((node) => {
+    const len = nodes.length;
+    for (let i = 0; i < len; i += 1) {
+      const node = nodes[i];
       let id = node.getAttribute("data-msg-id");
       if (!id && node.id && node.id.startsWith("msg-")) id = node.id.slice(4);
-      if (!id) return;
-      // Skip own messages (read receipts are for inbound)
+      if (!id) continue;
+      // Skip own / system messages (read receipts are for inbound)
       const mineAttr = node.getAttribute("data-msg-mine");
-      if (mineAttr === "1") return;
-      // If wrapper without mine attr, look at inner bubble
+      if (mineAttr === "1") continue;
       if (mineAttr == null) {
         const inner = node.querySelector?.("[data-msg-mine]");
-        if (inner?.getAttribute("data-msg-mine") === "1") return;
-        // system messages
-        if (node.getAttribute("data-msg-system") === "1") return;
-        if (inner?.getAttribute("data-msg-system") === "1") return;
+        if (inner?.getAttribute("data-msg-mine") === "1") continue;
+        if (node.getAttribute("data-msg-system") === "1") continue;
+        if (inner?.getAttribute("data-msg-system") === "1") continue;
       }
       const r = node.getBoundingClientRect();
-      // Any intersection with the list viewport counts (was 0.45 ratio — too strict for tall media)
+      // Past the bottom of the list viewport — remaining nodes are further down
+      if (r.top > rootRect.bottom + 4) break;
+      if (r.bottom < rootRect.top - 4) continue;
       const overlap = Math.min(r.bottom, rootRect.bottom) - Math.max(r.top, rootRect.top);
-      if (overlap < 12) return;
-      if (r.bottom <= rootRect.top + 2 || r.top >= rootRect.bottom - 2) return;
+      if (overlap < 12) continue;
       if (!seenQueuedRef.current.has(String(id))) {
         seenQueuedRef.current.add(String(id));
         found = true;
       }
-    });
+    }
     if (!found) return;
     setSeenMsgIds(new Set(seenQueuedRef.current));
     if (seenFlushTimerRef.current) clearTimeout(seenFlushTimerRef.current);
@@ -3850,10 +3912,13 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       const targetY = rootRect.top + Math.min(root.clientHeight * 0.28, 160);
       let bestId = null;
       let bestDist = Infinity;
-      for (let i = 0; i < nodes.length; i += 1) {
+      const len = nodes.length;
+      for (let i = 0; i < len; i += 1) {
         const el = nodes[i];
         const r = el.getBoundingClientRect();
-        if (r.bottom < rootRect.top - 20 || r.top > rootRect.bottom + 20) continue;
+        // Nodes are in document order (top → bottom). Stop once past viewport.
+        if (r.top > rootRect.bottom + 20) break;
+        if (r.bottom < rootRect.top - 20) continue;
         const dist = Math.abs(r.top - targetY);
         if (dist < bestDist) {
           bestDist = dist;
@@ -4104,10 +4169,20 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }
   }, [loadOlder]);
 
-  // Flush viewport before tab close / reload so "was at bottom" survives refresh
+  // Flush viewport + draft before tab close / reload so state survives refresh
   useEffect(() => {
     const flush = () => {
       try { persistViewportSnapshot(!!nearBottomRef.current); } catch { /* */ }
+      const cid = activeIdRef.current;
+      if (cid != null && !editingMsgRef.current) {
+        try {
+          // Best-effort: localStorage always; WS if still open
+          writeComposerDraft(cid, textRef.current);
+          if (wsRef.current && wsRef.current.readyState === 1) {
+            wsRef.current.send(JSON.stringify(draftPayload(cid, textRef.current)));
+          }
+        } catch { /* */ }
+      }
     };
     const onVis = () => {
       if (document.visibilityState === "hidden") flush();
@@ -4172,46 +4247,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const el = e.target;
     const h = el.clientHeight || 0;
     const distBottom = Math.max(0, el.scrollHeight - el.scrollTop - h);
-    const cid = activeIdRef.current;
-    if (cid && !restoringScrollRef.current) {
-      // Real user scroll ends the restore-hold window
-      if (Date.now() < scrollRestoreUntilRef.current) {
-        // Only end hold once the delta is intentional (not our own apply)
-        const anchor = scrollAnchorRef.current;
-        const expected = anchor && Number.isFinite(anchor.distanceBottom)
-          ? anchor.distanceBottom
-          : null;
-        if (expected == null || Math.abs(distBottom - expected) > 40) {
-          scrollRestoreUntilRef.current = 0;
-        }
-      }
-      const key = String(cid);
-      const atBottom = distBottom < NEAR_BOTTOM_PX;
-      const snapshot = {
-        scrollTop: Math.max(0, el.scrollTop),
-        distanceBottom: atBottom ? 0 : distBottom,
-        nearBottom: atBottom,
-        anchorMsgId: atBottom ? null : findAnchorMessageId(el),
-        savedAt: Date.now(),
-      };
-      const prev = messagesCacheRef.current.get(key) || {};
-      messagesCacheRef.current.set(key, {
-        ...prev,
-        ...snapshot,
-      });
-      scrollAnchorRef.current = { convId: key, ...snapshot };
-      scrollPositionKnownRef.current.add(key);
-      try {
-        sessionStorage.setItem(
-          "messenger.scrollAnchor." + key,
-          JSON.stringify(snapshot)
-        );
-      } catch { /* */ }
-    }
     nearBottomRef.current = distBottom < NEAR_BOTTOM_PX;
 
-    // Scroll velocity (px/ms). Positive => toward newer msgs (down the list).
-    // Negative => toward older msgs (up).
+    // Lightweight velocity tracking (cheap, every event)
     const now = performance.now();
     const sv = scrollVelRef.current;
     const dt = Math.max(1, now - (sv.lastTs || now));
@@ -4220,14 +4258,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     sv.velocity = sv.lastTs ? (sv.velocity * 0.65 + inst * 0.35) : inst;
     sv.lastTop = el.scrollTop;
     sv.lastTs = now;
-    const scrollingDown = sv.velocity > 0.05;   // toward bottom / newer
-    const scrollingUp = sv.velocity < -0.05;    // toward top / older
-    const speedUp = sv.velocity < 0 ? -sv.velocity : 0;
 
-    // Jump-to-bottom FAB — position-based (not velocity-based).
-    // Velocity thresholds missed slow/touch scrolls; if the user is away from
-    // the live edge, the control must be available.
-    // Suppress only during programmatic scroll until a real gesture rearms.
+    // Jump-to-bottom FAB — keep responsive (cheap setState only when needed)
     const awayFromBottom = distBottom > Math.max(NEAR_BOTTOM_PX, 160);
     const hasNewBelow = (pendingNewIdsRef.current?.length || 0) > 0 || newBelowCount > 0;
 
@@ -4243,18 +4275,14 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       pendingNewIdsRef.current = [];
       setNewBelowCount(0);
     } else if (scrollDownDismissedRef.current && !userScrollIntentRef.current) {
-      // Programmatic scroll in progress — stay hidden
       setShowScrollDown(false);
       setScrollDownOpacity(0);
     } else {
-      // Away from bottom: always arm (any direction / idle mid-chat)
       armScrollDownButton();
       if (hasNewBelow) recountNewBelow();
     }
 
-    markVisibleMessagesRead();
-
-    // Prefetch before hard edges (module: scrollPrefetch)
+    // Prefetch (cheap checks)
     const plan = getScrollPrefetchPlan(el, {
       isMobile,
       hasMoreNewer: hasMoreNewerRef.current,
@@ -4262,6 +4290,64 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     });
     if (plan.loadOlder) loadOlder();
     if (plan.loadNewer) loadNewer();
+
+    // ===== HEAVY WORK (DOM queries, sessionStorage, mark-read) — throttled via rAF + time =====
+    // Running querySelectorAll + getBoundingClientRect on every scroll event freezes the UI
+    // when the chat has many messages. Coalesce to one job per frame and further rate-limit
+    // the most expensive pieces.
+    if (scrollWorkRafRef.current != null) return;
+    scrollWorkRafRef.current = requestAnimationFrame(() => {
+      scrollWorkRafRef.current = null;
+      const cid = activeIdRef.current;
+      if (!cid || restoringScrollRef.current) return;
+
+      const box = listRef.current;
+      if (!box) return;
+      const bh = box.clientHeight || 0;
+      const dBottom = Math.max(0, box.scrollHeight - box.scrollTop - bh);
+
+      // End restore-hold only on intentional user delta
+      if (Date.now() < scrollRestoreUntilRef.current) {
+        const anchor = scrollAnchorRef.current;
+        const expected = anchor && Number.isFinite(anchor.distanceBottom)
+          ? anchor.distanceBottom
+          : null;
+        if (expected == null || Math.abs(dBottom - expected) > 40) {
+          scrollRestoreUntilRef.current = 0;
+        }
+      }
+
+      const key = String(cid);
+      const atBottom = dBottom < NEAR_BOTTOM_PX;
+      const ts = Date.now();
+      // Persist viewport at most ~4×/sec and skip expensive anchor scan when near bottom
+      if (ts - lastScrollPersistTsRef.current > 250) {
+        lastScrollPersistTsRef.current = ts;
+        const snapshot = {
+          scrollTop: Math.max(0, box.scrollTop),
+          distanceBottom: atBottom ? 0 : dBottom,
+          nearBottom: atBottom,
+          anchorMsgId: atBottom ? null : findAnchorMessageId(box),
+          savedAt: ts,
+        };
+        const prev = messagesCacheRef.current.get(key) || {};
+        messagesCacheRef.current.set(key, { ...prev, ...snapshot });
+        scrollAnchorRef.current = { convId: key, ...snapshot };
+        scrollPositionKnownRef.current.add(key);
+        try {
+          sessionStorage.setItem(
+            "messenger.scrollAnchor." + key,
+            JSON.stringify(snapshot)
+          );
+        } catch { /* */ }
+      }
+
+      // Mark visible as read at most ~3×/sec
+      if (ts - lastMarkReadTsRef.current > 320) {
+        lastMarkReadTsRef.current = ts;
+        try { markVisibleMessagesRead(); } catch { /* */ }
+      }
+    });
   };
 
   // Pin viewport after prepending older messages (separate from chat-switch restore).

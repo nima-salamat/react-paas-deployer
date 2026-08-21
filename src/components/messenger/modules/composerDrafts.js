@@ -88,16 +88,60 @@ export function readComposerDraftMeta(convId) {
 
 /**
  * Prefer the newest non-empty draft: local vs server.
- * Server wins only when it has text and is not clearly older empty.
+ *
+ * Rules (same-device UX first):
+ * 1. Local non-empty always wins when opening a chat on this device —
+ *    localStorage is updated on every keystroke and is the source of truth.
+ * 2. If local is empty, use server.
+ * 3. If both empty → "".
+ *
+ * Optional serverUpdatedAt (ms) can be passed if the API ever provides it;
+ * then we prefer the strictly newer side when both have text.
  */
-export function resolveComposerDraft(convId, serverDraft) {
+export function resolveComposerDraft(convId, serverDraft, serverUpdatedAt = 0) {
   const local = readComposerDraftMeta(convId);
   const server = typeof serverDraft === "string" ? serverDraft : "";
-  if (local.text.trim() && !server.trim()) return local.text;
-  if (server.trim() && !local.text.trim()) return server;
-  if (local.text.trim() && server.trim()) {
-    // Prefer local while typing on this device (always fresher for openChat)
-    return local.text.length >= server.length ? local.text : server;
+  const localTrim = local.text.trim();
+  const serverTrim = server.trim();
+
+  if (localTrim && !serverTrim) return local.text;
+  if (serverTrim && !localTrim) return server;
+  if (!localTrim && !serverTrim) return "";
+
+  // Both non-empty
+  const sAt = Number(serverUpdatedAt) || 0;
+  if (sAt > 0 && local.updatedAt > 0) {
+    // Prefer strictly newer timestamp
+    if (local.updatedAt >= sAt) return local.text;
+    return server;
   }
-  return local.text || server || "";
+  // No reliable server timestamp: local is fresher on this device
+  // (written on every keystroke; server only via debounced WS).
+  return local.text;
+}
+
+/**
+ * Hydrate a conversations array with the best draft for each row
+ * (localStorage takes priority when non-empty).
+ */
+export function hydrateConversationDrafts(conversations) {
+  if (!Array.isArray(conversations)) return conversations || [];
+  return conversations.map((c) => {
+    if (!c || c.id == null) return c;
+    const resolved = resolveComposerDraft(c.id, c.draft_text);
+    if ((c.draft_text || "") === resolved) return c;
+    return { ...c, draft_text: resolved };
+  });
+}
+
+/**
+ * Build the WS/API payload for the current draft of a conversation.
+ * Returns null if nothing to send (same as last sync) when lastSynced is provided.
+ */
+export function draftPayload(convId, text) {
+  return {
+    type: "draft",
+    conversation_id: Number(convId),
+    text: String(text ?? ""),
+  };
 }

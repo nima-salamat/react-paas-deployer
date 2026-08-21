@@ -1,7 +1,7 @@
 import apiRequest from "../../customHooks/apiRequest";
 import { parseCallSystemBody, formatCallSystemLabel, callSystemIcon, isCallSystemBody } from "../modules/callSystemMessage";
 import { MSG_API } from "../api";
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, memo } from "react";
 import Lottie from "lottie-react";
 import CheckIcon from "@mui/icons-material/Check";
 import {
@@ -1506,7 +1506,7 @@ function SingleEmojiLottie({ emoji, size = 72, playing = false, onPlayDone, onCl
 }
 
 
-export default function MessageBubble({
+function MessageBubble({
   m, meId, activeConv,
   onContextOpen, onReact, onReactAnchor, onReply, onEditCode,
   onOpenPreview, onShowReaders, onLoadUserProfile,
@@ -2369,6 +2369,40 @@ export default function MessageBubble({
     </Box>
   );
 }
+
+// Memoize to avoid re-rendering every bubble on parent state changes (audio progress,
+// scroll-related setState, typing indicators, etc.). Custom compare keeps the active
+// audio bubble updating while leaving the rest alone.
+function messageBubblePropsAreEqual(prev, next) {
+  if (prev.m !== next.m) return false;
+  if (prev.meId !== next.meId) return false;
+  if (prev.activeConv !== next.activeConv) return false;
+  if (prev.selectionMode !== next.selectionMode) return false;
+  if (prev.selected !== next.selected) return false;
+  if (prev.isUnread !== next.isUnread) return false;
+  if (prev.isPinnedMessage !== next.isPinnedMessage) return false;
+  if (prev.isFirstInSenderGroup !== next.isFirstInSenderGroup) return false;
+  if (prev.isLastInSenderGroup !== next.isLastInSenderGroup) return false;
+  if (prev.remoteEmojiPlay !== next.remoteEmojiPlay) return false;
+  if (prev.showOwnAvatar !== next.showOwnAvatar) return false;
+  if (prev.showOthersAvatar !== next.showOthersAvatar) return false;
+  if (prev.bubbleStyle !== next.bubbleStyle) return false;
+  // Audio: only re-render when this bubble owns (or just lost) the active track
+  const prevHasActive = prev.activeAudioId != null
+    && (prev.m?.attachments || []).some((a) => String(a.id) === String(prev.activeAudioId));
+  const nextHasActive = next.activeAudioId != null
+    && (next.m?.attachments || []).some((a) => String(a.id) === String(next.activeAudioId));
+  if (prevHasActive || nextHasActive) {
+    if (prev.activeAudioId !== next.activeAudioId) return false;
+    if (prev.audioIsPlaying !== next.audioIsPlaying) return false;
+    if (Math.abs((prev.audioCurrentTime || 0) - (next.audioCurrentTime || 0)) > 0.08) return false;
+    if (prev.audioDuration !== next.audioDuration) return false;
+  }
+  // Callbacks intentionally not compared — parent keeps them stable via useCallback
+  return true;
+}
+
+export default memo(MessageBubble, messageBubblePropsAreEqual);
 
 /** Reusable message-context menu items (used by the parent's right-click menu). */
 export function MessageContextMenuItems({
