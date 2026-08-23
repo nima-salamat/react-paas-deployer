@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
 import { Box, CssBaseline, ThemeProvider, alpha, createTheme } from "@mui/material";
+import { HelmetProvider } from "react-helmet-async";
+import SEO from "./components/seo/SEO.jsx";
 
 import Navbar from "./components/layout/Navbar.jsx";
 import Home from "./components/home/home.jsx";
@@ -164,37 +166,66 @@ function App() {
   );
 
   return (
-    <ThemeProvider theme={appTheme}>
-      <CssBaseline enableColorScheme />
-      <TicketNotifyProvider>
-      <Router>
-        <Routes>
-          <Route path="/messenger" element={<MessengerApp themeMode={themeMode} onThemeModeChange={setThemeMode} />} />
-          <Route path="/messenger/*" element={<MessengerApp themeMode={themeMode} onThemeModeChange={setThemeMode} />} />
-          {/* Standalone admin console — no main Navbar / Footer (messenger-style) */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/*" element={<AdminDashboard />} />
-          <Route path="/" element={<Layout themeMode={themeMode} setThemeMode={setThemeMode} />}>
-            <Route index element={<Home />} />
-            <Route path="services" element={<Services />} />
-            <Route path="volumes" element={<Volumes />} />
-            <Route path="networks" element={<Networks />} />
-            <Route path="plans" element={<Plans />} />
-            <Route path="signin_or_signup" element={<SigninOrSignup />} />
-            <Route path="aboutUs" element={<AboutUs />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="tickets" element={<TicketList />} />
-            <Route path="tickets/new" element={<CreateTicket />} />
-            <Route path="tickets/:id" element={<TicketDetail />} />
-            <Route path="staff" element={<StaffConsole />} />
-            <Route path="staff/tickets" element={<StaffConsole />} />
-            <Route path="admin/emails" element={<EmailManagement />} />
-            <Route path="service/:id" element={<ServiceDetail />} />
-          </Route>
-        </Routes>
-      </Router>
-      </TicketNotifyProvider>
-    </ThemeProvider>
+    <HelmetProvider>
+      <ThemeProvider theme={appTheme}>
+        <CssBaseline enableColorScheme />
+        <TicketNotifyProvider>
+          <Router>
+            <SEO />
+            <Routes>
+              <Route
+                path="/messenger"
+                element={
+                  <MessengerApp
+                    themeMode={themeMode}
+                    onThemeModeChange={setThemeMode}
+                  />
+                }
+              />
+              <Route
+                path="/messenger/*"
+                element={
+                  <MessengerApp
+                    themeMode={themeMode}
+                    onThemeModeChange={setThemeMode}
+                  />
+                }
+              />
+
+              {/* Standalone admin console — no main Navbar / Footer (messenger-style) */}
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/*" element={<AdminDashboard />} />
+
+              <Route
+                path="/"
+                element={
+                  <Layout
+                    themeMode={themeMode}
+                    setThemeMode={setThemeMode}
+                  />
+                }
+              >
+                <Route index element={<Home />} />
+                <Route path="services" element={<Services />} />
+                <Route path="volumes" element={<Volumes />} />
+                <Route path="networks" element={<Networks />} />
+                <Route path="plans" element={<Plans />} />
+                <Route path="signin_or_signup" element={<SigninOrSignup />} />
+                <Route path="aboutUs" element={<AboutUs />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="tickets" element={<TicketList />} />
+                <Route path="tickets/new" element={<CreateTicket />} />
+                <Route path="tickets/:id" element={<TicketDetail />} />
+                <Route path="staff" element={<StaffConsole />} />
+                <Route path="staff/tickets" element={<StaffConsole />} />
+                <Route path="admin/emails" element={<EmailManagement />} />
+                <Route path="service/:id" element={<ServiceDetail />} />
+              </Route>
+            </Routes>
+          </Router>
+        </TicketNotifyProvider>
+      </ThemeProvider>
+    </HelmetProvider>
   );
 }
 

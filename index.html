@@ -3,45 +3,74 @@
   <head>
     <meta charset="UTF-8" />
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <!-- Basic -->
     <meta name="theme-color" content="#081325" />
     <meta name="color-scheme" content="dark" />
+    <meta name="author" content="PassDeployer" />
 
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-
-   
-    <title><%= VITE_APP_NAME %></title>
+    <!-- Default / fallback SEO -->
+    <title>
+      PassDeployer | Deploy Django, Node.js, Flask & Docker Applications
+    </title>
 
     <meta
       name="description"
-      content="<%= VITE_APP_DESCRIPTION %>"
+      content="Deploy and manage Django, Node.js, Flask, and Docker applications with PassDeployer."
     />
 
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="<%= VITE_APP_NAME %>" />
-    <meta property="og:title" content="<%= VITE_APP_NAME %>" />
-    <meta property="og:description" content="<%= VITE_APP_DESCRIPTION %>" />
-    <meta property="og:url" content="<%= VITE_APP_URL %>" />
-    <meta property="og:image" content="<%= VITE_APP_PREVIEW %>" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large"
+    />
 
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="<%= VITE_APP_NAME %>" />
-    <meta name="twitter:description" content="<%= VITE_APP_DESCRIPTION %>" />
-    <meta name="twitter:image" content="<%= VITE_APP_PREVIEW %>" />
+    <meta
+      name="googlebot"
+      content="index, follow, max-image-preview:large"
+    />
+
+    <!-- Favicons -->
+    <link
+      rel="icon"
+      href="/favicon.ico"
+      sizes="any"
+    />
+
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/icon.svg"
+    />
+
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/apple-touch-icon.png"
+    />
 
     <style>
-      html, body {
+      html,
+      body {
         margin: 0;
         padding: 0;
         width: 100%;
-        height: 100%;
+        min-height: 100%;
         background: #0a0a0a;
         color: #fff;
       }
-      #root {
-        min-height: 100%;
+
+      body {
+        min-height: 100vh;
       }
-      /* Shown only until React mounts and replaces #root contents */
+
+      #root {
+        min-height: 100vh;
+      }
+
       .boot-splash {
         position: fixed;
         inset: 0;
@@ -51,6 +80,7 @@
         background: #0a0a0a;
         z-index: 99999;
       }
+
       .boot-spinner {
         width: 40px;
         height: 40px;
@@ -59,18 +89,29 @@
         border-radius: 50%;
         animation: boot-spin 0.75s linear infinite;
       }
+
       @keyframes boot-spin {
-        to { transform: rotate(360deg); }
+        to {
+          transform: rotate(360deg);
+        }
       }
     </style>
   </head>
 
   <body>
     <div id="root">
-      <div class="boot-splash" aria-busy="true" aria-label="Loading">
+      <div
+        class="boot-splash"
+        aria-busy="true"
+        aria-label="Loading"
+      >
         <div class="boot-spinner"></div>
       </div>
     </div>
-    <script type="module" src="/src/main.jsx"></script>
+
+    <script
+      type="module"
+      src="/src/main.jsx"
+    ></script>
   </body>
 </html>
