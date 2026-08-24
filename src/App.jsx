@@ -1,7 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Outlet } from "react-router-dom";
-import { Box, CssBaseline, ThemeProvider, alpha, createTheme } from "@mui/material";
-import { HelmetProvider } from "react-helmet-async";
+import {
+  Routes,
+  Route,
+  Outlet
+} from "react-router-dom";
+import {
+  Box,
+  CssBaseline,
+  ThemeProvider,
+  alpha,
+  createTheme,
+} from "@mui/material";
+
 import SEO from "./components/seo/SEO.jsx";
 
 import Navbar from "./components/layout/Navbar.jsx";
@@ -16,25 +26,40 @@ import Profile from "./components/profile/profile.jsx";
 import Volumes from "./components/volumes/Volumes.jsx";
 import Networks from "./components/networks/Networks.jsx";
 import FloatingNav from "./components/layout/FloatingNav";
+
 import TicketList from "./components/tickets/TicketList.jsx";
 import CreateTicket from "./components/tickets/CreateTicket.jsx";
 import TicketDetail from "./components/tickets/TicketDetail.jsx";
 import StaffConsole from "./components/staff/StaffConsole.jsx";
 import EmailManagement from "./components/emails/EmailManagement.jsx";
 import AdminDashboard from "./components/admin/AdminDashboard.jsx";
+
 import { TicketNotifyProvider } from "./components/tickets/TicketNotifyContext.jsx";
 import MessengerApp from "./components/messenger/MessengerApp.jsx";
 
-const THEME_STORAGE_KEY = "paas-theme-mode";
-const allowedThemeModes = new Set(["light", "dark", "system"]);
+import { HelmetProvider } from "react-helmet-async";
 
-const normalizeThemeMode = (value) => (allowedThemeModes.has(value) ? value : null);
+const THEME_STORAGE_KEY = "paas-theme-mode";
+
+const allowedThemeModes = new Set([
+  "light",
+  "dark",
+  "system",
+]);
+
+const normalizeThemeMode = (value) =>
+  allowedThemeModes.has(value) ? value : null;
 
 const getInitialThemeMode = () => {
-  if (typeof window === "undefined") return "system";
+  if (typeof window === "undefined") {
+    return "system";
+  }
 
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const stored = window.localStorage.getItem(
+      THEME_STORAGE_KEY
+    );
+
     return normalizeThemeMode(stored) || "system";
   } catch {
     return "system";
@@ -42,12 +67,29 @@ const getInitialThemeMode = () => {
 };
 
 const getSystemTheme = () => {
-  if (typeof window === "undefined" || !window.matchMedia) return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  if (
+    typeof window === "undefined" ||
+    !window.matchMedia
+  ) {
+    return "light";
+  }
+
+  return window.matchMedia(
+    "(prefers-color-scheme: dark)"
+  ).matches
+    ? "dark"
+    : "light";
 };
 
-const Layout = ({ themeMode, setThemeMode }) => {
-  const loggedIn = typeof window !== "undefined" && Boolean(window.localStorage.getItem("access"));
+const Layout = ({
+  themeMode,
+  setThemeMode,
+}) => {
+  const loggedIn =
+    typeof window !== "undefined" &&
+    Boolean(
+      window.localStorage.getItem("access")
+    );
 
   return (
     <Box
@@ -61,53 +103,117 @@ const Layout = ({ themeMode, setThemeMode }) => {
         color: "text.primary",
       }}
     >
-      <Navbar themeMode={themeMode} onThemeModeChange={setThemeMode} />
+      <Navbar
+        themeMode={themeMode}
+        onThemeModeChange={setThemeMode}
+      />
 
-      <Box component="main" sx={{ flex: 1, minHeight: 0, width: "100%" }}>
+      <Box
+        component="main"
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          width: "100%",
+        }}
+      >
         <Outlet />
       </Box>
 
       <Footer />
-      <FloatingNav loggedIn={loggedIn} />
+
+      <FloatingNav
+        loggedIn={loggedIn}
+      />
     </Box>
   );
 };
 
-function App() {
-  const [themeMode, setThemeMode] = useState(getInitialThemeMode);
-  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+export function App() {
+  const [themeMode, setThemeMode] = useState(
+    getInitialThemeMode
+  );
+
+  const [systemTheme, setSystemTheme] = useState(
+    getSystemTheme
+  );
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+      window.localStorage.setItem(
+        THEME_STORAGE_KEY,
+        themeMode
+      );
     } catch {
-      // localStorage may be unavailable in some environments; fail silently.
+      // Ignore localStorage errors.
     }
   }, [themeMode]);
 
-  const resolvedMode = themeMode === "system" ? systemTheme : themeMode;
+  const resolvedMode =
+    themeMode === "system"
+      ? systemTheme
+      : themeMode;
 
   useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.documentElement.dataset.theme = resolvedMode;
-    document.documentElement.style.colorScheme = resolvedMode;
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    document.documentElement.dataset.theme =
+      resolvedMode;
+
+    document.documentElement.style.colorScheme =
+      resolvedMode;
   }, [resolvedMode]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    if (
+      typeof window === "undefined" ||
+      !window.matchMedia
+    ) {
+      return undefined;
+    }
 
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const updateSystemTheme = () => setSystemTheme(mediaQuery.matches ? "dark" : "light");
+    const mediaQuery =
+      window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      );
+
+    const updateSystemTheme = () => {
+      setSystemTheme(
+        mediaQuery.matches
+          ? "dark"
+          : "light"
+      );
+    };
 
     updateSystemTheme();
 
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updateSystemTheme);
-      return () => mediaQuery.removeEventListener("change", updateSystemTheme);
+    if (
+      typeof mediaQuery.addEventListener ===
+      "function"
+    ) {
+      mediaQuery.addEventListener(
+        "change",
+        updateSystemTheme
+      );
+
+      return () => {
+        mediaQuery.removeEventListener(
+          "change",
+          updateSystemTheme
+        );
+      };
     }
 
-    mediaQuery.addListener(updateSystemTheme);
-    return () => mediaQuery.removeListener(updateSystemTheme);
+    mediaQuery.addListener(
+      updateSystemTheme
+    );
+
+    return () => {
+      mediaQuery.removeListener(
+        updateSystemTheme
+      );
+    };
   }, []);
 
   const appTheme = useMemo(
@@ -115,37 +221,65 @@ function App() {
       createTheme({
         palette: {
           mode: resolvedMode,
+
           primary: {
-            main: resolvedMode === "dark" ? "#8ab4ff" : "#2f66ff",
+            main:
+              resolvedMode === "dark"
+                ? "#8ab4ff"
+                : "#2f66ff",
           },
+
           secondary: {
-            main: resolvedMode === "dark" ? "#b08cff" : "#6d5efc",
+            main:
+              resolvedMode === "dark"
+                ? "#b08cff"
+                : "#6d5efc",
           },
+
           background: {
-            default: resolvedMode === "dark" ? "#0b1020" : "#f7f9fc",
-            paper: resolvedMode === "dark" ? "#111827" : "#ffffff",
+            default:
+              resolvedMode === "dark"
+                ? "#0b1020"
+                : "#f7f9fc",
+
+            paper:
+              resolvedMode === "dark"
+                ? "#111827"
+                : "#ffffff",
           },
-          divider: alpha(resolvedMode === "dark" ? "#ffffff" : "#0f172a", 0.08),
+
+          divider: alpha(
+            resolvedMode === "dark"
+              ? "#ffffff"
+              : "#0f172a",
+            0.08
+          ),
         },
+
         shape: {
           borderRadius: 16,
         },
+
         typography: {
           fontFamily:
             '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+
           button: {
             textTransform: "none",
             fontWeight: 600,
           },
         },
+
         components: {
           MuiCssBaseline: {
             styleOverrides: {
               body: {
-                transition: "background-color 180ms ease, color 180ms ease",
+                transition:
+                  "background-color 180ms ease, color 180ms ease",
               },
             },
           },
+
           MuiButton: {
             styleOverrides: {
               root: {
@@ -153,6 +287,7 @@ function App() {
               },
             },
           },
+
           MuiPaper: {
             styleOverrides: {
               root: {
@@ -169,60 +304,150 @@ function App() {
     <HelmetProvider>
       <ThemeProvider theme={appTheme}>
         <CssBaseline enableColorScheme />
+
         <TicketNotifyProvider>
-          <Router>
-            <SEO />
-            <Routes>
+          <SEO />
+
+          <Routes>
+            {/* Public SEO pages */}
+
+            <Route
+              path="/"
+              element={
+                <Layout
+                  themeMode={themeMode}
+                  setThemeMode={
+                    setThemeMode
+                  }
+                />
+              }
+            >
               <Route
-                path="/messenger"
-                element={
-                  <MessengerApp
-                    themeMode={themeMode}
-                    onThemeModeChange={setThemeMode}
-                  />
-                }
+                index
+                element={<Home />}
               />
+
               <Route
-                path="/messenger/*"
+                path="services"
+                element={<Services />}
+              />
+
+              <Route
+                path="volumes"
+                element={<Volumes />}
+              />
+
+              <Route
+                path="networks"
+                element={<Networks />}
+              />
+
+              <Route
+                path="plans"
+                element={<Plans />}
+              />
+
+              <Route
+                path="signin_or_signup"
                 element={
-                  <MessengerApp
-                    themeMode={themeMode}
-                    onThemeModeChange={setThemeMode}
-                  />
+                  <SigninOrSignup />
                 }
               />
 
-              {/* Standalone admin console — no main Navbar / Footer (messenger-style) */}
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/*" element={<AdminDashboard />} />
+              <Route
+                path="aboutUs"
+                element={<AboutUs />}
+              />
 
               <Route
-                path="/"
+                path="profile"
+                element={<Profile />}
+              />
+
+              <Route
+                path="tickets"
+                element={<TicketList />}
+              />
+
+              <Route
+                path="tickets/new"
+                element={<CreateTicket />}
+              />
+
+              <Route
+                path="tickets/:id"
                 element={
-                  <Layout
-                    themeMode={themeMode}
-                    setThemeMode={setThemeMode}
-                  />
+                  <TicketDetail />
                 }
-              >
-                <Route index element={<Home />} />
-                <Route path="services" element={<Services />} />
-                <Route path="volumes" element={<Volumes />} />
-                <Route path="networks" element={<Networks />} />
-                <Route path="plans" element={<Plans />} />
-                <Route path="signin_or_signup" element={<SigninOrSignup />} />
-                <Route path="aboutUs" element={<AboutUs />} />
-                <Route path="profile" element={<Profile />} />
-                <Route path="tickets" element={<TicketList />} />
-                <Route path="tickets/new" element={<CreateTicket />} />
-                <Route path="tickets/:id" element={<TicketDetail />} />
-                <Route path="staff" element={<StaffConsole />} />
-                <Route path="staff/tickets" element={<StaffConsole />} />
-                <Route path="admin/emails" element={<EmailManagement />} />
-                <Route path="service/:id" element={<ServiceDetail />} />
-              </Route>
-            </Routes>
-          </Router>
+              />
+
+              <Route
+                path="staff"
+                element={
+                  <StaffConsole />
+                }
+              />
+
+              <Route
+                path="staff/tickets"
+                element={
+                  <StaffConsole />
+                }
+              />
+
+              <Route
+                path="admin/emails"
+                element={
+                  <EmailManagement />
+                }
+              />
+
+              <Route
+                path="service/:id"
+                element={
+                  <ServiceDetail />
+                }
+              />
+            </Route>
+
+            {/* Messenger */}
+
+            <Route
+              path="/messenger"
+              element={
+                <MessengerApp
+                  themeMode={themeMode}
+                  onThemeModeChange={
+                    setThemeMode
+                  }
+                />
+              }
+            />
+
+            <Route
+              path="/messenger/*"
+              element={
+                <MessengerApp
+                  themeMode={themeMode}
+                  onThemeModeChange={
+                    setThemeMode
+                  }
+                />
+              }
+            />
+
+            {/* Admin */}
+
+            <Route
+              path="/admin"
+              element={<AdminDashboard />}
+            />
+
+            <Route
+              path="/admin/*"
+              element={<AdminDashboard />}
+            />
+          </Routes>
         </TicketNotifyProvider>
       </ThemeProvider>
     </HelmetProvider>
