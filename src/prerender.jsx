@@ -58,12 +58,17 @@ export async function prerender({ url }) {
     url: `${SITE_URL}/`,
   });
 
+  // SEO content stays in the HTML for crawlers, but is visually hidden.
+  // Users only see a dark loading shell + spinner until React hydrates.
   return {
     html: `
-      <main id="prerender-seo-shell">
-        <h1>${esc(page.heading)}</h1>
-        <p>${esc(page.text)}</p>
-      </main>
+      <div id="app-boot-shell" aria-busy="true" aria-live="polite">
+        <div class="app-boot-spinner" role="status" aria-label="Loading"></div>
+        <main id="prerender-seo-shell">
+          <h1>${esc(page.heading)}</h1>
+          <p>${esc(page.text)}</p>
+        </main>
+      </div>
     `,
     head: {
       lang: "en",
