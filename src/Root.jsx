@@ -5,7 +5,13 @@ import React, {
   useCallback,
 } from "react";
 
-import { ThemeProvider, CssBaseline } from "@mui/material";
+import {
+  ThemeProvider,
+  CssBaseline,
+} from "@mui/material";
+
+import { CacheProvider } from "@emotion/react";
+import { createEmotionCache } from "./emotionCache";
 
 import { getTheme } from "./theme";
 import { ProfileProvider } from "./components/profile/profile.jsx";
@@ -64,16 +70,23 @@ export default function Root() {
     [mode]
   );
 
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+  const emotionCache = useMemo(
+    () => createEmotionCache(),
+    []
+  );
 
-      <ProfileProvider>
-        <App
-          toggleTheme={toggleTheme}
-          themeMode={mode}
-        />
-      </ProfileProvider>
-    </ThemeProvider>
+  return (
+    <CacheProvider value={emotionCache}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+
+        <ProfileProvider>
+          <App
+            toggleTheme={toggleTheme}
+            themeMode={mode}
+          />
+        </ProfileProvider>
+      </ThemeProvider>
+    </CacheProvider>
   );
 }

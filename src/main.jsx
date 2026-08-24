@@ -1,5 +1,5 @@
 import React from "react";
-import { hydrateRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import Root from "./Root.jsx";
@@ -10,8 +10,7 @@ if (!rootElement) {
   throw new Error("Root element #root was not found.");
 }
 
-hydrateRoot(
-  rootElement,
+createRoot(rootElement).render(
   <React.StrictMode>
     <BrowserRouter>
       <Root />

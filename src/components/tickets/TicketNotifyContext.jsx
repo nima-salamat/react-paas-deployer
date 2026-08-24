@@ -29,7 +29,11 @@ function decodeJwtUserId(token) {
 }
 
 function buildNotifyWsUrl() {
-  const token = localStorage.getItem("access");
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const token = window.localStorage.getItem("access");
   if (!token) return null;
   try {
     const backendUrl = new URL(API_HOST.startsWith("http") ? API_HOST : `https://${API_HOST}`);
@@ -42,22 +46,34 @@ function buildNotifyWsUrl() {
 }
 
 function loadMuted() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
   try {
-    return localStorage.getItem(MUTE_KEY) === "1";
+    return window.localStorage.getItem(MUTE_KEY) === "1";
   } catch {
     return false;
   }
 }
 
 function persistMuted(value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
   try {
-    localStorage.setItem(MUTE_KEY, value ? "1" : "0");
+    window.localStorage.setItem(MUTE_KEY, value ? "1" : "0");
   } catch { /* */ }
 }
 
 function loadStoredItems() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
   try {
-    const raw = sessionStorage.getItem(ITEMS_KEY);
+    const raw = window.sessionStorage.getItem(ITEMS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed.slice(0, 40) : [];
@@ -67,8 +83,12 @@ function loadStoredItems() {
 }
 
 function persistItems(items) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
   try {
-    sessionStorage.setItem(ITEMS_KEY, JSON.stringify(items.slice(0, 40)));
+    window.sessionStorage.setItem(ITEMS_KEY, JSON.stringify(items.slice(0, 40)));
   } catch { /* */ }
 }
 
@@ -79,8 +99,16 @@ export function TicketNotifyProvider({ children }) {
   const [toast, setToast] = useState(null);
   const [muted, setMutedState] = useState(() => loadMuted());
   const [userId, setUserId] = useState(() => {
-    const t = localStorage.getItem("access");
-    return t ? decodeJwtUserId(t) : null;
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    try {
+      const t = window.localStorage.getItem("access");
+      return t ? decodeJwtUserId(t) : null;
+    } catch {
+      return null;
+    }
   });
   const wsRef = useRef(null);
   const listenersRef = useRef(new Set());

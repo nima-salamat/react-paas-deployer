@@ -972,16 +972,26 @@ export default function Home() {
     theme.palette.mode === "dark";
 
   const [loggedIn, setLoggedIn] =
-    useState(() =>
-      Boolean(
-        window.localStorage.getItem(
-          "access"
-        )
-      )
-    );
+    useState(() => {
+      if (typeof window === "undefined") {
+        return false;
+      }
+
+      try {
+        return Boolean(
+          window.localStorage.getItem("access")
+        );
+      } catch {
+        return false;
+      }
+    });
 
   const [orbitActive, setOrbitActive] =
     useState(() => {
+      if (typeof window === "undefined") {
+        return true;
+      }
+
       try {
         const saved =
           window.localStorage.getItem(

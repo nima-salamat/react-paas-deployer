@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   Routes,
   Route,
@@ -16,26 +16,26 @@ import SEO from "./components/seo/SEO.jsx";
 
 import Navbar from "./components/layout/Navbar.jsx";
 import Home from "./components/home/home.jsx";
-import Services from "./components/service/Services.jsx";
+const Services = lazy(() => import("./components/service/Services.jsx"));
 import SigninOrSignup from "./components/signin_or_signup/signin_or_signup.jsx";
 import Plans from "./components/plans/plans.jsx";
 import Footer from "./components/layout/Footer.jsx";
 import AboutUs from "./components/aboutUs/aboutUs.jsx";
-import ServiceDetail from "./components/service_detail/ServiceDetail.jsx";
-import Profile from "./components/profile/profile.jsx";
-import Volumes from "./components/volumes/Volumes.jsx";
-import Networks from "./components/networks/Networks.jsx";
+const ServiceDetail = lazy(() => import("./components/service_detail/ServiceDetail.jsx"));
+const Profile = lazy(() => import("./components/profile/profile.jsx"));
+const Volumes = lazy(() => import("./components/volumes/Volumes.jsx"));
+const Networks = lazy(() => import("./components/networks/Networks.jsx"));
 import FloatingNav from "./components/layout/FloatingNav";
 
-import TicketList from "./components/tickets/TicketList.jsx";
-import CreateTicket from "./components/tickets/CreateTicket.jsx";
-import TicketDetail from "./components/tickets/TicketDetail.jsx";
-import StaffConsole from "./components/staff/StaffConsole.jsx";
-import EmailManagement from "./components/emails/EmailManagement.jsx";
-import AdminDashboard from "./components/admin/AdminDashboard.jsx";
+const TicketList = lazy(() => import("./components/tickets/TicketList.jsx"));
+const CreateTicket = lazy(() => import("./components/tickets/CreateTicket.jsx"));
+const TicketDetail = lazy(() => import("./components/tickets/TicketDetail.jsx"));
+const StaffConsole = lazy(() => import("./components/staff/StaffConsole.jsx"));
+const EmailManagement = lazy(() => import("./components/emails/EmailManagement.jsx"));
+const AdminDashboard = lazy(() => import("./components/admin/AdminDashboard.jsx"));
 
 import { TicketNotifyProvider } from "./components/tickets/TicketNotifyContext.jsx";
-import MessengerApp from "./components/messenger/MessengerApp.jsx";
+const MessengerApp = lazy(() => import("./components/messenger/MessengerApp.jsx"));
 
 import { HelmetProvider } from "react-helmet-async";
 
@@ -308,8 +308,9 @@ export function App() {
         <TicketNotifyProvider>
           <SEO />
 
-          <Routes>
-            {/* Public SEO pages */}
+          <Suspense fallback={null}>
+            <Routes>
+              {/* Public SEO pages */}
 
             <Route
               path="/"
@@ -447,7 +448,8 @@ export function App() {
               path="/admin/*"
               element={<AdminDashboard />}
             />
-          </Routes>
+            </Routes>
+          </Suspense>
         </TicketNotifyProvider>
       </ThemeProvider>
     </HelmetProvider>
