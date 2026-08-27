@@ -1,7 +1,10 @@
 services:
   react:
     container_name: react-paas
-    build: .
+    build:
+      context: .
+      args:
+        DOCKERFILE_NPM_MIRROR: ${DOCKERFILE_NPM_MIRROR:-https://registry.npmmirror.com}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3005:3000"
