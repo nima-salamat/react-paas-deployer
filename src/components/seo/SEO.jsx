@@ -5,27 +5,27 @@ const SITE_URL = (import.meta.env.VITE_APP_URL || "").replace(/\/+$/, "");
 
 const PUBLIC_PAGES = {
   "/": {
-    title: "PassDeployer | Deploy Django, Node.js, Flask & Docker Applications",
+    title: "PassDeployer | Deploy Apps Easily",
     description:
-      "Deploy and manage Django, Node.js, Flask, and Docker applications with PassDeployer.",
+      "PassDeployer helps you deploy and manage Django, Node.js, Flask and Docker apps. Simple PaaS for developers — start, stop, scale and monitor in one place.",
   },
 
   "/plans": {
     title: "Plans | PassDeployer",
     description:
-      "Explore PassDeployer plans and choose the resources for your application.",
+      "Compare PassDeployer plans and pick the CPU, RAM and storage that fit your Django, Node.js, Flask or Docker application.",
   },
 
   "/aboutUs": {
     title: "About PassDeployer",
     description:
-      "Learn more about PassDeployer and the platform for deploying and managing applications.",
+      "Learn how PassDeployer helps teams deploy and manage Django, Node.js, Flask and Docker applications on a self-hosted PaaS.",
   },
 
   "/signin_or_signup": {
     title: "Sign in or Sign up | PassDeployer",
     description:
-      "Sign in to PassDeployer or create a new account.",
+      "Sign in to PassDeployer or create a free account to deploy and manage your Django, Node.js, Flask and Docker applications.",
   },
 };
 
@@ -41,7 +41,7 @@ export default function SEO() {
   const title = page?.title || "PassDeployer";
   const description =
     page?.description ||
-    "PassDeployer application platform.";
+    "PassDeployer helps you deploy and manage Django, Node.js, Flask and Docker applications.";
 
   const url =
     pathname === "/"

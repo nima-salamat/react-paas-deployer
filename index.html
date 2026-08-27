@@ -1,67 +1,30 @@
 <!doctype html>
-
 <html lang="en">
-
 <head>
-
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#081325" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="author" content="PassDeployer" />
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
-
-  <meta
-    name="theme-color"
-    content="#081325"
-  />
-
-  <meta
-    name="color-scheme"
-    content="dark"
-  />
-
-  <meta
-    name="author"
-    content="PassDeployer"
-  />
-
-  <title>
-    PassDeployer | Deploy Django, Node.js, Flask & Docker Applications
-  </title>
-
+  <!--
+    Title & description are injected by prerender (vite-prerender-plugin)
+    and react-helmet-async at runtime. Keeping only one set avoids
+    duplicate meta description tags reported by SEO checkers.
+    Fallback values below are used only if prerender/Helmet do not run.
+  -->
+  <title>PassDeployer | Deploy Apps Easily</title>
   <meta
     name="description"
-    content="Deploy and manage Django, Node.js, Flask, and Docker applications with PassDeployer."
+    content="PassDeployer helps you deploy and manage Django, Node.js, Flask and Docker apps. Simple PaaS for developers — start, stop, scale and monitor in one place."
   />
 
-  <meta
-    name="robots"
-    content="index, follow, max-image-preview:large"
-  />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="googlebot" content="index, follow, max-image-preview:large" />
 
-  <meta
-    name="googlebot"
-    content="index, follow, max-image-preview:large"
-  />
-
-  <link
-    rel="icon"
-    href="/favicon.ico"
-    sizes="any"
-  />
-
-  <link
-    rel="icon"
-    type="image/svg+xml"
-    href="/icon.svg"
-  />
-
-  <link
-    rel="apple-touch-icon"
-    sizes="180x180"
-    href="/apple-touch-icon.png"
-  />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
   <style>
     html,
@@ -110,8 +73,8 @@
     }
 
     /*
-      SEO shell: keep heading/paragraph in the DOM for crawlers,
-      but hide them from sighted users (not display:none).
+      SEO shell: keep heading/paragraph/links in the DOM for crawlers,
+      but hide them from sighted users (clip technique, not display:none).
     */
     #prerender-seo-shell {
       position: absolute;
@@ -125,11 +88,9 @@
       border: 0;
     }
   </style>
-
 </head>
 
 <body>
-
   <div id="root">
     <!-- Fallback for non-prerendered routes: dark screen + spinner -->
     <div id="app-boot-shell" aria-busy="true" aria-live="polite">
@@ -137,11 +98,6 @@
     </div>
   </div>
 
-  <script
-    type="module"
-    src="/src/main.jsx"
-  ></script>
-
+  <script type="module" src="/src/main.jsx"></script>
 </body>
-
 </html>
