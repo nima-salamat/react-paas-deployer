@@ -52,3 +52,10 @@ After deployment, inspect `/`, `/plans`, and `/aboutUs` with URL Inspection. Sub
 ## ads.txt
 
 `/ads.txt` is served by the Node SEO server and intentionally contains only a comment because PassDeployer currently has no advertising sellers. Do not add a made-up Google/ads network publisher record. When an ad platform is actually connected, replace the comment with the exact authorized-seller line supplied by that platform.
+
+
+## SEO content strategy
+
+The public pages are intentionally optimized around the product's core value rather than a list of runtimes. The main Home messaging emphasizes faster deployment, less infrastructure busywork, centralized service management, networks, persistent volumes, resource control, and the ability to change plans as workloads change. Platform/runtime names can still appear naturally where relevant, but they are not the primary keyword strategy.
+
+The Home page also contains visible FAQ content covering deployment simplicity, network and persistent-volume management, plan changes, and post-deployment operations. The SSR HTML contains the same core information so crawlers can access meaningful content before client-side JavaScript runs.

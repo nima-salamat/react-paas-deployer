@@ -7,19 +7,19 @@ const PREVIEW = import.meta.env.VITE_APP_PREVIEW || `${SITE_URL}/preview.png`;
 
 const PUBLIC_PAGES = {
   "/": {
-    title: "PassDeployer | PaaS for Django, Node.js, Flask & Docker",
+    title: "PassDeployer | Faster, Easier Application Deployment & Management",
     description:
-      "Deploy Django, Node.js, Flask and Docker applications from one developer-focused PaaS. Create services, manage compute and storage resources, and run your deployment workflow from one control plane.",
+      "Deploy applications faster with less infrastructure busywork. Create services, manage resources, networks and persistent volumes, and change plans whenever your workload changes.",
   },
   "/plans": {
     title: "Plans & Pricing | PassDeployer",
     description:
-      "Compare PassDeployer plans for application and data workloads. Review CPU, RAM, storage and deployment resources before creating a service.",
+      "Choose the CPU, RAM and storage your service needs. Compare deployment resources, start with a practical plan, and change plans as your workload grows.",
   },
   "/aboutUs": {
-    title: "About PassDeployer | Developer-focused PaaS",
+    title: "About PassDeployer | Simpler Application Deployment & Management",
     description:
-      "Learn about PassDeployer, an open-source PaaS for deploying and managing Django, Node.js, Flask and Docker applications from one control plane.",
+      "Learn how PassDeployer aims to make application deployment, resource management and everyday infrastructure operations simpler from one control plane.",
   },
 };
 
@@ -91,6 +91,44 @@ function buildSchema(page, pathname) {
       operatingSystem: "Web",
       url: pageUrl,
       description: page.description,
+    });
+
+    graph.push({
+      "@type": "FAQPage",
+      mainEntity: [
+        {
+          "@type": "Question",
+          name: "How does PassDeployer make deployment easier?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "PassDeployer puts service creation, deployment and everyday management into one workflow, reducing manual infrastructure setup between your code and a running service.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Can I manage networks and persistent volumes?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. Networks and persistent volumes are managed as part of the service environment, alongside the applications that use them.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "Can I change my plan later?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Yes. You can move to a different resource plan when your workload changes instead of rebuilding your deployment workflow from scratch.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "What can I manage after deployment?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "You can monitor service status and resource usage, perform common lifecycle actions, and manage the resources and supporting infrastructure around your services from the same control plane.",
+          },
+        },
+      ],
     });
   }
 

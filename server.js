@@ -12,42 +12,43 @@ const SITE_NAME = process.env.VITE_APP_NAME || 'PassDeployer';
 
 const PUBLIC_PAGES = {
   '/': {
-    title: 'PassDeployer | Deploy Django, Node.js, Flask & Docker Apps',
+    title: 'PassDeployer | Faster, Easier Application Deployment & Management',
     description:
-      'Deploy Django, Node.js, Flask and Docker applications from one modern PaaS control panel. Create services, manage resources and monitor deployments with PassDeployer.',
-    heading: 'Deploy applications without the deployment headache',
+      'Deploy applications faster with less infrastructure busywork. Create services, manage resources, networks and persistent volumes, and change plans whenever your workload changes.',
+    heading: 'Deploy faster. Manage everything in one place.',
     intro:
-      'PassDeployer is a developer-focused PaaS for deploying and managing Django, Node.js, Flask and Docker applications from one place.',
+      'PassDeployer is a PaaS control plane for application deployment and day-to-day infrastructure management, designed to make shipping and operating services simpler.',
     sections: [
-      ['Deploy popular application stacks', 'Create services for Django, Node.js, Flask and containerized applications without building your own deployment control plane.'],
-      ['Manage services and resources', 'Choose CPU, memory and storage plans, then manage service lifecycle, logs, networks and persistent volumes from a single dashboard.'],
-      ['Built for practical deployment workflows', 'Upload an application, configure the runtime, deploy it and keep control over the service after it goes live.'],
+      ['Deploy without the usual setup', 'Go from an application to a running service with a straightforward workflow that reduces repetitive configuration and manual deployment work.'],
+      ['Manage the infrastructure around your services', 'Control compute and storage resources, service lifecycle, logs, networks and persistent volumes from one interface instead of stitching together multiple tools.'],
+      ['Stay flexible as your workload changes', 'Start with the resources you need and change plans whenever your application grows, traffic changes or a different workload calls for more capacity.'],
+      ['Keep everyday operations simple', 'Monitor what is running, perform common service actions and keep the operational controls you need close to the application.'],
     ],
   },
   '/plans': {
-    title: 'Plans & Pricing | PassDeployer',
+    title: 'Flexible Plans & Pricing | PassDeployer',
     description:
-      'Explore PassDeployer plans for Django, Node.js, Flask and Docker applications. Compare CPU, RAM, storage and deployment resources for your next service.',
-    heading: 'Choose a deployment plan for your application',
+      'Choose the CPU, RAM and storage your service needs. Compare deployment resources, start with a practical plan, and change plans as your workload grows.',
+    heading: 'Choose resources that fit your workload',
     intro:
-      'PassDeployer plans let you choose the compute and storage resources that fit the workload you want to deploy.',
+      'PassDeployer plans are built around the resources your services actually use, with the flexibility to move to a different plan when your needs change.',
     sections: [
-      ['Application plans', 'Select a plan based on the CPU, RAM and storage requirements of your web application or API.'],
-      ['Database and data services', 'Use dedicated resource options for databases, caches and other supporting services when your application needs persistent data.'],
-      ['Scale as your workload grows', 'Start with the resources you need today and move to a larger plan as traffic, background jobs or application requirements increase.'],
+      ['Start with the resources you need', 'Choose CPU, memory and storage based on the size and behavior of your application rather than committing to infrastructure you do not need yet.'],
+      ['Manage more than compute', 'Plan around the complete service environment, including persistent storage, network connectivity and the operational controls needed to keep services running.'],
+      ['Change plans when you need to', 'As your application grows or your workload changes, move to a more suitable resource level without rebuilding your deployment workflow from scratch.'],
     ],
   },
   '/aboutUs': {
-    title: 'About PassDeployer | Developer-focused PaaS',
+    title: 'About PassDeployer | Simpler Application Deployment & Management',
     description:
-      'Learn about PassDeployer, an open-source developer-focused PaaS for deploying and managing Django, Node.js, Flask and Docker applications.',
-    heading: 'About PassDeployer',
+      'Learn how PassDeployer aims to make application deployment, resource management and everyday infrastructure operations simpler from one control plane.',
+    heading: 'Making application deployment easier to manage',
     intro:
-      'PassDeployer is a developer-focused deployment platform built around a Django control plane and a React operator interface.',
+      'PassDeployer is built around a simple idea: deployment should be repeatable and infrastructure management should not require a pile of disconnected tools.',
     sections: [
-      ['A focused deployment platform', 'The goal is simple: make application deployment, service management and operational tasks easier without hiding the underlying infrastructure.'],
-      ['Open-source stack', 'The project combines a Django backend for orchestration with a React frontend for the management experience.'],
-      ['One control plane for your services', 'Plans, services, private networks, persistent volumes and deployment workflows are managed from one interface.'],
+      ['Less deployment friction', 'The platform focuses on shortening the path between your application and a running service while keeping practical operational controls available.'],
+      ['One control plane for everyday operations', 'Services, resources, networks, persistent volumes and deployment workflows can be managed from one place, making routine changes easier to understand and repeat.'],
+      ['Open and practical by design', 'PassDeployer combines a React management experience with a Django-backed control plane and a workflow that keeps the underlying deployment model understandable.'],
     ],
   },
 };
@@ -137,6 +138,16 @@ function buildSchema(page, pathname) {
       description: page.description,
       image: `${SITE_URL}/preview.png`,
     });
+
+    graph.push({
+      '@type': 'FAQPage',
+      mainEntity: [
+        { '@type': 'Question', name: 'How does PassDeployer make deployment easier?', acceptedAnswer: { '@type': 'Answer', text: 'PassDeployer puts service creation, deployment and everyday management into one workflow, reducing manual infrastructure setup between your code and a running service.' } },
+        { '@type': 'Question', name: 'Can I manage networks and persistent volumes?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. Networks and persistent volumes are managed as part of the service environment, alongside the applications that use them.' } },
+        { '@type': 'Question', name: 'Can I change my plan later?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. You can move to a different resource plan when your workload changes instead of rebuilding your deployment workflow from scratch.' } },
+        { '@type': 'Question', name: 'What can I manage after deployment?', acceptedAnswer: { '@type': 'Answer', text: 'You can monitor service status and resource usage, perform common lifecycle actions, and manage the resources and supporting infrastructure around your services from the same control plane.' } },
+      ],
+    });
   }
 
   return { '@context': 'https://schema.org', '@graph': graph };
@@ -154,11 +165,19 @@ function buildPublicBody(page, pathname) {
         <section class="seo-sections" aria-label="${escapeHtml(page.heading)}">
           ${page.sections.map(([heading, text]) => `<article><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(text)}</p></article>`).join('')}
         </section>
+        ${pathname === '/' ? `
+        <section class="seo-sections" aria-labelledby="seo-faq-heading">
+          <h2 id="seo-faq-heading">A simpler way to deploy and manage services</h2>
+          <article><h3>How does PassDeployer make deployment easier?</h3><p>PassDeployer puts service creation, deployment and everyday management into one workflow, reducing manual infrastructure setup between your code and a running service.</p></article>
+          <article><h3>Can I manage networks and persistent volumes?</h3><p>Yes. Networks and persistent volumes are managed as part of the service environment, alongside the applications that use them.</p></article>
+          <article><h3>Can I change my plan later?</h3><p>Yes. You can move to a different resource plan when your workload changes instead of rebuilding your deployment workflow from scratch.</p></article>
+          <article><h3>What can I manage after deployment?</h3><p>You can monitor service status and resource usage, perform common lifecycle actions, and manage the resources and supporting infrastructure around your services from the same control plane.</p></article>
+        </section>` : ''}
         <nav class="seo-links" aria-label="Explore PassDeployer">
           <a href="/">Deploy applications</a>
-          <a href="/plans">Plans</a>
-          <a href="/aboutUs">About PassDeployer</a>
-          <a href="/signin_or_signup">Create an account</a>
+          <a href="/plans">Compare plans and resources</a>
+          <a href="/aboutUs">Why PassDeployer</a>
+          <a href="/signin_or_signup">Get started</a>
         </nav>
       </div>
     </main>`;

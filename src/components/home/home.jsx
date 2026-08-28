@@ -118,9 +118,9 @@ const dataStack = [
 const workflow = [
   {
     id: "01",
-    title: "Choose a plan",
+    title: "Choose the resources you need",
     description:
-      "Set the resources and limits your service will use.",
+      "Pick CPU, memory and storage that fit your workload, then change plans whenever your needs change.",
     icon: TuneRoundedIcon,
     accent: "#60a5fa",
   },
@@ -128,23 +128,23 @@ const workflow = [
     id: "02",
     title: "Create a service",
     description:
-      "Connect your application, runtime and configuration.",
+      "Set up your application, configuration and runtime without assembling deployment infrastructure by hand.",
     icon: TerminalRoundedIcon,
     accent: "#818cf8",
   },
   {
     id: "03",
-    title: "Deploy",
+    title: "Deploy faster",
     description:
-      "PassDeployer builds and launches your application.",
+      "Move from configured service to a running deployment with a repeatable workflow and less manual work.",
     icon: RocketLaunchRoundedIcon,
     accent: "#a78bfa",
   },
   {
     id: "04",
-    title: "Manage",
+    title: "Manage everything in one place",
     description:
-      "Monitor, restart and control the service from one place.",
+      "Monitor services, manage networks and persistent volumes, restart workloads and adjust resources from one control surface.",
     icon: CloudDoneRoundedIcon,
     accent: "#38bdf8",
   },
@@ -1292,9 +1292,9 @@ export default function Home() {
                       950,
                   }}
                 >
-                  Deploy Django, Node.js,
+                  Deploy faster.
                   <br />
-                  Flask & Docker apps.
+                  Manage more. Worry less.
                 </Typography>
               </motion.div>
 
@@ -1329,9 +1329,9 @@ export default function Home() {
                       "text.secondary",
                   }}
                 >
-                  Deploy Django, Node.js, Flask and Docker applications
-                  from a single PaaS control plane. Create services,
-                  manage resources and keep your deployment workflow in one place.
+                  Deploy and manage applications without the usual infrastructure busywork.
+                  Create services quickly, choose the resources you need, connect networks,
+                  keep persistent volumes, and change plans whenever your workload grows.
                 </Typography>
               </motion.div>
 
@@ -1913,7 +1913,7 @@ export default function Home() {
               >
                 Your application.
                 <br />
-                One deployment pipeline.
+                One place for deployment and infrastructure.
               </Typography>
 
               <Typography
@@ -1924,9 +1924,9 @@ export default function Home() {
                     1.85,
                 }}
               >
-                PassDeployer keeps the development stack
-                familiar while handling the deployment layer
-                behind the scenes.
+                PassDeployer brings deployment and day-to-day service management
+                into one control plane, so you spend less time wiring infrastructure
+                together and more time shipping your application.
               </Typography>
             </Stack>
           </SectionReveal>
@@ -2626,9 +2626,8 @@ export default function Home() {
                     maxWidth: 620,
                   }}
                 >
-                  Every deployment gets a clear control
-                  surface for status, resources, usage and
-                  everyday actions.
+                  Every service gets a clear control surface for status, resources, usage and
+                everyday actions, so routine operations stay simple after deployment.
                 </Typography>
               </Box>
 
@@ -2765,11 +2764,8 @@ export default function Home() {
                           1.75,
                       }}
                     >
-                      Status, resource
-                      limits and live
-                      usage stay visible
-                      from the same service
-                      surface.
+                      Status, resource limits and live usage stay visible from the same service surface,
+                      so you can understand what is running without jumping between tools.
                     </Typography>
                   </Stack>
                 </Paper>
@@ -2821,7 +2817,7 @@ export default function Home() {
                           850,
                       }}
                     >
-                      Start. Stop. Open. Edit.
+                      Start, stop, restart and change resources.
                     </Typography>
 
                     <Typography
@@ -2940,25 +2936,25 @@ export default function Home() {
                   icon:
                     SpeedRoundedIcon,
                   title:
-                    "Fast workflow",
+                    "Faster deployment",
                   text:
-                    "Less setup between your code and a running service.",
+                    "Reduce repetitive setup and get from application to running service with fewer manual steps.",
                 },
                 {
                   icon:
                     SecurityRoundedIcon,
                   title:
-                    "Controlled infrastructure",
+                    "Infrastructure, without the busywork",
                   text:
-                    "Keep deployment resources and service boundaries organized.",
+                    "Manage resources, networks, persistent volumes and service boundaries from one place.",
                 },
                 {
                   icon:
                     AutoAwesomeRoundedIcon,
                   title:
-                    "Familiar tooling",
+                    "Flexible as you grow",
                   text:
-                    "Use the technologies and runtimes your team already knows.",
+                    "Change plans when your workload changes instead of rebuilding your deployment setup.",
                 },
               ].map(
                 (
@@ -3129,9 +3125,8 @@ export default function Home() {
                     maxWidth: 620,
                   }}
                 >
-                  A predictable deployment flow that keeps
-                  infrastructure complexity out of your
-                  development workflow.
+                  A straightforward deployment flow that removes repetitive infrastructure work
+                  while keeping the controls you need to run and manage real services.
                 </Typography>
               </Box>
 
@@ -3369,6 +3364,86 @@ export default function Home() {
               )}
             </Box>
           </Box>
+        </Container>
+      </Box>
+
+      {/* ======================================================
+          FAQ / SEARCH-INTENT CONTENT
+      ======================================================= */}
+
+      <Box
+        component="section"
+        aria-labelledby="deployment-faq-heading"
+        sx={{
+          position: "relative",
+          py: { xs: 9, md: 14 },
+        }}
+      >
+        <Container maxWidth="md">
+          <SectionReveal>
+            <Box sx={{ textAlign: "center", mb: { xs: 5, md: 7 } }}>
+              <Typography
+                component="h2"
+                id="deployment-faq-heading"
+                sx={{
+                  fontSize: { xs: "2.1rem", md: "3.15rem" },
+                  lineHeight: 1.05,
+                  letterSpacing: "-0.055em",
+                  fontWeight: 950,
+                }}
+              >
+                A simpler way to deploy and manage services.
+              </Typography>
+              <Typography
+                color="text.secondary"
+                sx={{ mt: 1.6, lineHeight: 1.8, maxWidth: 690, mx: "auto" }}
+              >
+                The platform is designed to remove repetitive infrastructure work while keeping
+                the resource and operational controls you need close at hand.
+              </Typography>
+            </Box>
+          </SectionReveal>
+
+          <Stack spacing={1.5}>
+            {[
+              {
+                q: "How does PassDeployer make deployment easier?",
+                a: "PassDeployer puts service creation, deployment and everyday management into one workflow, reducing the amount of manual infrastructure setup between your code and a running service.",
+              },
+              {
+                q: "Can I manage networks and persistent volumes?",
+                a: "Yes. Networks and persistent volumes are part of the service environment, so they can be managed alongside the applications that use them instead of being treated as disconnected infrastructure.",
+              },
+              {
+                q: "Can I change my plan later?",
+                a: "Yes. You can move to a different resource plan when your workload changes, rather than rebuilding your deployment workflow from scratch.",
+              },
+              {
+                q: "What can I manage after deployment?",
+                a: "You can monitor service status and resource usage, perform common lifecycle actions, and manage the resources and supporting infrastructure around your services from the same control plane.",
+              },
+            ].map((item) => (
+              <Paper
+                key={item.q}
+                component="article"
+                elevation={0}
+                sx={{
+                  p: { xs: 2.5, md: 3 },
+                  borderRadius: { xs: 3, md: 4 },
+                  border: "1px solid",
+                  borderColor: subtleBorder,
+                  bgcolor: "background.paper",
+                }}
+              >
+                <Typography component="h3" sx={{ fontWeight: 900, mb: 0.8 }}>
+                  {item.q}
+                </Typography>
+                <Typography color="text.secondary" sx={{ lineHeight: 1.8 }}>
+                  {item.a}
+                </Typography>
+              </Paper>
+            ))}
+          </Stack>
         </Container>
       </Box>
 
@@ -3975,7 +4050,7 @@ export default function Home() {
               variant="caption"
               color="text.secondary"
             >
-              Deploy. Manage. Scale.
+              Deploy faster. Manage everything in one place. Scale when you need to.
             </Typography>
           </Stack>
         </Container>
