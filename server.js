@@ -4,65 +4,18 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createReadStream } from 'node:fs';
 
+import {
+  PUBLIC_PAGES,
+  buildSchema,
+  canonicalUrl,
+  getSiteConfig,
+  isNoIndex,
+} from './src/seo-config.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, 'dist');
-const SITE_URL = (process.env.VITE_APP_URL || 'https://echonode.website').replace(/\/+$/, '');
-const SITE_NAME = process.env.VITE_APP_NAME || 'PassDeployer';
-
-const PUBLIC_PAGES = {
-  '/': {
-    title: 'PassDeployer | Faster, Easier Application Deployment & Management',
-    description:
-      'Deploy applications faster with less infrastructure busywork. Create services, manage resources, networks and persistent volumes, and change plans whenever your workload changes.',
-    heading: 'Deploy faster. Manage everything in one place.',
-    intro:
-      'PassDeployer is a PaaS control plane for application deployment and day-to-day infrastructure management, designed to make shipping and operating services simpler.',
-    sections: [
-      ['Deploy without the usual setup', 'Go from an application to a running service with a straightforward workflow that reduces repetitive configuration and manual deployment work.'],
-      ['Manage the infrastructure around your services', 'Control compute and storage resources, service lifecycle, logs, networks and persistent volumes from one interface instead of stitching together multiple tools.'],
-      ['Stay flexible as your workload changes', 'Start with the resources you need and change plans whenever your application grows, traffic changes or a different workload calls for more capacity.'],
-      ['Keep everyday operations simple', 'Monitor what is running, perform common service actions and keep the operational controls you need close to the application.'],
-    ],
-  },
-  '/plans': {
-    title: 'Flexible Plans & Pricing | PassDeployer',
-    description:
-      'Choose the CPU, RAM and storage your service needs. Compare deployment resources, start with a practical plan, and change plans as your workload grows.',
-    heading: 'Choose resources that fit your workload',
-    intro:
-      'PassDeployer plans are built around the resources your services actually use, with the flexibility to move to a different plan when your needs change.',
-    sections: [
-      ['Start with the resources you need', 'Choose CPU, memory and storage based on the size and behavior of your application rather than committing to infrastructure you do not need yet.'],
-      ['Manage more than compute', 'Plan around the complete service environment, including persistent storage, network connectivity and the operational controls needed to keep services running.'],
-      ['Change plans when you need to', 'As your application grows or your workload changes, move to a more suitable resource level without rebuilding your deployment workflow from scratch.'],
-    ],
-  },
-  '/aboutUs': {
-    title: 'About PassDeployer | Simpler Application Deployment & Management',
-    description:
-      'Learn how PassDeployer aims to make application deployment, resource management and everyday infrastructure operations simpler from one control plane.',
-    heading: 'Making application deployment easier to manage',
-    intro:
-      'PassDeployer is built around a simple idea: deployment should be repeatable and infrastructure management should not require a pile of disconnected tools.',
-    sections: [
-      ['Less deployment friction', 'The platform focuses on shortening the path between your application and a running service while keeping practical operational controls available.'],
-      ['One control plane for everyday operations', 'Services, resources, networks, persistent volumes and deployment workflows can be managed from one place, making routine changes easier to understand and repeat.'],
-      ['Open and practical by design', 'PassDeployer combines a React management experience with a Django-backed control plane and a workflow that keeps the underlying deployment model understandable.'],
-    ],
-  },
-};
-
-const NOINDEX_PREFIXES = [
-  '/profile', '/services', '/service/', '/volumes', '/networks', '/tickets',
-  '/staff', '/admin', '/messenger', '/signin_or_signup'
-];
-
-function normalizePath(input) {
-  const raw = new URL(input, SITE_URL).pathname || '/';
-  if (raw === '/') return '/';
-  return raw.replace(/\/+$/, '') || '/';
-}
+const { siteUrl: SITE_URL, siteName: SITE_NAME, preview: PREVIEW } = getSiteConfig(process.env);
 
 function escapeHtml(value) {
   return String(value)
@@ -77,136 +30,25 @@ function escapeJsonLd(value) {
   return JSON.stringify(value).replaceAll('<', '\\u003c');
 }
 
-function isNoIndex(pathname) {
-  return NOINDEX_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
-}
-
-function canonicalUrl(pathname) {
-  return `${SITE_URL}${pathname === '/' ? '/' : pathname}`;
-}
-
-function buildSchema(page, pathname) {
-  const pageUrl = canonicalUrl(pathname);
-  const graph = [
-    {
-      '@type': 'WebSite',
-      '@id': `${SITE_URL}/#website`,
-      name: SITE_NAME,
-      url: `${SITE_URL}/`,
-      publisher: { '@id': `${SITE_URL}/#organization` },
-    },
-    {
-      '@type': 'Organization',
-      '@id': `${SITE_URL}/#organization`,
-      name: SITE_NAME,
-      url: `${SITE_URL}/`,
-      logo: `${SITE_URL}/icon.svg`,
-      sameAs: [
-        'https://github.com/nima-salamat/react-paas-deployer',
-        'https://github.com/nima-salamat/django-paas-deployer',
-      ],
-    },
-    {
-      '@type': 'WebPage',
-      '@id': `${pageUrl}#webpage`,
-      url: pageUrl,
-      name: page.title,
-      description: page.description,
-      inLanguage: 'en',
-      isPartOf: { '@id': `${SITE_URL}/#website` },
-      primaryImageOfPage: { '@type': 'ImageObject', url: `${SITE_URL}/preview.png` },
-    },
-  ];
-
-  if (pathname !== '/') {
-    graph.push({
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE_URL}/` },
-        { '@type': 'ListItem', position: 2, name: page.heading, item: pageUrl },
-      ],
-    });
-  }
-
-  if (pathname === '/') {
-    graph.push({
-      '@type': 'SoftwareApplication',
-      name: SITE_NAME,
-      applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'Web',
-      url: pageUrl,
-      description: page.description,
-      image: `${SITE_URL}/preview.png`,
-    });
-
-    graph.push({
-      '@type': 'FAQPage',
-      mainEntity: [
-        { '@type': 'Question', name: 'How does PassDeployer make deployment easier?', acceptedAnswer: { '@type': 'Answer', text: 'PassDeployer puts service creation, deployment and everyday management into one workflow, reducing manual infrastructure setup between your code and a running service.' } },
-        { '@type': 'Question', name: 'Can I manage networks and persistent volumes?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. Networks and persistent volumes are managed as part of the service environment, alongside the applications that use them.' } },
-        { '@type': 'Question', name: 'Can I change my plan later?', acceptedAnswer: { '@type': 'Answer', text: 'Yes. You can move to a different resource plan when your workload changes instead of rebuilding your deployment workflow from scratch.' } },
-        { '@type': 'Question', name: 'What can I manage after deployment?', acceptedAnswer: { '@type': 'Answer', text: 'You can monitor service status and resource usage, perform common lifecycle actions, and manage the resources and supporting infrastructure around your services from the same control plane.' } },
-      ],
-    });
-  }
-
-  return { '@context': 'https://schema.org', '@graph': graph };
-}
-
-function buildPublicBody(page, pathname) {
-  return `
-    <main class="seo-page" id="seo-content">
-      <div class="seo-container">
-        <nav class="seo-breadcrumbs" aria-label="Breadcrumb">
-          <a href="/">Home</a>${pathname !== '/' ? `<span aria-hidden="true">/</span><span>${escapeHtml(page.heading)}</span>` : ''}
-        </nav>
-        <h1>${escapeHtml(page.heading)}</h1>
-        <p class="seo-lead">${escapeHtml(page.intro)}</p>
-        <section class="seo-sections" aria-label="${escapeHtml(page.heading)}">
-          ${page.sections.map(([heading, text]) => `<article><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(text)}</p></article>`).join('')}
-        </section>
-        ${pathname === '/' ? `
-        <section class="seo-sections" aria-labelledby="seo-faq-heading">
-          <h2 id="seo-faq-heading">A simpler way to deploy and manage services</h2>
-          <article><h3>How does PassDeployer make deployment easier?</h3><p>PassDeployer puts service creation, deployment and everyday management into one workflow, reducing manual infrastructure setup between your code and a running service.</p></article>
-          <article><h3>Can I manage networks and persistent volumes?</h3><p>Yes. Networks and persistent volumes are managed as part of the service environment, alongside the applications that use them.</p></article>
-          <article><h3>Can I change my plan later?</h3><p>Yes. You can move to a different resource plan when your workload changes instead of rebuilding your deployment workflow from scratch.</p></article>
-          <article><h3>What can I manage after deployment?</h3><p>You can monitor service status and resource usage, perform common lifecycle actions, and manage the resources and supporting infrastructure around your services from the same control plane.</p></article>
-        </section>` : ''}
-        <nav class="seo-links" aria-label="Explore PassDeployer">
-          <a href="/">Deploy applications</a>
-          <a href="/plans">Compare plans and resources</a>
-          <a href="/aboutUs">Why PassDeployer</a>
-          <a href="/signin_or_signup">Get started</a>
-        </nav>
-      </div>
-    </main>`;
-}
-
-function buildNotFoundBody() {
-  return `
-    <main class="seo-page" id="seo-content">
-      <div class="seo-container">
-        <h1>Page not found</h1>
-        <p class="seo-lead">The page you requested does not exist.</p>
-        <p><a href="/">Return to PassDeployer home</a></p>
-      </div>
-    </main>`;
-}
-
 function buildHead(page, pathname, noindex = false) {
-  const url = canonicalUrl(pathname);
-  const robots = noindex ? 'noindex, nofollow, noarchive' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
-  const schema = page ? buildSchema(page, pathname) : null;
-  const preview = `${SITE_URL}/preview.png`;
+  const url = canonicalUrl(pathname, SITE_URL);
+  const robots = noindex
+    ? 'noindex, nofollow, noarchive'
+    : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1';
+  const schema = page
+    ? buildSchema(page, pathname, { siteUrl: SITE_URL, siteName: SITE_NAME, preview: PREVIEW })
+    : null;
 
   return `
     <title>${escapeHtml(page?.title || `404 | ${SITE_NAME}`)}</title>
     <meta name="description" content="${escapeHtml(page?.description || 'The requested page could not be found.')}" />
     <meta name="robots" content="${robots}" />
     <meta name="googlebot" content="${robots}" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <meta name="theme-color" content="#081325" />
     ${page && !noindex ? `<link rel="canonical" href="${escapeHtml(url)}" />` : ''}
     <link rel="icon" href="/favicon.ico" sizes="48x48" type="image/x-icon" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     ${page && !noindex ? `
       <meta property="og:type" content="website" />
@@ -214,16 +56,15 @@ function buildHead(page, pathname, noindex = false) {
       <meta property="og:title" content="${escapeHtml(page.title)}" />
       <meta property="og:description" content="${escapeHtml(page.description)}" />
       <meta property="og:url" content="${escapeHtml(url)}" />
-      <meta property="og:image" content="${escapeHtml(preview)}" />
+      <meta property="og:image" content="${escapeHtml(PREVIEW)}" />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="675" />
-      <meta property="og:image:alt" content="PassDeployer deployment platform" />
+      <meta property="og:image:alt" content="${escapeHtml(SITE_NAME)} deployment platform" />
       <meta property="og:locale" content="en_US" />
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:url" content="${escapeHtml(url)}" />
       <meta name="twitter:title" content="${escapeHtml(page.title)}" />
       <meta name="twitter:description" content="${escapeHtml(page.description)}" />
-      <meta name="twitter:image" content="${escapeHtml(preview)}" />
+      <meta name="twitter:image" content="${escapeHtml(PREVIEW)}" />
     ` : ''}
     ${schema ? `<script type="application/ld+json">${escapeJsonLd(schema)}</script>` : ''}
   `;
@@ -236,15 +77,16 @@ function loadTemplate() {
 function renderDocument(pathname, statusCode = 200) {
   const page = PUBLIC_PAGES[pathname];
   const noindex = !page || isNoIndex(pathname);
-  const titlePage = page || null;
-  const body = page ? buildPublicBody(page, pathname) : buildNotFoundBody();
   let html = loadTemplate();
+
   html = html.replace(/<title>[\s\S]*?<\/title>/i, '');
   html = html.replace(/<meta\s+name=["']description["'][^>]*>/i, '');
   html = html.replace(/<meta\s+name=["']robots["'][^>]*>/i, '');
   html = html.replace(/<meta\s+name=["']googlebot["'][^>]*>/i, '');
-  html = html.replace('</head>', `${buildHead(titlePage, pathname, noindex)}\n</head>`);
-  html = html.replace(/<div id="root">[\s\S]*?<\/div>/i, `<div id="root">${body}</div>`);
+  html = html.replace(/<meta\s+name=["']referrer["'][^>]*>/i, '');
+  html = html.replace(/<meta\s+name=["']theme-color["'][^>]*>/i, '');
+  html = html.replace('</head>', `${buildHead(page, pathname, noindex)}\n</head>`);
+
   return { statusCode, html };
 }
 
@@ -289,7 +131,7 @@ function serveStatic(req, res, pathname) {
 function sitemapXml() {
   const urls = Object.keys(PUBLIC_PAGES).map((pathname) => `
     <url>
-      <loc>${escapeHtml(canonicalUrl(pathname))}</loc>
+      <loc>${escapeHtml(canonicalUrl(pathname, SITE_URL))}</loc>
       <changefreq>${pathname === '/' ? 'weekly' : 'monthly'}</changefreq>
       <priority>${pathname === '/' ? '1.0' : '0.7'}</priority>
     </url>`).join('');
