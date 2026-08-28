@@ -7,19 +7,19 @@ const PREVIEW = import.meta.env.VITE_APP_PREVIEW || `${SITE_URL}/preview.png`;
 
 const PUBLIC_PAGES = {
   "/": {
-    title: "PassDeployer | Deploy Django, Node.js, Flask & Docker Apps",
+    title: "PassDeployer | PaaS for Django, Node.js, Flask & Docker",
     description:
-      "Deploy Django, Node.js, Flask and Docker applications from one modern PaaS control panel. Create services, manage resources and monitor deployments with PassDeployer.",
+      "Deploy Django, Node.js, Flask and Docker applications from one developer-focused PaaS. Create services, manage compute and storage resources, and run your deployment workflow from one control plane.",
   },
   "/plans": {
     title: "Plans & Pricing | PassDeployer",
     description:
-      "Explore PassDeployer plans for Django, Node.js, Flask and Docker applications. Compare CPU, RAM, storage and deployment resources for your next service.",
+      "Compare PassDeployer plans for application and data workloads. Review CPU, RAM, storage and deployment resources before creating a service.",
   },
   "/aboutUs": {
     title: "About PassDeployer | Developer-focused PaaS",
     description:
-      "Learn about PassDeployer, an open-source developer-focused PaaS for deploying and managing Django, Node.js, Flask and Docker applications.",
+      "Learn about PassDeployer, an open-source PaaS for deploying and managing Django, Node.js, Flask and Docker applications from one control plane.",
   },
 };
 
@@ -119,6 +119,7 @@ export default function SEO() {
       <meta name="description" content={description} />
       <meta name="robots" content={robots} />
       <meta name="googlebot" content={robots} />
+      <meta name="referrer" content="strict-origin-when-cross-origin" />
 
       {!noindex && <link rel="canonical" href={url} />}
 
@@ -132,7 +133,9 @@ export default function SEO() {
           <meta property="og:image" content={PREVIEW} />
           <meta property="og:image:width" content="1200" />
           <meta property="og:image:height" content="675" />
-          <meta property="og:image:alt" content="PassDeployer" />
+          <meta property="og:image:alt" content="PassDeployer deployment platform" />
+          <meta property="og:locale" content="en_US" />
+          <meta name="twitter:url" content={url} />
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:title" content={title} />
           <meta name="twitter:description" content={description} />

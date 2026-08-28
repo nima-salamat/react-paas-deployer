@@ -154,7 +154,7 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
               <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
                 {plan.platform ?? "Platform"}
               </Typography>
-              <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
+              <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
                 {plan.name ?? "Unnamed"}
               </Typography>
               <Typography variant="body2" color="text.secondary" noWrap>

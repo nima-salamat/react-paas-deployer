@@ -1292,9 +1292,9 @@ export default function Home() {
                       950,
                   }}
                 >
-                  Deploy without
+                  Deploy Django, Node.js,
                   <br />
-                  the deployment headache.
+                  Flask & Docker apps.
                 </Typography>
               </motion.div>
 
@@ -1329,10 +1329,9 @@ export default function Home() {
                       "text.secondary",
                   }}
                 >
-                  Deploy Django, Node.js,
-                  Flask and containerized
-                  applications from a single,
-                  focused control plane.
+                  Deploy Django, Node.js, Flask and Docker applications
+                  from a single PaaS control plane. Create services,
+                  manage resources and keep your deployment workflow in one place.
                 </Typography>
               </motion.div>
 

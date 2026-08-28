@@ -48,3 +48,7 @@ Expected:
 ## 4. Google Search Console
 
 After deployment, inspect `/`, `/plans`, and `/aboutUs` with URL Inspection. Submit `/sitemap.xml`. Google can take days or longer to recrawl and reprocess favicon/indexing changes. Google recommends the URL Inspection and Sitemap reports for this verification. 
+
+## ads.txt
+
+`/ads.txt` is served by the Node SEO server and intentionally contains only a comment because PassDeployer currently has no advertising sellers. Do not add a made-up Google/ads network publisher record. When an ad platform is actually connected, replace the comment with the exact authorized-seller line supplied by that platform.

@@ -99,7 +99,11 @@ function buildSchema(page, pathname) {
       '@id': `${SITE_URL}/#organization`,
       name: SITE_NAME,
       url: `${SITE_URL}/`,
-      logo: `${SITE_URL}/favicon.ico`,
+      logo: `${SITE_URL}/icon.svg`,
+      sameAs: [
+        'https://github.com/nima-salamat/react-paas-deployer',
+        'https://github.com/nima-salamat/django-paas-deployer',
+      ],
     },
     {
       '@type': 'WebPage',
@@ -107,7 +111,9 @@ function buildSchema(page, pathname) {
       url: pageUrl,
       name: page.title,
       description: page.description,
+      inLanguage: 'en',
       isPartOf: { '@id': `${SITE_URL}/#website` },
+      primaryImageOfPage: { '@type': 'ImageObject', url: `${SITE_URL}/preview.png` },
     },
   ];
 
@@ -129,6 +135,7 @@ function buildSchema(page, pathname) {
       operatingSystem: 'Web',
       url: pageUrl,
       description: page.description,
+      image: `${SITE_URL}/preview.png`,
     });
   }
 
@@ -191,8 +198,10 @@ function buildHead(page, pathname, noindex = false) {
       <meta property="og:image" content="${escapeHtml(preview)}" />
       <meta property="og:image:width" content="1200" />
       <meta property="og:image:height" content="675" />
-      <meta property="og:image:alt" content="PassDeployer" />
+      <meta property="og:image:alt" content="PassDeployer deployment platform" />
+      <meta property="og:locale" content="en_US" />
       <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:url" content="${escapeHtml(url)}" />
       <meta name="twitter:title" content="${escapeHtml(page.title)}" />
       <meta name="twitter:description" content="${escapeHtml(page.description)}" />
       <meta name="twitter:image" content="${escapeHtml(preview)}" />
@@ -269,7 +278,16 @@ function sitemapXml() {
 }
 
 function robotsTxt() {
-  return `User-agent: *\nAllow: /\nDisallow: /profile\nDisallow: /services\nDisallow: /service/\nDisallow: /volumes\nDisallow: /networks\nDisallow: /tickets\nDisallow: /staff\nDisallow: /admin\nDisallow: /messenger\nDisallow: /signin_or_signup\n\nSitemap: ${SITE_URL}/sitemap.xml\n`;
+  // Keep ordinary application pages crawlable so Google can see their noindex
+  // directives. robots.txt is not an access-control mechanism.
+  return `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`;
+}
+
+function adsTxt() {
+  // The site currently has no advertising partners. Keep this endpoint valid
+  // and intentionally empty until an advertising platform provides an
+  // authorized-seller record. Never invent a publisher/ad-network line.
+  return `# ${SITE_NAME} currently has no authorized digital advertising sellers.\n`;
 }
 
 const server = http.createServer((req, res) => {
@@ -298,6 +316,12 @@ const server = http.createServer((req, res) => {
   if (pathname === '/sitemap.xml') {
     res.writeHead(200, { ...securityHeaders, 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
     res.end(sitemapXml());
+    return;
+  }
+
+  if (pathname === '/ads.txt') {
+    res.writeHead(200, { ...securityHeaders, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
+    res.end(adsTxt());
     return;
   }
 

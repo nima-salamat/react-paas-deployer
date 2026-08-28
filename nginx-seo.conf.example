@@ -45,6 +45,15 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 
+    location = /ads.txt {
+        proxy_pass http://127.0.0.1:3005/ads.txt;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Real-IP $remote_addr;
+        access_log off;
+    }
+
     # Vite hashed assets can be cached for a year. HTML stays revalidated.
     location ~* \.(?:js|css|png|jpg|jpeg|webp|svg|ico|woff|woff2)$ {
         proxy_pass http://127.0.0.1:3005;
