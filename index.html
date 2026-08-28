@@ -7,11 +7,63 @@
   <meta name="color-scheme" content="dark light" />
   <meta name="author" content="PassDeployer" />
   <meta name="application-name" content="PassDeployer" />
+  <title>PassDeployer | Application Deployment &amp; Management</title>
+  <meta name="description" content="Deploy and manage applications with less infrastructure work. Run services, control resources, networks and persistent storage from one platform." />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <link rel="icon" href="/favicon.ico" sizes="48x48" type="image/x-icon" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
   <style>
     html, body { margin: 0; padding: 0; width: 100%; min-height: 100%; }
+
+    .seo-shell {
+      box-sizing: border-box;
+      min-height: 100vh;
+      padding: clamp(48px, 8vw, 96px) 20px;
+      background: #f7f9fc;
+      color: #0f172a;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .seo-shell > * { max-width: 960px; margin-inline: auto; }
+    .seo-shell__hero { text-align: center; }
+    .seo-shell__eyebrow {
+      margin: 0 0 14px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #2f66ff;
+    }
+    .seo-shell h1, .seo-shell h2 {
+      margin: 0 0 18px;
+      line-height: 1.08;
+      letter-spacing: -.035em;
+      color: #0f172a;
+    }
+    .seo-shell h1 { font-size: clamp(2.35rem, 6vw, 5.1rem); }
+    .seo-shell h2 { margin-top: 48px; font-size: clamp(1.7rem, 3vw, 2.7rem); }
+    .seo-shell p {
+      max-width: 780px;
+      margin: 0 auto 18px;
+      font-size: 1.03rem;
+      line-height: 1.82;
+      color: #475569;
+    }
+    .seo-shell nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px 20px;
+      margin-top: 28px;
+    }
+    .seo-shell a { color: #2f66ff; font-weight: 700; text-decoration: none; }
+    .seo-shell a:hover { text-decoration: underline; }
+    @media (prefers-color-scheme: dark) {
+      .seo-shell { background: #0b1020; color: #e2e8f0; }
+      .seo-shell h1, .seo-shell h2 { color: #f8fafc; }
+      .seo-shell p { color: #b8c3d1; }
+    }
     html { background: #f7f9fc; }
     body { min-height: 100vh; background: #f7f9fc; }
     #root { min-height: 100vh; }
@@ -29,22 +81,45 @@
 </head>
 <body>
   <div id="root">
-    <div class="app-loading" aria-busy="true" aria-live="polite">
-      <div class="app-loading__spinner" role="status" aria-label="Loading PassDeployer"></div>
-    </div>
+    <!-- APP_SHELL_START -->
+    <main class="seo-shell" aria-label="PassDeployer overview">
+      <header class="seo-shell__hero">
+        <div class="seo-shell__eyebrow">PassDeployer</div>
+        <h1>Deploy faster. Manage more. Worry less.</h1>
+        <p>PassDeployer is an application deployment and infrastructure management platform for teams that want a simpler path from configured service to running application. Create services, choose CPU and memory resources, connect networks, keep persistent storage, and manage operational tasks from one focused control panel. The public experience explains the product clearly while the authenticated workspace remains focused on practical service operations.</p>
+        <p>Instead of stitching together separate deployment utilities for every workload, PassDeployer brings the most common application operations into a consistent workflow. It is designed for developers and operators who need practical service controls without adding unnecessary infrastructure ceremony, giving them a focused place to deploy applications, manage resources, connect supporting infrastructure, and handle the service lifecycle with fewer repetitive steps.</p>
+        <nav aria-label="Primary navigation">
+          <a href="/plans">Plans &amp; Pricing</a>
+          <a href="/aboutUs">About PassDeployer</a>
+          <a href="/signin_or_signup">Sign in</a>
+        </nav>
+      </header>
+
+      <section aria-labelledby="platform-heading">
+        <h2 id="platform-heading">One place for deployment and infrastructure management</h2>
+        <p>PassDeployer keeps service deployment, resource selection, networking, and persistent storage close together. You can define a service, give it the resources it needs, connect it to the right network, and keep its persistent data available across the service lifecycle. The goal is a predictable operational experience that lets teams spend more time improving their applications and less time repeating routine infrastructure work across disconnected tools.</p>
+        <p><strong>Service management</strong> covers the everyday actions required to run an application, while <strong>resource controls</strong> help you choose CPU, memory, and storage based on the workload. Networks and persistent volumes are treated as first-class resources so that an application can grow without forcing every operational task into a separate tool. This keeps infrastructure concepts close to the service that actually uses them.</p>
+      </section>
+
+      <section aria-labelledby="workflow-heading">
+        <h2 id="workflow-heading">From resources to a running service</h2>
+        <p>The deployment workflow is built around a few clear steps. Choose the resources that fit the application, create the service and configuration, deploy it through a repeatable process, and then manage the running workload from the same control surface. When requirements change, resource plans can be adjusted instead of rebuilding the entire operating model around the new workload. That approach keeps routine deployments consistent while leaving room for applications to grow.</p>
+      </section>
+
+      <section aria-labelledby="open-source-heading">
+        <h2 id="open-source-heading">Built in the open for developers</h2>
+        <p>PassDeployer is built as an open-source stack with a Django API and a React frontend. That architecture keeps the deployment API and operator experience distinct while making the project easier to inspect, extend, and integrate. Developers can review the implementation, understand the service workflow, and adapt the platform to their own deployment environment instead of relying on an opaque hosted interface. The public project pages provide context before users enter private operations.</p>
+        <p><strong>Application deployment</strong>, <strong>service lifecycle management</strong>, <strong>networks</strong>, and <strong>persistent volumes</strong> are the core concepts exposed by the platform. These capabilities make the public site useful as a product overview while the authenticated control panel remains dedicated to private operational data. Keeping public information separate from private service details also gives search engines a clean set of pages to crawl and index.</p>
+      </section>
+
+      <section aria-labelledby="start-heading">
+        <h2 id="start-heading">Ready to deploy?</h2>
+        <p>Explore the available plans, learn how the platform works, or continue to the application to create and manage services. The public pages are intended to explain the product clearly to people and search engines, while private application routes remain protected from search indexing. Visitors can move from product information to the appropriate workflow without passing through a temporary SEO-only page.</p>
+      </section>
+    </main>
+    <!-- APP_SHELL_END -->
   </div>
   <script type="module" src="/src/main.jsx"></script>
-  <noscript>
-    <main style="max-width: 760px; margin: 0 auto; padding: 48px 20px; font-family: system-ui, sans-serif;">
-      <h1>Deploy applications with PassDeployer</h1>
-      <p>PassDeployer is a focused platform for deploying applications and managing services, resources, networks and persistent storage.</p>
-      <nav aria-label="Primary">
-        <a href="/">Home</a> ·
-        <a href="/plans">Plans</a> ·
-        <a href="/aboutUs">About</a> ·
-        <a href="/signin_or_signup">Sign in</a>
-      </nav>
-    </main>
-  </noscript>
+
 </body>
 </html>

@@ -54,10 +54,6 @@ export function canonicalUrl(pathname, siteUrl) {
   return `${String(siteUrl).replace(/\/+$/, "")}${normalized === "/" ? "/" : normalized}`;
 }
 
-function answer(text) {
-  return { "@type": "Answer", text };
-}
-
 export function buildSchema(page, pathname, siteConfig) {
   if (!page) return null;
 
@@ -98,34 +94,6 @@ export function buildSchema(page, pathname, siteConfig) {
       url: pageUrl,
       description: page.description,
       publisher: { "@id": `${siteUrl}/#organization` },
-    });
-
-    graph.push({
-      "@type": "FAQPage",
-      "@id": `${pageUrl}#faq`,
-      mainEntity: [
-        {
-          "@type": "Question",
-          name: "How does PassDeployer simplify deployment?",
-          acceptedAnswer: answer(
-            "PassDeployer brings service creation, deployment and everyday application management into one workflow, reducing repetitive infrastructure work between your code and a running service.",
-          ),
-        },
-        {
-          "@type": "Question",
-          name: "Can I manage networks and persistent storage?",
-          acceptedAnswer: answer(
-            "Yes. PassDeployer provides dedicated management for private networks and persistent volumes alongside the services that use them.",
-          ),
-        },
-        {
-          "@type": "Question",
-          name: "Can I change resources as my workload grows?",
-          acceptedAnswer: answer(
-            "Yes. You can change the resource plan for a service as traffic, workload size or application requirements change.",
-          ),
-        },
-      ],
     });
   } else {
     graph.push({

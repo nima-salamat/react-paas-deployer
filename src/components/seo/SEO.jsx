@@ -35,7 +35,13 @@ export default function SEO() {
       <meta name="googlebot" content={robots} />
       <meta name="referrer" content="strict-origin-when-cross-origin" />
 
-      {!noindex && <link rel="canonical" href={url} />}
+      {!noindex && (
+        <>
+          <link rel="canonical" href={url} />
+          <link rel="alternate" hreflang="en" href={url} />
+          <link rel="alternate" hreflang="x-default" href={url} />
+        </>
+      )}
 
       {!noindex && (
         <>

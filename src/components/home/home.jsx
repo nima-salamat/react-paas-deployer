@@ -1329,7 +1329,7 @@ export default function Home() {
                       "text.secondary",
                   }}
                 >
-                  Deploy and manage applications without the usual infrastructure busywork.
+                  <strong>Deploy and manage applications</strong> without the usual infrastructure busywork.
                   Create services quickly, choose the resources you need, connect networks,
                   keep persistent volumes, and change plans whenever your workload grows.
                 </Typography>
