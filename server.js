@@ -48,6 +48,7 @@ function buildHead(page, pathname, noindex = false) {
     <meta name="theme-color" content="#081325" />
     ${page && !noindex ? `
       <link rel="canonical" href="${escapeHtml(url)}" />
+      ${pathname === "/" ? '<link rel="amphtml" href="' + escapeHtml(SITE_URL + '/amp/') + '" />' : ''}
       <link rel="alternate" hreflang="en" href="${escapeHtml(url)}" />
       <link rel="alternate" hreflang="x-default" href="${escapeHtml(url)}" />
     ` : ''}
@@ -152,6 +153,7 @@ function buildPublicShell(pathname) {
   const sectionHtml = shell.sections.map((section) => `
     <section aria-labelledby="${slugify(section.heading)}">
       <h2 id="${slugify(section.heading)}">${escapeHtml(section.heading)}</h2>
+      ${section.heading === "One place for deployment and infrastructure management" ? '<h3>Keep everyday operations in one workflow</h3>' : ''}
       ${section.paragraphs.map(paragraph => `<p>${safeInlineHtml(paragraph)}</p>`).join('')}
     </section>
   `).join('');
@@ -280,6 +282,16 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { ...securityHeaders, 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
     res.end(robotsTxt());
     return;
+  }
+
+  if (pathname === '/amp' || pathname === '/amp/') {
+    const ampPath = path.join(DIST_DIR, 'amp', 'index.html');
+    if (fs.existsSync(ampPath)) {
+      res.writeHead(200, { ...securityHeaders, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=3600' });
+      if (req.method === 'HEAD') res.end();
+      else createReadStream(ampPath).pipe(res);
+      return;
+    }
   }
 
   if (pathname === '/sitemap.xml') {

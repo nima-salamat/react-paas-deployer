@@ -38,6 +38,9 @@ export default function SEO() {
       {!noindex && (
         <>
           <link rel="canonical" href={url} />
+          {pathname === "/" && (
+            <link rel="amphtml" href={`${siteConfig.siteUrl}/amp/`} />
+          )}
           <link rel="alternate" hreflang="en" href={url} />
           <link rel="alternate" hreflang="x-default" href={url} />
         </>
