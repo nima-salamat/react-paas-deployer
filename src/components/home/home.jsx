@@ -1849,7 +1849,7 @@ export default function Home() {
       </Box>
 
       {/* ======================================================
-          STACK ARCHITECTURE
+          HOW YOUR APP FITS TOGETHER
       ======================================================= */}
 
       <Box
@@ -1893,7 +1893,7 @@ export default function Home() {
                     "uppercase",
                 }}
               >
-                THE PLATFORM
+                HOW IT WORKS
               </Typography>
 
               <Typography
@@ -1913,7 +1913,7 @@ export default function Home() {
               >
                 Your application.
                 <br />
-                One place for deployment and infrastructure.
+                One simple place to run it.
               </Typography>
 
               <Typography
@@ -1924,9 +1924,8 @@ export default function Home() {
                     1.85,
                 }}
               >
-                PassDeployer brings deployment and day-to-day service management
-                into one control plane, so you spend less time wiring infrastructure
-                together and more time shipping your application.
+                PassDeployer brings deployment and day-to-day service management together,
+                so you can spend less time setting things up and more time building your application.
               </Typography>
             </Stack>
           </SectionReveal>
@@ -2538,6 +2537,90 @@ export default function Home() {
       </Box>
 
       {/* ======================================================
+          PAY AS YOU GO
+      ======================================================= */}
+
+      <Box
+        component="section"
+        sx={{
+          position: "relative",
+          py: { xs: 8, md: 11 },
+        }}
+      >
+        <Container maxWidth="lg">
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 3, md: 5 },
+              borderRadius: { xs: 4, md: 6 },
+              border: "1px solid",
+              borderColor: subtleBorder,
+              bgcolor: alpha(theme.palette.background.paper, isDark ? 0.72 : 0.84),
+              backdropFilter: "blur(18px)",
+            }}
+          >
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={{ xs: 3, md: 5 }}
+              alignItems={{ xs: "flex-start", md: "center" }}
+              justifyContent="space-between"
+            >
+              <Box sx={{ maxWidth: 720 }}>
+                <Typography
+                  sx={{
+                    color: "primary.main",
+                    fontSize: "0.72rem",
+                    fontWeight: 900,
+                    letterSpacing: "0.13em",
+                  }}
+                >
+                  PAY AS YOU GO
+                </Typography>
+                <Typography
+                  component="h2"
+                  sx={{
+                    mt: 1,
+                    fontSize: { xs: "2rem", md: "3rem" },
+                    lineHeight: 1.05,
+                    letterSpacing: "-0.055em",
+                    fontWeight: 950,
+                  }}
+                >
+                  Use what you need. Pay for what you use.
+                </Typography>
+                <Typography
+                  color="text.secondary"
+                  sx={{ mt: 1.5, lineHeight: 1.85, maxWidth: 690 }}
+                >
+                  Not every application needs a large plan all the time. With hourly usage,
+                  you can start with the resources that fit your workload, run a short-lived
+                  environment, test an idea, or keep a smaller service online without paying
+                  for capacity you do not need. <strong>You choose the resources, use them for as long as they are useful, and move to a different plan when the workload changes.</strong>
+                </Typography>
+              </Box>
+
+              <Button
+                variant="contained"
+                onClick={() => navigate("/plans")}
+                endIcon={<ArrowForwardRoundedIcon />}
+                sx={{
+                  minWidth: 180,
+                  minHeight: 50,
+                  px: 2.5,
+                  borderRadius: 3,
+                  textTransform: "none",
+                  fontWeight: 850,
+                  flexShrink: 0,
+                }}
+              >
+                See plans
+              </Button>
+            </Stack>
+          </Paper>
+        </Container>
+      </Box>
+
+      {/* ======================================================
           SERVICE PREVIEW
       ======================================================= */}
 
@@ -2593,7 +2676,7 @@ export default function Home() {
                       "0.16em",
                   }}
                 >
-                  SERVICE CONTROL
+                  MANAGE YOUR SERVICES
                 </Typography>
 
                 <Typography
@@ -3125,8 +3208,8 @@ export default function Home() {
                     maxWidth: 620,
                   }}
                 >
-                  A straightforward deployment flow that removes repetitive infrastructure work
-                  while keeping the controls you need to run and manage real services.
+                  A straightforward deployment flow that keeps the setup clear,
+                  while giving you the controls you need to run real services.
                 </Typography>
               </Box>
 
@@ -3415,8 +3498,8 @@ export default function Home() {
                 a: "Yes. Networks and persistent volumes are part of the service environment, so they can be managed alongside the applications that use them instead of being treated as disconnected infrastructure.",
               },
               {
-                q: "Can I change my plan later?",
-                a: "Yes. You can move to a different resource plan when your workload changes, rather than rebuilding your deployment workflow from scratch.",
+                q: "Can I use PassDeployer for short or changing workloads?",
+                a: "Yes. Plans support hourly usage, so you can choose resources for the workload you have now, keep a temporary environment running when you need it, and move to a different plan as your application grows.",
               },
               {
                 q: "What can I manage after deployment?",

@@ -5,7 +5,7 @@ export const PUBLIC_PAGES = {
   "/": {
     title: "PassDeployer | Application Deployment & Management",
     description:
-      "Deploy and manage applications with less infrastructure work. Run services, control resources, networks and persistent storage from one platform.",
+      "Deploy applications, manage services, and choose the resources you need. Start small, use hourly plans when they fit, and scale your workload when it grows.",
   },
   "/plans": {
     title: "Plans & Pricing | PassDeployer",
