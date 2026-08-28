@@ -13,107 +13,100 @@
   <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <link rel="icon" href="/favicon.ico" sizes="48x48" type="image/x-icon" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; min-height: 100%; }
-
-    .seo-shell {
-      box-sizing: border-box;
-      min-height: 100vh;
-      padding: clamp(48px, 8vw, 96px) 20px;
-      background: #f7f9fc;
-      color: #0f172a;
+    html, body { margin: 0; padding: 0; width: 100%; min-height: 100%; background: #f7f9fc; }
+    #root { min-height: 100vh; }
+    .app-loading {
+      min-height: 100vh; display: grid; place-items: center;
+      background: #f7f9fc; color: #0f172a;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .seo-shell > * { max-width: 960px; margin-inline: auto; }
-    .seo-shell__hero { text-align: center; }
-    .seo-shell__eyebrow {
-      margin: 0 0 14px;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: .16em;
-      text-transform: uppercase;
-      color: #2f66ff;
+    .app-loading__inner { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .app-loading__spinner {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(47, 102, 255, 0.16); border-top-color: #2f66ff;
+      border-radius: 50%; animation: app-loading-spin 0.8s linear infinite;
     }
-    .seo-shell h1, .seo-shell h2, .seo-shell h3 {
-      margin: 0 0 18px;
-      line-height: 1.08;
-      letter-spacing: -.035em;
-      color: #0f172a;
-    }
-    .seo-shell h1 { font-size: clamp(2.35rem, 6vw, 5.1rem); }
-    .seo-shell h2 { margin-top: 48px; font-size: clamp(1.7rem, 3vw, 2.7rem); }
-    .seo-shell h3 { margin: 26px 0 12px; font-size: clamp(1.18rem, 2vw, 1.45rem); line-height: 1.25; letter-spacing: -.02em; }
-    .seo-shell p {
-      max-width: 780px;
-      margin: 0 auto 18px;
-      font-size: 1.03rem;
-      line-height: 1.82;
-      color: #475569;
-    }
-    .seo-shell nav {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px 20px;
-      margin-top: 28px;
-    }
-    .seo-shell a { color: #2f66ff; font-weight: 700; text-decoration: none; }
-    .seo-shell a:hover { text-decoration: underline; }
-    @media (prefers-color-scheme: dark) {
-      .seo-shell { background: #0b1020; color: #e2e8f0; }
-      .seo-shell h1, .seo-shell h2, .seo-shell h3 { color: #f8fafc; }
-      .seo-shell p { color: #b8c3d1; }
-    }
-    html { background: #f7f9fc; }
-    body { min-height: 100vh; background: #f7f9fc; }
-    #root { min-height: 100vh; }
-    .app-loading { min-height: 100vh; display: grid; place-items: center; background: #f7f9fc; }
-    .app-loading__spinner { width: 28px; height: 28px; border: 3px solid rgba(47, 102, 255, 0.16); border-top-color: #2f66ff; border-radius: 50%; animation: app-loading-spin .8s linear infinite; }
+    .app-loading__text { margin: 0; font-size: 0.95rem; color: #64748b; letter-spacing: 0.02em; }
     @keyframes app-loading-spin { to { transform: rotate(360deg); } }
     @media (prefers-color-scheme: dark) {
-      html, body, .app-loading { background: #0b1020; }
+      html, body, .app-loading { background: #0b1020; color: #e2e8f0; }
       .app-loading__spinner { border-color: rgba(138, 180, 255, 0.18); border-top-color: #8ab4ff; }
+      .app-loading__text { color: #94a3b8; }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .app-loading__spinner { animation-duration: 1.8s; }
+    @media (prefers-reduced-motion: reduce) { .app-loading__spinner { animation-duration: 1.8s; } }
+    .seo-noscript {
+      box-sizing: border-box; min-height: 100vh; padding: clamp(48px, 8vw, 96px) 20px;
+      background: #f7f9fc; color: #0f172a;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .seo-noscript > * { max-width: 960px; margin-inline: auto; }
+    .seo-noscript__hero { text-align: center; }
+    .seo-noscript__eyebrow {
+      margin: 0 0 14px; font-size: 13px; font-weight: 800;
+      letter-spacing: .16em; text-transform: uppercase; color: #2f66ff;
+    }
+    .seo-noscript h1, .seo-noscript h2, .seo-noscript h3 {
+      margin: 0 0 18px; line-height: 1.08; letter-spacing: -.035em; color: #0f172a;
+    }
+    .seo-noscript h1 { font-size: clamp(2.35rem, 6vw, 5.1rem); }
+    .seo-noscript h2 { margin-top: 48px; font-size: clamp(1.7rem, 3vw, 2.7rem); }
+    .seo-noscript p {
+      max-width: 780px; margin: 0 auto 18px; font-size: 1.03rem; line-height: 1.82; color: #475569;
+    }
+    .seo-noscript nav {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 20px; margin-top: 28px;
+    }
+    .seo-noscript a { color: #2f66ff; font-weight: 700; text-decoration: none; }
+    .seo-noscript a:hover { text-decoration: underline; }
+    @media (prefers-color-scheme: dark) {
+      .seo-noscript { background: #0b1020; color: #e2e8f0; }
+      .seo-noscript h1, .seo-noscript h2, .seo-noscript h3 { color: #f8fafc; }
+      .seo-noscript p { color: #b8c3d1; }
     }
   </style>
 </head>
 <body>
   <div id="root">
     <!-- APP_SHELL_START -->
-    <main class="seo-shell" aria-label="PassDeployer home">
-      <section class="seo-shell__hero">
-        <div class="seo-shell__eyebrow">PassDeployer</div>
-        <h1>Deploy faster. Manage more. Worry less.</h1>
-        <p>PassDeployer gives you a simpler way to deploy applications, manage services, and choose the resources that fit each workload. Start with what you need today and change it as your application grows.</p>
-        <nav aria-label="Primary navigation">
-          <a href="/plans">View plans</a>
-          <a href="/aboutUs">About PassDeployer</a>
-          <a href="/signin_or_signup">Get started</a>
-        </nav>
-      </section>
-
-      <section aria-labelledby="seo-payg-heading">
-        <h2 id="seo-payg-heading">Pay only for what you need</h2>
-        <p>With a <strong>pay-as-you-go approach</strong>, you can use the resources your application needs without committing to more capacity than necessary. Hourly usage makes it easier to test an idea, run a temporary workload, or keep a service online while your needs are still changing.</p>
-        <p>You can also move to a different resource plan when your workload grows. The goal is simple: <strong>use what you need, when you need it</strong>, and keep your deployment setup easy to understand.</p>
-      </section>
-
-      <section aria-labelledby="seo-platform-heading">
-        <h2 id="seo-platform-heading">Everything you need to run an application</h2>
-        <p>Bring deployment, service management, CPU and memory resources, networking, and persistent storage into one focused workflow. Instead of moving between several tools for routine operations, you can create a service, deploy it, review its resources, and manage its lifecycle from one place.</p>
-      </section>
-
-      <section aria-labelledby="seo-start-heading">
-        <h2 id="seo-start-heading">Start small and scale when it matters</h2>
-        <p>PassDeployer is designed for developers and teams who want a practical way to get applications running without unnecessary operational overhead. Choose a plan, create your service, and adjust resources as your workload changes.</p>
-      </section>
-    </main>
+    <div class="app-loading" role="status" aria-live="polite" aria-label="Loading PassDeployer">
+      <div class="app-loading__inner">
+        <div class="app-loading__spinner" aria-hidden="true"></div>
+        <p class="app-loading__text">Loading PassDeployer…</p>
+      </div>
+    </div>
     <!-- APP_SHELL_END -->
   </div>
-  <script type="module" src="/src/main.jsx"></script>
 
+  <noscript>
+    <main class="seo-noscript" aria-label="PassDeployer home">
+      <header class="seo-noscript__hero">
+        <div class="seo-noscript__eyebrow">PassDeployer</div>
+        <h1>Deploy faster. Manage more. Worry less.</h1>
+        <p>PassDeployer is an application deployment and infrastructure management platform for teams that want a simpler path from configured service to running application. Create services, choose CPU and memory resources, connect networks, keep persistent storage, and manage operational tasks from one focused control panel.</p>
+        <nav aria-label="Primary navigation">
+          <a href="/plans">Plans &amp; Pricing</a>
+          <a href="/aboutUs">About PassDeployer</a>
+          <a href="/signin_or_signup">Sign in</a>
+        </nav>
+      </header>
+      <section aria-labelledby="seo-ops-heading">
+        <h2 id="seo-ops-heading">One place for deployment and infrastructure management</h2>
+        <p>PassDeployer keeps service deployment, resource selection, networking, and persistent storage close together. You can define a service, give it the resources it needs, connect it to the right network, and keep its persistent data available across the service lifecycle.</p>
+      </section>
+      <section aria-labelledby="seo-workflow-heading">
+        <h2 id="seo-workflow-heading">From resources to a running service</h2>
+        <p>Choose the resources that fit the application, create the service and configuration, deploy it through a repeatable process, and then manage the running workload from the same control surface.</p>
+      </section>
+      <section aria-labelledby="seo-open-heading">
+        <h2 id="seo-open-heading">Built in the open for developers</h2>
+        <p>PassDeployer is built as an open-source stack with a Django API and a React frontend. Application deployment, service lifecycle management, networks, and persistent volumes are the core concepts exposed by the platform.</p>
+      </section>
+    </main>
+  </noscript>
+
+  <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

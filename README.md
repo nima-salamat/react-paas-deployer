@@ -154,3 +154,26 @@ Control plane and orchestrator:
 ## License
 
 No license file is published in the repository yet. Add one if you intend to open the project for reuse.
+
+---
+
+## SEO (server + SPA)
+
+Public marketing routes (`/`, `/plans`, `/aboutUs`) receive:
+
+1. **Server-injected `<head>`** – unique title, description, robots, canonical, hreflang, Open Graph, Twitter cards, and JSON-LD from `src/seo-config.js` (same source of truth as the React `SEO` component).
+2. **Neutral loading shell** inside `#root` – a spinner only. Users never see a separate “SEO marketing page”; React’s `createRoot` replaces `#root` as soon as the app boots and the real Home / Plans / About UI is shown.
+3. **`<noscript>` body** – route-specific readable HTML for non-JS agents. This is the only place the long SEO copy lives in the initial HTML; it is not shown when JavaScript is enabled.
+4. **Private routes** (`/services`, `/profile`, `/admin`, `/messenger`, …) get `noindex, nofollow` and are excluded from `sitemap.xml`.
+
+Build and run:
+
+```bash
+npm ci
+npm run build
+npm run start   # node server.js → port 3000
+```
+
+Production edge: use `nginx-seo.conf.example` so `/`, `/plans`, `/aboutUs`, `/robots.txt`, `/sitemap.xml`, and SPA fallbacks all hit the Node process. Canonical host is controlled at Nginx.
+
+Do **not** put keyword blocks inside `#root` and hide them with CSS — that is cloaking. The current design keeps the visible UI identical for users and JS-capable crawlers, while still giving non-JS agents useful HTML.
