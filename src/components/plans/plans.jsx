@@ -601,7 +601,7 @@ export default function PlatformPlans() {
               <LayersOutlinedIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+              <Typography component="h1" variant="h3" sx={{ fontWeight: 850, lineHeight: 1.1 }}>
                 Plans
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -634,6 +634,20 @@ export default function PlatformPlans() {
           </Stack>
         </Stack>
       </Paper>
+
+      <Box component="section" aria-labelledby="available-plans-heading" sx={{ mt: 1 }}>
+        <Typography
+          id="available-plans-heading"
+          component="h2"
+          variant="h5"
+          sx={{ fontWeight: 850, letterSpacing: "-0.02em", mb: 1 }}
+        >
+          Available deployment plans
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, maxWidth: 760 }}>
+          Compare application and data-service resources and choose the plan that fits your workload.
+        </Typography>
+      </Box>
 
       <Box
         sx={{

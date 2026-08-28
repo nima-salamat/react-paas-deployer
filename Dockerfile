@@ -13,8 +13,6 @@ COPY . .
 
 RUN npm run build
 
-RUN npm install -g serve --no-audit --no-fund
-
 EXPOSE 3000
 
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["npm", "run", "start"]

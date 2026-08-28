@@ -331,6 +331,7 @@ const AboutUs = () => {
             </Typography>
 
             <Typography
+              component="h1"
               variant="h3"
               sx={{
                 fontWeight: 900,
@@ -345,6 +346,14 @@ const AboutUs = () => {
               }}
             >
               PaaS Deployer
+            </Typography>
+
+            <Typography
+              component="h2"
+              variant="subtitle1"
+              sx={{ fontWeight: 800, mb: 1 }}
+            >
+              A focused deployment platform
             </Typography>
 
             <Typography
