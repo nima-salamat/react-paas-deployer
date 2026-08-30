@@ -32,6 +32,9 @@ export default function CreateDeployPanel({
   editActions,
   deployState,
   deployActions,
+  deployPermissions: deployPermissionsProp = null,
+  isServiceOwner: isServiceOwnerProp = true,
+  meId: meIdProp = null,
   planPlatform,
   planCpu,
   planRam,
@@ -85,6 +88,9 @@ export default function CreateDeployPanel({
     handleNext,
     handleDownloadZip,
   } = deployActions;
+  const deployPermissions = deployPermissionsProp || {};
+  const isServiceOwner = Boolean(isServiceOwnerProp);
+  const meId = meIdProp;
 
   const effectivePlatform = planPlatform || createPlatform || "docker";
   const isDb = editingDeployId
@@ -185,6 +191,24 @@ export default function CreateDeployPanel({
             isSelected={isSelected}
             cannotSelect={cannotSelect}
             actionState={actionState[deploy.id] ?? {}}
+            canSelect={isServiceOwner || !!deployPermissions.can_deploy_select}
+            canEdit={
+              isServiceOwner
+              || !!deployPermissions.can_deploy_edit_others
+              || (
+                !!deployPermissions.can_deploy_edit
+                && String(deploy.created_by ?? deploy.created_by_id ?? "") === String(meId ?? "")
+              )
+            }
+            canDelete={
+              isServiceOwner
+              || !!deployPermissions.can_deploy_remove_others
+              || (
+                !!deployPermissions.can_deploy_remove
+                && String(deploy.created_by ?? deploy.created_by_id ?? "") === String(meId ?? "")
+              )
+            }
+            canDownload={isServiceOwner || !!deployPermissions.can_deploy_download}
             onEdit={handleEditClick}
             onSelect={handleSelectDeploy}
             onUnselect={handleUnselectDeploy}

@@ -1720,7 +1720,11 @@ function MessageBubble({
           ? "warning"
           : "default";
       return (
-        <Box sx={{ textAlign: "center", my: 1.25, width: "100%" }}>
+        <Box
+          data-msg-id={m.id}
+          data-msg-system="1"
+          sx={{ textAlign: "center", my: 1.25, width: "100%" }}
+        >
           <Chip
             label={label}
             size="small"
@@ -1764,7 +1768,11 @@ function MessageBubble({
       : (isMissed ? PhoneMissedIcon : CallIcon);
     if (looksLikeCall || callInfo) {
       return (
-        <Box sx={{ textAlign: "center", my: 1.25, width: "100%" }}>
+        <Box
+          data-msg-id={m.id}
+          data-msg-system="1"
+          sx={{ textAlign: "center", my: 1.25, width: "100%" }}
+        >
           <Chip
             label={label}
             size="small"
@@ -1785,7 +1793,11 @@ function MessageBubble({
       );
     }
     return (
-      <Box sx={{ textAlign: "center", my: 1, width: "100%" }}>
+      <Box
+        data-msg-id={m.id}
+        data-msg-system="1"
+        sx={{ textAlign: "center", my: 1, width: "100%" }}
+      >
         <Chip
           label={label}
           size="small"

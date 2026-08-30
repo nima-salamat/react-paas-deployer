@@ -66,6 +66,16 @@ export default function ServiceDetail() {
 
   const [activeTab, setActiveTab] = useState("overview");
   const [shareAccess, setShareAccess] = useState({ loading: true, is_owner: true, permissions: null });
+  const meId = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("user") || localStorage.getItem("me");
+      if (raw) {
+        const u = JSON.parse(raw);
+        return u?.id ?? u?.pk ?? null;
+      }
+    } catch { /* */ }
+    return null;
+  }, []);
 
 
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(DEFAULT_REFRESH_INTERVAL_MS);
@@ -198,7 +208,8 @@ export default function ServiceDetail() {
         });
       } catch {
         if (!cancelled) {
-          setShareAccess({ loading: false, is_owner: true, permissions: null });
+          // Fail closed — do not treat as owner on error
+          setShareAccess({ loading: false, is_owner: false, permissions: {} });
         }
       }
     })();
@@ -207,14 +218,15 @@ export default function ServiceDetail() {
 
   const allowedTabs = useMemo(() => {
     if (shareAccess.loading) return ["overview"];
-    if (shareAccess.is_owner || !shareAccess.permissions) {
+    if (shareAccess.is_owner) {
       return ["overview", "create", "logs", "settings"];
     }
-    const p = shareAccess.permissions;
+    const p = shareAccess.permissions || {};
     const tabs = ["overview"];
-    if (p.can_deploy_add || p.can_deploy_edit || p.can_rebuild) tabs.push("create");
+    // Create deploy tab only when explicitly allowed to add deploys
+    if (p.can_deploy_add) tabs.push("create");
     if (p.can_view_logs || p.can_view_deploy_logs) tabs.push("logs");
-    if (p.can_change_config || p.can_network_change || p.can_volume_attach) tabs.push("settings");
+    if (p.can_change_config || p.can_network_change || p.can_volume_attach || p.can_volume_add) tabs.push("settings");
     return tabs;
   }, [shareAccess]);
 
@@ -418,7 +430,7 @@ export default function ServiceDetail() {
 
     try {
       const token = localStorage.getItem("access");
-      const url = `${DEPLOY_DOWNLOAD_BASE}${deployId}/download/`;
+      const url = `${DEPLOY_BASE}${deployId}/download/`;
 
       const resp = await axios.get(url, {
         responseType: "blob",
@@ -1781,6 +1793,9 @@ export default function ServiceDetail() {
 
           {activeTab === "overview" && (
             <OverviewPanel
+              deployPermissions={shareAccess.is_owner ? null : (shareAccess.permissions || {})}
+              isServiceOwner={shareAccess.is_owner}
+              meId={meId}
               service={service}
               serviceRunning={serviceRunning}
               selectedDeploy={selectedDeploy}
@@ -1799,6 +1814,9 @@ export default function ServiceDetail() {
               editActions={{ setEditData, setEditDbFields, setEditZipFile, handleUpdateDeploy, handleCancelEdit }}
               deployState={{ deploys, deploysLoading, pageInfo, selectedDeployId, actionState }}
               deployActions={{ handleSelectDeploy, handleUnselectDeploy, handleEditClick, openConfirm, handlePrev, handleNext, handleDownloadZip }}
+              deployPermissions={shareAccess.is_owner ? null : (shareAccess.permissions || {})}
+              isServiceOwner={Boolean(shareAccess.is_owner)}
+              meId={meId}
               planPlatform={planPlatform}
               planCpu={planDetail?.max_cpu ?? service?.plan?.max_cpu}
               planRam={planDetail?.max_ram ?? service?.plan?.max_ram}

@@ -25,6 +25,10 @@ export default memo(
     onEdit,
     onSelect,
     onUnselect,
+    canSelect = true,
+    canEdit = true,
+    canDelete = true,
+    canDownload = true,
     onDelete,
     onDownload,
   }) {
@@ -188,45 +192,29 @@ export default memo(
           </Box>
 
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <Button
-              size="small"
-              variant={isSelected ? "outlined" : "contained"}
-              color={isSelected ? "success" : "primary"}
-              disabled={busy || cannotSelect}
-              onClick={() => (isSelected ? onUnselect(deploy) : onSelect(deploy))}
-              sx={{
-                flex: "1 1 auto",
-                minWidth: 72,
-                borderRadius: 1.5,
-                fontWeight: 700,
-                textTransform: "none",
-              }}
-            >
-              {busy ? "..." : isSelected ? "Unselect" : "Select"}
-            </Button>
-
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => onEdit(deploy)}
-              disabled={busy}
-              sx={{
-                flex: "1 1 auto",
-                minWidth: 56,
-                borderRadius: 1.5,
-                fontWeight: 600,
-                textTransform: "none",
-              }}
-            >
-              Edit
-            </Button>
-
-            {hasZip ? (
+            {canSelect && (
+              <Button
+                size="small"
+                variant={isSelected ? "outlined" : "contained"}
+                color={isSelected ? "success" : "primary"}
+                disabled={busy || cannotSelect}
+                onClick={() => (isSelected ? onUnselect(deploy) : onSelect(deploy))}
+                sx={{
+                  flex: "1 1 auto",
+                  minWidth: 72,
+                  borderRadius: 1.5,
+                  fontWeight: 700,
+                  textTransform: "none",
+                }}
+              >
+                {busy ? "..." : isSelected ? "Unselect" : "Select"}
+              </Button>
+            )}
+            {canEdit && (
               <Button
                 size="small"
                 variant="outlined"
-                color="info"
-                onClick={() => onDownload?.(deploy)}
+                onClick={() => onEdit(deploy)}
                 disabled={busy}
                 sx={{
                   flex: "1 1 auto",
@@ -236,26 +224,45 @@ export default memo(
                   textTransform: "none",
                 }}
               >
+                Edit
+              </Button>
+            )}
+            {hasZip && canDownload ? (
+              <Button
+                size="small"
+                variant="outlined"
+                color="info"
+                onClick={() => onDownload?.(deploy)}
+                disabled={busy}
+                sx={{
+                  flex: "1 1 auto",
+                  minWidth: 72,
+                  borderRadius: 1.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
+              >
                 Download
               </Button>
             ) : null}
-
-            <Button
-              size="small"
-              variant="outlined"
-              color="error"
-              onClick={() => onDelete(deploy)}
-              disabled={busy}
-              sx={{
-                flex: "1 1 auto",
-                minWidth: 56,
-                borderRadius: 1.5,
-                fontWeight: 600,
-                textTransform: "none",
-              }}
-            >
-              Delete
-            </Button>
+            {canDelete && (
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                onClick={() => onDelete(deploy)}
+                disabled={busy}
+                sx={{
+                  flex: "1 1 auto",
+                  minWidth: 56,
+                  borderRadius: 1.5,
+                  fontWeight: 600,
+                  textTransform: "none",
+                }}
+              >
+                Delete
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Paper>

@@ -3703,14 +3703,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       let id = node.getAttribute("data-msg-id");
       if (!id && node.id && node.id.startsWith("msg-")) id = node.id.slice(4);
       if (!id) continue;
-      // Skip own / system messages (read receipts are for inbound)
+      // Skip own messages only. System/call events must mark as seen too.
       const mineAttr = node.getAttribute("data-msg-mine");
       if (mineAttr === "1") continue;
       if (mineAttr == null) {
         const inner = node.querySelector?.("[data-msg-mine]");
         if (inner?.getAttribute("data-msg-mine") === "1") continue;
-        if (node.getAttribute("data-msg-system") === "1") continue;
-        if (inner?.getAttribute("data-msg-system") === "1") continue;
       }
       const r = node.getBoundingClientRect();
       // Past the bottom of the list viewport — remaining nodes are further down
@@ -4382,7 +4380,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     e.preventDefault?.();
     e.stopPropagation?.();
 
-    if (!message?.id || message?.type === "day" || message?.is_system) return;
+    if (!message?.id || message?.type === "day") return;
 
     // A context menu belongs to the message that was actually right-clicked.
     setCtx({
@@ -4396,7 +4394,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const selectingRef = useRef(false);
 
   const toggleSelectMessage = (message, forceEnter = false, event = null) => {
-    if (!message?.id || message?.type === "day" || message?.is_system) return;
+    if (!message?.id || message?.type === "day") return;
 
     const id = String(message.id);
 
@@ -4436,7 +4434,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   };
 
   const selectRangeByIds = (fromId, toId) => {
-    const ids = messages.filter((m) => m?.id && !m.is_system).map((m) => String(m.id));
+    const ids = messages.filter((m) => m?.id).map((m) => String(m.id));
     const a = ids.indexOf(String(fromId));
     const b = ids.indexOf(String(toId));
     if (a < 0 || b < 0) return;
@@ -5462,8 +5460,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
                   selectionMode={selectionMode}
                   selected={selectedIds.has(String(m.id))}
                   isUnread={
-                    String(m.sender?.id) !== String(meId)
-                    && !m.is_system
+                    (String(m.sender?.id) !== String(meId) || m.is_system)
                     && !seenMsgIds.has(String(m.id))
                   }
                   isPinnedMessage={isMessagePinned(m.id)}
