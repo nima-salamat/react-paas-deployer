@@ -65,6 +65,8 @@ export default function ServiceDetail() {
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
   const [activeTab, setActiveTab] = useState("overview");
+  const [shareAccess, setShareAccess] = useState({ loading: true, is_owner: true, permissions: null });
+
 
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(DEFAULT_REFRESH_INTERVAL_MS);
   const [intervalMenuAnchor, setIntervalMenuAnchor] = useState(null);
@@ -176,6 +178,52 @@ export default function ServiceDetail() {
       mountedRef.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiRequest({
+          method: "GET",
+          url: `${SERVICE_ACTION_ROOT}services/${id}/access/`,
+        });
+        if (cancelled) return;
+        const data = res?.data || {};
+        setShareAccess({
+          loading: false,
+          is_owner: Boolean(data.is_owner),
+          permissions: data.permissions || {},
+          share_id: data.share_id || null,
+        });
+      } catch {
+        if (!cancelled) {
+          setShareAccess({ loading: false, is_owner: true, permissions: null });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const allowedTabs = useMemo(() => {
+    if (shareAccess.loading) return ["overview"];
+    if (shareAccess.is_owner || !shareAccess.permissions) {
+      return ["overview", "create", "logs", "settings"];
+    }
+    const p = shareAccess.permissions;
+    const tabs = ["overview"];
+    if (p.can_deploy_add || p.can_deploy_edit || p.can_rebuild) tabs.push("create");
+    if (p.can_view_logs || p.can_view_deploy_logs) tabs.push("logs");
+    if (p.can_change_config || p.can_network_change || p.can_volume_attach) tabs.push("settings");
+    return tabs;
+  }, [shareAccess]);
+
+  useEffect(() => {
+    if (!allowedTabs.includes(activeTab)) {
+      setActiveTab(allowedTabs[0] || "overview");
+    }
+  }, [allowedTabs, activeTab]);
+
 
   useEffect(() => {
     serviceLogPausedRef.current = serviceLogsPaused;
@@ -1698,6 +1746,7 @@ export default function ServiceDetail() {
             <TabSidebar
               activeTab={activeTab}
               setActiveTab={setActiveTab}
+              allowedTabs={allowedTabs}
               service={service}
               selectedDeploy={selectedDeploy}
               deployCount={deployCount}
@@ -1829,6 +1878,7 @@ export default function ServiceDetail() {
         {/* Mobile edge nav FAB + bottom sheet */}
         {!isDesktop ? (
           <MobileNavFab
+            allowedTabs={allowedTabs}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             service={service}

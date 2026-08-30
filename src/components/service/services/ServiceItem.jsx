@@ -1,5 +1,9 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   Box,
   Button,
   Chip,
@@ -20,6 +24,7 @@ import HubIcon from "@mui/icons-material/Hub";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import AppsIcon from "@mui/icons-material/Apps";
 import ShareIcon from "@mui/icons-material/Share";
+import { RULE_LABELS } from "./ShareServiceDialog";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -155,6 +160,14 @@ function ServiceItem({
     </Stack>
   );
 
+  const isReceived = Boolean(shareMeta?.isReceived);
+  const perms = shareMeta?.permissions || {};
+  const canStart = isReceived ? !!perms.can_start : true;
+  const canStop = isReceived ? !!perms.can_stop : true;
+  const canRestart = isReceived ? !!perms.can_restart : true;
+  const showStartStop = !isReceived || canStart || canStop;
+  const [myPermsOpen, setMyPermsOpen] = useState(false);
+
   const actionBtnSx = {
     borderRadius: 1.5,
     textTransform: "none",
@@ -165,7 +178,7 @@ function ServiceItem({
     fontSize: { xs: 12.5, sm: 13 },
   };
 
-  const actions = !isReadOnly && (
+  const actions = (
     <Box
       sx={{
         display: "flex",
@@ -174,11 +187,15 @@ function ServiceItem({
         width: "100%",
       }}
     >
+      {showStartStop && (
       <Button
         size="small"
         variant="contained"
         color={isRunning ? "error" : "success"}
-        disabled={isUpdating}
+        disabled={
+          isUpdating ||
+          (isRunning ? !canStop : !canStart)
+        }
         startIcon={
           isRunning ? <StopIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />
         }
@@ -190,6 +207,7 @@ function ServiceItem({
       >
         {isUpdating ? "…" : isRunning ? "Stop" : "Start"}
       </Button>
+      )}
       <Button
         size="small"
         variant="contained"
@@ -230,7 +248,7 @@ function ServiceItem({
         Delete
       </Button>
 
-      {(shareMeta?.permissions?.can_restart || (!shareMeta?.isReceived && onRestart)) && (
+      {(canRestart && onRestart) && (
         <Button
           size="small"
           variant="outlined"
@@ -302,26 +320,60 @@ function ServiceItem({
           </Button>
         </>
       )}
-      {shareMeta?.isReceived && shareMeta?.shareId && (
+      {shareMeta?.isReceived && (
         <Button
           size="small"
           variant="outlined"
           startIcon={<SettingsIcon fontSize="small" />}
           onClick={(e) => {
             e.stopPropagation();
-            onManageShare?.(shareMeta);
+            setMyPermsOpen(true);
           }}
           sx={actionBtnSx}
         >
-          Permissions
+          My permissions
         </Button>
       )}
     </Box>
   );
 
+  const myPermsDialog = (
+    <Dialog open={myPermsOpen} onClose={() => setMyPermsOpen(false)} fullWidth maxWidth="xs">
+      <DialogTitle sx={{ fontWeight: 800 }}>Your permissions</DialogTitle>
+      <DialogContent dividers>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Read-only. Only the person who shared this service can change rules.
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+          {Object.entries(perms)
+            .filter(([k, v]) => k !== "daily_deploy_limit" && !!v)
+            .map(([k]) => (
+              <Chip key={k} size="small" label={RULE_LABELS[k] || k} color="primary" variant="outlined" />
+            ))}
+          {perms.daily_deploy_limit != null && (
+            <Chip
+              size="small"
+              label={`Daily deploy limit: ${perms.daily_deploy_limit}`}
+              color="secondary"
+              variant="outlined"
+            />
+          )}
+          {Object.entries(perms).filter(([k, v]) => k !== "daily_deploy_limit" && !!v).length === 0 && (
+            <Typography variant="body2" color="text.secondary">No action permissions granted.</Typography>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setMyPermsOpen(false)}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+
   /* ─── Row layout ─── */
   if (layout === "row") {
     return (
+      <>
+      {myPermsDialog}
       <Paper
         elevation={0}
         sx={{
@@ -375,11 +427,14 @@ function ServiceItem({
           <Box sx={{ width: { xs: "100%", md: 280 }, flexShrink: 0 }}>{actions}</Box>
         </Stack>
       </Paper>
+      </>
     );
   }
 
   /* ─── Card layout ─── */
   return (
+    <>
+    {myPermsDialog}
     <Paper
       elevation={0}
       sx={{
@@ -476,22 +531,21 @@ function ServiceItem({
         <Box sx={{ flexGrow: 1 }} />
       </Box>
 
-      {!isReadOnly && (
-        <Box
-          sx={{
-            px: { xs: 1.25, sm: 1.5 },
-            py: 1.25,
-            mt: "auto",
-            borderTop: "1px solid",
-            borderColor: "divider",
-            bgcolor: (t) =>
-              t.palette.mode === "dark" ? "rgba(0,0,0,0.18)" : "rgba(15,23,42,0.02)",
-          }}
-        >
-          {actions}
-        </Box>
-      )}
+      <Box
+        sx={{
+          px: { xs: 1.25, sm: 1.5 },
+          py: 1.25,
+          mt: "auto",
+          borderTop: "1px solid",
+          borderColor: "divider",
+          bgcolor: (t) =>
+            t.palette.mode === "dark" ? "rgba(0,0,0,0.18)" : "rgba(15,23,42,0.02)",
+        }}
+      >
+        {actions}
+      </Box>
     </Paper>
+    </>
   );
 }
 

@@ -15,7 +15,7 @@ import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import SubjectIcon from "@mui/icons-material/Subject";
 import SettingsIcon from "@mui/icons-material/Settings";
 
-const TABS = [
+const ALL_TABS = [
   { value: "overview", label: "Overview", icon: <Inventory2Icon fontSize="small" /> },
   { value: "create", label: "Create deploy", icon: <AddCircleOutlineIcon fontSize="small" /> },
   { value: "logs", label: "Logs", icon: <SubjectIcon fontSize="small" /> },
@@ -31,8 +31,12 @@ export default function TabSidebar({
   volumeCount,
   networkName,
   serviceRunning,
+  allowedTabs = null, // null = all tabs; array of tab values
 }) {
   const theme = useTheme();
+  const TABS = allowedTabs
+    ? ALL_TABS.filter((tab) => allowedTabs.includes(tab.value))
+    : ALL_TABS;
 
   return (
     <Paper

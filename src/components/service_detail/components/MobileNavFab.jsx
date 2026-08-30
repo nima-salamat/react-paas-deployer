@@ -26,7 +26,7 @@ import HubIcon from "@mui/icons-material/Hub";
 import StorageIcon from "@mui/icons-material/Storage";
 import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 
-const TABS = [
+const ALL_TABS = [
   { value: "overview", label: "Overview", icon: <Inventory2Icon /> },
   { value: "create", label: "Deploys", icon: <AddCircleOutlineIcon /> },
   { value: "logs", label: "Logs", icon: <SubjectIcon /> },
@@ -40,6 +40,7 @@ const TABS = [
  * Same size (52 mobile / 56 desktop), borderRadius 3, shadow, zIndex 20.
  */
 export default function MobileNavFab({
+  allowedTabs = null,
   activeTab,
   setActiveTab,
   service,
@@ -53,6 +54,9 @@ export default function MobileNavFab({
 }) {
   const theme = useTheme();
   const isSm = useMediaQuery(theme.breakpoints.down("sm"));
+  const TABS = allowedTabs
+    ? ALL_TABS.filter((tab) => allowedTabs.includes(tab.value))
+    : ALL_TABS;
   const [open, setOpen] = useState(false);
   const [sheetOffset, setSheetOffset] = useState(0);
   const sheetStartY = useRef(0);

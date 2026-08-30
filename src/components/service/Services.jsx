@@ -790,16 +790,22 @@ export default function ServicesListMui({
     }
     const rows = shareScope === "shared_with_me" ? sharedWithMe : sharedByMe;
     return rows.map((share) => {
-      const svc = share.service || {
-        id: share.service_id,
-        name: share.service_name,
-        status: share.service_status,
+      const svc = (share.service && typeof share.service === "object") ? share.service : {};
+      const service = {
+        ...svc,
+        id: svc.id || svc.pk || share.service_id,
+        pk: svc.pk || svc.id || share.service_id,
+        name: svc.name || share.service_name || share.service_id,
+        status: svc.status || share.service_status || "unknown",
+        plan: svc.plan || (share.service_platform || share.service_plan_type
+          ? {
+              platform: share.service_platform || svc.platform,
+              plan_type: share.service_plan_type || svc.plan_type,
+            }
+          : svc.plan),
+        platform: svc.platform || share.service_platform,
+        plan_type: svc.plan_type || share.service_plan_type,
       };
-      // If nested service object missing fields, keep id/name/status from share
-      const service = typeof svc === "object" ? { ...svc } : { id: share.service_id };
-      if (!service.name) service.name = share.service_name;
-      if (!service.status) service.status = share.service_status;
-      if (!service.id) service.id = share.service_id;
       return {
         service,
         shareMeta: {
@@ -1018,7 +1024,7 @@ export default function ServicesListMui({
                   key={shareMeta?.shareId || getKey(s)}
                   s={s}
                   layout="row"
-                  isReadOnly={Boolean(shareMeta?.isReceived)}
+                  isReadOnly={false}
                   planCache={planCache}
                   networkCache={networkCache}
                   statusEntry={statusMap[getKey(s)] || null}
@@ -1069,7 +1075,7 @@ export default function ServicesListMui({
                   <ServiceItem
                     s={s}
                     layout="card"
-                    isReadOnly={viewMode === "overview" || Boolean(shareMeta?.isReceived)}
+                    isReadOnly={viewMode === "overview"}
                     planCache={planCache}
                     networkCache={networkCache}
                     statusEntry={statusMap[getKey(s)] || null}
