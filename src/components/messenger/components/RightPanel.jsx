@@ -848,6 +848,7 @@ export default function RightPanel({
             />
           </ListItemButton>
         </Box>
+      )}
 
       {activeConv?.type === "group" && (
         <Box sx={{ px: 2, pb: 1.5 }}>
@@ -870,8 +871,6 @@ export default function RightPanel({
             <ChevronRightIcon sx={{ color: "text.secondary" }} />
           </ListItemButton>
         </Box>
-      )}
-
       )}
 
       {activeConv?.type === "group" && (
