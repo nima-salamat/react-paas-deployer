@@ -26,6 +26,7 @@ import apiRequest from "../customHooks/apiRequest";
 import ServiceItem from "./services/ServiceItem";
 import ServiceEditDialog from "./services/ServiceEditDialog";
 import ServicesToolbar from "./services/ServicesToolbar";
+import ShareServiceDialog from "./services/ShareServiceDialog";
 import {
   API_BASE,
   NETWORK_API_ROOT,
@@ -33,6 +34,9 @@ import {
   PLANS_API,
   SERVICE_ACTION_ROOT,
   SERVICE_API,
+  SHARE_UNIFIED_URL,
+  shareDetailUrl,
+  shareLeaveUrl,
   getKey,
   friendlyError,
   extractList,
@@ -98,6 +102,15 @@ export default function ServicesListMui({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [servicesFetchError, setServicesFetchError] = useState(null);
+
+  // Share scope: mine | shared_with_me | shared_by_me
+  const [shareScope, setShareScope] = useState("mine");
+  const [sharedWithMe, setSharedWithMe] = useState([]); // share rows
+  const [sharedByMe, setSharedByMe] = useState([]); // share rows
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareTargetService, setShareTargetService] = useState(null);
+  const [shareExisting, setShareExisting] = useState(null);
+  const [messengerGroups, setMessengerGroups] = useState([]);
 
   const [planCache, setPlanCache] = useState({});
   const [networkCache, setNetworkCache] = useState({});
@@ -278,6 +291,45 @@ export default function ServicesListMui({
   );
 
   /** Live CPU/RAM via service_status (same API as ServiceDetail). */
+
+  const fetchShares = useCallback(async () => {
+    try {
+      const res = await apiRequest({ method: "GET", url: SHARE_UNIFIED_URL });
+      if (!mountedRef.current) return;
+      const data = res?.data || {};
+      setSharedWithMe(Array.isArray(data.shared_with_me) ? data.shared_with_me : []);
+      setSharedByMe(Array.isArray(data.shared_by_me) ? data.shared_by_me : []);
+      // When on mine tab, also refresh services from unified.mine if present
+      if (Array.isArray(data.mine) && shareScope === "mine" && page === 1) {
+        // keep existing pagination path; optional soft update
+      }
+    } catch (e) {
+      // non-fatal
+      console.warn("fetchShares failed", e);
+    }
+  }, [shareScope, page]);
+
+  const loadMessengerGroups = useCallback(async () => {
+    try {
+      // Best-effort: messenger conversations of type group
+      const res = await apiRequest({
+        method: "GET",
+        url: `${API_BASE}/messenger/conversations/?page_size=50`,
+      });
+      const list = extractList(res?.data);
+      setMessengerGroups(
+        list
+          .filter((c) => String(c.type || "").toLowerCase() === "group")
+          .map((c) => ({
+            id: c.id ?? c.pk ?? c.public_id,
+            title: c.title || c.name || "Group",
+          }))
+      );
+    } catch {
+      setMessengerGroups([]);
+    }
+  }, []);
+
   const fetchStatusBatch = useCallback(async () => {
     if (editingOpenRef.current || statusBusyRef.current) return;
     const list = servicesRef.current || [];
@@ -397,7 +449,8 @@ export default function ServicesListMui({
 
   useEffect(() => {
     fetchServices(false);
-  }, [fetchServices]);
+    fetchShares();
+  }, [fetchServices, fetchShares]);
 
   useEffect(() => {
     fetchNetworks({ silent: false });
@@ -727,23 +780,131 @@ export default function ServicesListMui({
     }
   };
 
+  // Map share rows → display services + meta for shared tabs
+  const displayEntries = useMemo(() => {
+    if (shareScope === "mine") {
+      return services.map((s) => ({
+        service: s,
+        shareMeta: null,
+      }));
+    }
+    const rows = shareScope === "shared_with_me" ? sharedWithMe : sharedByMe;
+    return rows.map((share) => {
+      const svc = share.service || {
+        id: share.service_id,
+        name: share.service_name,
+        status: share.service_status,
+      };
+      // If nested service object missing fields, keep id/name/status from share
+      const service = typeof svc === "object" ? { ...svc } : { id: share.service_id };
+      if (!service.name) service.name = share.service_name;
+      if (!service.status) service.status = share.service_status;
+      if (!service.id) service.id = share.service_id;
+      return {
+        service,
+        shareMeta: {
+          shareId: share.id,
+          isOwnerShare: shareScope === "shared_by_me",
+          isReceived: shareScope === "shared_with_me",
+          permissions: share.my_permissions || share.rules || {},
+          label: shareScope === "shared_with_me" ? "Shared with me" : "I shared",
+          raw: share,
+        },
+      };
+    });
+  }, [shareScope, services, sharedWithMe, sharedByMe]);
+
   const filteredServices = useMemo(() => {
-    if (kindFilter === "all") return services;
-    return services.filter(
-      (s) => resolveServiceKind(s, planCache) === kindFilter
+    const list = displayEntries;
+    if (kindFilter === "all") return list;
+    return list.filter(
+      (entry) => resolveServiceKind(entry.service, planCache) === kindFilter
     );
-  }, [services, kindFilter, planCache]);
+  }, [displayEntries, kindFilter, planCache]);
 
   const kindCounts = useMemo(() => {
     let app = 0;
     let db = 0;
-    for (const s of services) {
+    const base = displayEntries.map((e) => e.service);
+    for (const s of base) {
       const k = resolveServiceKind(s, planCache);
       if (k === "db") db += 1;
       else if (k === "app") app += 1;
     }
-    return { app, db, all: services.length };
-  }, [services, planCache]);
+    return { app, db, all: base.length };
+  }, [displayEntries, planCache]);
+
+  const shareCounts = useMemo(
+    () => ({
+      mine: services.length,
+      shared_with_me: sharedWithMe.length,
+      shared_by_me: sharedByMe.length,
+    }),
+    [services.length, sharedWithMe.length, sharedByMe.length]
+  );
+
+  
+  const handleRestart = useCallback(async (svc) => {
+    const id = svc?.id ?? svc?.pk;
+    if (!id) return;
+    try {
+      await apiRequest({
+        method: "POST",
+        url: `${SERVICE_ACTION_ROOT}restart_service/`,
+        data: { service_id: id },
+      });
+      fetchServices(true);
+      fetchShares?.();
+    } catch (e) {
+      console.error(e);
+      showAlert?.(e?.response?.data?.detail || e?.message || "Restart failed", "error");
+    }
+  }, [fetchServices, fetchShares, showAlert]);
+
+  const handleLeaveShare = useCallback(async (shareMeta) => {
+    if (!shareMeta?.shareId) return;
+    if (!shareMeta?.targetUserId) {
+      showAlert?.(
+        "For group shares, leave the messenger group to revoke access.",
+        "info"
+      );
+      return;
+    }
+    try {
+      await apiRequest({
+        method: "POST",
+        url: shareLeaveUrl(shareMeta.shareId),
+      });
+      fetchServices(true);
+      fetchShares?.();
+    } catch (e) {
+      showAlert?.(e?.response?.data?.detail || e?.message || "Leave failed", "error");
+    }
+  }, [fetchServices, fetchShares, showAlert]);
+
+  const openShareDialog = useCallback((service, existing = null) => {
+    setShareTargetService(service);
+    setShareExisting(existing);
+    setShareDialogOpen(true);
+    loadMessengerGroups();
+  }, [loadMessengerGroups]);
+
+  const handleUnshare = useCallback(
+    async (shareMeta) => {
+      if (!shareMeta?.shareId) return;
+      try {
+        await apiRequest({
+          method: "DELETE",
+          url: shareDetailUrl(shareMeta.shareId),
+        });
+        showAlert("success", "Share removed.");
+        fetchShares();
+      } catch (e) {
+        showAlert("error", friendlyError(e, "Could not unshare."));
+      }
+    },
+    [fetchShares, showAlert]
+  );
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 } }}>
@@ -772,6 +933,13 @@ export default function ServicesListMui({
         menuAnchorEl={menuAnchorEl}
         setMenuAnchorEl={setMenuAnchorEl}
         showSearch={showSearch}
+        shareScope={shareScope}
+        setShareScope={(scope) => {
+          setShareScope(scope);
+          setPage(1);
+          if (scope !== "mine") fetchShares();
+        }}
+        shareCounts={shareCounts}
       />
 
       <Snackbar
@@ -833,19 +1001,24 @@ export default function ServicesListMui({
               }}
             >
               <Typography color="text.secondary">
-                {services.length === 0
-                  ? "No services found."
+                {displayEntries.length === 0
+                  ? shareScope === "mine"
+                    ? "No services found."
+                    : "No shared services."
                   : "No services match this filter."}
               </Typography>
             </Paper>
           ) : viewMode === "rows" ? (
             <Stack>
-              {filteredServices.map((s) => (
+              {filteredServices.map((entry) => {
+                const s = entry.service;
+                const shareMeta = entry.shareMeta;
+                return (
                 <ServiceItem
-                  key={getKey(s)}
+                  key={shareMeta?.shareId || getKey(s)}
                   s={s}
                   layout="row"
-                  isReadOnly={false}
+                  isReadOnly={Boolean(shareMeta?.isReceived)}
                   planCache={planCache}
                   networkCache={networkCache}
                   statusEntry={statusMap[getKey(s)] || null}
@@ -853,8 +1026,16 @@ export default function ServicesListMui({
                   onEdit={handleEdit}
                   onDelete={deleteService}
                   onOpen={handleOpen}
+                  shareMeta={shareMeta}
+                  onShare={(svc) => openShareDialog(svc)}
+                  onRestart={handleRestart}
+                  onLeaveShare={handleLeaveShare}
+                  onManageShare={(meta) =>
+                    openShareDialog(s, meta?.raw || null)
+                  }
+                  onUnshare={handleUnshare}
                 />
-              ))}
+              );})}
             </Stack>
           ) : (
             <Box
@@ -873,9 +1054,12 @@ export default function ServicesListMui({
                 justifyItems: "stretch",
               }}
             >
-              {filteredServices.map((s) => (
+              {filteredServices.map((entry) => {
+                const s = entry.service;
+                const shareMeta = entry.shareMeta;
+                return (
                 <Box
-                  key={getKey(s)}
+                  key={shareMeta?.shareId || getKey(s)}
                   sx={{
                     display: "flex",
                     width: "100%",
@@ -885,7 +1069,7 @@ export default function ServicesListMui({
                   <ServiceItem
                     s={s}
                     layout="card"
-                    isReadOnly={viewMode === "overview"}
+                    isReadOnly={viewMode === "overview" || Boolean(shareMeta?.isReceived)}
                     planCache={planCache}
                     networkCache={networkCache}
                     statusEntry={statusMap[getKey(s)] || null}
@@ -893,9 +1077,17 @@ export default function ServicesListMui({
                     onEdit={handleEdit}
                     onDelete={deleteService}
                     onOpen={handleOpen}
+                    shareMeta={shareMeta}
+                    onShare={(svc) => openShareDialog(svc)}
+                  onRestart={handleRestart}
+                  onLeaveShare={handleLeaveShare}
+                    onManageShare={(meta) =>
+                      openShareDialog(s, meta?.raw || null)
+                    }
+                    onUnshare={handleUnshare}
                   />
                 </Box>
-              ))}
+              );})}
             </Box>
           )}
         </Box>
@@ -919,6 +1111,21 @@ export default function ServicesListMui({
         </Box>
       )}
 
+      <ShareServiceDialog
+        open={shareDialogOpen}
+        onClose={() => {
+          setShareDialogOpen(false);
+          setShareTargetService(null);
+          setShareExisting(null);
+        }}
+        service={shareTargetService}
+        groups={messengerGroups}
+        existingShare={shareExisting}
+        onShared={() => {
+          fetchShares();
+          showAlert("success", "Share updated.");
+        }}
+      />
       <ServiceEditDialog
         open={Boolean(editingDraft)}
         draft={editingDraft}

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box, Stack, Typography, IconButton, TextField, InputAdornment, Avatar,
   List, ListItemButton, ListItemAvatar, ListItemText, CircularProgress,
@@ -12,6 +13,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import PublicIcon from "@mui/icons-material/Public";
 import LinkIcon from "@mui/icons-material/Link";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import GroupsIcon from "@mui/icons-material/Groups";
 import { formatCallSystemLabel, parseCallSystemBody } from "../modules/callSystemMessage";
@@ -65,12 +67,26 @@ function formatLastMessagePreview(lm) {
   const callLabel = formatCallSystemLabel(body);
   if (callLabel) return callLabel;
   if (body.includes("__call__:")) return "Call";
+  if (body.startsWith("__service_event__:")) {
+    const nl = body.indexOf("\n");
+    if (nl >= 0 && body.slice(nl + 1).trim()) return body.slice(nl + 1).trim();
+    try {
+      const jsonPart = nl >= 0 ? body.slice("__service_event__:".length, nl) : body.slice("__service_event__:".length);
+      const d = JSON.parse(jsonPart);
+      const actor = d.actor_name || "Someone";
+      const svc = d.service_name || "service";
+      return `${actor}: ${d.action || "event"} · ${svc}`;
+    } catch {
+      return "Service event";
+    }
+  }
   if (body) return body;
   if (lm.has_attachments) return "📎 Attachment";
   return "No messages yet";
 }
 
 export default function Sidebar({
+  // navigate used for Services shortcut
   meId, conversations, loadingConvs,
   activeId, openChat,
   searchQ, setSearchQ, searchResults, searching,
@@ -87,6 +103,7 @@ export default function Sidebar({
   onOpenMyProfile,
 }) {
   const [ctx, setCtx] = useState(null); // { x, y, conv, peer, role }
+  const navigate = useNavigate();
   const [listMenuAnchor, setListMenuAnchor] = useState(null);
   const [publicSearchQ, setPublicSearchQ] = useState("");
 
@@ -166,6 +183,10 @@ export default function Sidebar({
           <MenuItem onClick={() => { setListMenuAnchor(null); onNavigateHome?.(); }}>
             <ListItemIcon><HomeOutlinedIcon fontSize="small" /></ListItemIcon>
             Back to Deployer
+          </MenuItem>
+          <MenuItem onClick={() => { setListMenuAnchor(null); navigate("/services"); }}>
+            <ListItemIcon><MiscellaneousServicesOutlinedIcon fontSize="small" /></ListItemIcon>
+            Services
           </MenuItem>
         </Menu>
       </Stack>

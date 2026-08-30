@@ -19,6 +19,11 @@ import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import HubIcon from "@mui/icons-material/Hub";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import AppsIcon from "@mui/icons-material/Apps";
+import ShareIcon from "@mui/icons-material/Share";
+import LinkOffIcon from "@mui/icons-material/LinkOff";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import LogoutIcon from "@mui/icons-material/Logout";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { resolveServiceKind, resolveUsage, getKey } from "./helpers";
 import UsageBar from "./UsageBar";
 
@@ -33,6 +38,12 @@ function ServiceItem({
   onEdit,
   onDelete,
   onOpen,
+  shareMeta = null, // { shareId, isOwnerShare, isReceived, permissions, label }
+  onShare = null,
+  onManageShare = null,
+  onUnshare = null,
+  onRestart = null,
+  onLeaveShare = null,
 }) {
   const planIsObj = s.plan && typeof s.plan === "object";
   const netIsObj = s.network && typeof s.network === "object";
@@ -200,6 +211,7 @@ function ServiceItem({
           onEdit?.(s);
         }}
         sx={actionBtnSx}
+        disabled={Boolean(shareMeta?.isReceived)}
       >
         Edit
       </Button>
@@ -213,9 +225,97 @@ function ServiceItem({
           onDelete?.(s.id ?? s.pk);
         }}
         sx={actionBtnSx}
+        disabled={Boolean(shareMeta?.isReceived)}
       >
         Delete
       </Button>
+
+      {(shareMeta?.permissions?.can_restart || (!shareMeta?.isReceived && onRestart)) && (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<RestartAltIcon fontSize="small" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRestart?.(s);
+          }}
+          sx={actionBtnSx}
+        >
+          Restart
+        </Button>
+      )}
+      {shareMeta?.isReceived && shareMeta?.shareId && onLeaveShare && !shareMeta?.isOwnerShare && (
+        <Button
+          size="small"
+          variant="outlined"
+          color="warning"
+          startIcon={<LogoutIcon fontSize="small" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onLeaveShare?.(shareMeta);
+          }}
+          sx={actionBtnSx}
+        >
+          Leave share
+        </Button>
+      )}
+      {!shareMeta?.isReceived && (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<ShareIcon fontSize="small" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onShare?.(s);
+          }}
+          sx={actionBtnSx}
+        >
+          Share
+        </Button>
+      )}
+      {shareMeta?.isOwnerShare && (
+        <>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<SettingsIcon fontSize="small" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onManageShare?.(shareMeta);
+            }}
+            sx={actionBtnSx}
+          >
+            Rules
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="warning"
+            startIcon={<LinkOffIcon fontSize="small" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onUnshare?.(shareMeta);
+            }}
+            sx={actionBtnSx}
+          >
+            Unshare
+          </Button>
+        </>
+      )}
+      {shareMeta?.isReceived && shareMeta?.shareId && (
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<SettingsIcon fontSize="small" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onManageShare?.(shareMeta);
+          }}
+          sx={actionBtnSx}
+        >
+          Permissions
+        </Button>
+      )}
     </Box>
   );
 
@@ -243,6 +343,18 @@ function ServiceItem({
                 {s.name || "(no name)"}
               </Typography>
               {kindChip}
+              {shareMeta?.isReceived && (
+                <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
+              )}
+              {shareMeta?.adminOnly && (
+                <Chip size="small" color="warning" variant="outlined" label="Admins only" sx={{ fontWeight: 700, height: 22 }} />
+              )}
+              {shareMeta?.preset && (
+                <Chip size="small" variant="outlined" label={shareMeta.preset} sx={{ fontWeight: 700, height: 22 }} />
+              )}
+              {shareMeta?.isOwnerShare && (
+                <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
+              )}
               <Chip
                 label={s.status ?? "unknown"}
                 color={statusColor}
@@ -335,6 +447,12 @@ function ServiceItem({
               </Typography>
               <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
                 {kindChip}
+                {shareMeta?.isReceived && (
+                  <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
+                )}
+                {shareMeta?.isOwnerShare && (
+                  <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
+                )}
                 <Typography
                   variant="caption"
                   color="text.secondary"

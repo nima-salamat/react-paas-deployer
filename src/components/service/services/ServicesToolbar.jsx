@@ -41,6 +41,9 @@ export default function ServicesToolbar({
   menuAnchorEl,
   setMenuAnchorEl,
   showSearch = true,
+  shareScope = "mine",
+  setShareScope = null,
+  shareCounts = { mine: 0, shared_with_me: 0, shared_by_me: 0 },
 }) {
   return (
     <>
@@ -59,7 +62,11 @@ export default function ServicesToolbar({
           fontWeight={800}
           sx={{ letterSpacing: "-0.02em" }}
         >
-          My Services
+          {shareScope === "shared_with_me"
+            ? "Shared with me"
+            : shareScope === "shared_by_me"
+            ? "Shared by me"
+            : "My Services"}
         </Typography>
         <Stack direction="row" spacing={0.5}>
           <Tooltip title="Refresh">
@@ -193,6 +200,38 @@ export default function ServicesToolbar({
               <MenuItem value="overview">Overview</MenuItem>
             </Select>
           </FormControl>
+          {typeof setShareScope === "function" && (
+            <Stack
+              direction="row"
+              spacing={0.75}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+              sx={{ width: "100%", mb: 0.5 }}
+            >
+              {[
+                { key: "mine", label: `Mine (${shareCounts.mine ?? 0})` },
+                {
+                  key: "shared_with_me",
+                  label: `Shared with me (${shareCounts.shared_with_me ?? 0})`,
+                },
+                {
+                  key: "shared_by_me",
+                  label: `I shared (${shareCounts.shared_by_me ?? 0})`,
+                },
+              ].map((f) => (
+                <Chip
+                  key={f.key}
+                  label={f.label}
+                  size="small"
+                  color={shareScope === f.key ? "secondary" : "default"}
+                  variant={shareScope === f.key ? "filled" : "outlined"}
+                  onClick={() => setShareScope(f.key)}
+                  sx={{ fontWeight: 700, height: 28 }}
+                />
+              ))}
+            </Stack>
+          )}
           <Stack
             direction="row"
             spacing={0.75}

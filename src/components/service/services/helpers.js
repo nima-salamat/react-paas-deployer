@@ -146,3 +146,20 @@ export function sameListById(prev, next, extraKeys = []) {
     return true;
   });
 }
+
+// ---------------------------------------------------------------------------
+// Service Sharing API roots
+// ---------------------------------------------------------------------------
+export const SHARE_API_ROOT = `${API_BASE}/services/`;
+export const SHARE_UNIFIED_URL = `${SHARE_API_ROOT}services/unified/`;
+export const SHARE_CREATE_URL = `${SHARE_API_ROOT}services/share/`;
+export const shareDetailUrl = (id) => `${SHARE_API_ROOT}services/shares/${id}/`;
+export const sharePermissionsUrl = (id) =>
+  `${SHARE_API_ROOT}services/shares/${id}/permissions/`;
+export const shareEventsUrl = (id) =>
+  `${SHARE_API_ROOT}services/shares/${id}/events/`;
+export const SHARE_LIST_URL = `${SHARE_API_ROOT}services/shared/`;
+
+export function shareLeaveUrl(id) {
+  return `${SHARE_API_ROOT}services/shares/${id}/leave/`;
+}

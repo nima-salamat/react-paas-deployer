@@ -1506,6 +1506,39 @@ function SingleEmojiLottie({ emoji, size = 72, playing = false, onPlayDone, onCl
 }
 
 
+
+function parseServiceEventBody(body) {
+  const raw = typeof body === "string" ? body : (body != null ? String(body) : "");
+  if (!raw.startsWith("__service_event__:")) return null;
+  try {
+    const nl = raw.indexOf("\n");
+    const jsonPart = nl >= 0 ? raw.slice("__service_event__:".length, nl) : raw.slice("__service_event__:".length);
+    const human = nl >= 0 ? raw.slice(nl + 1) : "";
+    const data = JSON.parse(jsonPart);
+    return { data, human: human || null };
+  } catch {
+    return null;
+  }
+}
+
+function serviceEventLabel(parsed) {
+  if (!parsed) return null;
+  if (parsed.human) return parsed.human;
+  const d = parsed.data || {};
+  const actor = d.actor_name || "Someone";
+  const svc = d.service_name || "service";
+  const map = {
+    share: `${actor} shared service «${svc}» with this group`,
+    unshare: `${actor} stopped sharing «${svc}»`,
+    start: `${actor} started «${svc}»`,
+    stop: `${actor} stopped «${svc}»`,
+    restart: `${actor} restarted «${svc}»`,
+    deploy: `${actor} deployed / rebuilt «${svc}»`,
+    rules_updated: `${actor} updated rules for «${svc}»`,
+  };
+  return map[d.action] || `${actor}: ${d.action || "event"} on «${svc}»`;
+}
+
 function MessageBubble({
   m, meId, activeConv,
   onContextOpen, onReact, onReactAnchor, onReply, onEditCode,
@@ -1675,13 +1708,50 @@ function MessageBubble({
     looksLikeCall = typeof bodyStr === "string" && bodyStr.indexOf("__call__:") >= 0;
   }
   if (looksLikeCall || m.is_system) {
+    // Service-share events (from PaaS share system)
+    const svcEvent = parseServiceEventBody(bodyStr) || parseServiceEventBody(m.body);
+    if (svcEvent) {
+      const label = serviceEventLabel(svcEvent) || "Service event";
+      const action = String((svcEvent.data && svcEvent.data.action) || "");
+      const color =
+        action === "start" || action === "deploy"
+          ? "success"
+          : action === "stop" || action === "unshare"
+          ? "warning"
+          : "default";
+      return (
+        <Box sx={{ textAlign: "center", my: 1.25, width: "100%" }}>
+          <Chip
+            label={label}
+            size="small"
+            color={color === "default" ? undefined : color}
+            variant={color === "default" ? "outlined" : "filled"}
+            sx={{
+              fontSize: 12,
+              fontWeight: 600,
+              maxWidth: "94%",
+              height: "auto",
+              py: 0.5,
+              "& .MuiChip-label": {
+                whiteSpace: "normal",
+                overflow: "visible",
+                textOverflow: "clip",
+                display: "block",
+                py: 0.25,
+              },
+            }}
+          />
+        </Box>
+      );
+    }
+
     let label = "System";
     try {
       label =
         m._call_label
         || formatCallSystemLabel(callInfo || bodyStr)
         || (looksLikeCall ? "Call" : null)
-        || (typeof bodyStr === "string" && bodyStr.indexOf("__call__:") < 0 ? bodyStr : "System")
+        || (typeof bodyStr === "string" && bodyStr.indexOf("__call__:") < 0 && bodyStr.indexOf("__service_event__:") < 0 ? bodyStr : "System")
         || "System";
     } catch {
       label = looksLikeCall ? "Call" : "System";

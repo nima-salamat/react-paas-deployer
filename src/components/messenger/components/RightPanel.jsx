@@ -1,4 +1,6 @@
 import React, { useRef, useState } from "react";
+import GroupSharedServicesPanel from "./GroupSharedServicesPanel";
+import CloudQueueIcon from "@mui/icons-material/CloudQueue";
 import {
   Box, Stack, Typography, IconButton, Divider, List, ListItemButton, ListItemIcon,
   ListItemText, ListItemAvatar, Button, TextField, FormControlLabel, Switch, Paper, Avatar,
@@ -97,6 +99,7 @@ export default function RightPanel({
   // the hook count varies between renders of different `kind` panels and
   // React throws "Invalid hook call" (#300) when the user switches panels.
     const [showSharedMedia, setShowSharedMedia] = useState(false);
+  const [showSharedServices, setShowSharedServices] = useState(false);
   const [memberCtx, setMemberCtx] = useState(null); // { x, y, user, role }
   const [memberMenuAnchor, setMemberMenuAnchor] = useState(null); // for ⋮ button
   const [memberMenuTarget, setMemberMenuTarget] = useState(null);
@@ -636,6 +639,33 @@ export default function RightPanel({
   }
 
 
+  if (showSharedServices && activeConv?.type === "group") {
+    return (
+      <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider" }}>
+          {canGoBack || true ? (
+            <IconButton size="small" onClick={() => setShowSharedServices(false)}>
+              <ArrowBackIcon />
+            </IconButton>
+          ) : null}
+          <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Shared services</Typography>
+          {onClose && (
+            <IconButton size="small" onClick={onClose}>
+              <ArrowBackIcon sx={{ transform: "rotate(180deg)" }} />
+            </IconButton>
+          )}
+        </Stack>
+        <Box sx={{ flex: 1, minHeight: 0 }}>
+          <GroupSharedServicesPanel
+            activeConv={activeConv}
+            meId={meId}
+            onClose={() => setShowSharedServices(false)}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
   if (showSharedMedia) {
     return (
       <Box sx={{ width: "100%", height: "100%", bgcolor: "background.paper", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -818,6 +848,30 @@ export default function RightPanel({
             />
           </ListItemButton>
         </Box>
+
+      {activeConv?.type === "group" && (
+        <Box sx={{ px: 2, pb: 1.5 }}>
+          <ListItemButton
+            onClick={() => setShowSharedServices(true)}
+            sx={{
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 40 }}>
+              <CloudQueueIcon color="primary" />
+            </ListItemIcon>
+            <ListItemText
+              primary="Shared services"
+              secondary="Share & manage group services"
+              primaryTypographyProps={{ fontWeight: 700 }}
+            />
+            <ChevronRightIcon sx={{ color: "text.secondary" }} />
+          </ListItemButton>
+        </Box>
+      )}
+
       )}
 
       {activeConv?.type === "group" && (
