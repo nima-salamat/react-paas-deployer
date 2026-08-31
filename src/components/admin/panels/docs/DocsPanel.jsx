@@ -52,6 +52,9 @@ import CollectionsRoundedIcon from "@mui/icons-material/CollectionsRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import LinkOffRoundedIcon from "@mui/icons-material/LinkOffRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import MenuOpenRoundedIcon from "@mui/icons-material/MenuOpenRounded";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import apiRequest from "../../../customHooks/apiRequest";
 import { hostBase, authMediaSrc } from "../../adminUtils";
 import MarkdownEditor from "../../../docs/MarkdownEditor";
@@ -110,7 +113,7 @@ function CategoryTree({ nodes, selectedId, onSelect, onCategoryAction, depth = 0
         return (
           <React.Fragment key={node.id}>
             <ListItemButton
-              sx={{ borderRadius: 1.5, py: 0.55, mb: 0.2, minWidth: 0 }}
+              sx={{ borderRadius: 0.5, py: 0.55, mb: 0.2, minWidth: 0 }}
               onClick={() => setOpen((x) => ({ ...x, [node.id]: !expanded }))}
             >
               {hasChildren ? (
@@ -145,7 +148,7 @@ function CategoryTree({ nodes, selectedId, onSelect, onCategoryAction, depth = 0
                   key={doc.id}
                   selected={selectedId === doc.id}
                   onClick={() => onSelect(doc)}
-                  sx={{ borderRadius: 1.5, py: 0.45, mb: 0.15, pl: 4.25, minWidth: 0 }}
+                  sx={{ borderRadius: 0.5, py: 0.45, mb: 0.15, pl: 4.25, minWidth: 0 }}
                 >
                   <ListItemIcon sx={{ minWidth: 27 }}><DescriptionRoundedIcon fontSize="small" color="action" /></ListItemIcon>
                   <ListItemText
@@ -211,7 +214,15 @@ function AssetLibrary({
 
 
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        borderRadius: 0.5,
+        overflow: "hidden",
+        boxShadow: (t) =>
+          `inset 0 1px 0 ${t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.85)"}`,
+      }}
+    >
       <Box sx={{ p: 1.5 }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
@@ -237,6 +248,7 @@ function AssetLibrary({
                 <CloudUploadRoundedIcon />
               )
             }
+            sx={{ borderRadius: 0.5 }}
           >
             {uploading ? "Uploading…" : "Upload"}
             <input
@@ -263,8 +275,9 @@ function AssetLibrary({
                 </InputAdornment>
               ),
             }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0.5 } }}
           />
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ minWidth: 140, "& .MuiOutlinedInput-root": { borderRadius: 0.5 } }}>
             <InputLabel id="asset-kind-label">Type</InputLabel>
             <Select
               labelId="asset-kind-label"
@@ -295,7 +308,7 @@ function AssetLibrary({
               variant="outlined"
               sx={{
                 p: 1.25,
-                borderRadius: 2,
+                borderRadius: 0.5,
                 display: "grid",
                 gridTemplateColumns: {
                   xs: "1fr",
@@ -309,7 +322,7 @@ function AssetLibrary({
                 sx={{
                   width: 56,
                   height: 56,
-                  borderRadius: 1.5,
+                  borderRadius: 0.5,
                   overflow: "hidden",
                   bgcolor: (t) => alpha(t.palette.primary.main, 0.06),
                   display: "grid",
@@ -364,7 +377,7 @@ function AssetLibrary({
               <Stack direction="row" spacing={0.5} flexWrap="wrap">
                 {onInsert && (
                   <Tooltip title="Insert into current article">
-                    <Button size="small" variant="outlined" onClick={() => onInsert(asset)}>
+                    <Button size="small" variant="outlined" sx={{ borderRadius: 0.5 }} onClick={() => onInsert(asset)}>
                       Insert
                     </Button>
                   </Tooltip>
@@ -398,7 +411,7 @@ function AssetLibrary({
         <Typography variant="caption" color="text.secondary">{assetsTotal ?? 0} files</Typography>
         <Pagination count={Math.max(1, assetPageCount || 1)} page={assetPage || 1} onChange={(_, value) => onAssetPageChange?.(value)} size="small" showFirstButton showLastButton />
       </Stack>
-      <Dialog open={Boolean(confirmId)} onClose={() => setConfirmId(null)}>
+      <Dialog open={Boolean(confirmId)} onClose={() => setConfirmId(null)} PaperProps={{ sx: { borderRadius: 0.5 } }}>
         <DialogTitle>Delete file?</DialogTitle>
         <DialogContent>
           <Typography>
@@ -406,7 +419,7 @@ function AssetLibrary({
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmId(null)}>Cancel</Button>
+          <Button onClick={() => setConfirmId(null)} sx={{ borderRadius: 0.5 }}>Cancel</Button>
           <Button
             color="error"
             variant="contained"
@@ -414,16 +427,17 @@ function AssetLibrary({
               onDelete(confirmId);
               setConfirmId(null);
             }}
+            sx={{ borderRadius: 0.5 }}
           >
             Delete
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog open={Boolean(previewAsset)} onClose={() => setPreviewAsset(null)} maxWidth="md" fullWidth>
+      <Dialog open={Boolean(previewAsset)} onClose={() => setPreviewAsset(null)} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 0.5 } }}>
         <DialogTitle sx={{ pr: 7 }}>{previewAsset?.name || "Preview"}</DialogTitle>
         <DialogContent dividers sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
           {previewAsset?.kind === "image" ? (
-            <Box component="img" src={authMediaSrc(previewAsset.url)} alt={previewAsset.alt || previewAsset.name} sx={{ maxWidth: "100%", maxHeight: "65vh", objectFit: "contain", borderRadius: 2 }} />
+            <Box component="img" src={authMediaSrc(previewAsset.url)} alt={previewAsset.alt || previewAsset.name} sx={{ maxWidth: "100%", maxHeight: "65vh", objectFit: "contain", borderRadius: 0.5 }} />
           ) : previewAsset?.kind === "video" ? (
             <Box component="video" src={authMediaSrc(previewAsset.url)} controls sx={{ maxWidth: "100%", maxHeight: "65vh" }} />
           ) : previewAsset?.kind === "audio" ? (
@@ -458,6 +472,24 @@ export default function DocsPanel() {
   const [newCat, setNewCat] = useState({ name: "", parent: "" });
   const [mainTab, setMainTab] = useState(0);
   const [docSearch, setDocSearch] = useState("");
+  const [treeCollapsed, setTreeCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem("docs-admin-tree-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleTree = () => {
+    setTreeCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem("docs-admin-tree-collapsed", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const reload = useCallback(async () => {
     const assetParams = { page: assetPage, page_size: 24 };
@@ -504,7 +536,50 @@ export default function DocsPanel() {
     );
   }, [docs, docSearch]);
 
-  const create = () =>
+  const normalizeContent = (raw) => {
+    if (raw == null) return "";
+    if (typeof raw === "string") return raw;
+    if (Array.isArray(raw)) {
+      return raw
+        .map((block) => {
+          if (!block || typeof block !== "object") return "";
+          if (block.type === "heading") return `${"#".repeat(block.level || 2)} ${block.text || ""}`;
+          if (block.type === "paragraph") return block.text || "";
+          if (block.type === "code") return "```" + (block.language || "") + "\n" + (block.code || "") + "\n```";
+          if (block.type === "list") {
+            const items = block.items || [];
+            return items.map((it, i) => (block.ordered ? `${i + 1}. ${it}` : `- ${it}`)).join("\n");
+          }
+          if (block.type === "callout") return `:::${block.tone || "note"}\n${block.text || ""}\n:::`;
+          if (block.type === "quote") return `> ${block.text || ""}`;
+          if (block.type === "divider") return "---";
+          if (block.type === "link") return `[${block.label || block.url || ""}](${block.url || ""})`;
+          if (typeof block.text === "string") return block.text;
+          return "";
+        })
+        .filter(Boolean)
+        .join("\n\n");
+    }
+    if (typeof raw === "object" && typeof raw.markdown === "string") return raw.markdown;
+    try { return String(raw); } catch { return ""; }
+  };
+
+  const selectDocument = async (doc) => {
+    if (!doc) { setDraft(null); return; }
+    setDraft({ ...doc, content: normalizeContent(doc.content) });
+    setMainTab(0);
+    if (!doc.id) return;
+    setError("");
+    try {
+      const res = await apiRequest({ url: `${base}/admin/documents/${doc.id}/` });
+      const full = res?.data?.data || res?.data || doc;
+      setDraft({ ...full, content: normalizeContent(full.content) });
+    } catch (e) {
+      setError(e?.response?.data?.detail || "Could not load full article body.");
+    }
+  };
+
+    const create = () =>
     setDraft({
       id: null,
       title: "",
@@ -766,6 +841,16 @@ export default function DocsPanel() {
               <RefreshRoundedIcon />
             </IconButton>
           </Tooltip>
+          {mainTab === 0 && (
+            <Button
+              variant="outlined"
+              startIcon={treeCollapsed ? <MenuOpenRoundedIcon /> : <ChevronLeftRoundedIcon />}
+              onClick={toggleTree}
+              sx={{ borderRadius: 0.5, textTransform: "none" }}
+            >
+              {treeCollapsed ? "Show tree" : "Hide tree"}
+            </Button>
+          )}
           <Button
             component="a"
             href="/docs"
@@ -834,161 +919,197 @@ export default function DocsPanel() {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", xl: "320px minmax(0, 1fr)" },
+            gridTemplateColumns: {
+              xs: "1fr",
+              md: treeCollapsed ? "minmax(0, 1fr)" : "300px minmax(0, 1fr)",
+              xl: treeCollapsed ? "minmax(0, 1fr)" : "320px minmax(0, 1fr)",
+            },
             gap: 2,
+            alignItems: "start",
+            transition: "grid-template-columns 180ms ease",
           }}
         >
-          {/* Sidebar: categories + document list */}
-          <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
-            <Box sx={{ p: 1.5 }}>
-              <Typography fontWeight={850}>Content tree</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Categories and all articles (draft & published)
-              </Typography>
-            </Box>
-            <Divider />
-            <Box sx={{ p: 1.25, borderBottom: 1, borderColor: "divider" }}>
-              <Stack spacing={1}>
-                <TextField
-                  size="small"
-                  label="New category"
-                  value={newCat.name}
-                  onChange={(e) =>
-                    setNewCat({ ...newCat, name: e.target.value })
-                  }
-                />
-                <FormControl size="small" fullWidth>
-                  <InputLabel id="parent-cat-label">Parent category</InputLabel>
-                  <Select
-                    labelId="parent-cat-label"
-                    label="Parent category"
-                    value={newCat.parent}
-                    onChange={(e) =>
-                      setNewCat({ ...newCat, parent: e.target.value })
-                    }
-                  >
-                    <MenuItem value="">
-                      <em>Root category</em>
-                    </MenuItem>
-                    {flatCats.map((c) => (
-                      <MenuItem key={c.id} value={c.id}>
-                        {"\u00A0".repeat(c.depth * 2)}
-                        {c.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <Button
-                  onClick={createCategory}
-                  size="small"
-                  startIcon={<AddRoundedIcon />}
-                  variant="outlined"
-                >
-                  Create category
-                </Button>
-              </Stack>
-            </Box>
-            <Box sx={{ p: 1, borderBottom: 1, borderColor: "divider" }}>
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Filter articles…"
-                value={docSearch}
-                onChange={(e) => setDocSearch(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" color="disabled" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
-            <Box sx={{ maxHeight: 640, overflow: "auto", p: 0.75 }}>
-              {!docSearch && (
-                <>
-                  <CategoryTree
-                    nodes={categories}
-                    selectedId={draft?.id}
-                    onSelect={(doc) => {
-                      setDraft(doc);
-                      setMainTab(0);
-                    }}
-                    onCategoryAction={handleCategoryAction}
-                  />
-                  {(uncategorized.length > 0 ||
-                    docs.some((d) => !d.category)) && (
-                    <>
-                      <Divider sx={{ my: 1 }} />
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ px: 1.5, fontWeight: 700 }}
+          {/* Sidebar: categories + document list (collapsible) */}
+          {!treeCollapsed && (
+          <Paper
+            variant="outlined"
+            sx={{
+              borderRadius: 0.5,
+              overflow: "hidden",
+              position: { md: "sticky" },
+              top: { md: 12 },
+              maxHeight: { md: "calc(100vh - 120px)" },
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: (t) =>
+                `inset 0 1px 0 ${t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.85)"}`,
+            }}
+          >
+              <>
+                <Box sx={{ p: 1.25, display: "flex", alignItems: "flex-start", gap: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography fontWeight={850}>Content tree</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Categories and all articles (draft & published)
+                    </Typography>
+                  </Box>
+                  <Tooltip title="Collapse tree — more writing space">
+                    <IconButton
+                      size="small"
+                      onClick={toggleTree}
+                      aria-label="Collapse content tree"
+                      sx={{ borderRadius: 0.5, border: 1, borderColor: "divider", flexShrink: 0 }}
+                    >
+                      <ChevronLeftRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                <Divider />
+                <Box sx={{ p: 1.25, borderBottom: 1, borderColor: "divider" }}>
+                  <Stack spacing={1}>
+                    <TextField
+                      size="small"
+                      label="New category"
+                      value={newCat.name}
+                      onChange={(e) =>
+                        setNewCat({ ...newCat, name: e.target.value })
+                      }
+                    />
+                    <FormControl size="small" fullWidth>
+                      <InputLabel id="parent-cat-label">Parent category</InputLabel>
+                      <Select
+                        labelId="parent-cat-label"
+                        label="Parent category"
+                        value={newCat.parent}
+                        onChange={(e) =>
+                          setNewCat({ ...newCat, parent: e.target.value })
+                        }
                       >
-                        General (no category)
-                      </Typography>
-                      {(uncategorized.length
-                        ? uncategorized
-                        : docs.filter((d) => !d.category)
-                      ).map((doc) => (
+                        <MenuItem value="">
+                          <em>Root category</em>
+                        </MenuItem>
+                        {flatCats.map((c) => (
+                          <MenuItem key={c.id} value={c.id}>
+                            {"\u00A0".repeat(c.depth * 2)}
+                            {c.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <Button
+                      onClick={createCategory}
+                      size="small"
+                      startIcon={<AddRoundedIcon />}
+                      variant="outlined"
+                      sx={{ borderRadius: 0.5 }}
+                    >
+                      Create category
+                    </Button>
+                  </Stack>
+                </Box>
+                <Box sx={{ p: 1, borderBottom: 1, borderColor: "divider" }}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    placeholder="Filter articles…"
+                    value={docSearch}
+                    onChange={(e) => setDocSearch(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchRoundedIcon fontSize="small" color="disabled" />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Box>
+                <Box sx={{ flex: 1, overflow: "auto", p: 0.75, minHeight: 0 }}>
+                  {!docSearch && (
+                    <>
+                      <CategoryTree
+                        nodes={categories}
+                        selectedId={draft?.id}
+                        onSelect={(doc) => {
+                          selectDocument(doc);
+                          setMainTab(0);
+                        }}
+                        onCategoryAction={handleCategoryAction}
+                      />
+                      {(uncategorized.length > 0 ||
+                        docs.some((d) => !d.category)) && (
+                        <>
+                          <Divider sx={{ my: 1 }} />
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ px: 1.5, fontWeight: 700 }}
+                          >
+                            General (no category)
+                          </Typography>
+                          {(uncategorized.length
+                            ? uncategorized
+                            : docs.filter((d) => !d.category)
+                          ).map((doc) => (
+                            <ListItemButton
+                              key={doc.id}
+                              selected={draft?.id === doc.id}
+                              onClick={() => selectDocument(doc)}
+                              sx={{ borderRadius: 0.5, mt: 0.25 }}
+                            >
+                              <ListItemIcon sx={{ minWidth: 28 }}>
+                                <DescriptionRoundedIcon fontSize="small" />
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={doc.title}
+                                secondary={doc.status}
+                                primaryTypographyProps={{ fontSize: 13 }}
+                              />
+                              <Chip
+                                size="small"
+                                label={doc.status}
+                                color={
+                                  doc.status === "published" ? "success" : "default"
+                                }
+                                sx={{ height: 20, fontSize: 10 }}
+                              />
+                            </ListItemButton>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )}
+                  {docSearch && (
+                    <List dense>
+                      {filteredDocs.map((doc) => (
                         <ListItemButton
                           key={doc.id}
                           selected={draft?.id === doc.id}
-                          onClick={() => setDraft(doc)}
-                          sx={{ borderRadius: 1.5, mt: 0.25 }}
+                          onClick={() => selectDocument(doc)}
+                          sx={{ borderRadius: 0.5 }}
                         >
-                          <ListItemIcon sx={{ minWidth: 28 }}>
-                            <DescriptionRoundedIcon fontSize="small" />
-                          </ListItemIcon>
                           <ListItemText
                             primary={doc.title}
-                            secondary={doc.status}
+                            secondary={`${doc.status}${doc.category_name ? ` · ${doc.category_name}` : ""}`}
                             primaryTypographyProps={{ fontSize: 13 }}
-                          />
-                          <Chip
-                            size="small"
-                            label={doc.status}
-                            color={
-                              doc.status === "published" ? "success" : "default"
-                            }
-                            sx={{ height: 20, fontSize: 10 }}
                           />
                         </ListItemButton>
                       ))}
-                    </>
+                      {!filteredDocs.length && (
+                        <Alert severity="info" sx={{ m: 1 }}>
+                          No articles match “{docSearch}”.
+                        </Alert>
+                      )}
+                    </List>
                   )}
-                </>
-              )}
-              {docSearch && (
-                <List dense>
-                  {filteredDocs.map((doc) => (
-                    <ListItemButton
-                      key={doc.id}
-                      selected={draft?.id === doc.id}
-                      onClick={() => setDraft(doc)}
-                      sx={{ borderRadius: 1.5 }}
-                    >
-                      <ListItemText
-                        primary={doc.title}
-                        secondary={`${doc.status}${doc.category_name ? ` · ${doc.category_name}` : ""}`}
-                        primaryTypographyProps={{ fontSize: 13 }}
-                      />
-                    </ListItemButton>
-                  ))}
-                  {!filteredDocs.length && (
+                  {!categories.length && !docs.length && (
                     <Alert severity="info" sx={{ m: 1 }}>
-                      No articles match “{docSearch}”.
+                      No documentation yet. Create a category or a new document.
                     </Alert>
                   )}
-                </List>
-              )}
-              {!categories.length && !docs.length && (
-                <Alert severity="info" sx={{ m: 1 }}>
-                  No documentation yet. Create a category or a new document.
-                </Alert>
-              )}
-            </Box>
+                </Box>
+              </>
           </Paper>
+          )}
 
           {/* Editor */}
           {!draft ? (
@@ -999,7 +1120,9 @@ export default function DocsPanel() {
                 minHeight: 520,
                 display: "grid",
                 placeItems: "center",
-                borderRadius: 3,
+                borderRadius: 0.5,
+                boxShadow: (t) =>
+                  `inset 0 1px 0 ${t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.85)"}`,
               }}
             >
               <Box textAlign="center">
@@ -1029,7 +1152,13 @@ export default function DocsPanel() {
           ) : (
             <Paper
               variant="outlined"
-              sx={{ p: { xs: 1.25, md: 2 }, borderRadius: 3 }}
+              sx={{
+                p: { xs: 1.25, md: 2 },
+                borderRadius: 0.5,
+                overflow: "hidden",
+                boxShadow: (t) =>
+                  `inset 0 1px 0 ${t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.85)"}`,
+              }}
             >
               <Stack spacing={2}>
                 <Stack
@@ -1040,6 +1169,17 @@ export default function DocsPanel() {
                 >
                   <Box>
                     <Stack direction="row" spacing={1} alignItems="center">
+                      {treeCollapsed && (
+                        <Tooltip title="Expand content tree">
+                          <IconButton
+                            size="small"
+                            onClick={toggleTree}
+                            sx={{ borderRadius: 0.5, border: 1, borderColor: "divider" }}
+                          >
+                            <MenuOpenRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                       <Typography fontWeight={900}>
                         {draft.id ? "Edit article" : "New article"}
                       </Typography>
@@ -1059,6 +1199,17 @@ export default function DocsPanel() {
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={1} flexWrap="wrap">
+                    <Tooltip title={treeCollapsed ? "Show content tree" : "Hide content tree for more writing space"}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={toggleTree}
+                        startIcon={treeCollapsed ? <MenuOpenRoundedIcon /> : <ChevronLeftRoundedIcon />}
+                        sx={{ borderRadius: 0.5, textTransform: "none" }}
+                      >
+                        {treeCollapsed ? "Show tree" : "Hide tree"}
+                      </Button>
+                    </Tooltip>
                     <Button
                       startIcon={<SaveRoundedIcon />}
                       onClick={() => save()}
@@ -1193,7 +1344,7 @@ export default function DocsPanel() {
                 </Box>
 
                 <MarkdownEditor
-                  value={draft.content || ""}
+                  value={typeof draft.content === "string" ? draft.content : (draft.content == null ? "" : String(draft.content))}
                   onChange={(content) => setDraft({ ...draft, content })}
                   assets={assets}
                   onUpload={upload}
@@ -1209,7 +1360,7 @@ export default function DocsPanel() {
         variant="outlined"
         sx={{
           p: 1.25,
-          borderRadius: 2.5,
+          borderRadius: 0.5,
           bgcolor: (t) => alpha(t.palette.primary.main, 0.025),
         }}
       >

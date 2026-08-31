@@ -1,28 +1,15 @@
 import hljs from "highlight.js/lib/common";
+import { escapeHtml, slugifyHeading } from "./markdownShared";
+import {
+  expandCustomInline,
+  tryRenderDirective,
+  isSpecialFence,
+  renderSpecialFence,
+  postProcessHtml,
+  tryDefinitionList,
+} from "./docComponents";
 
-export const escapeHtml = (value = "") =>
-  String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-
-/** Stable, unicode-aware slug for heading anchors (Persian/Arabic included). */
-export const slugifyHeading = (value) => {
-  const text = String(value)
-    .replace(/<[^>]+>/g, "")
-    .replace(/&[a-z#0-9]+;/gi, " ")
-    .trim()
-    .toLowerCase();
-  const slug = text
-    .replace(/[^\p{L}\p{N}\s\-_]/gu, "")
-    .trim()
-    .replace(/[\s_]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  return slug || "section";
-};
+export { escapeHtml, slugifyHeading };
 
 const safeUrl = (value = "") => {
   const url = String(value).trim();
@@ -178,6 +165,8 @@ const inline = (raw, resolveUrl = safeUrl) => {
   s = s.replace(/__([^_]+)__/g, "<strong>$1</strong>");
   s = s.replace(/\*([^*]+)\*/g, "<em>$1</em>");
   s = s.replace(/(?<![\w])_([^_]+)_(?![\w])/g, "<em>$1</em>");
+  // Custom inline: kbd, badge, copy, term
+  s = expandCustomInline(s);
 
   return s;
 };
@@ -230,6 +219,35 @@ const renderTable = (rows, resolveUrl) => {
   return `<div class="doc-table-wrap" dir="auto"><table><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table></div>`;
 };
 
+/**
+ * Minimal sanitizer for live-HTML fences.
+ * Removes script/style/iframe/object/embed/form and on* event handlers.
+ * Allows common presentation tags so docs can embed diagrams, cards, etc.
+ */
+const sanitizeLiveHtml = (raw = "") => {
+  let html = String(raw);
+  // Remove dangerous tags entirely (opening + content + closing when possible)
+  html = html.replace(
+    /<\s*(script|style|iframe|object|embed|form|link|meta|base|svg\s+onload)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
+    ""
+  );
+  html = html.replace(
+    /<\s*(script|style|iframe|object|embed|form|link|meta|base)[^>]*\/?\s*>/gi,
+    ""
+  );
+  // Strip event handlers and javascript: URLs
+  html = html.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  html = html.replace(
+    /\s+(href|src|xlink:href)\s*=\s*(["'])\s*javascript:[^"']*\2/gi,
+    ' $1="#"'
+  );
+  html = html.replace(
+    /\s+(href|src)\s*=\s*javascript:[^\s>]*/gi,
+    ' $1="#"'
+  );
+  return html;
+};
+
 const highlightCode = (raw, langHint) => {
   const normalizedLang = normalizeLanguage(langHint);
   let highlighted = escapeHtml(raw);
@@ -262,10 +280,14 @@ const highlightCode = (raw, langHint) => {
 };
 
 /**
- * Full Markdown → safe HTML renderer.
+ * Full Markdown → safe HTML renderer (Docs-as-Code).
  * Supports: headings (+ id anchors), GFM tables (alignment), fenced code + highlight.js,
- * lists / task lists, callouts, images, audio/video, file chips, internal # links,
- * blockquotes, hr, auto dir for RTL paragraphs.
+ * live HTML fences (```html-render / :::html), lists / task lists, callouts,
+ * images, audio/video, file chips, internal # links, blockquotes, hr,
+ * auto dir for RTL paragraphs.
+ *
+ * Live HTML: ```html-render | ```live-html | ```raw-html | ```html! | :::html
+ * (scripts / iframes / on* handlers stripped).
  *
  * options.resolveUrl(url) — rewrite media/asset URLs (e.g. auth token).
  */
@@ -308,9 +330,39 @@ export function renderMarkdown(markdown = "", options = {}) {
     list = null;
   };
 
+  const alertClass = (kind) => {
+    const k = String(kind || "").toLowerCase();
+    const map = {
+      note: "note",
+      tip: "tip",
+      important: "important",
+      warning: "warning",
+      caution: "danger",
+      danger: "danger",
+    };
+    return map[k] || "note";
+  };
+
+  const alertLabel = (kind) => {
+    const k = String(kind || "").toLowerCase();
+    return ({ note: "Note", tip: "Tip", important: "Important", warning: "Warning", caution: "Caution", danger: "Danger" })[k] || kind;
+  };
+
   const flushQuote = () => {
     if (!quote.length) return;
-    out.push(`<blockquote dir="auto">${renderMarkdown(quote.join("\n"), options)}</blockquote>`);
+    const body = quote.join("\n");
+    // GitHub-style alerts: first line is [!NOTE] / [!IMPORTANT] / ...
+    const m = body.match(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER)\]\s*(.*)$/is);
+    if (m) {
+      const kind = m[1].toLowerCase();
+      const rest = (m[2] || "").replace(/^\n+/, "");
+      const cls = alertClass(kind);
+      out.push(
+        `<aside class="doc-callout doc-callout-${cls}" dir="auto"><strong>${alertLabel(kind)}</strong>${renderMarkdown(rest, options)}</aside>`
+      );
+    } else {
+      out.push(`<blockquote dir="auto">${renderMarkdown(body, options)}</blockquote>`);
+    }
     quote = [];
   };
 
@@ -319,12 +371,19 @@ export function renderMarkdown(markdown = "", options = {}) {
     const trimmed = line.trim();
 
     // Fenced code blocks ``` or ~~~
+    // Special langs that RENDER as live HTML (not highlighted source):
+    //   ```html-render | ```render-html | ```live-html | ```html! | ```raw-html
     if (/^```/.test(trimmed) || /^~~~/.test(trimmed)) {
       flushParagraph();
       flushList();
       flushQuote();
       const marker = trimmed.slice(0, 3);
-      const lang = trimmed.slice(3).trim().split(/\s+/)[0] || "";
+      const langRaw = trimmed.slice(3).trim();
+      const lang = langRaw.split(/\s+/)[0] || "";
+      const langLower = lang.toLowerCase();
+      const isLiveHtml =
+        /^(html-render|render-html|live-html|raw-html|html!)$/i.test(langLower) ||
+        (langLower === "html" && /\brender\b/i.test(langRaw));
       const code = [];
       i += 1;
       while (i < lines.length && !lines[i].trim().startsWith(marker)) {
@@ -332,28 +391,78 @@ export function renderMarkdown(markdown = "", options = {}) {
         i += 1;
       }
       const raw = code.join("\n");
-      const { highlighted, detectedLang } = highlightCode(raw, lang);
-      const lineCount = Math.max(1, raw ? raw.split("\n").length : 1);
-      const languageLabel = `<span class="doc-code-lang">${escapeHtml(lang || detectedLang || "text")}</span>`;
-      out.push(
-        `<div class="doc-code" data-lang="${escapeHtml(detectedLang || "text")}">` +
-          `<div class="doc-code-head">` +
-          `<span class="doc-code-meta">${languageLabel}<span class="doc-code-lines">${lineCount} lines</span></span>` +
-          `<button type="button" class="doc-copy-btn" aria-label="Copy code" title="Copy code">` +
-            `<span class="doc-copy-icon" aria-hidden="true">` +
-              `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">` +
-                `<rect x="9" y="9" width="11" height="11" rx="2"></rect>` +
-                `<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>` +
-              `</svg>` +
-            `</span>` +
-            `<span class="doc-copy-label">Copy</span>` +
-          `</button>` +
-          `</div>` +
-          `<pre><code class="hljs language-${escapeHtml(detectedLang || "text")}">${highlighted}</code></pre>` +
+
+      if (isLiveHtml) {
+        const safeHtml = sanitizeLiveHtml(raw);
+        out.push(
+          `<div class="doc-html">` +
+            `<div class="doc-html-head"><span>Live HTML</span></div>` +
+            `<div class="doc-html-body">${safeHtml}</div>` +
           `</div>`
+        );
+      } else if (isSpecialFence(langLower)) {
+        const special = renderSpecialFence(langLower, raw, highlightCode);
+        if (special) out.push(special);
+      } else {
+        const { highlighted, detectedLang } = highlightCode(raw, lang);
+        const lineCount = Math.max(1, raw ? raw.split("\n").length : 1);
+        const languageLabel = `<span class="doc-code-lang">${escapeHtml(lang || detectedLang || "text")}</span>`;
+        out.push(
+          `<div class="doc-code" data-lang="${escapeHtml(detectedLang || "text")}">` +
+            `<div class="doc-code-head">` +
+            `<span class="doc-code-meta">${languageLabel}<span class="doc-code-lines">${lineCount} lines</span></span>` +
+            `<button type="button" class="doc-copy-btn" aria-label="Copy code" title="Copy code">` +
+              `<span class="doc-copy-icon" aria-hidden="true">` +
+                `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">` +
+                  `<rect x="9" y="9" width="11" height="11" rx="2"></rect>` +
+                  `<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>` +
+                `</svg>` +
+              `</span>` +
+              `<span class="doc-copy-label">Copy</span>` +
+            `</button>` +
+            `</div>` +
+            `<pre><code class="hljs language-${escapeHtml(detectedLang || "text")}">${highlighted}</code></pre>` +
+          `</div>`
+        );
+      }
+      i += 1;
+      continue;
+    }
+
+    // Live HTML block via :::html ... :::
+    if (/^:::html\s*$/i.test(trimmed)) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      const body = [];
+      i += 1;
+      while (i < lines.length && lines[i].trim() !== ":::") {
+        body.push(lines[i]);
+        i += 1;
+      }
+      const safeHtml = sanitizeLiveHtml(body.join("\n"));
+      out.push(
+        `<div class="doc-html">` +
+          `<div class="doc-html-head"><span>Live HTML</span></div>` +
+          `<div class="doc-html-body">${safeHtml}</div>` +
+        `</div>`
       );
       i += 1;
       continue;
+    }
+
+    // Extended ::: directives (tabs, steps, api, …)
+    if (/^:::[a-z]/i.test(trimmed)) {
+      const renderInner = (md) => renderMarkdown(md, options);
+      const dir = tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl);
+      if (dir) {
+        flushParagraph();
+        flushList();
+        flushQuote();
+        out.push(dir.html);
+        i = dir.nextIndex;
+        continue;
+      }
     }
 
     // Callouts :::note / tip / warning / danger
@@ -424,6 +533,39 @@ export function renderMarkdown(markdown = "", options = {}) {
       continue;
     }
 
+    // GitHub / Docs alerts: [!IMPORTANT] title-or-body (standalone, not blockquote)
+    // Also supports multi-line: [!WARNING] on its own line, body until blank line
+    {
+      const alertStart = trimmed.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER)\]\s*(.*)$/i);
+      if (alertStart) {
+        flushParagraph();
+        flushList();
+        flushQuote();
+        const kind = alertStart[1].toLowerCase();
+        const firstRest = (alertStart[2] || "").trim();
+        const body = [];
+        if (firstRest) body.push(firstRest);
+        i += 1;
+        while (i < lines.length) {
+          const n = lines[i];
+          const nt = n.trim();
+          if (!nt) break;
+          if (/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER)\]/i.test(nt)) break;
+          if (/^#{1,6}\s/.test(nt)) break;
+          if (/^:::/.test(nt)) break;
+          if (/^```/.test(nt) || /^~~~/.test(nt)) break;
+          if (/^>\s?/.test(n)) break;
+          body.push(n);
+          i += 1;
+        }
+        const cls = alertClass(kind);
+        out.push(
+          `<aside class="doc-callout doc-callout-${cls}" dir="auto"><strong>${alertLabel(kind)}</strong>${renderMarkdown(body.join("\n"), options)}</aside>`
+        );
+        continue;
+      }
+    }
+
     // Blockquote
     if (/^>\s?/.test(line)) {
       flushParagraph();
@@ -468,6 +610,19 @@ export function renderMarkdown(markdown = "", options = {}) {
       continue;
     }
 
+    // Definition list: Term\n: definition
+    {
+      const dl = tryDefinitionList(lines, i, (t) => inline(t, resolveUrl));
+      if (dl) {
+        flushParagraph();
+        flushList();
+        flushQuote();
+        out.push(dl.html);
+        i = dl.nextIndex;
+        continue;
+      }
+    }
+
     paragraph.push(trimmed);
     i += 1;
   }
@@ -475,36 +630,121 @@ export function renderMarkdown(markdown = "", options = {}) {
   flushParagraph();
   flushList();
   flushQuote();
-  return out.join("\n");
+  const joined = out.join("\n");
+  return postProcessHtml(joined, String(markdown));
 }
 
 export const MARKDOWN_CHEATSHEET = [
   { group: "Structure", label: "Heading", icon: "H", snippet: "## Section title\n" },
-  {
-    group: "Structure",
-    label: "Table",
-    icon: "▦",
-    snippet: "| Column | Value |\n| --- | --- |\n| Item | Value |\n",
-  },
-  {
-    group: "Structure",
-    label: "Aligned table",
-    icon: "☰",
-    snippet: "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n",
-  },
-  { group: "Formatting", label: "Bold", icon: "B", snippet: "**important text**" },
+  { group: "Structure", label: "Table", icon: "▦", snippet: "| Column | Value |\n| --- | --- |\n| Item | Value |\n" },
+  { group: "Structure", label: "TOC", icon: "☰", snippet: ":::toc\n:::\n" },
+  { group: "Structure", label: "Anchors menu", icon: "↕", snippet: ":::anchors h2\n:::\n" },
+  { group: "Structure", label: "Breadcrumb", icon: "›", snippet: ":::breadcrumb Home > API > Auth\n:::\n" },
+  { group: "Structure", label: "Reading time", icon: "⏱", snippet: ":::reading-time\n:::\n" },
+  { group: "Structure", label: "Meta bar", icon: "i", snippet: ":::meta author=Team updated=2026-08-31 tags=api,guide\n:::\n" },
+  { group: "Structure", label: "Page nav", icon: "⇔", snippet: ":::nav prev=intro|Introduction next=auth|Authentication\n:::\n" },
+  { group: "Structure", label: "Steps", icon: "1", snippet: ":::steps\n1. Install\n   Details here\n2. Configure\n3. Run\n:::\n" },
+  { group: "Structure", label: "Tabs", icon: "◫", snippet: ":::tabs\n=== JavaScript\n`npm i pkg`\n=== Python\n`pip install pkg`\n:::\n" },
+  { group: "Structure", label: "Accordion", icon: "▾", snippet: ":::details FAQ title\nHidden content\n:::\n" },
+  { group: "Structure", label: "Cards", icon: "▦", snippet: ":::cards\n=== Feature A\nDescription\n=== Feature B\nDescription\n:::\n" },
+  { group: "Structure", label: "Compare", icon: "▥", snippet: ":::compare Free | Pro\n=== Free\n- Basic\n=== Pro\n- Advanced\n:::\n" },
+  { group: "Structure", label: "Timeline", icon: "∴", snippet: ":::timeline\n2026-01-01 — Launch\nInitial release\n2026-06-01 — v2\nMajor update\n:::\n" },
+  { group: "Formatting", label: "Bold", icon: "B", snippet: "**important**" },
   { group: "Formatting", label: "Italic", icon: "I", snippet: "*emphasis*" },
   { group: "Formatting", label: "Strike", icon: "S", snippet: "~~removed~~" },
   { group: "Formatting", label: "Link", icon: "↗", snippet: "[label](https://example.com)" },
-  { group: "Formatting", label: "Anchor link", icon: "#", snippet: "[Jump to section](#section-title)" },
+  { group: "Formatting", label: "Kbd", icon: "⌨", snippet: "[[kbd:Ctrl+K]]" },
+  { group: "Formatting", label: "Badge", icon: "●", snippet: "[[badge:success New]]" },
+  { group: "Formatting", label: "Copy value", icon: "⧉", snippet: "[[copy:sk_live_xxx]]" },
+  { group: "Formatting", label: "Term", icon: "?", snippet: "[[term:OAuth]]" },
   { group: "Code", label: "Code block", icon: "</>", snippet: "```js\nconsole.log('hello')\n```\n" },
-  { group: "Code", label: "Inline code", icon: "`", snippet: "`value`" },
-  { group: "Content", label: "Image from library", icon: "▧", action: "library-image" },
-  { group: "Content", label: "File from library", icon: "↓", action: "library-file" },
-  { group: "Content", label: "Audio from library", icon: "♫", action: "library-audio" },
-  { group: "Content", label: "Video from library", icon: "▶", action: "library-video" },
-  { group: "Content", label: "Callout", icon: "!", snippet: ":::note\nUseful information.\n:::\n" },
+  { group: "Code", label: "Terminal", icon: "$", snippet: "```terminal\n$ npm install\n+ pkg@1.0.0\n```\n" },
+  { group: "Code", label: "Output", icon: "◀", snippet: "```output\n{ \"ok\": true }\n```\n" },
+  { group: "Code", label: "Diff", icon: "±", snippet: "```diff\n- old\n+ new\n```\n" },
+  { group: "Code", label: "Code group", icon: "{ }", snippet: ":::code-group\n=== index.js\n```js\nexport default 1\n```\n=== index.ts\n```ts\nexport default 1\n```\n:::\n" },
+  { group: "Code", label: "Live HTML", icon: "<>", snippet: "```html-render\n<div style=\"padding:12px;border:1px solid #334155\">Hello</div>\n```\n" },
+  { group: "Code", label: "Mermaid", icon: "⬡", snippet: "```mermaid\nflowchart LR\n  A-->B\n```\n" },
+  { group: "API", label: "API endpoint", icon: "API", snippet: ":::api GET /v1/users\nReturns a list of users.\n:::\n" },
+  { group: "API", label: "Env table", icon: "ENV", snippet: ":::env\nAPI_KEY · yes · — · Secret key\nDEBUG · no · false · Verbose logs\n:::\n" },
+  { group: "API", label: "Props table", icon: "P", snippet: ":::props\nid · string · — · Unique id\nsize · number · 16 · Icon size\n:::\n" },
+  { group: "API", label: "File tree", icon: "🌳", snippet: ":::tree\nsrc/\n  components/\n    App.jsx\n  index.js\n:::\n" },
+  { group: "API", label: "Matrix", icon: "⊞", snippet: ":::matrix\n| Feature | Free | Pro |\n| --- | --- | --- |\n| API | ✓ | ✓ |\n| SSO | ✗ | ✓ |\n:::\n" },
+  { group: "Callouts", label: "Note", icon: "!", snippet: ":::note\nUseful information.\n:::\n" },
+  { group: "Callouts", label: "Tip", icon: "✓", snippet: ":::tip\nHelpful tip.\n:::\n" },
+  { group: "Callouts", label: "Warning", icon: "⚠", snippet: ":::warning\nBe careful.\n:::\n" },
+  { group: "Callouts", label: "Danger", icon: "✕", snippet: ":::danger\nDestructive action.\n:::\n" },
+  { group: "Callouts", label: "Deprecated", icon: "⛔", snippet: ":::deprecated since=2.0 use=newApi\nOld endpoint removed soon.\n:::\n" },
+  { group: "Callouts", label: "Security", icon: "🔒", snippet: ":::security critical\nRotate keys immediately.\n:::\n" },
+  { group: "Callouts", label: "Best practice", icon: "★", snippet: ":::best-practice\nPrefer idempotent writes.\n:::\n" },
+  { group: "Callouts", label: "Example", icon: "✓", snippet: ":::example\nCorrect usage.\n:::\n" },
+  { group: "Callouts", label: "Anti-example", icon: "✗", snippet: ":::anti-example\nAvoid this pattern.\n:::\n" },
+  { group: "Callouts", label: "Draft", icon: "✎", snippet: ":::draft\nWork in progress.\n:::\n" },
+  { group: "Callouts", label: "Changelog", icon: "📦", snippet: ":::changelog 1.2.0 2026-08-01\n- Added tabs\n- Fixed anchors\n:::\n" },
+  { group: "Media", label: "Image library", icon: "▧", action: "library-image" },
+  { group: "Media", label: "File library", icon: "↓", action: "library-file" },
+  { group: "Media", label: "Audio library", icon: "♫", action: "library-audio" },
+  { group: "Media", label: "Video library", icon: "▶", action: "library-video" },
+  { group: "Media", label: "Figure", icon: "▣", snippet: ":::figure\n![Alt](url)\nCaption text\n:::\n" },
+  { group: "Media", label: "Download", icon: "⬇", snippet: ":::download /files/spec.pdf API Spec PDF\n:::\n" },
+  { group: "Media", label: "Embed YT", icon: "▶", snippet: ":::embed youtube dQw4w9WgXcQ\n:::\n" },
+  { group: "Media", label: "QR code", icon: "▦", snippet: ":::qr https://example.com/app\n:::\n" },
+  { group: "Content", label: "Definition", icon: "≡", snippet: "OAuth\n: Open protocol for authorization\n" },
+  { group: "Content", label: "Spoiler", icon: "▒", snippet: ":::spoiler Answer\n42\n:::\n" },
+  { group: "Content", label: "Related", icon: "→", snippet: ":::related\n[Auth guide](/docs/auth) — tokens\n[Errors](/docs/errors)\n:::\n" },
+  { group: "Content", label: "Feedback", icon: "?", snippet: ":::feedback\n:::\n" },
+  { group: "Content", label: "Author", icon: "☺", snippet: ":::author @team\nPlatform engineering\n:::\n" },
+  { group: "Content", label: "Progress", icon: "%", snippet: ":::progress 70\nRoadmap complete\n:::\n" },
+  { group: "Content", label: "Date", icon: "📅", snippet: ":::date 2026-12-01\n:::\n" },
+  { group: "Content", label: "i18n note", icon: "文", snippet: ":::i18n فارسی\n:::\n" },
   { group: "Content", label: "Quote", icon: "❝", snippet: "> Useful note\n" },
   { group: "Lists", label: "Bullet list", icon: "•", snippet: "- First item\n- Second item\n" },
   { group: "Lists", label: "Task list", icon: "☑", snippet: "- [ ] Todo\n- [x] Done\n" },
 ];
+
+/** Full syntax reference for admin — paste into a doc or open from helper */
+export const DOCS_COMPONENT_REFERENCE = `# Docs-as-Code component reference
+
+:::meta author=Docs Team updated=2026-08-31 tags=markdown,components
+:::
+
+:::reading-time
+:::
+
+:::note
+Every custom block available in the admin Markdown editor is listed below. Use **Ctrl/Cmd+K** in the editor to insert snippets.
+:::
+
+## Inline tokens
+
+| Token | Syntax |
+| --- | --- |
+| Keyboard | [[kbd:Ctrl+K]] |
+| Badge | [[badge:success New]] |
+| Copy value | [[copy:sk_live_xxx]] |
+| Term | [[term:OAuth]] |
+
+## Layout blocks
+
+Tabs, Accordion (\`:::details\`), Steps, Cards, Compare, Timeline, TOC (\`:::toc\`), Anchors (\`:::anchors h2\`), Breadcrumb, Page nav, Reading time, Meta bar.
+
+## API & code
+
+\`:::api GET /path\`, \`:::env\`, \`:::props\`, \`:::tree\`, \`:::matrix\`, \`:::code-group\`
+
+Fences: \`\`\`terminal\` \`\`\`output\` \`\`\`diff\` \`\`\`mermaid\` \`\`\`html-render\` \`\`\`math\`
+
+## Callouts
+
+\`:::note\` \`:::tip\` \`:::warning\` \`:::danger\` \`:::deprecated\` \`:::security\` \`:::best-practice\` \`:::example\` \`:::anti-example\` \`:::draft\` \`:::changelog\`
+
+## Media
+
+\`:::figure\` \`:::download\` \`:::embed youtube ID\` \`:::qr URL\`
+
+## Other
+
+Definition lists, \`:::spoiler\`, \`:::related\`, \`:::feedback\`, \`:::author\`, \`:::progress\`, \`:::date\`, \`:::i18n\`
+
+:::feedback
+:::
+`;
