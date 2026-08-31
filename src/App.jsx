@@ -27,6 +27,7 @@ const Volumes = lazy(() => import("./components/volumes/Volumes.jsx"));
 const Networks = lazy(() => import("./components/networks/Networks.jsx"));
 import FloatingNav from "./components/layout/FloatingNav";
 import NotFound from "./components/not_found/NotFound.jsx";
+const DocsHome = lazy(() => import("./components/docs/DocsHome.jsx"));
 
 const TicketList = lazy(() => import("./components/tickets/TicketList.jsx"));
 const CreateTicket = lazy(() => import("./components/tickets/CreateTicket.jsx"));
@@ -411,6 +412,10 @@ export function App() {
                 }
               />
             </Route>
+
+            {/* Documentation workspace — intentionally outside the public site layout */}
+            <Route path="/docs" element={<DocsHome />} />
+            <Route path="/docs/:slug" element={<DocsHome />} />
 
             {/* Messenger */}
 

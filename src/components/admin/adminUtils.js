@@ -286,6 +286,7 @@ const TAB_RULES = {
   codes: "auth_codes.view",
   emails: "emails.manage",
   tables: "tables.view",
+  docs: "docs.manage",
 };
 
 export function canSeeNav(tabId) {
@@ -331,7 +332,7 @@ export function getAllPermissionCodes() {
         "deploys.manage", "volumes.manage", "networks.manage",
         "plans.view", "plans.manage",
         "login_settings.view", "login_settings.manage",
-        "tables.view", "tables.manage",
+        "tables.view", "tables.manage", "docs.manage",
       ];
 }
 

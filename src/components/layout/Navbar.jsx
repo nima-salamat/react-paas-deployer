@@ -50,6 +50,7 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightnessOutlined";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 
 import { useProfiles, resolveProfileImageUrl } from "../profile/profile.jsx";
 
@@ -58,6 +59,7 @@ const DEFAULT_ICON = "/icon.svg";
 
 const baseNavItems = [
   { path: "/", label: "Home", icon: HomeOutlinedIcon, guest: true },
+  { path: "/docs", label: "Docs", icon: MenuBookOutlinedIcon, guest: true },
   { path: "/services", label: "Services", icon: MiscellaneousServicesOutlinedIcon, guest: false },
   { path: "/volumes", label: "Volumes", icon: Inventory2OutlinedIcon, guest: false },
   { path: "/networks", label: "Networks", icon: LanOutlinedIcon, guest: false },

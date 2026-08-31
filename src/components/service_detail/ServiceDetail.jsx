@@ -1702,9 +1702,12 @@ export default function ServiceDetail() {
   };
 
   const openServiceInNewTab = () => {
-    if (!service?.service_name) return;
-    const host = `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`;
-    window.open(`http://${host}`, "_blank", "noopener,noreferrer");
+    const host = service?.service_host || (service?.service_name
+      ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`
+      : "");
+    if (!host) return;
+    const url = /^https?:\/\//i.test(host) ? host : `https://${host}`;
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const tabLabelMap = {

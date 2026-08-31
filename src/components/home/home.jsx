@@ -1153,10 +1153,11 @@ export default function Home() {
         />
 
         <Container
-          maxWidth="lg"
+          maxWidth={false}
           sx={{
             position: "relative",
             zIndex: 2,
+            px: { xs: 2, sm: 3, md: 6, lg: 8, xl: 10 },
           }}
         >
           <Box>
@@ -1278,7 +1279,7 @@ export default function Home() {
                   component="h1"
                   sx={{
                     mt: 3.2,
-                    maxWidth: 980,
+                    maxWidth: 1100,
                     fontSize: {
                       xs: "2.7rem",
                       sm: "3.8rem",
@@ -1294,7 +1295,7 @@ export default function Home() {
                 >
                   Deploy faster.
                   <br />
-                  Manage more. Worry less.
+                  Scale smarter. Ship with confidence.
                 </Typography>
               </motion.div>
 
@@ -1315,23 +1316,25 @@ export default function Home() {
                 }}
               >
                 <Typography
+                  component="h2"
                   sx={{
                     mt: 2.5,
-                    maxWidth: 670,
+                    maxWidth: 720,
                     fontSize: {
                       xs: "0.98rem",
                       sm: "1.05rem",
-                      md: "1.12rem",
+                      md: "1.15rem",
                     },
                     lineHeight:
                       1.8,
                     color:
                       "text.secondary",
+                    fontWeight: 450,
                   }}
                 >
-                  <strong>Deploy and manage applications</strong> without the usual infrastructure busywork.
-                  Create services quickly, choose the resources you need, connect networks,
-                  keep persistent volumes, and change plans whenever your workload grows.
+                  A focused platform to <strong>deploy and manage applications</strong> without
+                  infrastructure busywork. Create services, pick CPU and memory, attach volumes,
+                  connect networks, and grow your plan when the workload demands it.
                 </Typography>
               </motion.div>
 
@@ -1435,6 +1438,29 @@ export default function Home() {
                     }}
                   >
                     Explore platform
+                  </Button>
+
+                  <Button
+                    variant="text"
+                    size="large"
+                    onClick={() =>
+                      navigate("/docs")
+                    }
+                    endIcon={
+                      <EastRoundedIcon />
+                    }
+                    sx={{
+                      minWidth: 160,
+                      minHeight: 52,
+                      px: 2.5,
+                      borderRadius: 3,
+                      textTransform:
+                        "none",
+                      fontWeight:
+                        750,
+                    }}
+                  >
+                    Read the docs
                   </Button>
                 </Stack>
               </motion.div>
@@ -1873,7 +1899,7 @@ export default function Home() {
           }
         />
 
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <SectionReveal>
             <Stack
               alignItems="center"
@@ -1881,6 +1907,7 @@ export default function Home() {
               spacing={1.5}
             >
               <Typography
+                component="h6"
                 sx={{
                   color:
                     "primary.main",
@@ -1893,13 +1920,13 @@ export default function Home() {
                     "uppercase",
                 }}
               >
-                HOW IT WORKS
+                How it works
               </Typography>
 
               <Typography
                 component="h2"
                 sx={{
-                  maxWidth: 750,
+                  maxWidth: 820,
                   fontSize: {
                     xs: "2.15rem",
                     md: "3.35rem",
@@ -1913,7 +1940,7 @@ export default function Home() {
               >
                 Your application.
                 <br />
-                One simple place to run it.
+                One place to run and grow it.
               </Typography>
 
               <Typography
@@ -2547,7 +2574,7 @@ export default function Home() {
           py: { xs: 8, md: 11 },
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Paper
             elevation={0}
             sx={{
@@ -2645,7 +2672,7 @@ export default function Home() {
           }
         />
 
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <SectionReveal>
             <Stack
               direction={{
@@ -2997,7 +3024,7 @@ export default function Home() {
           },
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <SectionReveal>
             <Box
               sx={{
@@ -3145,7 +3172,7 @@ export default function Home() {
             subtleBorder,
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <SectionReveal>
             <Stack
               direction={{
@@ -3462,7 +3489,7 @@ export default function Home() {
           py: { xs: 9, md: 14 },
         }}
       >
-        <Container maxWidth="md">
+        <Container maxWidth="lg">
           <SectionReveal>
             <Box sx={{ textAlign: "center", mb: { xs: 5, md: 7 } }}>
               <Typography
@@ -3555,7 +3582,7 @@ export default function Home() {
           }
         />
 
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Paper
             elevation={0}
             sx={{
@@ -3926,7 +3953,7 @@ export default function Home() {
           },
         }}
       >
-        <Container maxWidth="md">
+        <Container maxWidth="lg">
           <SectionReveal>
             <Box
               sx={{
@@ -4079,7 +4106,7 @@ export default function Home() {
           pb: 3,
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Divider
             sx={{
               borderColor:

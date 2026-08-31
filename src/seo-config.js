@@ -17,6 +17,11 @@ export const PUBLIC_PAGES = {
     description:
       "Learn how PassDeployer simplifies application deployment and day-to-day service management with a focused developer platform.",
   },
+  "/docs": {
+    title: "Documentation | PassDeployer",
+    description:
+      "Guides, references and how-tos for deploying and managing applications on PassDeployer.",
+  },
 };
 
 export const NOINDEX_PREFIXES = [

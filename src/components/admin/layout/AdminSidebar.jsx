@@ -18,6 +18,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import MenuBookRoundedIcon from "@mui/icons-material/MenuBookRounded";
 import { canSeeNav, isSessionSuperuser, isSessionStaff, authMediaSrc } from "../adminUtils";
 
 const NAV_ITEMS = [
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { id: "services", label: "Services", icon: <DnsIcon fontSize="small" />, shortcut: "4" },
   { id: "plans", label: "Plans", icon: <StorageIcon fontSize="small" />, shortcut: "5" },
   { id: "tables", label: "DB tables", icon: <TableChartIcon fontSize="small" />, shortcut: "6" },
+  { id: "docs", label: "Documentation", icon: <MenuBookRoundedIcon fontSize="small" />, shortcut: "D" },
   { id: "login", label: "Login system", icon: <SettingsIcon fontSize="small" />, shortcut: "7" },
   { id: "invites", label: "Invites", icon: <LinkIcon fontSize="small" />, shortcut: "8" },
   { id: "codes", label: "Auth codes", icon: <VpnKeyIcon fontSize="small" />, shortcut: "9" },

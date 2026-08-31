@@ -28,6 +28,7 @@ import InvitesPanel from "./panels/InvitesPanel.jsx";
 import AuthCodesPanel from "./panels/AuthCodesPanel.jsx";
 import EmailsPanel from "./panels/EmailsPanel.jsx";
 import ProfilePanel from "./panels/ProfilePanel.jsx";
+import DocsPanel from "./panels/docs/DocsPanel.jsx";
 
 const PAGE_TITLES = {
   overview: "Overview",
@@ -41,6 +42,7 @@ const PAGE_TITLES = {
   codes: "Auth codes",
   emails: "Email",
   profile: "My profile",
+  docs: "Documentation",
 };
 
 /** Alt+key → tab id */
@@ -56,6 +58,7 @@ const SHORTCUT_MAP = {
   "9": "codes",
   "0": "emails",
   p: "profile",
+  d: "docs",
   P: "profile",
   "[": "__collapse__",
 };
@@ -423,6 +426,7 @@ function AdminDashboardInner() {
           {tab === "plans" && canSeeNav("plans") && <PlansPanel />}
           {tab === "login" && canSeeNav("login") && <LoginSettingsPanel />}
           {tab === "tables" && canSeeNav("tables") && <TablesPanel />}
+          {tab === "docs" && canSeeNav("docs") && <DocsPanel />}
         </Box>
       </Box>
 
