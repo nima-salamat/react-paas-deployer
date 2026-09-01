@@ -14,12 +14,14 @@ import Inventory2Icon from "@mui/icons-material/Inventory2";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import SubjectIcon from "@mui/icons-material/Subject";
 import SettingsIcon from "@mui/icons-material/Settings";
+import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
 
 const ALL_TABS = [
   { value: "overview", label: "Overview", icon: <Inventory2Icon fontSize="small" /> },
   { value: "create", label: "Create deploy", icon: <AddCircleOutlineIcon fontSize="small" /> },
   { value: "logs", label: "Logs", icon: <SubjectIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsIcon fontSize="small" /> },
+  { value: "shell", label: "Shell", icon: <TerminalRoundedIcon fontSize="small" /> },
 ];
 
 export default function TabSidebar({

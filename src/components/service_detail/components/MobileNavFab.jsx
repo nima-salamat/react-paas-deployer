@@ -21,6 +21,7 @@ import Inventory2Icon from "@mui/icons-material/Inventory2";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import SubjectIcon from "@mui/icons-material/Subject";
 import SettingsIcon from "@mui/icons-material/Settings";
+import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
 import CloseIcon from "@mui/icons-material/Close";
 import HubIcon from "@mui/icons-material/Hub";
 import StorageIcon from "@mui/icons-material/Storage";
@@ -31,6 +32,7 @@ const ALL_TABS = [
   { value: "create", label: "Deploys", icon: <AddCircleOutlineIcon /> },
   { value: "logs", label: "Logs", icon: <SubjectIcon /> },
   { value: "settings", label: "Settings", icon: <SettingsIcon /> },
+  { value: "shell", label: "Shell", icon: <TerminalRoundedIcon /> },
 ];
 
 /**

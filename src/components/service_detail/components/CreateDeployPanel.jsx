@@ -24,6 +24,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import SearchIcon from "@mui/icons-material/Search";
 import axios from "axios";
+import ConfigBuilder from "./ConfigBuilder";
 
 export default function CreateDeployPanel({
   formState,
@@ -392,14 +393,13 @@ export default function CreateDeployPanel({
               >
                 {["username", "password", "root_password", "database", "port"].map(
                   (field) => {
-                    const isPasswordField = field === "password" || field === "root_password";
                     const editing = Boolean(editingDeployId);
                     return (
                       <TextField
                         key={field}
                         fullWidth
                         size="small"
-                        type={isPasswordField ? "password" : "text"}
+                        type="text"
                         label={field.replace(/_/g, " ")}
                         placeholder={
                           (isPasswordField && editing)
@@ -446,27 +446,22 @@ export default function CreateDeployPanel({
             </Box>
           ) : (
             <>
-              <TextField
-                fullWidth
-                label="Config (JSON)"
-                size="small"
-                multiline
-                rows={6}
-                value={
+              <ConfigBuilder
+                platform={effectivePlatform}
+                configText={
                   editingDeployId
-                    ? typeof editData.config === "object" &&
-                      editData.config !== null
-                      ? JSON.stringify(editData.config, null, 2)
+                    ? typeof editData.config === "object" && editData.config !== null
+                      ? JSON.stringify(editData.config)
                       : editData.config || ""
                     : config
                 }
-                onChange={(e) =>
+                onChange={(value) =>
                   editingDeployId
-                    ? setEditData((d) => ({ ...d, config: e.target.value }))
-                    : setConfig(e.target.value)
+                    ? setEditData((d) => ({ ...d, config: value }))
+                    : setConfig(value)
                 }
-                helperText='Optional JSON. "platform" is set automatically for app deploys.'
-                sx={{ mb: 1.5 }}
+                inspectResult={inspectResult}
+                disabled={submitting || Boolean(actionState[editingDeployId]?.updating)}
               />
 
               <Box

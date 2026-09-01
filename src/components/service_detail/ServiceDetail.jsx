@@ -26,6 +26,7 @@ import CreateDeployPanel from "./components/CreateDeployPanel";
 import LogsPanel from "./components/LogsPanel";
 import ServiceToolbar from "./components/ServiceToolbar";
 import SettingsPanel from "./components/SettingsPanel";
+import ShellPanel from "./components/ShellPanel";
 import MobileNavFab from "./components/MobileNavFab";
 import MobileServiceHeader from "./components/MobileServiceHeader";
 
@@ -219,7 +220,7 @@ export default function ServiceDetail() {
   const allowedTabs = useMemo(() => {
     if (shareAccess.loading) return ["overview"];
     if (shareAccess.is_owner) {
-      return ["overview", "create", "logs", "settings"];
+      return ["overview", "create", "logs", "settings", "shell"];
     }
     const p = shareAccess.permissions || {};
     const tabs = ["overview"];
@@ -227,6 +228,7 @@ export default function ServiceDetail() {
     if (p.can_deploy_add) tabs.push("create");
     if (p.can_view_logs || p.can_view_deploy_logs) tabs.push("logs");
     if (p.can_change_config || p.can_network_change || p.can_volume_attach || p.can_volume_add) tabs.push("settings");
+    if (p.can_shell) tabs.push("shell");
     return tabs;
   }, [shareAccess]);
 
@@ -974,11 +976,30 @@ export default function ServiceDetail() {
   }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAttachedVolumes]);
 
   useEffect(() => {
-    if (refreshIntervalRef.current) { clearInterval(refreshIntervalRef.current); refreshIntervalRef.current = null; }
-    if (!id || !refreshIntervalMs || refreshIntervalMs < 1000) return undefined;
-    refreshIntervalRef.current = setInterval(() => { silentRefresh(); }, refreshIntervalMs);
-    return () => { if (refreshIntervalRef.current) { clearInterval(refreshIntervalRef.current); refreshIntervalRef.current = null; } };
-  }, [id, refreshIntervalMs, silentRefresh]);
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
+
+    // The Shell is stateful (terminal history, cwd, open files, editor buffers).
+    // Do not let the page-level service poll churn its parent state while the
+    // user is actively working in the shell. ShellPanel owns its own refreshes.
+    if (!id || activeTab === "shell" || !refreshIntervalMs || refreshIntervalMs < 1000) {
+      return undefined;
+    }
+
+    refreshIntervalRef.current = setInterval(() => {
+      if (document.hidden) return;
+      silentRefresh();
+    }, refreshIntervalMs);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+        refreshIntervalRef.current = null;
+      }
+    };
+  }, [id, activeTab, refreshIntervalMs, silentRefresh]);
 
   const openConfirm = (type, deployId, title, message) => setConfirmDialog({ open: true, type, deployId, title, message, loading: false });
   const closeConfirm = () => setConfirmDialog({ open: false, type: null, deployId: null, title: "", message: "", loading: false });
@@ -1715,6 +1736,7 @@ export default function ServiceDetail() {
     create: "Deploys",
     logs: "Logs",
     settings: "Settings",
+    shell: "Shell",
   };
 
   return (
@@ -1840,6 +1862,13 @@ export default function ServiceDetail() {
               isDesktop={isDesktop}
               handleDownloadEntries={handleDownloadEntries}
               handleCopyEntries={handleCopyEntries}
+            />
+          )}
+
+          {activeTab === "shell" && (
+            <ShellPanel
+              service={service}
+              enabled={Boolean(shareAccess.is_owner || shareAccess.permissions?.can_shell)}
             />
           )}
 
