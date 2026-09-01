@@ -127,6 +127,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [helperRect, setHelperRect] = useState({ left: 12, top: 20 });
   const helperRef = useRef(null);
   const [helperMode, setHelperMode] = useState("commands");
+  const [interactiveRunning, setInteractiveRunning] = useState(false);
+  const [interactiveInput, setInteractiveInput] = useState("");
+  const [interactiveSecret, setInteractiveSecret] = useState(false);
+  const shellSocketRef = useRef(null);
 
   const terminalRef = useRef(null);
   const terminalInputRef = useRef(null);
@@ -240,6 +244,75 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     loadCommandCatalog();
   }, [loadCommandCatalog, refreshDirectory, session?.token]);
 
+  useEffect(() => {
+    const shellToken = session?.token;
+    const accessToken = typeof window !== "undefined" ? localStorage.getItem("access") : null;
+    if (!shellToken || !accessToken || !serviceId) return undefined;
+
+    const base = typeof window !== "undefined" ? window.location : null;
+    if (!base) return undefined;
+    const protocol = base.protocol === "https:" ? "wss:" : "ws:";
+    const backendUrl = (() => {
+      try {
+        const configured = process.env.REACT_APP_API_URL || base.origin;
+        return new URL(configured, base.origin);
+      } catch {
+        return base;
+      }
+    })();
+    const socketUrl = `${protocol}//${backendUrl.host}/ws/services/shell/${serviceId}/?token=${encodeURIComponent(accessToken)}&shell_token=${encodeURIComponent(shellToken)}`;
+    const socket = new WebSocket(socketUrl);
+    shellSocketRef.current = socket;
+
+    socket.onopen = () => appendHistory({ type: "system", text: "Interactive PTY connected." });
+    socket.onmessage = (event) => {
+      let message;
+      try { message = JSON.parse(event.data); } catch { return; }
+      if (message.type === "ready") {
+        setSession((prev) => prev ? { ...prev, cwd: message.cwd || prev.cwd, platform: message.platform || prev.platform } : prev);
+        return;
+      }
+      if (message.type === "process.started") {
+        setInteractiveRunning(true);
+        setInteractiveInput("");
+        setInteractiveSecret(false);
+        return;
+      }
+      if (message.type === "process.output") {
+        const text = cleanOutput(message.data);
+        if (text) appendHistory({ type: "output", stdout: text, stderr: "", exitCode: null });
+        if (/password\s*:/i.test(text)) setInteractiveSecret(true);
+        return;
+      }
+      if (message.type === "process.exit") {
+        setInteractiveRunning(false);
+        setInteractiveInput("");
+        setInteractiveSecret(false);
+        appendHistory({ type: "output", stdout: "", stderr: message.exit_code && message.exit_code !== 0 ? `Process exited with code ${message.exit_code}` : "", exitCode: message.exit_code ?? 0 });
+        focusTerminal();
+        return;
+      }
+      if (message.type === "confirm_required") {
+        appendHistory({ type: "error", text: message.message || "Confirmation is required." });
+        return;
+      }
+      if (message.type === "error") {
+        appendHistory({ type: "error", text: message.message || "Interactive shell error." });
+      }
+    };
+    socket.onerror = () => appendHistory({ type: "error", text: "Interactive PTY connection failed. Basic command API remains available." });
+    socket.onclose = () => {
+      shellSocketRef.current = null;
+      setInteractiveRunning(false);
+      setInteractiveInput("");
+      setInteractiveSecret(false);
+    };
+    return () => {
+      try { socket.close(); } catch { /* noop */ }
+      if (shellSocketRef.current === socket) shellSocketRef.current = null;
+    };
+  }, [appendHistory, focusTerminal, serviceId, session?.token]);
+
   const createSession = useCallback(async () => {
     if (!serviceId || !enabled || sessionLoading || session) return;
     setSessionLoading(true);
@@ -301,40 +374,112 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     setHistory((prev) => [...prev, { id: `${Date.now()}-close`, type: "system", text: "Shell disconnected." }].slice(-HISTORY_LIMIT));
   }, [apiRoot, session?.token]);
 
+  const contextualCommands = useMemo(() => {
+    const common = [
+      { command: "pwd", display: "pwd", label: "command" },
+      { command: "ls", display: "ls", label: "command" },
+      { command: "ls -la", display: "ls -la", label: "command" },
+      { command: "whoami", display: "whoami", label: "command" },
+      { command: "php -v", display: "php -v", label: "PHP" },
+      { command: "php --ini", display: "php --ini", label: "PHP" },
+      { command: "php artisan", display: "php artisan", label: "Laravel" },
+    ];
+    const php = [
+      { command: "php artisan", display: "php artisan", label: "Laravel" },
+      { command: "php -v", display: "php -v", label: "PHP" },
+      { command: "php --ini", display: "php --ini", label: "PHP" },
+      { command: "php -m", display: "php -m", label: "PHP" },
+      { command: "php -i", display: "php -i", label: "PHP" },
+    ];
+    const artisanNames = [
+      "about", "list", "help", "route:list", "migrate:status", "route:clear", "view:clear",
+      "config:clear", "cache:clear", "optimize", "optimize:clear", "schedule:list", "storage:link",
+    ];
+    const artisan = artisanNames.map((name) => ({ command: `php artisan ${name}`, display: `php artisan ${name}`, label: "Artisan" }));
+    const node = [
+      { command: "npm -v", display: "npm -v", label: "Node" },
+      { command: "npm run", display: "npm run", label: "npm" },
+      { command: "npm run build", display: "npm run build", label: "npm" },
+      { command: "node -v", display: "node -v", label: "Node" },
+    ];
+    const python = [
+      { command: "python --version", display: "python --version", label: "Python" },
+      { command: "python manage.py check", display: "python manage.py check", label: "Django" },
+      { command: "python manage.py migrate", display: "python manage.py migrate", label: "Django" },
+      { command: "python manage.py showmigrations", display: "python manage.py showmigrations", label: "Django" },
+    ];
+    if (platform === "laravel") return [...common, ...php, ...artisan, ...node];
+    if (platform === "php") return [...common, ...php];
+    if (platform === "django" || platform === "python") return [...common, ...python];
+    if (platform === "node") return [...common, ...node];
+    return common;
+  }, [platform]);
+
   const commandContext = useMemo(() => {
     const value = String(command || "");
     const trimmed = value.trimStart();
     const parts = trimmed.split(/\s+/).filter(Boolean);
-    return {
+    const lastToken = value.match(/(?:^|\s)([^\s]*)$/)?.[1] || "";
+    const commandWord = (parts[0] || "").toLowerCase();
+    const secondWord = (parts[1] || "").toLowerCase();
+    const base = {
       value,
       trimmed,
-      commandWord: (parts[0] || "").toLowerCase(),
-      token: value.match(/(?:^|\s)([^\s]*)$/)?.[1] || "",
+      parts,
+      commandWord,
+      secondWord,
+      token: lastToken,
+      hasTrailingSpace: /\s$/.test(value),
     };
+    return base;
   }, [command]);
 
   const completionSuggestions = useMemo(() => {
-    const { trimmed, commandWord, token } = commandContext;
-    if (helperMode === "commands" && !trimmed) return commandCatalog.slice(0, 16);
-
-    if (commandWord === "cd") {
-      const prefix = token.toLowerCase();
-      return tree
-        .filter((item) => item.directory && item.name.toLowerCase().startsWith(prefix))
-        .map((item) => ({ command: item.name, display: `${item.name}/`, label: "directory", description: `cd into ${item.name}` }));
+    const { trimmed, commandWord, secondWord, token, hasTrailingSpace } = commandContext;
+    if (helperMode === "paths") {
+      if (commandWord === "cd") {
+        const prefix = hasTrailingSpace ? "" : token.toLowerCase();
+        return tree
+          .filter((item) => item.directory && item.name.toLowerCase().startsWith(prefix))
+          .map((item) => ({ command: item.name, display: `${item.name}/`, label: "directory", description: `cd into ${item.name}` }));
+      }
+      if (["nano", "vi", "vim"].includes(commandWord)) {
+        const prefix = hasTrailingSpace ? "" : token.toLowerCase();
+        return tree
+          .filter((item) => !item.directory && item.name.toLowerCase().startsWith(prefix))
+          .map((item) => ({ command: item.name, display: item.name, label: "file", description: "open in editor" }));
+      }
     }
 
-    if (commandWord === "nano" || commandWord === "vi" || commandWord === "vim") {
-      const prefix = token.toLowerCase();
-      return tree
-        .filter((item) => !item.directory && item.name.toLowerCase().startsWith(prefix))
-        .map((item) => ({ command: item.name, display: item.name, label: "file", description: "open in editor" }));
+    const source = [
+      ...commandCatalog.map((item) => ({
+        command: String(item.command || ""),
+        display: item.display || item.command,
+        label: item.label || "command",
+        dangerous: item.dangerous,
+        interactive: item.interactive,
+      })),
+      ...contextualCommands,
+    ].filter((item, index, arr) => item.command && arr.findIndex((other) => other.command === item.command) === index);
+
+    if (!trimmed) return source.slice(0, 40);
+
+    if (commandWord === "php") {
+      const typed = commandContext.value.toLowerCase();
+      const phpSource = source.filter((item) => item.command.toLowerCase().startsWith("php "));
+      if (!secondWord) {
+        return phpSource.filter((item) => item.command.toLowerCase().startsWith(typed)).slice(0, 32);
+      }
+      if (secondWord === "artisan") {
+        const artisanPrefix = hasTrailingSpace ? "php artisan " : typed;
+        return phpSource.filter((item) => item.command.toLowerCase().startsWith(artisanPrefix)).slice(0, 32);
+      }
+      return phpSource.filter((item) => item.command.toLowerCase().startsWith(typed)).slice(0, 32);
     }
 
-    const prefix = token.toLowerCase();
-    if (!prefix) return commandCatalog.slice(0, 16);
-    return commandCatalog.filter((item) => String(item.command || "").toLowerCase().startsWith(prefix)).slice(0, 16);
-  }, [commandCatalog, commandContext, helperMode, tree]);
+    const prefix = hasTrailingSpace ? "" : token.toLowerCase();
+    return source.filter((item) => item.command.toLowerCase().startsWith(prefix)).slice(0, 32);
+  }, [commandCatalog, commandContext, contextualCommands, helperMode, tree]);
 
   useEffect(() => {
     if (!completionOpen) return;
@@ -361,7 +506,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, []);
 
   const applyCompletion = useCallback((index = completionIndex) => {
-    if (!completionSuggestions.length || !terminalInputRef.current) return;
+    if (!completionSuggestions.length || !terminalInputRef.current) return "";
     const selected = completionSuggestions[Math.max(0, Math.min(index, completionSuggestions.length - 1))];
     const element = terminalInputRef.current;
     const current = element.textContent || "";
@@ -378,14 +523,31 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     const after = current.slice(caret);
     const match = before.match(/(?:^|\s)([^\s]*)$/);
     const start = match ? before.length - match[1].length : 0;
-    const nextBefore = `${before.slice(0, start)}${selected.command}`;
+    let replacement = selected.command;
+    if (selected.label === "directory") replacement += "/";
+    const nextBefore = `${before.slice(0, start)}${replacement}`;
     const next = `${nextBefore}${after}`;
     element.textContent = next;
     setCommand(next);
     setCaretOffset(element, nextBefore.length);
-    setCompletionOpen(true);
     requestAnimationFrame(() => updateHelperPosition());
+    return next;
   }, [completionIndex, completionSuggestions, setCaretOffset, updateHelperPosition]);
+
+  const isInteractiveCommand = useCallback((cmd) => {
+    const normalized = String(cmd || "").trim().toLowerCase();
+    return commandCatalog.some((item) => item.interactive && String(item.command || "").trim().toLowerCase() === normalized);
+  }, [commandCatalog]);
+
+  const sendInteractiveInput = useCallback((data) => {
+    const socket = shellSocketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      handleError("Interactive shell is not connected.");
+      return false;
+    }
+    socket.send(JSON.stringify({ type: "stdin", data }));
+    return true;
+  }, [handleError]);
 
   const runCommand = useCallback(async (value) => {
     const cmd = String(value ?? command).trim();
@@ -396,6 +558,23 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       setCommandHistoryIndex(null);
       setCompletionOpen(false);
       if (terminalInputRef.current) terminalInputRef.current.textContent = "";
+      focusTerminal();
+      return;
+    }
+
+    if (isInteractiveCommand(cmd)) {
+      const socket = shellSocketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        handleError("Interactive shell connection is not ready. Reconnect the shell session and try again.");
+        return;
+      }
+      setHistory((prev) => [...prev, { id: `${Date.now()}-cmd`, type: "command", text: cmd, cwd: currentCwd }].slice(-HISTORY_LIMIT));
+      setCommandHistory((prev) => [cmd, ...prev.filter((item) => item !== cmd)].slice(0, COMMAND_HISTORY_LIMIT));
+      setCommandHistoryIndex(null);
+      setCommand("");
+      setCompletionOpen(false);
+      if (terminalInputRef.current) terminalInputRef.current.textContent = "";
+      socket.send(JSON.stringify({ type: "command", command: cmd }));
       focusTerminal();
       return;
     }
@@ -433,7 +612,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       runningRef.current = false;
       focusTerminal();
     }
-  }, [apiRoot, command, currentCwd, focusTerminal, refreshDirectory, session?.token]);
+  }, [apiRoot, command, currentCwd, focusTerminal, handleError, isInteractiveCommand, refreshDirectory, session?.token]);
 
   const runningRef = useRef(false);
 
@@ -616,33 +795,60 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                       spellCheck={false}
                       role="textbox"
                       aria-label="Shell command line"
-                      data-placeholder="type a command…"
-                      onInput={(e) => { setCommand(e.currentTarget.textContent || ""); setCommandHistoryIndex(null); }}
+                      onInput={(e) => {
+                        const text = e.currentTarget.textContent || "";
+                        if (interactiveRunning) setInteractiveInput(text);
+                        else setCommand(text);
+                        setCommandHistoryIndex(null);
+                      }}
+                      data-placeholder={interactiveRunning ? (interactiveSecret ? "password…" : "type input…") : "type a command…"}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          if (completionOpen && completionSuggestions.length) { applyCompletion(completionIndex); return; }
+                          if (interactiveRunning) {
+                            const text = e.currentTarget.textContent || "";
+                            sendInteractiveInput(`${text}\n`);
+                            e.currentTarget.textContent = "";
+                            setInteractiveInput("");
+                            return;
+                          }
+                          if (completionOpen && completionSuggestions.length) {
+                            const nextCommand = applyCompletion(completionIndex);
+                            setCompletionOpen(false);
+                            if (nextCommand) runCommand(nextCommand);
+                            return;
+                          }
                           runCommand(e.currentTarget.textContent || "");
+                          return;
+                        }
+                        if (interactiveRunning && e.ctrlKey && e.key.toLowerCase() === "c") {
+                          e.preventDefault();
+                          const socket = shellSocketRef.current;
+                          if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "signal", name: "ctrl-c" }));
+                          return;
+                        }
+                        if (interactiveRunning && e.key === "Tab") {
+                          e.preventDefault();
+                          sendInteractiveInput("\t");
                           return;
                         }
                         if (e.key === "Tab") {
                           e.preventDefault();
                           if (!completionOpen) {
                             setCompletionIndex(0);
-                            showHelper(commandContext.commandWord === "cd" || commandContext.commandWord === "nano" ? "paths" : "commands");
+                            showHelper(commandContext.commandWord === "cd" || commandContext.commandWord === "nano" || commandContext.commandWord === "vi" || commandContext.commandWord === "vim" ? "paths" : "commands");
                             return;
                           }
                           if (completionSuggestions.length) {
-                            const next = (completionIndex + 1) % completionSuggestions.length;
-                            setCompletionIndex(next);
-                            applyCompletion(next);
+                            setCompletionIndex((prev) => (prev + 1) % completionSuggestions.length);
+                            requestAnimationFrame(() => updateHelperPosition());
                           }
                           return;
                         }
                         if (e.ctrlKey && e.code === "Space") {
                           e.preventDefault();
                           setCompletionIndex(0);
-                          showHelper(commandContext.commandWord === "cd" || commandContext.commandWord === "nano" ? "paths" : "commands");
+                          showHelper(commandContext.commandWord === "cd" || commandContext.commandWord === "nano" || commandContext.commandWord === "vi" || commandContext.commandWord === "vim" ? "paths" : "commands");
                           return;
                         }
                         if (e.key === "ArrowUp") {
@@ -664,7 +870,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                         if (e.ctrlKey && e.key.toLowerCase() === "l") { e.preventDefault(); setHistory([]); setCompletionOpen(false); return; }
                       }}
                       onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }}
-                      sx={{ flex: 1, outline: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere", color: "#e7eef6", caretColor: "#f8fafc", minHeight: 22, '&:empty:before': { content: "attr(data-placeholder)", color: "#475565" } }}
+                      sx={{ flex: 1, outline: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere", color: interactiveSecret ? "transparent" : "#e7eef6", caretColor: "#f8fafc", minHeight: 22, '&:empty:before': { content: "attr(data-placeholder)", color: "#475565" } }}
                     />
                   </Box>
                 ) : null}
