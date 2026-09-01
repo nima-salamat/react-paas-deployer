@@ -30,9 +30,11 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import apiRequest from "../../customHooks/apiRequest";
 import { SERVICE_ACTION_ROOT } from "../constants";
-import { loadHljs, highlightCode, HLJS_TOKEN_SX, langLabel } from "../../messenger/modules/codeHighlight";
+import { langLabel } from "../../messenger/modules/codeHighlight";
 
 const HISTORY_LIMIT = 500;
 const COMMAND_HISTORY_LIMIT = 100;
@@ -58,15 +60,7 @@ function joinPath(cwd, name) {
   return `${base}/${name}`;
 }
 
-function normalizeLsLine(line) {
-  const value = String(line || "").trim();
-  if (!value) return null;
-  return {
-    raw: value,
-    name: value.endsWith("/") ? value.slice(0, -1) : value,
-    directory: value.endsWith("/"),
-  };
-}
+
 
 function splitPath(path) {
   const safe = String(path || "/").replace(/\\/g, "/");
@@ -122,7 +116,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [activeTab, setActiveTab] = useState("shell");
   const [openFiles, setOpenFiles] = useState({});
   const [fileLoading, setFileLoading] = useState(false);
-  const [hljsReady, setHljsReady] = useState(false);
   const [replaceDialog, setReplaceDialog] = useState({ open: false, canReplace: false, activeUser: null, loading: false });
   const [helperRect, setHelperRect] = useState({ left: 12, top: 20 });
   const helperRef = useRef(null);
@@ -135,19 +128,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const terminalRef = useRef(null);
   const terminalInputRef = useRef(null);
   const editorInputRef = useRef(null);
-  const editorHighlightRef = useRef(null);
 
   const serviceId = service?.id ?? service?.pk;
   const platform = normalizePlatform(service?.platform || service?.framework || service?.selected_platform);
   const apiRoot = `${SERVICE_ACTION_ROOT}services/${serviceId}/shell`;
   const currentCwd = session?.cwd || "/";
   const activeFile = activeTab.startsWith("file:") ? activeTab.slice(5) : null;
-
-  useEffect(() => {
-    let alive = true;
-    loadHljs().then((api) => { if (alive && api) setHljsReady(true); });
-    return () => { alive = false; };
-  }, []);
 
   const appendHistory = useCallback((entry) => {
     setHistory((prev) => [...prev, { ...entry, id: `${Date.now()}-${Math.random()}` }].slice(-HISTORY_LIMIT));
@@ -209,8 +195,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     try {
       const response = await apiRequest({
         method: "POST",
-        url: `${apiRoot}/command/`,
-        data: { token, command: "ls -1Ap" },
+        url: `${apiRoot}/tree/`,
+        data: { token },
       });
       const data = response?.data || {};
       if (data.result !== "success") throw new Error(data.detail || "Unable to read directory.");
@@ -219,7 +205,11 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         if (!prev) return prev;
         return prev.cwd === resolvedCwd ? prev : { ...prev, cwd: resolvedCwd };
       });
-      setTree(cleanOutput(data.stdout).split("\n").map(normalizeLsLine).filter(Boolean));
+      setTree(Array.isArray(data.entries) ? data.entries.map((item) => ({
+        raw: item.name, name: item.name, directory: Boolean(item.directory),
+        writable: item.writable !== false, mode: item.mode || (item.writable === false ? "ro" : "rw"),
+        readOnlyReason: item.read_only_reason || "Read-only", path: item.path,
+      })) : []);
     } catch (err) {
       handleError(err?.response?.data?.detail || err?.message || "Unable to read directory.");
     } finally {
@@ -398,8 +388,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     const artisan = artisanNames.map((name) => ({ command: `php artisan ${name}`, display: `php artisan ${name}`, label: "Artisan" }));
     const node = [
       { command: "npm -v", display: "npm -v", label: "Node" },
-      { command: "npm run", display: "npm run", label: "npm" },
-      { command: "npm run build", display: "npm run build", label: "npm" },
       { command: "node -v", display: "node -v", label: "Node" },
     ];
     const python = [
@@ -562,6 +550,30 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       return;
     }
 
+    const editorCommand = cmd.match(/^(?:nano|vi|vim)\s+(.+)$/i);
+    if (editorCommand) {
+      try {
+        const args = editorCommand[1].trim().split(/\s+/);
+        if (args.length !== 1 || /^(?:-|--)/.test(args[0])) throw new Error("Use a single file path with the built-in editor.");
+        const path = args[0].startsWith("/") ? args[0] : joinPath(currentCwd, args[0]);
+        await (async () => {
+          const response = await apiRequest({ method: "POST", url: `${apiRoot}/file/`, data: { token: session.token, action: "read", path } });
+          const data = response?.data || {};
+          if (data.result !== "success") throw new Error(data.detail || "Unable to read file.");
+          setActiveTab(`file:${path}`);
+          setTabs((prev) => prev.some((tab) => tab.id === `file:${path}`) ? prev : [...prev, { id: `file:${path}`, type: "file", title: path.split("/").pop() || path, path }]);
+          setOpenFiles((prev) => ({ ...prev, [path]: { content: String(data.content || ""), dirty: false, writable: data.writable !== false, readOnlyReason: data.read_only_reason || "This file is read-only." } }));
+        })();
+      } catch (err) {
+        handleError(err?.response?.data?.detail || err?.message || "Unable to open file.");
+      }
+      if (terminalInputRef.current) terminalInputRef.current.textContent = "";
+      setCommand("");
+      setCompletionOpen(false);
+      focusTerminal();
+      return;
+    }
+
     if (isInteractiveCommand(cmd)) {
       const socket = shellSocketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
@@ -689,17 +701,37 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     }
   }, [apiRoot, handleError, openFiles, session?.token]);
 
+  const createNewFile = useCallback(async () => {
+    if (!session?.token) return;
+    const name = window.prompt("File name (inside current directory):", "new-file.txt");
+    if (!name || /(^\s*$|[\\/\\0])/.test(name) || name === "." || name === "..") return;
+    const path = joinPath(currentCwd, name.trim());
+    try {
+      const response = await apiRequest({ method: "POST", url: `${apiRoot}/file/`, data: { token: session.token, action: "create", path } });
+      const data=response?.data||{};
+      if(data.result!=="success") throw new Error(data.detail||"Unable to create file.");
+      await openFileTab(path);
+      await refreshDirectory();
+    } catch(err){ handleError(err?.response?.data?.detail||err?.message||"Unable to create file."); }
+  }, [apiRoot, currentCwd, handleError, openFileTab, refreshDirectory, session?.token]);
+
+  const deleteActiveFile = useCallback(async () => {
+    if (!activeFile || !session?.token || openFiles[activeFile]?.writable === false) return;
+    if (!window.confirm(`Delete ${activeFile}? This cannot be undone.`)) return;
+    try {
+      const response=await apiRequest({method:"POST",url:`${apiRoot}/file/`,data:{token:session.token,action:"delete",path:activeFile}});
+      const data=response?.data||{};
+      if(data.result!=="success") throw new Error(data.detail||"Unable to delete file.");
+      const tabId=`file:${activeFile}`;
+      setTabs(prev=>prev.filter(tab=>tab.id!==tabId));
+      setOpenFiles(prev=>{const next={...prev}; delete next[activeFile]; return next;});
+      setActiveTab("shell");
+      await refreshDirectory();
+    } catch(err){ handleError(err?.response?.data?.detail||err?.message||"Unable to delete file."); }
+  }, [activeFile, apiRoot, handleError, openFiles, refreshDirectory, session?.token]);
+
   const activeContent = activeFile ? (openFiles[activeFile]?.content || "") : "";
   const activeLanguage = activeFile ? detectLanguage(activeFile) : "";
-  const highlighted = useMemo(() => activeFile ? highlightCode(activeContent, activeLanguage).html : "", [activeContent, activeFile, activeLanguage, hljsReady]);
-  const breadcrumbItems = useMemo(() => splitPath(currentCwd), [currentCwd]);
-
-  const syncEditorScroll = useCallback(() => {
-    if (!editorInputRef.current || !editorHighlightRef.current) return;
-    editorHighlightRef.current.scrollTop = editorInputRef.current.scrollTop;
-    editorHighlightRef.current.scrollLeft = editorInputRef.current.scrollLeft;
-  }, []);
-
   const copyFile = useCallback(async () => {
     if (!activeContent) return;
     try { await navigator.clipboard?.writeText(activeContent); } catch { /* ignore */ }
@@ -766,7 +798,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   {!session ? <Typography sx={{ p: 1.3, color: "#5e6d7c", fontSize: 11.5 }}>Open a shell to browse files.</Typography> : tree.map((item) => (
                     <Box key={`${item.directory ? "d" : "f"}-${item.name}`} onDoubleClick={() => openTreeItem(item)} onClick={() => !item.directory && openTreeItem(item)} sx={{ display: "flex", alignItems: "center", gap: .65, px: 1.1, py: .42, cursor: "pointer", color: "#c4ced8", ":hover": { bgcolor: "rgba(96,165,250,.08)" } }}>
                       {item.directory ? <FolderRoundedIcon sx={{ fontSize: 16, color: "#77a7d8" }} /> : <InsertDriveFileRoundedIcon sx={{ fontSize: 15, color: fileIconColor(item.name) }} />}
-                      <Typography sx={{ fontFamily: MONO, fontSize: 11.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}{item.directory ? "/" : ""}</Typography>
+                      <Typography sx={{ fontFamily: MONO, fontSize: 11.5, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.writable === false ? .72 : 1 }}>{item.name}{item.directory ? "/" : ""}</Typography>
+                      <Typography sx={{ fontFamily: MONO, fontSize: 9, color: item.writable === false ? "#e8a08f" : "#73a386", flexShrink: 0 }}>{item.writable === false ? "RO" : "RW"}</Typography>
                     </Box>
                   ))}
                 </Box>
@@ -899,13 +932,36 @@ export default function ShellPanel({ service, enabled = true, onError }) {
               <Chip size="small" label={langLabel(activeLanguage || "text")} sx={{ height: 21, bgcolor: "rgba(96,165,250,.08)", color: "#91aac2" }} />
               {openFiles[activeFile]?.writable === false ? <Chip size="small" icon={<WarningAmberRoundedIcon sx={{ fontSize: "14px !important" }} />} label="read-only" sx={{ height: 21, color: "#ffb19f", bgcolor: "rgba(255,143,143,.07)" }} /> : null}
               {openFiles[activeFile]?.dirty ? <Chip size="small" label="modified" sx={{ height: 21, color: "#e9bd69", bgcolor: "rgba(246,199,108,.07)" }} /> : null}
+              <Tooltip title="New file"><span><IconButton size="small" onClick={createNewFile} disabled={!session} sx={{ color: "#7e8e9f" }}><AddRoundedIcon sx={{ fontSize: 17 }} /></IconButton></span></Tooltip>
+              <Tooltip title="Delete file"><span><IconButton size="small" onClick={deleteActiveFile} disabled={!activeFile || fileLoading || openFiles[activeFile]?.writable === false} sx={{ color: "#c77f7f" }}><DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} /></IconButton></span></Tooltip>
               <Tooltip title="Copy"><span><IconButton size="small" onClick={copyFile} disabled={!activeContent} sx={{ color: "#7e8e9f" }}><ContentCopyRoundedIcon sx={{ fontSize: 16 }} /></IconButton></span></Tooltip>
               <Button size="small" variant="contained" startIcon={<SaveRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => writeOpenFile(activeFile)} disabled={fileLoading || !openFiles[activeFile]?.dirty || openFiles[activeFile]?.writable === false} sx={{ textTransform: "none", fontSize: 11 }}>Save</Button>
             </Box>
             <Box sx={{ position: "relative", flex: 1, minHeight: 0, bgcolor: "#0b1016" }}>
-              <Box ref={editorHighlightRef} component="pre" aria-hidden="true" sx={{ position: "absolute", inset: 0, m: 0, p: 1.5, overflow: "hidden", pointerEvents: "none", fontFamily: MONO, fontSize: 13, lineHeight: "20px", whiteSpace: "pre", color: "#e6edf3", ...HLJS_TOKEN_SX }} dangerouslySetInnerHTML={{ __html: highlighted + (activeContent.endsWith("\n") ? "\n" : "") }} />
-              <Box ref={editorInputRef} component="textarea" value={activeContent} onChange={(e) => updateFileContent(activeFile, e.target.value)} onScroll={syncEditorScroll} spellCheck={false} readOnly={fileLoading || openFiles[activeFile]?.writable === false} sx={{ position: "relative", zIndex: 1, width: "100%", height: "100%", resize: "none", border: 0, outline: 0, p: 1.5, m: 0, boxSizing: "border-box", bgcolor: "transparent", color: "transparent", caretColor: "#f8fafc", fontFamily: MONO, fontSize: 13, lineHeight: "20px", whiteSpace: "pre", overflow: "auto" }} />
-              {openFiles[activeFile]?.writable === false ? <Box sx={{ position: "absolute", right: 12, bottom: 10, color: "#ffab96", fontFamily: MONO, fontSize: 10 }}>{openFiles[activeFile]?.readOnlyReason}</Box> : null}
+              <Box component="textarea"
+                ref={editorInputRef}
+                value={activeContent}
+                onChange={(e) => updateFileContent(activeFile, e.target.value)}
+                spellCheck={false}
+                readOnly={fileLoading || openFiles[activeFile]?.writable === false}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+                    e.preventDefault();
+                    if (openFiles[activeFile]?.writable !== false) writeOpenFile(activeFile);
+                    return;
+                  }
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    const target=e.currentTarget; const start=target.selectionStart; const endPos=target.selectionEnd;
+                    if (openFiles[activeFile]?.writable === false) return;
+                    const next=`${target.value.slice(0,start)}\t${target.value.slice(endPos)}`;
+                    updateFileContent(activeFile,next);
+                    requestAnimationFrame(()=>{ target.selectionStart=start+1; target.selectionEnd=start+1; });
+                  }
+                }}
+                sx={{ width: "100%", height: "100%", resize: "none", boxSizing: "border-box", border: 0, outline: 0, p: 1.6, bgcolor: "#0b1016", color: "#e6edf3", caretColor: "#f8fafc", fontFamily: MONO, fontSize: 13, lineHeight: "20px", whiteSpace: "pre", overflow: "auto", tabSize: 2, WebkitFontSmoothing: "antialiased" }}
+              />
+              {openFiles[activeFile]?.writable === false ? <Box sx={{ position: "absolute", right: 12, bottom: 10, px: .8, py: .35, borderRadius: .5, bgcolor: "rgba(20,10,10,.75)", color: "#ffab96", fontFamily: MONO, fontSize: 10 }}>READ ONLY · {openFiles[activeFile]?.readOnlyReason}</Box> : null}
             </Box>
           </Box>
         )}
