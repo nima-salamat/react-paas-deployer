@@ -125,6 +125,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [hljsReady, setHljsReady] = useState(false);
   const [replaceDialog, setReplaceDialog] = useState({ open: false, canReplace: false, activeUser: null, loading: false });
   const [helperRect, setHelperRect] = useState({ left: 12, top: 20 });
+  const helperRef = useRef(null);
   const [helperMode, setHelperMode] = useState("commands");
 
   const terminalRef = useRef(null);
@@ -159,20 +160,36 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     if (!selection || selection.rangeCount === 0 || !element.contains(selection.anchorNode)) return null;
     const range = selection.getRangeAt(0).cloneRange();
     range.collapse(true);
-    const rect = range.getBoundingClientRect();
-    const containerRect = terminalRef.current?.getBoundingClientRect();
-    if (!containerRect) return null;
-    const left = Math.max(8, Math.min(rect.left - containerRect.left, containerRect.width - 340));
-    const top = Math.max(8, rect.bottom - containerRect.top + 4);
-    return { left, top };
+    let rect = range.getBoundingClientRect();
+    if (!rect.width && !rect.height) {
+      const elementRect = element.getBoundingClientRect();
+      rect = { left: elementRect.left, right: elementRect.left, top: elementRect.top, bottom: elementRect.bottom, width: 0, height: elementRect.height };
+    }
+    return rect;
   }, []);
+
+  const updateHelperPosition = useCallback(() => {
+    const caret = getCaretRect();
+    if (!caret) return;
+    const gap = 6;
+    const viewportPadding = 8;
+    const popup = helperRef.current;
+    const popupRect = popup?.getBoundingClientRect();
+    const popupWidth = popupRect?.width || Math.min(560, Math.max(260, window.innerWidth - 16));
+    const popupHeight = popupRect?.height || 240;
+    const canFitBelow = caret.bottom + gap + popupHeight <= window.innerHeight - viewportPadding;
+    const canFitAbove = caret.top - gap - popupHeight >= viewportPadding;
+    const placeAbove = !canFitBelow && canFitAbove;
+    const top = placeAbove ? caret.top - gap - popupHeight : Math.min(caret.bottom + gap, window.innerHeight - popupHeight - viewportPadding);
+    const left = Math.min(Math.max(viewportPadding, caret.left), Math.max(viewportPadding, window.innerWidth - popupWidth - viewportPadding));
+    setHelperRect({ left, top });
+  }, [getCaretRect]);
 
   const showHelper = useCallback((mode = "commands") => {
     setHelperMode(mode);
-    const rect = getCaretRect();
-    if (rect) setHelperRect(rect);
     setCompletionOpen(true);
-  }, [getCaretRect]);
+    requestAnimationFrame(() => updateHelperPosition());
+  }, [updateHelperPosition]);
 
   const handleError = useCallback((message) => {
     appendHistory({ type: "error", text: String(message || "Unknown shell error.") });
@@ -319,6 +336,19 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     return commandCatalog.filter((item) => String(item.command || "").toLowerCase().startsWith(prefix)).slice(0, 16);
   }, [commandCatalog, commandContext, helperMode, tree]);
 
+  useEffect(() => {
+    if (!completionOpen) return;
+    const reposition = () => requestAnimationFrame(updateHelperPosition);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    const timer = window.setTimeout(updateHelperPosition, 0);
+    return () => {
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+      window.clearTimeout(timer);
+    };
+  }, [completionOpen, completionSuggestions.length, updateHelperPosition]);
+
   const setCaretOffset = useCallback((element, offset) => {
     const node = element?.firstChild;
     if (!element || !node) return;
@@ -354,7 +384,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     setCommand(next);
     setCaretOffset(element, nextBefore.length);
     setCompletionOpen(true);
-  }, [completionIndex, completionSuggestions, setCaretOffset]);
+    requestAnimationFrame(() => updateHelperPosition());
+  }, [completionIndex, completionSuggestions, setCaretOffset, updateHelperPosition]);
 
   const runCommand = useCallback(async (value) => {
     const cmd = String(value ?? command).trim();
@@ -571,7 +602,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 {session ? <Tooltip title="Close session"><IconButton size="small" onClick={(e) => { e.stopPropagation(); closeSession(); }} sx={{ color: "#cc7f7f" }}><StopCircleOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip> : <Button size="small" variant="outlined" startIcon={sessionLoading ? <CircularProgress size={14} color="inherit" /> : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />} onClick={(e) => { e.stopPropagation(); createSession(); }} disabled={sessionLoading} sx={{ borderColor: "rgba(96,165,250,.3)", color: "#9ac2ed", textTransform: "none", fontSize: 11.5 }}>Open Shell</Button>}
               </Box>
 
-              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58 }} onScroll={() => completionOpen && setCompletionOpen(false)}>
+              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58 }} onScroll={() => completionOpen && requestAnimationFrame(updateHelperPosition)}>
                 {terminalLines.map((line) => (
                   <Box key={line.key} sx={{ color: line.type === "stderr" || line.type === "error" ? "#ff9b8f" : line.type === "system" ? "#87b4d9" : line.type === "command" ? "#b9d7f4" : "#dce6ef", whiteSpace: "pre-wrap", overflowWrap: "anywhere", minHeight: line.text ? 20 : 6 }}>{line.text || " "}</Box>
                 ))}
@@ -640,7 +671,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
               </Box>
 
               {completionOpen && completionSuggestions.length > 0 ? (
-                <Box sx={{ position: "absolute", left: helperRect.left, top: helperRect.top, width: { xs: "calc(100% - 16px)", md: 560 }, maxWidth: "calc(100% - 16px)", bgcolor: "#111922", border: "1px solid rgba(128,151,174,.3)", boxShadow: "0 16px 40px rgba(0,0,0,.45)", borderRadius: .8, overflow: "hidden", zIndex: 20 }}>
+                <Box ref={helperRef} sx={{ position: "fixed", left: helperRect.left, top: helperRect.top, width: { xs: "calc(100vw - 16px)", md: 560 }, maxWidth: "calc(100vw - 16px)", maxHeight: "min(46vh, 420px)", overflowY: "auto", bgcolor: "#111922", border: "1px solid rgba(128,151,174,.3)", boxShadow: "0 16px 40px rgba(0,0,0,.45)", borderRadius: .8, zIndex: 1600 }}>
                   <Box sx={{ px: 1.1, py: .65, display: "flex", alignItems: "center", gap: .7, borderBottom: "1px solid rgba(148,163,184,.1)" }}>
                     <Typography sx={{ color: "#93a6ba", fontSize: 10.5, fontWeight: 800, letterSpacing: ".05em", flex: 1 }}>{helperMode === "paths" ? "PATH COMPLETION" : "COMMAND COMPLETION"}</Typography>
                     <Typography sx={{ color: "#617285", fontSize: 9.5 }}>Tab ↹ · ↑↓ · Enter · Esc</Typography>

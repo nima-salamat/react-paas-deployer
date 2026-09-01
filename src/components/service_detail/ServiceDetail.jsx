@@ -1865,12 +1865,12 @@ export default function ServiceDetail() {
             />
           )}
 
-          {activeTab === "shell" && (
+          <Box sx={{ display: activeTab === "shell" ? "block" : "none", minWidth: 0 }}>
             <ShellPanel
               service={service}
               enabled={Boolean(shareAccess.is_owner || shareAccess.permissions?.can_shell)}
             />
-          )}
+          </Box>
 
           {activeTab === "settings" && (
             <SettingsPanel
