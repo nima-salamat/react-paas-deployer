@@ -181,25 +181,30 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, [appendHistory, focusTerminal, onError]);
 
   const refreshDirectory = useCallback(async () => {
-    if (!session?.token) return;
+    const token = session?.token;
+    const sessionCwd = session?.cwd || "/";
+    if (!token) return;
     setTreeLoading(true);
     try {
       const response = await apiRequest({
         method: "POST",
         url: `${apiRoot}/command/`,
-        data: { token: session.token, command: "ls -1Ap" },
+        data: { token, command: "ls -1Ap" },
       });
       const data = response?.data || {};
       if (data.result !== "success") throw new Error(data.detail || "Unable to read directory.");
-      const cwd = data.cwd || currentCwd;
-      setSession((prev) => (prev ? { ...prev, cwd } : prev));
+      const resolvedCwd = data.cwd || sessionCwd;
+      setSession((prev) => {
+        if (!prev) return prev;
+        return prev.cwd === resolvedCwd ? prev : { ...prev, cwd: resolvedCwd };
+      });
       setTree(cleanOutput(data.stdout).split("\n").map(normalizeLsLine).filter(Boolean));
     } catch (err) {
       handleError(err?.response?.data?.detail || err?.message || "Unable to read directory.");
     } finally {
       setTreeLoading(false);
     }
-  }, [apiRoot, currentCwd, handleError, session?.token]);
+  }, [apiRoot, handleError, session?.token]);
 
   const loadCommandCatalog = useCallback(async () => {
     if (!session?.token) return;
@@ -213,10 +218,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, [apiRoot, session?.token]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session?.token) return;
     refreshDirectory();
     loadCommandCatalog();
-  }, [loadCommandCatalog, refreshDirectory, session]);
+  }, [loadCommandCatalog, refreshDirectory, session?.token]);
 
   const createSession = useCallback(async () => {
     if (!serviceId || !enabled || sessionLoading || session) return;
