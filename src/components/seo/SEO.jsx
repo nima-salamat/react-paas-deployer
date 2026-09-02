@@ -41,8 +41,8 @@ export default function SEO() {
           {pathname === "/" && (
             <link rel="amphtml" href={`${siteConfig.siteUrl}/amp/`} />
           )}
-          <link rel="alternate" hreflang="en" href={url} />
-          <link rel="alternate" hreflang="x-default" href={url} />
+          <link rel="alternate" hrefLang="en" href={url} />
+          <link rel="alternate" hrefLang="x-default" href={url} />
         </>
       )}
 

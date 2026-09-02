@@ -54,6 +54,7 @@ async function postRefresh(refreshToken) {
         { refresh: refreshToken },
         {
           headers: { "Content-Type": "application/json" },
+          timeout: 5000,
           // Do not send expired access token to refresh endpoint
           validateStatus: (s) => s >= 200 && s < 300,
         }
@@ -108,8 +109,10 @@ function refreshAccessToken() {
       return access;
     } catch (err) {
       const status = err?.response?.status;
-      if (status === 401 || status === 403 || !err?.response) {
-        // Invalid/expired refresh, or network after token death
+      // Only an explicit auth rejection proves that the refresh credential
+      // is invalid. Network/timeout/5xx failures are transient and MUST NOT
+      // destroy the locally stored session.
+      if (status === 401 || status === 403) {
         clearAuthAndRedirect();
       }
       throw err;
@@ -121,7 +124,7 @@ function refreshAccessToken() {
   return refreshPromise;
 }
 
-const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploadProgress }) => {
+const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploadProgress, responseType }) => {
   const accessToken = localStorage.getItem("access");
 
   try {
@@ -132,6 +135,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
       params,
       headers: buildHeaders(accessToken, data),
       onUploadProgress,
+      ...(responseType ? { responseType } : {}),
     });
     return response;
   } catch (error) {
@@ -155,6 +159,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
           params,
           headers: buildHeaders(newAccess, data),
           onUploadProgress,
+          ...(responseType ? { responseType } : {}),
         });
         return retryResponse;
       } catch (refreshErr) {

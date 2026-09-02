@@ -24,7 +24,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import Block from "@mui/icons-material/Block";
 
 const BASE_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api`;
-const MotionPaper = motion(Paper);
+const MotionPaper = motion.create(Paper);
 const fadeUp = { hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } };
 
 const DEFAULT_SETTINGS = {

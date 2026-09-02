@@ -208,6 +208,13 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     }
   };
 
+  const isNetworkAuthFailure = (error) => {
+    if (!error) return false;
+    if (error.name === "AbortError" || error.name === "TimeoutError") return true;
+    if (error instanceof TypeError && !error?.response) return true;
+    return !error?.response && !error?.status;
+  };
+
   const runAuthCheck = async ({ force = false } = {}) => {
     const accessToken = window.localStorage.getItem("access");
 
@@ -235,20 +242,40 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     if (mountedRef.current) setCheckingAuth(true);
 
     try {
-      const validateRes = await fetch(`${API_BASE}/auth/api/validateToken/`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 5000);
+      let validateRes;
+      try {
+        validateRes = await fetch(`${API_BASE}/auth/api/validateToken/`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: controller.signal,
+          cache: "no-store",
+        });
+      } finally {
+        window.clearTimeout(timer);
+      }
 
       if (!mountedRef.current) return false;
 
       if (!validateRes.ok) {
-        setLoggedIn(false);
-        setIsStaff(false);
-        setUserImage(null);
-        profilesLoadedRef.current = false;
-        currentProfileIdRef.current = null;
-        return false;
+        // Only 401 means the access token is invalid. A 403 can be a valid
+        // authenticated user without permission, and 5xx means the backend
+        // is unavailable. Neither should log the user out.
+        if (validateRes.status === 401) {
+          setLoggedIn(false);
+          setIsStaff(false);
+          setUserImage(null);
+          profilesLoadedRef.current = false;
+          currentProfileIdRef.current = null;
+          return false;
+        }
+        if (validateRes.status === 403) {
+          setLoggedIn(true);
+          return true;
+        }
+        setLoggedIn(true);
+        return true;
       }
 
       setLoggedIn(true);
@@ -269,8 +296,14 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     } catch (error) {
       if (mountedRef.current) {
         console.error("Auth check failed:", error);
+        if (isNetworkAuthFailure(error)) {
+          // Connectivity loss must never destroy an otherwise valid local session.
+          // The locally stored access/refresh tokens remain untouched.
+          setLoggedIn(true);
+          return true;
+        }
         setLoggedIn(false);
-      setIsStaff(false);
+        setIsStaff(false);
         setUserImage(null);
         profilesLoadedRef.current = false;
         currentProfileIdRef.current = null;
@@ -389,20 +422,36 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     setCheckingAuth(true);
 
     try {
-      const validateRes = await fetch(`${API_BASE}/auth/api/validateToken/`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 5000);
+      let validateRes;
+      try {
+        validateRes = await fetch(`${API_BASE}/auth/api/validateToken/`, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: controller.signal,
+          cache: "no-store",
+        });
+      } finally {
+        window.clearTimeout(timer);
+      }
 
       if (!validateRes.ok) {
-        window.localStorage.setItem("auth_mode", "signin_or_signup");
-        setLoggedIn(false);
-      setIsStaff(false);
-        setUserImage(null);
-        profilesLoadedRef.current = false;
-        currentProfileIdRef.current = null;
+        if (validateRes.status === 401) {
+          window.localStorage.setItem("auth_mode", "signin_or_signup");
+          setLoggedIn(false);
+          setIsStaff(false);
+          setUserImage(null);
+          profilesLoadedRef.current = false;
+          currentProfileIdRef.current = null;
+          if (fromMenu) closeDrawer();
+          navigate("/signin_or_signup");
+          return;
+        }
+        // 403/5xx are not proof that the session is invalid. Keep the local
+        // authenticated state and let the user continue/retry.
+        setLoggedIn(true);
         if (fromMenu) closeDrawer();
-        navigate("/signin_or_signup");
         return;
       }
 
@@ -411,6 +460,13 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
       if (fromMenu) closeDrawer();
     } catch (error) {
       console.error("Auth validation failed on sign-in click:", error);
+      if (isNetworkAuthFailure(error)) {
+        // Offline / timeout: do not log out or redirect. The token is still
+        // retained locally and authentication will be checked later.
+        setLoggedIn(true);
+        if (fromMenu) closeDrawer();
+        return;
+      }
       window.localStorage.setItem("auth_mode", "signin_or_signup");
       setLoggedIn(false);
       setIsStaff(false);

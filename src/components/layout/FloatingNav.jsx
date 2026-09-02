@@ -133,18 +133,26 @@ export default function FloatingNav({
         const data = await res.json();
         const u = data?.user || data?.data?.user || data;
         if (!cancelled) setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
-      } catch {
+      } catch (firstError) {
+        // Network failures are indeterminate, not an auth failure. Keep the
+        // previous staff state instead of flickering it to false while offline.
+        if (!firstError?.response && (firstError?.name === "AbortError" || firstError instanceof TypeError)) {
+          return;
+        }
         try {
           const base = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
           const token = localStorage.getItem("access");
           const res = await fetch(`${base}/api/users/user/`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
           });
+          if (!res.ok) return;
           const data = await res.json();
           const u = data?.user || data?.data || data;
           if (!cancelled) setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
-        } catch {
-          if (!cancelled) setIsStaff(false);
+        } catch (fallbackError) {
+          if (!cancelled && fallbackError?.name !== "AbortError" && !(fallbackError instanceof TypeError)) {
+            setIsStaff(false);
+          }
         }
       }
     };

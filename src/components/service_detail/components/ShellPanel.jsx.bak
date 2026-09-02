@@ -41,49 +41,11 @@ import { SERVICE_ACTION_ROOT } from "../constants";
 import { langLabel } from "../../messenger/modules/codeHighlight";
 import hljs from "highlight.js/lib/common";
 import "highlight.js/styles/github-dark.css";
-import ShellXterm from "./ShellXterm";
 
 const HISTORY_LIMIT = 500;
 const COMMAND_HISTORY_LIMIT = 100;
 const TERMINAL_HEIGHT = { xs: 560, md: 700 };
 const MONO = "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace";
-
-const SHELL_SNIPPETS = {
-  laravel: [
-    { label: "Create admin user (tinker)", command: "php artisan tinker" },
-    { label: "Migrate status", command: "php artisan migrate:status" },
-    { label: "Run migrations", command: "php artisan migrate" },
-    { label: "Clear all caches", command: "php artisan optimize:clear" },
-    { label: "Route list", command: "php artisan route:list" },
-    { label: "About", command: "php artisan about" },
-    { label: "Queue one job", command: "php artisan queue:work --once" },
-    { label: "Run scheduler once", command: "php artisan schedule:run" },
-  ],
-  php: [
-    { label: "PHP version", command: "php -v" },
-    { label: "PHP modules", command: "php -m" },
-  ],
-  django: [
-    { label: "System check", command: "python manage.py check" },
-    { label: "Show migrations", command: "python manage.py showmigrations" },
-    { label: "Migrate", command: "python manage.py migrate" },
-    { label: "Create superuser", command: "python manage.py createsuperuser" },
-  ],
-  python: [
-    { label: "Python version", command: "python --version" },
-  ],
-  node: [
-    { label: "Node version", command: "node -v" },
-    { label: "NPM version", command: "npm -v" },
-    { label: "Outdated packages", command: "npm outdated" },
-  ],
-  generic: [
-    { label: "Working directory", command: "pwd" },
-    { label: "List files", command: "ls -la" },
-    { label: "Disk usage", command: "df -h" },
-  ],
-};
-
 
 function normalizePlatform(platform) {
   const raw = String(platform || "generic").toLowerCase();
@@ -94,29 +56,8 @@ function normalizePlatform(platform) {
   return "generic";
 }
 
-function stripAnsi(text) {
-  // Remove CSI / OSC / charset / private-mode sequences so PsySH and other
-  // TTY programs render as readable plain text in our non-xterm UI.
-  return String(text ?? "")
-    // OSC sequences: ESC ] ... BEL  or  ESC ] ... ESC \
-    .replace(/\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g, "")
-    // CSI sequences: ESC [ ... final-byte
-    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "")
-    // Charset / single-char escapes: ESC ( B, ESC > etc.
-    .replace(/\u001b[()][0-9A-Za-z]/g, "")
-    .replace(/\u001b[=><]/g, "")
-    // Remaining ESC + one char
-    .replace(/\u001b./g, "")
-    // C1 controls sometimes emitted as raw bytes
-    .replace(/[\u0080-\u009f]/g, "");
-}
-
 function cleanOutput(text) {
-  return stripAnsi(String(text ?? ""))
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    // Collapse pure cursor-noise blank runs a bit without destroying real blanks
-    .replace(/\n{4,}/g, "\n\n\n");
+  return String(text ?? "").replace(/\r/g, "");
 }
 
 function joinPath(cwd, name) {
@@ -220,7 +161,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [openFiles, setOpenFiles] = useState({});
   const [fileLoading, setFileLoading] = useState(false);
   const [replaceDialog, setReplaceDialog] = useState({ open: false, canReplace: false, activeUser: null, loading: false });
-  const [confirmCommand, setConfirmCommand] = useState(null);
   const [contextMenu, setContextMenu] = useState({ mouseX: null, mouseY: null, item: null });
   const [helperRect, setHelperRect] = useState({ left: 12, top: 20 });
   const helperRef = useRef(null);
@@ -230,31 +170,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [interactiveRunning, setInteractiveRunning] = useState(false);
   const [interactiveInput, setInteractiveInput] = useState("");
   const [interactiveSecret, setInteractiveSecret] = useState(false);
-  const [commandRunning, setCommandRunning] = useState(false);
-  const [dryRun, setDryRun] = useState(false);
-  const [auditOpen, setAuditOpen] = useState(false);
-  const [auditEvents, setAuditEvents] = useState([]);
-  const [auditLoading, setAuditLoading] = useState(false);
-  const [auditPage, setAuditPage] = useState(1);
-  const [auditTotalPages, setAuditTotalPages] = useState(1);
-  const [auditTotal, setAuditTotal] = useState(0);
-  const [auditFilter, setAuditFilter] = useState("");
-  const [auditSearch, setAuditSearch] = useState("");
-  const [auditSearchInput, setAuditSearchInput] = useState("");
-  const AUDIT_PAGE_SIZE = 30;
-  const [envOpen, setEnvOpen] = useState(false);
-  const [envItems, setEnvItems] = useState([]);
-  const [health, setHealth] = useState(null);
-  const [snippetsOpen, setSnippetsOpen] = useState(false);
-
   const shellSocketRef = useRef(null);
-  // Unified "busy" flag: outer prompt must not appear while a child owns the TTY
-  // or while we are waiting for a normal command response.
-  const commandBusy = interactiveRunning || commandRunning;
 
   const terminalRef = useRef(null);
   const terminalInputRef = useRef(null);
-  const xtermWriteRef = useRef(null);
   const editorInputRef = useRef(null);
 
   const serviceId = service?.id ?? service?.pk;
@@ -416,17 +335,15 @@ export default function ShellPanel({ service, enabled = true, onError }) {
 
     const base = typeof window !== "undefined" ? window.location : null;
     if (!base) return undefined;
-    const configuredApi = String(import.meta.env.VITE_API_BASE || "").trim();
-    let backendUrl;
-    try {
-      const candidate = configuredApi
-        ? (configuredApi.startsWith("http://") || configuredApi.startsWith("https://") ? configuredApi : `https://${configuredApi}`)
-        : base.origin;
-      backendUrl = new URL(candidate, base.origin);
-    } catch {
-      backendUrl = base;
-    }
-    const protocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
+    const protocol = base.protocol === "https:" ? "wss:" : "ws:";
+    const backendUrl = (() => {
+      try {
+        const configured = process.env.REACT_APP_API_URL || base.origin;
+        return new URL(configured, base.origin);
+      } catch {
+        return base;
+      }
+    })();
     const socketUrl = `${protocol}//${backendUrl.host}/ws/services/shell/${serviceId}/?token=${encodeURIComponent(accessToken)}&shell_token=${encodeURIComponent(shellToken)}`;
     const socket = new WebSocket(socketUrl);
     shellSocketRef.current = socket;
@@ -441,42 +358,30 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       }
       if (message.type === "process.started") {
         setInteractiveRunning(true);
-        setCommandRunning(false);
         setInteractiveInput("");
         setInteractiveSecret(false);
-        setCompletionOpen(false);
         return;
       }
       if (message.type === "process.output") {
-        const raw = String(message.data ?? "");
-        // Prefer real terminal when interactive PTY is active (colors, cursor, tables).
-        if (xtermWriteRef.current) {
-          xtermWriteRef.current(raw);
-        } else {
-          const cleaned = cleanOutput(raw);
-          if (cleaned) appendHistory({ type: "output", stdout: cleaned, stderr: "", exitCode: null });
-        }
-        if (/password\s*:/i.test(raw)) setInteractiveSecret(true);
+        const text = cleanOutput(message.data);
+        if (text) appendHistory({ type: "output", stdout: text, stderr: "", exitCode: null });
+        if (/password\s*:/i.test(text)) setInteractiveSecret(true);
         return;
       }
       if (message.type === "process.exit") {
         setInteractiveRunning(false);
-        setCommandRunning(false);
         setInteractiveInput("");
         setInteractiveSecret(false);
-        // Keep exitCode only — terminalLines renders the message once from exitCode.
-        appendHistory({ type: "output", stdout: "", stderr: "", exitCode: message.exit_code ?? 0 });
+        appendHistory({ type: "output", stdout: "", stderr: message.exit_code && message.exit_code !== 0 ? `Process exited with code ${message.exit_code}` : "", exitCode: message.exit_code ?? 0 });
         focusTerminal();
         return;
       }
       if (message.type === "confirm_required") {
-        setConfirmCommand(message.command || null);
+        appendHistory({ type: "error", text: message.message || "Confirmation is required." });
         return;
       }
       if (message.type === "error") {
         appendHistory({ type: "error", text: message.message || "Interactive shell error." });
-        // If we were waiting to start / run, release the outer prompt.
-        setCommandRunning(false);
       }
     };
     socket.onerror = () => { /* Basic command API remains available when PTY is unavailable. */ };
@@ -509,22 +414,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     } catch (err) {
       const status = err?.response?.status;
       const payload = err?.response?.data || {};
-      const detail = String(payload?.detail || err?.message || "");
-      const isActiveConflict =
-        status === 409 && (
-          payload.code === "SHELL_SESSION_ACTIVE"
-          || /active shell session/i.test(detail)
-          || /already has .+ session/i.test(detail)
-        );
-      if (isActiveConflict) {
-        setReplaceDialog({
-          open: true,
-          canReplace: payload.can_replace !== false,
-          activeUser: payload.active_session || null,
-          loading: false,
-        });
+      if (status === 409 && payload.code === "SHELL_SESSION_ACTIVE") {
+        setReplaceDialog({ open: true, canReplace: Boolean(payload.can_replace), activeUser: payload.active_session || null, loading: false });
       } else {
-        handleError(detail || "Unable to create shell session.");
+        handleError(payload?.detail || err?.message || "Unable to create shell session.");
       }
     } finally {
       setSessionLoading(false);
@@ -624,7 +517,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, [command]);
 
   const completionSuggestions = useMemo(() => {
-    const { trimmed, token, hasTrailingSpace, commandWord } = commandContext;
+    const { trimmed, commandWord, secondWord, token, hasTrailingSpace } = commandContext;
     if (helperMode === "paths") {
       if (commandWord === "cd") {
         const prefix = hasTrailingSpace ? "" : token.toLowerCase();
@@ -653,15 +546,21 @@ export default function ShellPanel({ service, enabled = true, onError }) {
 
     if (!trimmed) return source.slice(0, 40);
 
-    // Completion always filters against the full command prefix before the
-    // current token. This makes `php `, `php artisan ` and `python manage.py `
-    // behave consistently instead of duplicating the already typed command.
-    const fullPrefix = commandContext.value.slice(0, commandContext.value.length).toLowerCase();
-    const tokenPrefix = token.toLowerCase();
-    const sourceForContext = hasTrailingSpace
-      ? source.filter((item) => item.command.toLowerCase().startsWith(fullPrefix))
-      : source.filter((item) => item.command.toLowerCase().startsWith(commandContext.value.slice(0, commandContext.value.length - token.length).toLowerCase() + tokenPrefix));
-    return sourceForContext.slice(0, 32);
+    if (commandWord === "php") {
+      const typed = commandContext.value.toLowerCase();
+      const phpSource = source.filter((item) => item.command.toLowerCase().startsWith("php "));
+      if (!secondWord) {
+        return phpSource.filter((item) => item.command.toLowerCase().startsWith(typed)).slice(0, 32);
+      }
+      if (secondWord === "artisan") {
+        const artisanPrefix = hasTrailingSpace ? "php artisan " : typed;
+        return phpSource.filter((item) => item.command.toLowerCase().startsWith(artisanPrefix)).slice(0, 32);
+      }
+      return phpSource.filter((item) => item.command.toLowerCase().startsWith(typed)).slice(0, 32);
+    }
+
+    const prefix = hasTrailingSpace ? "" : token.toLowerCase();
+    return source.filter((item) => item.command.toLowerCase().startsWith(prefix)).slice(0, 32);
   }, [commandCatalog, commandContext, contextualCommands, helperMode, tree]);
 
   useEffect(() => {
@@ -721,20 +620,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     const after = current.slice(caret);
     const match = before.match(/(?:^|\s)([^\s]*)$/);
     const start = match ? before.length - match[1].length : 0;
-    // Replace only the current token, keeping the already typed command prefix.
-    // `php ` -> `php artisan`, `python m` -> `python manage.py check`, etc.
-    const tokenStart = start;
-    const prefixBeforeToken = before.slice(0, tokenStart);
-    const candidate = String(selected.command || "");
-    const lowerPrefix = prefixBeforeToken.toLowerCase();
-    const lowerCandidate = candidate.toLowerCase();
-    let replacement = candidate;
-    if (lowerCandidate.startsWith(lowerPrefix)) {
-      replacement = candidate.slice(prefixBeforeToken.length);
-    } else if (selected.label === "directory") {
-      replacement = candidate;
-    }
-    if (selected.label === "directory" && !replacement.endsWith("/")) replacement += "/";
+    let replacement = selected.command;
+    if (selected.label === "directory") replacement += "/";
     const nextBefore = `${before.slice(0, start)}${replacement}`;
     const next = `${nextBefore}${after}`;
     element.textContent = next;
@@ -755,37 +642,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       handleError("Interactive shell is not connected.");
       return false;
     }
-    // TTY processes (tinker/psysh) echo input themselves; do not local-echo
-    // or the terminal will show every line twice.
     socket.send(JSON.stringify({ type: "stdin", data }));
     return true;
   }, [handleError]);
-
-  const handleXtermData = useCallback((data) => {
-    sendInteractiveInput(data);
-  }, [sendInteractiveInput]);
-
-  const handleXtermResize = useCallback((cols, rows) => {
-    const socket = shellSocketRef.current;
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    try {
-      socket.send(JSON.stringify({ type: "resize", cols, rows }));
-    } catch { /* noop */ }
-  }, []);
-
-  const parseSingleEditorArgument = useCallback((raw) => {
-    const value = String(raw || "").trim();
-    if (!value) return null;
-    if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
-      const quote = value[0];
-      let inner = value.slice(1, -1);
-      if (quote === "'") inner = inner.replace(/'\\''/g, "'");
-      else inner = inner.replace(/\\([\\"$`])/g, "$1");
-      return inner;
-    }
-    if (/\s/.test(value)) return null;
-    return value;
-  }, []);
 
   const runCommand = useCallback(async (value, options = {}) => {
     const cmd = String(value ?? command).trim();
@@ -804,9 +663,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     if (editorCommand) {
       appendHistory({ type: "command", text: cmd, cwd: currentCwd });
       try {
-        const editorArg = parseSingleEditorArgument(editorCommand[1]);
-        if (!editorArg || /^(?:-|--)/.test(editorArg)) throw new Error("Use a single file path with the built-in editor.");
-        const path = editorArg.startsWith("/") ? editorArg : joinPath(currentCwd, editorArg);
+        const args = editorCommand[1].trim().split(/\s+/);
+        if (args.length !== 1 || /^(?:-|--)/.test(args[0])) throw new Error("Use a single file path with the built-in editor.");
+        const path = args[0].startsWith("/") ? args[0] : joinPath(currentCwd, args[0]);
         await (async () => {
           const response = await apiRequest({ method: "POST", url: `${apiRoot}/file/`, data: { token: session.token, action: "read", path } });
           const data = response?.data || {};
@@ -843,15 +702,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       setCommand("");
       setCompletionOpen(false);
       if (terminalInputRef.current) terminalInputRef.current.textContent = "";
-      // Hide outer prompt immediately; process.started will take over with interactiveRunning.
-      setCommandRunning(true);
       socket.send(JSON.stringify({ type: "command", command: cmd }));
       focusTerminal();
       return true;
     }
 
     runningRef.current = true;
-    setCommandRunning(true);
     setHistory((prev) => [...prev, { id: `${Date.now()}-cmd`, type: "command", text: cmd, cwd: currentCwd }].slice(-HISTORY_LIMIT));
     setCommandHistory((prev) => [cmd, ...prev.filter((item) => item !== cmd)].slice(0, COMMAND_HISTORY_LIMIT));
     setCommandHistoryIndex(null);
@@ -860,7 +716,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     if (terminalInputRef.current) terminalInputRef.current.textContent = "";
 
     try {
-      const response = await apiRequest({ method: "POST", url: `${apiRoot}/command/`, data: { token: session.token, command: cmd, confirm: Boolean(options.confirm), dry_run: Boolean(options.dryRun ?? dryRun) } });
+      const response = await apiRequest({ method: "POST", url: `${apiRoot}/command/`, data: { token: session.token, command: cmd, confirm: Boolean(options.confirm) } });
       const data = response?.data || {};
       if (data.result !== "success") throw new Error(data.detail || "Command failed.");
 
@@ -875,14 +731,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
 
       const nextCwd = data.cwd || currentCwd;
       setSession((prev) => (prev ? { ...prev, cwd: nextCwd } : prev));
-      if (data.dry_run) {
-        const planText = Array.isArray(data.plan)
-          ? data.plan.map((p, i) => `${i + 1}. ${(p.argv || []).join(" ")}${p.destructive ? "  [destructive]" : ""}`).join("\n")
-          : "dry-run";
-        setHistory((prev) => [...prev, { id: `${Date.now()}-dry`, type: "system", text: `Dry-run plan:\n${planText}` }].slice(-HISTORY_LIMIT));
-      } else {
-        setHistory((prev) => [...prev, { id: `${Date.now()}-out`, type: "output", exitCode: data.exit_code ?? 0, stdout: cleanOutput(data.stdout), stderr: cleanOutput(data.stderr) }].slice(-HISTORY_LIMIT));
-      }
+      setHistory((prev) => [...prev, { id: `${Date.now()}-out`, type: "output", exitCode: data.exit_code ?? 0, stdout: cleanOutput(data.stdout), stderr: cleanOutput(data.stderr) }].slice(-HISTORY_LIMIT));
       if (cmd === "pwd" || cmd.startsWith("cd ") || cmd === "cd" || cmd === "ls" || cmd.startsWith("ls ")) await refreshDirectory();
       else if (cmd.startsWith("rm ") || cmd.startsWith("rmdir ") || cmd.startsWith("mv ") || cmd.startsWith("cp ") || cmd.startsWith("mkdir ") || cmd.startsWith("touch ")) await refreshDirectory();
       return true;
@@ -891,10 +740,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       return false;
     } finally {
       runningRef.current = false;
-      setCommandRunning(false);
       focusTerminal();
     }
-  }, [apiRoot, command, currentCwd, dryRun, focusTerminal, handleError, isInteractiveCommand, parseSingleEditorArgument, refreshDirectory, session?.token]);
+  }, [apiRoot, command, currentCwd, focusTerminal, handleError, isInteractiveCommand, refreshDirectory, session?.token]);
 
   const runningRef = useRef(false);
 
@@ -1100,7 +948,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     try { await navigator.clipboard?.writeText(activeContent); } catch { /* ignore */ }
   }, [activeContent]);
 
-  const terminalLines = useMemo(() => history.flatMap((entry) => {
+  const terminalLines = history.flatMap((entry) => {
     if (entry.type === "command") return [{ key: `${entry.id}-command`, type: "command", cwd: entry.cwd || currentCwd, text: entry.text }];
     if (entry.type === "output") {
       const rows = [];
@@ -1110,139 +958,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       return rows;
     }
     return [{ key: entry.id, type: entry.type, text: entry.text }];
-  }), [history, currentCwd]);
-
-
-  const loadAudit = useCallback(async (page = 1, action = auditFilter, q = auditSearch) => {
-    if (!serviceId) return;
-    setAuditLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(Math.max(1, page)),
-        page_size: String(AUDIT_PAGE_SIZE),
-      });
-      if (action) params.set("action", action);
-      if (q) params.set("q", q);
-      const response = await apiRequest({ method: "GET", url: `${apiRoot}/audit/?${params.toString()}` });
-      const data = response?.data || {};
-      setAuditEvents(Array.isArray(data.events) ? data.events : []);
-      setAuditPage(Number(data.page) || page);
-      setAuditTotalPages(Number(data.total_pages) || 1);
-      setAuditTotal(Number(data.total) || 0);
-    } catch (err) {
-      handleError(err?.response?.data?.detail || err?.message || "Failed to load audit log.");
-    } finally {
-      setAuditLoading(false);
-    }
-  }, [apiRoot, auditFilter, auditSearch, handleError, serviceId]);
-
-  const downloadAudit = useCallback(async (fmt = "csv") => {
-    if (!serviceId) return;
-    try {
-      const params = new URLSearchParams({ format: fmt });
-      if (auditFilter) params.set("action", auditFilter);
-      if (auditSearch) params.set("q", auditSearch);
-      const response = await apiRequest({
-        method: "GET",
-        url: `${apiRoot}/audit/export/?${params.toString()}`,
-        responseType: "blob",
-      });
-      const blob = response?.data instanceof Blob
-        ? response.data
-        : new Blob([typeof response?.data === "string" ? response.data : JSON.stringify(response?.data ?? {})], {
-            type: fmt === "json" ? "application/json" : "text/csv",
-          });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `shell-audit.${fmt}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      handleError(err?.response?.data?.detail || err?.message || "Failed to download audit log.");
-    }
-  }, [apiRoot, auditFilter, auditSearch, handleError, serviceId]);
-
-  const loadEnv = useCallback(async () => {
-    if (!serviceId) return;
-    try {
-      const response = await apiRequest({ method: "GET", url: `${apiRoot}/env/` });
-      const data = response?.data || {};
-      setEnvItems(Array.isArray(data.env) ? data.env : []);
-      setEnvOpen(true);
-    } catch (err) {
-      handleError(err?.response?.data?.detail || err?.message || "Failed to load environment.");
-    }
-  }, [apiRoot, handleError, serviceId]);
-
-  const loadHealth = useCallback(async () => {
-    if (!serviceId) return;
-    try {
-      const response = await apiRequest({ method: "GET", url: `${apiRoot}/health/` });
-      setHealth(response?.data || null);
-    } catch {
-      setHealth(null);
-    }
-  }, [apiRoot, serviceId]);
-
-  const loadServerHistory = useCallback(async () => {
-    if (!serviceId || !session?.token) return;
-    try {
-      const response = await apiRequest({ method: "GET", url: `${apiRoot}/history/?limit=40` });
-      const commands = response?.data?.commands;
-      if (Array.isArray(commands) && commands.length) {
-        setCommandHistory((prev) => {
-          const merged = [...commands.map((c) => c.command), ...prev];
-          const seen = new Set();
-          return merged.filter((c) => {
-            if (!c || seen.has(c)) return false;
-            seen.add(c);
-            return true;
-          }).slice(0, COMMAND_HISTORY_LIMIT);
-        });
-      }
-    } catch { /* optional */ }
-  }, [apiRoot, serviceId, session?.token]);
-
-
-  
-  useEffect(() => {
-    const el = terminalRef.current;
-    if (!el || !session) return undefined;
-    const notify = () => {
-      const socket = shellSocketRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) return;
-      const cols = Math.max(40, Math.floor((el.clientWidth || 800) / 8));
-      const rows = Math.max(10, Math.floor((el.clientHeight || 400) / 18));
-      try { socket.send(JSON.stringify({ type: "resize", cols, rows })); } catch { /* noop */ }
-    };
-    const ro = new ResizeObserver(() => notify());
-    ro.observe(el);
-    notify();
-    return () => ro.disconnect();
-  }, [session]);
-
-  useEffect(() => {
-    if (session) {
-      loadHealth();
-      loadServerHistory();
-    }
-  }, [session, loadHealth, loadServerHistory]);
-
-
-  useEffect(() => {
-    if (!auditOpen) return undefined;
-    const t = setTimeout(() => {
-      const next = String(auditSearchInput || "").trim();
-      setAuditSearch(next);
-      setAuditPage(1);
-      loadAudit(1, auditFilter, next);
-    }, 400);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auditSearchInput, auditOpen]);
+  });
 
   if (!enabled) {
     return (
@@ -1308,18 +1024,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 <Tooltip title={sidebarOpen ? "Hide project" : "Show project"}><IconButton size="small" onClick={(e) => { e.stopPropagation(); setSidebarOpen((v) => !v); }} sx={{ color: "#8291a0" }}>{sidebarOpen ? <MenuOpenRoundedIcon sx={{ fontSize: 18 }} /> : <MenuRoundedIcon sx={{ fontSize: 18 }} />}</IconButton></Tooltip>
                 {session ? <Chip size="small" icon={<CheckCircleRoundedIcon sx={{ fontSize: "13px !important" }} />} label={currentCwd} sx={{ height: 23, color: "#a6b7c8", bgcolor: "rgba(53,211,153,.06)", border: "1px solid rgba(53,211,153,.14)", fontFamily: MONO, maxWidth: 420, ".MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }} /> : <Chip size="small" label="Disconnected" sx={{ height: 23, color: "#7f8b97", bgcolor: "rgba(148,163,184,.06)" }} />}
                 <Box sx={{ flex: 1 }} />
-                {session ? (
-                  <>
-                    <Tooltip title={dryRun ? "Dry-run ON (commands are planned only)" : "Dry-run OFF"}>
-                      <Chip size="small" onClick={(e) => { e.stopPropagation(); setDryRun((v) => !v); }} label={dryRun ? "dry-run" : "live"} sx={{ height: 22, cursor: "pointer", color: dryRun ? "#e9bd69" : "#8fa0b0", bgcolor: dryRun ? "rgba(246,199,108,.1)" : "rgba(148,163,184,.06)" }} />
-                    </Tooltip>
-                    <Tooltip title="Snippets"><Button size="small" onClick={(e) => { e.stopPropagation(); setSnippetsOpen(true); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Snippets</Button></Tooltip>
-                    <Tooltip title="Environment (masked)"><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Env</Button></Tooltip>
-                    <Tooltip title="Activity / audit log"><Button size="small" onClick={(e) => { e.stopPropagation(); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Audit</Button></Tooltip>
-                    {health?.container?.running ? <Chip size="small" label="healthy" sx={{ height: 22, color: "#73c9a0", bgcolor: "rgba(53,211,153,.08)" }} /> : session ? <Chip size="small" label="check" onClick={(e) => { e.stopPropagation(); loadHealth(); }} sx={{ height: 22, cursor: "pointer", color: "#9ab0c4" }} /> : null}
-                    <Tooltip title="Close session"><IconButton size="small" onClick={(e) => { e.stopPropagation(); closeSession(); }} sx={{ color: "#cc7f7f" }}><StopCircleOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
-                  </>
-                ) : <Button size="small" variant="outlined" startIcon={sessionLoading ? <CircularProgress size={14} color="inherit" /> : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />} onClick={(e) => { e.stopPropagation(); createSession(); }} disabled={sessionLoading} sx={{ borderColor: "rgba(96,165,250,.3)", color: "#9ac2ed", textTransform: "none", fontSize: 11.5 }}>Open Shell</Button>}
+                {session ? <Tooltip title="Close session"><IconButton size="small" onClick={(e) => { e.stopPropagation(); closeSession(); }} sx={{ color: "#cc7f7f" }}><StopCircleOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip> : <Button size="small" variant="outlined" startIcon={sessionLoading ? <CircularProgress size={14} color="inherit" /> : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />} onClick={(e) => { e.stopPropagation(); createSession(); }} disabled={sessionLoading} sx={{ borderColor: "rgba(96,165,250,.3)", color: "#9ac2ed", textTransform: "none", fontSize: 11.5 }}>Open Shell</Button>}
               </Box>
 
               <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58, userSelect: "text", WebkitUserSelect: "text" }} onScroll={() => completionOpen && requestAnimationFrame(updateHelperPosition)}>
@@ -1333,43 +1038,23 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     <Box key={line.key} sx={{ color: line.type === "stderr" || line.type === "error" ? "#ff9b8f" : line.type === "system" ? "#87b4d9" : "#dce6ef", whiteSpace: "pre-wrap", overflowWrap: "anywhere", minHeight: line.text ? 20 : 6, userSelect: "text", WebkitUserSelect: "text" }}>{line.text || " "}</Box>
                   )
                 ))}
-                                {interactiveRunning ? (
-                  <Box sx={{ my: 1 }}>
-                    <ShellXterm
-                      active={interactiveRunning}
-                      onData={handleXtermData}
-                      onResize={handleXtermResize}
-                      writeRef={xtermWriteRef}
-                      height={Math.max(280, (typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.35) : 320))}
-                    />
-                    <Typography sx={{ mt: 0.5, fontSize: 11, color: "#5e6d7c" }}>
-                      Interactive session · Ctrl+C interrupt · Ctrl+D exit · typed keys go to the process
-                    </Typography>
-                  </Box>
-                ) : null}
-                {session && !interactiveRunning ? (
-                  <Box sx={{ display: "flex", alignItems: "flex-start", minHeight: 22, opacity: commandRunning && !interactiveRunning ? 0.55 : 1 }}>
-                    {/* Outer shell prompt only when idle. During interactive PTY (tinker, etc.)
-                        the child process owns the prompt (e.g. PsySH "> "); do not interfere. */}
-                    {!interactiveRunning && !commandBusy ? (
-                      <Typography component="span" sx={{ color: "#78b6e7", fontFamily: MONO, fontSize: 13, mr: .7, flexShrink: 0 }}>{currentCwd} $</Typography>
-                    ) : interactiveRunning ? (
-                      <Typography component="span" sx={{ color: "#5a6a7a", fontFamily: MONO, fontSize: 13, mr: .7, flexShrink: 0, userSelect: "none" }}>…</Typography>
-                    ) : null}
+                {session ? (
+                  <Box sx={{ display: "flex", alignItems: "flex-start", minHeight: 22 }}>
+                    <Typography component="span" sx={{ color: "#78b6e7", fontFamily: MONO, fontSize: 13, mr: .7, flexShrink: 0 }}>{currentCwd} $</Typography>
                     <Box
                       ref={terminalInputRef}
-                      contentEditable={!commandRunning || interactiveRunning}
+                      contentEditable
                       suppressContentEditableWarning
                       spellCheck={false}
                       role="textbox"
-                      aria-label={interactiveRunning ? "Interactive process input" : "Shell command line"}
+                      aria-label="Shell command line"
                       onInput={(e) => {
                         const text = e.currentTarget.textContent || "";
                         if (interactiveRunning) setInteractiveInput(text);
                         else setCommand(text);
                         setCommandHistoryIndex(null);
                       }}
-                      data-placeholder={interactiveRunning ? (interactiveSecret ? "password…" : "") : (commandRunning ? "running…" : "type a command…")}
+                      data-placeholder={interactiveRunning ? (interactiveSecret ? "password…" : "type input…") : "type a command…"}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1380,8 +1065,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                             setInteractiveInput("");
                             return;
                           }
-                          // Outer shell is waiting for a previous command — ignore.
-                          if (commandBusy) return;
                           if (completionOpen && completionSuggestions.length) {
                             const nextCommand = applyCompletion(completionIndex);
                             setCompletionOpen(false);
@@ -1397,13 +1080,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                           if (hasSelectedTerminalText) return;
                           e.preventDefault();
                           const socket = shellSocketRef.current;
-                          if (socket?.readyState === WebSocket.OPEN) {
-                            socket.send(JSON.stringify({ type: "signal", name: "ctrl-c" }));
-                            appendHistory({ type: "system", text: "^C" });
-                            setInteractiveSecret(false);
-                            if (terminalInputRef.current) terminalInputRef.current.textContent = "";
-                            setInteractiveInput("");
-                          }
+                          if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "signal", name: "ctrl-c" }));
                           return;
                         }
                         if (!interactiveRunning && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
@@ -1412,12 +1089,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                             // Let the browser perform its native copy operation.
                             return;
                           }
-                        }
-                        if (interactiveRunning && e.ctrlKey && e.key.toLowerCase() === "d") {
-                          e.preventDefault();
-                          sendInteractiveInput("\x04");
-                          appendHistory({ type: "system", text: "^D" });
-                          return;
                         }
                         if (interactiveRunning && e.key === "Tab") {
                           e.preventDefault();
@@ -1570,166 +1241,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           {replaceDialog.canReplace ? <Button color="error" variant="contained" onClick={replaceActiveSession} disabled={replaceDialog.loading}>{replaceDialog.loading ? <CircularProgress size={16} color="inherit" /> : "Terminate & open new shell"}</Button> : null}
         </DialogActions>
       </Dialog>
-
-      <Dialog open={Boolean(confirmCommand)} onClose={() => setConfirmCommand(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Confirm command</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            This command changes application state. Run it anyway?
-          </DialogContentText>
-          <Box sx={{ mt: 1.2, p: 1, bgcolor: "#0b1016", borderRadius: .6, fontFamily: MONO, fontSize: 12, color: "#cbd6e0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-            {confirmCommand || ""}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmCommand(null)}>Cancel</Button>
-          <Button variant="contained" color="warning" onClick={() => { const cmd = confirmCommand; setConfirmCommand(null); if (cmd) runCommand(cmd, { confirm: true }); }}>Run</Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={auditOpen} onClose={() => setAuditOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-          <span>Shell activity log</span>
-          <Typography component="span" sx={{ fontSize: 12, color: "text.secondary", fontWeight: 400 }}>
-            {auditTotal} event{auditTotal === 1 ? "" : "s"}
-          </Typography>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Box
-            component="input"
-            value={auditSearchInput}
-            onChange={(e) => setAuditSearchInput(e.target.value)}
-            placeholder="Search command, path, user, detail…"
-            sx={{
-              width: "100%",
-              mb: 1.5,
-              px: 1.25,
-              py: 0.9,
-              borderRadius: 1,
-              border: "1px solid rgba(148,163,184,.25)",
-              bgcolor: "rgba(15,23,32,.9)",
-              color: "#e7eef6",
-              fontFamily: MONO,
-              fontSize: 13,
-              outline: "none",
-            }}
-          />
-          <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: "wrap" }}>
-            {[
-              { key: "", label: "All" },
-              { key: "command", label: "Commands" },
-              { key: "file_write", label: "File writes" },
-              { key: "file_delete", label: "Deletes" },
-              { key: "interactive_start", label: "Interactive" },
-              { key: "session_open", label: "Sessions" },
-            ].map((f) => (
-              <Chip
-                key={f.key || "all"}
-                size="small"
-                label={f.label}
-                onClick={() => {
-                  setAuditFilter(f.key);
-                  setAuditPage(1);
-                  loadAudit(1, f.key, auditSearch);
-                }}
-                sx={{
-                  height: 24,
-                  cursor: "pointer",
-                  color: auditFilter === f.key ? "#e7eef6" : "#8fa0b0",
-                  bgcolor: auditFilter === f.key ? "rgba(96,165,250,.2)" : "rgba(148,163,184,.08)",
-                }}
-              />
-            ))}
-          </Stack>
-          {auditLoading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}><CircularProgress size={22} /></Box>
-          ) : (
-            <Box sx={{ fontFamily: MONO, fontSize: 12, maxHeight: 420, overflow: "auto" }}>
-              {auditEvents.length === 0 ? (
-                <Typography color="text.secondary">No events on this page.</Typography>
-              ) : auditEvents.map((ev) => (
-                <Box key={ev.id} sx={{ py: .7, borderBottom: "1px solid rgba(148,163,184,.12)" }}>
-                  <Typography sx={{ fontSize: 11, color: "#8fa0b0" }}>
-                    {ev.created_at} · {ev.action} · {ev.user_email || ev.user_id || "—"}
-                    {ev.exit_code != null ? ` · exit=${ev.exit_code}` : ""}
-                    {ev.success === false ? " · failed" : ""}
-                  </Typography>
-                  <Typography sx={{ fontFamily: MONO, fontSize: 12.5, color: ev.success ? "#dce6ef" : "#ff9b8f", whiteSpace: "pre-wrap" }}>
-                    {ev.command || ev.path || ev.detail || "—"}
-                  </Typography>
-                  {ev.output_preview ? (
-                    <Typography sx={{ fontFamily: MONO, fontSize: 11, color: "#7f8b97", whiteSpace: "pre-wrap" }}>
-                      {String(ev.output_preview).slice(0, 400)}
-                    </Typography>
-                  ) : null}
-                </Box>
-              ))}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button
-              size="small"
-              disabled={auditLoading || auditPage <= 1}
-              onClick={() => { const p = auditPage - 1; setAuditPage(p); loadAudit(p, auditFilter, auditSearch); }}
-            >
-              Previous
-            </Button>
-            <Typography sx={{ fontSize: 12, color: "text.secondary", minWidth: 90, textAlign: "center" }}>
-              Page {auditPage} / {auditTotalPages}
-            </Typography>
-            <Button
-              size="small"
-              disabled={auditLoading || auditPage >= auditTotalPages}
-              onClick={() => { const p = auditPage + 1; setAuditPage(p); loadAudit(p, auditFilter, auditSearch); }}
-            >
-              Next
-            </Button>
-          </Stack>
-          <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Button size="small" onClick={() => downloadAudit("csv")}>Download CSV</Button>
-            <Button size="small" onClick={() => downloadAudit("json")}>Download JSON</Button>
-            <Button onClick={() => loadAudit(auditPage, auditFilter, auditSearch)}>Refresh</Button>
-            <Button onClick={() => setAuditOpen(false)}>Close</Button>
-          </Stack>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog open={envOpen} onClose={() => setEnvOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Container environment (secrets masked)</DialogTitle>
-        <DialogContent dividers>
-          <Box sx={{ fontFamily: MONO, fontSize: 12, maxHeight: 480, overflow: "auto" }}>
-            {envItems.map((item) => (
-              <Box key={item.key} sx={{ display: "flex", gap: 1, py: .35 }}>
-                <Typography sx={{ fontFamily: MONO, fontSize: 12, color: "#9ac2ed", minWidth: 160 }}>{item.key}</Typography>
-                <Typography sx={{ fontFamily: MONO, fontSize: 12, color: item.masked ? "#e9bd69" : "#dce6ef", wordBreak: "break-all" }}>{item.value}</Typography>
-              </Box>
-            ))}
-          </Box>
-        </DialogContent>
-        <DialogActions><Button onClick={() => setEnvOpen(false)}>Close</Button></DialogActions>
-      </Dialog>
-
-      <Dialog open={snippetsOpen} onClose={() => setSnippetsOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Command snippets</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={.5}>
-            {(SHELL_SNIPPETS[platform] || SHELL_SNIPPETS.generic || []).map((s) => (
-              <Button key={s.command} fullWidth sx={{ justifyContent: "flex-start", textTransform: "none", fontFamily: MONO, fontSize: 12 }} onClick={() => { setSnippetsOpen(false); runCommand(s.command); }}>
-                {s.label}
-              </Button>
-            ))}
-            {(SHELL_SNIPPETS.generic || []).filter((s) => !(SHELL_SNIPPETS[platform] || []).some((x) => x.command === s.command)).map((s) => (
-              <Button key={`g-${s.command}`} fullWidth sx={{ justifyContent: "flex-start", textTransform: "none", fontFamily: MONO, fontSize: 12, color: "#8fa0b0" }} onClick={() => { setSnippetsOpen(false); runCommand(s.command); }}>
-                {s.label}
-              </Button>
-            ))}
-          </Stack>
-        </DialogContent>
-        <DialogActions><Button onClick={() => setSnippetsOpen(false)}>Close</Button></DialogActions>
-      </Dialog>
-
     </>
   );
 }
