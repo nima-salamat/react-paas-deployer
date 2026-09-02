@@ -15,6 +15,7 @@ import LogPanel from "./LogPanel";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import WifiIcon from "@mui/icons-material/Wifi";
 import WifiOffIcon from "@mui/icons-material/WifiOff";
+import SyncIcon from "@mui/icons-material/Sync";
 
 export default function LogsPanel({
   serviceLogs,
@@ -29,32 +30,51 @@ export default function LogsPanel({
   handleCopyEntries,
 }) {
   const deployLive = Boolean(deployLogs?.connected);
+  const deployReconnecting = Boolean(deployLogs?.reconnecting);
 
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960, width: "100%" }}>
       <LogPanel
         title="Service logs"
-        subtitle="Latest logs stay at the bottom. Scroll up for older lines."
+        subtitle="Live stream + retained history"
         entries={serviceLogs.entries}
         loading={serviceLogs.loading}
         error={serviceLogs.error}
         connected={serviceLogs.connected}
+        reconnecting={serviceLogs.reconnecting}
         paused={serviceLogs.paused}
         filter={serviceLogs.filter}
         level={serviceLogs.level}
+        searchMode={serviceLogs.searchMode}
+        onSearchModeChange={serviceLogActions.setSearchMode}
+        historyQInput={serviceLogs.historyQInput}
+        onHistoryQChange={serviceLogActions.setHistoryQInput}
+        supportServerSearch
+        gap={serviceLogs.gap}
+        onDismissGap={() => serviceLogActions.setGap?.(null)}
+        usage={serviceLogs.usage}
+        policy={serviceLogs.policy}
+        searching={serviceLogs.searching}
+        hasMoreOlder={serviceLogs.hasMoreOlder}
+        loadingOlder={serviceLogs.loadingOlder}
+        onLoadOlder={serviceLogActions.loadOlder}
         onFilterChange={serviceLogActions.setFilter}
         onLevelChange={serviceLogActions.setLevel}
         onTogglePaused={serviceLogActions.onTogglePaused}
         onRefresh={serviceLogActions.refresh}
         onClear={serviceLogActions.clear}
+        onServerDownload={() => serviceLogActions.download?.("txt")}
         onDownload={(entries) =>
           handleDownloadEntries(`service-${id}-logs.txt`, entries)
         }
+        exporting={serviceLogs.exporting}
         onCopy={(entries) => handleCopyEntries(entries)}
         onJumpToLatest={() => {
-          const el = serviceLogActions.scrollRef.current;
+          serviceLogActions.jumpToLatest?.();
+          const el = serviceLogActions.scrollRef?.current;
           if (el) el.scrollTop = el.scrollHeight;
         }}
+        onRetryConnection={serviceLogActions.retryConnection}
         scrollRef={serviceLogActions.scrollRef}
         emptyText="No service logs yet."
       />
@@ -85,15 +105,29 @@ export default function LogsPanel({
                 Deploy history
               </Typography>
               <Chip
-                icon={deployLive ? <WifiIcon /> : <WifiOffIcon />}
-                label={deployLive ? "Live events" : "Offline"}
-                color={deployLive ? "success" : "default"}
+                icon={
+                  deployReconnecting ? (
+                    <SyncIcon />
+                  ) : deployLive ? (
+                    <WifiIcon />
+                  ) : (
+                    <WifiOffIcon />
+                  )
+                }
+                label={
+                  deployReconnecting
+                    ? "Reconnecting…"
+                    : deployLive
+                    ? "Live events"
+                    : "Offline"
+                }
+                color={deployLive ? "success" : deployReconnecting ? "warning" : "default"}
                 size="small"
                 sx={{ fontWeight: 600 }}
               />
             </Stack>
             <Typography variant="caption" color="text.secondary">
-              Latest at the bottom. Live deployment events appear here while connected.
+              Latest at the bottom. Live deployment events appear while connected.
             </Typography>
           </Box>
 
@@ -113,7 +147,7 @@ export default function LogsPanel({
               <InputLabel>Deploy</InputLabel>
               <Select
                 label="Deploy"
-                value={deployLogs.deployId}
+                value={deployLogs.deployId || ""}
                 onChange={(e) => deployLogActions.setDeployId(e.target.value)}
               >
                 {deploys.length ? (
@@ -163,6 +197,7 @@ export default function LogsPanel({
           loadingOlder={deployLogs.loadingOlder}
           error={deployLogs.error}
           connected={deployLive}
+          reconnecting={deployReconnecting}
           showConnectionChip
           filter={deployLogs.filter}
           level={deployLogs.level}
@@ -170,19 +205,26 @@ export default function LogsPanel({
           onLevelChange={deployLogActions.setLevel}
           onRefresh={() => deployLogActions.refresh(deployLogs.deployId)}
           onClear={deployLogActions.clear}
+          onServerDownload={
+            deployLogActions.download
+              ? () => deployLogActions.download(deployLogs.deployId)
+              : undefined
+          }
           onDownload={(entries) =>
             handleDownloadEntries(
               `deploy-${deployLogs.deployId || id}-logs.txt`,
               entries
             )
           }
+          exporting={deployLogs.exporting}
           onCopy={(entries) => handleCopyEntries(entries)}
           onJumpToLatest={() => {
-            const el = deployLogActions.scrollRef.current;
+            const el = deployLogActions.scrollRef?.current;
             if (el) el.scrollTop = el.scrollHeight;
           }}
           onLoadOlder={deployLogActions.loadOlder}
           hasMoreOlder={deployLogs.hasMoreOlder}
+          onRetryConnection={deployLogActions.retryConnection}
           scrollRef={deployLogActions.scrollRef}
           emptyText="No deploy history available. Start a deploy to see live events."
         />

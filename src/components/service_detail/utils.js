@@ -156,14 +156,116 @@ export function inferLogLevel(line) {
     lower.includes("fatal") ||
     lower.includes("panic") ||
     lower.includes("traceback") ||
-    lower.includes("error") ||
+    /\berror\b/.test(lower) ||
     lower.includes("exception")
   ) {
     return "error";
   }
-  if (lower.includes("warn") || lower.includes("deprecated")) return "warning";
-  if (lower.includes("debug")) return "debug";
+  if (/\bwarn(ing)?\b/.test(lower) || lower.includes("deprecated")) return "warning";
+  if (/\bdebug\b/.test(lower)) return "debug";
   return "info";
+}
+
+/**
+ * Canonical log entry shape used by LogPanel / LogRow.
+ * Accepts heterogeneous backend payloads (service WS, deploy WS, REST history).
+ */
+export function normalizeLogEntry(raw, fallbackText, extra = {}) {
+  if (raw == null && fallbackText == null) return null;
+
+  if (typeof raw === "string" || (raw == null && fallbackText != null)) {
+    const text = String(fallbackText ?? raw ?? "").replace(/\r$/, "");
+    if (!text.trim()) return null;
+    const timestamp = extra.timestamp || null;
+    return {
+      id: extra.id || `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      key: extra.key || null,
+      text,
+      message: text,
+      level: extra.level || inferLogLevel(text),
+      timestamp,
+      ts: timestamp,
+      cursor: extra.cursor || null,
+      stream: extra.stream || null,
+      stage: extra.stage || null,
+      progress: extra.progress != null ? extra.progress : null,
+      seq: extra.seq != null ? extra.seq : null,
+      raw: extra.raw ?? raw ?? fallbackText,
+    };
+  }
+
+  if (typeof raw !== "object") {
+    return normalizeLogEntry(null, String(raw), extra);
+  }
+
+  const timestamp =
+    raw.timestamp ||
+    raw.ts ||
+    raw.created_at ||
+    raw.time ||
+    raw.datetime ||
+    extra.timestamp ||
+    null;
+
+  let level = String(raw.level || raw.severity || raw.type || extra.level || "")
+    .toLowerCase()
+    .trim();
+  if (level === "warn") level = "warning";
+  if (!level || level === "null" || level === "undefined") level = "";
+
+  let text =
+    raw.message ??
+    raw.text ??
+    raw.log ??
+    raw.line ??
+    raw.detail ??
+    raw.content ??
+    fallbackText ??
+    null;
+
+  if (text == null && (raw.stage || raw.progress != null)) {
+    const parts = [];
+    if (raw.stage) parts.push(`[${raw.stage}]`);
+    if (raw.progress != null && raw.progress !== "") parts.push(`(${raw.progress}%)`);
+    text = parts.join(" ") || JSON.stringify(raw);
+  }
+
+  if (text != null && typeof text === "object") {
+    text = JSON.stringify(text, null, 2);
+  }
+  text = String(text ?? "").replace(/\r$/, "");
+  if (!text.trim() && !raw.stage) return null;
+
+  if (!level) level = inferLogLevel(text);
+
+  const id = String(
+    raw.cursor ||
+      raw.id ||
+      raw.pk ||
+      extra.id ||
+      `${timestamp || Date.now()}-${raw.seq ?? Math.random().toString(36).slice(2, 8)}`
+  );
+
+  return {
+    id,
+    key: extra.key || id,
+    text,
+    message: text,
+    level,
+    timestamp,
+    ts: timestamp,
+    cursor: raw.cursor || extra.cursor || null,
+    stream: raw.stream || null,
+    stage: raw.stage || extra.stage || null,
+    progress:
+      raw.progress != null
+        ? raw.progress
+        : extra.progress != null
+        ? extra.progress
+        : null,
+    seq: raw.seq != null ? raw.seq : null,
+    raw,
+  };
 }
 
 export function normalizeTextEntries(input) {

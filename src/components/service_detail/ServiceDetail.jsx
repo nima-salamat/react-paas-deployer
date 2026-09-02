@@ -29,6 +29,8 @@ import SettingsPanel from "./components/SettingsPanel";
 import ShellPanel from "./components/ShellPanel";
 import MobileNavFab from "./components/MobileNavFab";
 import MobileServiceHeader from "./components/MobileServiceHeader";
+import useServiceLogs from "./hooks/useServiceLogs";
+import useDeployLogs from "./hooks/useDeployLogs";
 
 import {
   API_BASE,
@@ -39,9 +41,6 @@ import {
   NETWORK_API_ROOT,
   VOLUME_API_ROOT,
   PLANS_BASE,
-  SERVICE_LOG_MAX_LINES,
-  DEPLOY_LOG_PAGE_SIZE,
-  DEPLOY_LOG_POLL_INTERVAL,
   DEFAULT_REFRESH_INTERVAL_MS,
   MUTABLE_DB_CONFIG_KEYS,
 } from "./constants";
@@ -51,9 +50,6 @@ import {
   isDbPlatform,
   buildConfigPayload,
   parseDeployConfig,
-  normalizeTextEntries,
-  mergeEntries,
-  mergeEntriesPrepend,
   mergeObjects,
   downloadTextFile,
   getDeployEntryText,
@@ -136,52 +132,41 @@ export default function ServiceDetail() {
   const [serviceRam, setServiceRam] = useState(null);
   const [serviceStatusLoadingManual, setServiceStatusLoadingManual] = useState(false);
 
-  const [serviceLogsEntries, setServiceLogsEntries] = useState([]);
-  const [serviceLogsConnected, setServiceLogsConnected] = useState(false);
-  const [serviceLogsError, setServiceLogsError] = useState(null);
-  const [serviceLogsPaused, setServiceLogsPaused] = useState(false);
-  const [serviceLogsFilter, setServiceLogsFilter] = useState("");
-  const [serviceLogsLevel, setServiceLogsLevel] = useState("all");
-  const [serviceLogsLoading, setServiceLogsLoading] = useState(false);
-
-  const [deployLogEntries, setDeployLogEntries] = useState([]);
-  const [deployLogError, setDeployLogError] = useState(null);
-  const [deployLogLoading, setDeployLogLoading] = useState(false);
-  const [deployLogLoadingOlder, setDeployLogLoadingOlder] = useState(false);
-  const [deployLogFilter, setDeployLogFilter] = useState("");
-  const [deployLogLevel, setDeployLogLevel] = useState("all");
-  const [deployLogDeployId, setDeployLogDeployId] = useState("");
-  const [deployLogLiveConnected, setDeployLogLiveConnected] = useState(false);
-
   const mountedRef = useRef(false);
   const fetchIdRef = useRef(0);
   const fetchDeploysLock = useRef(false);
   const refreshIntervalRef = useRef(null);
   const pageInfoRef = useRef(pageInfo);
   const autoRefreshBusyRef = useRef(false);
-
   const zipInputRef = useRef(null);
   const editZipInputRef = useRef(null);
 
-  const serviceLogPausedRef = useRef(false);
-  const serviceLogSocketRef = useRef(null);
-  const serviceLogReconnectTimerRef = useRef(null);
-  const serviceLogReconnectAttemptRef = useRef(0);
-  const serviceLogShouldReconnectRef = useRef(true);
-  const serviceLogScrollRef = useRef(null);
+  // runtime service logs: useServiceLogs hook (single source of truth)
+  const serviceLogs = useServiceLogs({
+    serviceId: id,
+    enabled: Boolean(id) && activeTab === "logs",
+  });
 
-  const deployLogScrollRef = useRef(null);
-  const deployLogPollTimerRef = useRef(null);
-  const deployLogPollLockRef = useRef(false);
+  // deploy logs: dedicated hook (WS + poll fallback)
+  const [deployLogDeployId, setDeployLogDeployId] = useState("");
   const deployLogManualSelectRef = useRef(false);
-  const deployLogOldestCursorRef = useRef(null);
-  const deployLogNewestCursorRef = useRef(null);
-  const deployLogHasMoreOlderRef = useRef(false);
-  const deployWsRef = useRef(null);
-  const deployWsReconnectTimerRef = useRef(null);
-  const deployWsReconnectAttemptRef = useRef(0);
-  const deployWsShouldReconnectRef = useRef(true);
   const deployLogDeployIdRef = useRef("");
+  useEffect(() => {
+    deployLogDeployIdRef.current = deployLogDeployId;
+  }, [deployLogDeployId]);
+
+  const currentDeployStatus = (() => {
+    if (!deployLogDeployId) return "";
+    const d = deploys.find((x) => String(x.id ?? x.pk ?? "") === String(deployLogDeployId));
+    return d?.status || "";
+  })();
+
+  const deployLogsHook = useDeployLogs({
+    deployId: deployLogDeployId,
+    enabled: Boolean(deployLogDeployId) && activeTab === "logs",
+    serviceStatus: service?.status,
+    deployStatus: currentDeployStatus,
+  });
 
   useEffect(() => {
     mountedRef.current = true;
@@ -239,9 +224,6 @@ export default function ServiceDetail() {
   }, [allowedTabs, activeTab]);
 
 
-  useEffect(() => {
-    serviceLogPausedRef.current = serviceLogsPaused;
-  }, [serviceLogsPaused]);
 
   useEffect(() => {
     deployLogDeployIdRef.current = deployLogDeployId;
@@ -250,176 +232,6 @@ export default function ServiceDetail() {
   const safeSetSnackbar = useCallback((severity, message) => {
     setSnackbar({ severity, message });
   }, []);
-
-  const stopServiceLogConnection = useCallback(() => {
-    serviceLogShouldReconnectRef.current = false;
-    serviceLogReconnectAttemptRef.current = 0;
-
-    if (serviceLogReconnectTimerRef.current) {
-      clearTimeout(serviceLogReconnectTimerRef.current);
-      serviceLogReconnectTimerRef.current = null;
-    }
-
-    if (serviceLogSocketRef.current) {
-      try {
-        serviceLogSocketRef.current.close();
-      } catch {
-        // ignore
-      }
-      serviceLogSocketRef.current = null;
-    }
-
-    setServiceLogsConnected(false);
-  }, []);
-
-  const stopDeployLogWs = useCallback(() => {
-    deployWsShouldReconnectRef.current = false;
-    deployWsReconnectAttemptRef.current = 0;
-    if (deployWsReconnectTimerRef.current) {
-      clearTimeout(deployWsReconnectTimerRef.current);
-      deployWsReconnectTimerRef.current = null;
-    }
-    if (deployWsRef.current) {
-      try {
-        deployWsRef.current.close();
-      } catch {
-        /* ignore */
-      }
-      deployWsRef.current = null;
-    }
-    setDeployLogLiveConnected(false);
-  }, []);
-
-  const appendDeployLiveEvent = useCallback((payload) => {
-    if (!payload || typeof payload !== "object") return;
-    const stage = payload.stage || "";
-    const message = payload.message || "";
-    const level = String(payload.level || "info").toLowerCase();
-    const progress = payload.progress;
-    const ts = payload.timestamp || new Date().toISOString();
-    const parts = [];
-    if (stage) parts.push(`[${stage}]`);
-    if (progress != null && progress !== "") parts.push(`(${progress}%)`);
-    if (message) parts.push(message);
-    const text = parts.join(" ").trim() || JSON.stringify(payload);
-    const key = `live-${payload.deploy_id || ""}-${stage}-${ts}-${text.slice(0, 48)}`;
-    const entry = {
-      key,
-      text,
-      level: level === "warn" ? "warning" : level,
-      timestamp: ts,
-      stage: stage || undefined,
-      progress: progress != null ? progress : undefined,
-      raw: payload,
-    };
-    setDeployLogEntries((prev) => {
-      if (prev.some((e) => e.key === key)) return prev;
-      const out = [...prev, entry];
-      if (out.length > SERVICE_LOG_MAX_LINES) {
-        return out.slice(out.length - SERVICE_LOG_MAX_LINES);
-      }
-      return out;
-    });
-  }, []);
-
-  const connectDeployLogStream = useCallback((deployId) => {
-    if (!deployId) return;
-    deployWsShouldReconnectRef.current = true;
-
-    if (deployWsRef.current) {
-      try {
-        deployWsRef.current.close();
-      } catch {
-        /* ignore */
-      }
-      deployWsRef.current = null;
-    }
-    if (deployWsReconnectTimerRef.current) {
-      clearTimeout(deployWsReconnectTimerRef.current);
-      deployWsReconnectTimerRef.current = null;
-    }
-
-    const token = localStorage.getItem("access");
-    if (!token) {
-      setDeployLogError((prev) => prev || "Authentication required for live deploy events.");
-      setDeployLogLiveConnected(false);
-      return;
-    }
-
-    let backendUrl;
-    try {
-      backendUrl = new URL(API_BASE);
-    } catch {
-      setDeployLogError("Invalid API base URL for WebSocket.");
-      return;
-    }
-    const protocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
-    const socketUrl = `${protocol}//${backendUrl.host}/ws/deployments/${deployId}/?token=${encodeURIComponent(token)}`;
-    const socket = new WebSocket(socketUrl);
-    deployWsRef.current = socket;
-
-    socket.onopen = () => {
-      if (!mountedRef.current) return;
-      if (deployLogDeployIdRef.current !== String(deployId)) {
-        try {
-          socket.close();
-        } catch {
-          /* ignore */
-        }
-        return;
-      }
-      deployWsReconnectAttemptRef.current = 0;
-      setDeployLogLiveConnected(true);
-      setDeployLogError(null);
-    };
-
-    socket.onmessage = (event) => {
-      if (!mountedRef.current) return;
-      if (deployLogDeployIdRef.current !== String(deployId)) return;
-      let payload;
-      try {
-        payload = JSON.parse(event.data);
-      } catch {
-        return;
-      }
-      if (payload?.type === "deployment.connected") {
-        setDeployLogLiveConnected(true);
-        return;
-      }
-      if (payload?.type === "deployment.event") {
-        appendDeployLiveEvent(payload.event || payload);
-        return;
-      }
-      // Some sinks may send the event object directly
-      if (payload?.stage || payload?.message) {
-        appendDeployLiveEvent(payload);
-      }
-    };
-
-    socket.onerror = () => {
-      if (!mountedRef.current) return;
-      setDeployLogLiveConnected(false);
-    };
-
-    socket.onclose = (evt) => {
-      if (!mountedRef.current) return;
-      setDeployLogLiveConnected(false);
-      if (!deployWsShouldReconnectRef.current || evt.wasClean) return;
-      if (deployLogDeployIdRef.current !== String(deployId)) return;
-
-      deployWsReconnectAttemptRef.current += 1;
-      const attempt = deployWsReconnectAttemptRef.current;
-      const delay = Math.min(15000, 1000 * 2 ** Math.max(0, attempt - 1));
-      deployWsReconnectTimerRef.current = setTimeout(() => {
-        if (!mountedRef.current || !deployWsShouldReconnectRef.current) return;
-        if (deployLogDeployIdRef.current !== String(deployId)) return;
-        connectDeployLogStream(deployId);
-      }, delay);
-    };
-  }, [appendDeployLiveEvent]);
-
-
-
 
   const handleDownloadZip = useCallback(async (deploy) => {
     const deployId = deploy?.id ?? deploy?.pk;
@@ -468,18 +280,7 @@ export default function ServiceDetail() {
     }
   }, [safeSetSnackbar]);
 
-  const appendServiceLogEntries = useCallback((incoming) => {
-    const next = normalizeTextEntries(incoming);
-    if (!next.length) return;
-
-    setServiceLogsEntries((prev) => {
-      const out = [...prev, ...next];
-      if (out.length > SERVICE_LOG_MAX_LINES) {
-        return out.slice(out.length - SERVICE_LOG_MAX_LINES);
-      }
-      return out;
-    });
-  }, []);
+  const appendServiceLogEntries = useCallback(() => { /* migrated to useServiceLogs */ }, []);
 
   const checkDeployNameAvailable = useCallback(
     async (candidate) => {
@@ -656,180 +457,6 @@ export default function ServiceDetail() {
     [id, serviceStatusLoadingManual, normalizePercent]
   );
 
-  const fetchServiceLogs = useCallback(async () => {
-    if (!id) return;
-    setServiceLogsLoading(true);
-    setServiceLogsError(null);
-    try {
-      const resp = await apiRequest({ method: "GET", url: `${SERVICE_BASE}${id}/logs/` });
-      if (!mountedRef.current) return;
-      setServiceLogsEntries(normalizeTextEntries(resp.data?.logs));
-    } catch (err) {
-      if (!mountedRef.current) return;
-      setServiceLogsError(err.response?.data?.detail || "Unable to load service logs.");
-    } finally {
-      if (mountedRef.current) setServiceLogsLoading(false);
-    }
-  }, [id]);
-
-  const connectServiceLogStream = useCallback(() => {
-    if (!id) return;
-    serviceLogShouldReconnectRef.current = true;
-
-    if (serviceLogSocketRef.current) {
-      try { serviceLogSocketRef.current.close(); } catch {}
-      serviceLogSocketRef.current = null;
-    }
-    if (serviceLogReconnectTimerRef.current) {
-      clearTimeout(serviceLogReconnectTimerRef.current);
-      serviceLogReconnectTimerRef.current = null;
-    }
-
-    const token = localStorage.getItem("access");
-    if (!token) {
-      setServiceLogsError("Authentication is required for live logs.");
-      setServiceLogsConnected(false);
-      return;
-    }
-
-    setServiceLogsError(null);
-    const backendUrl = new URL(API_BASE);
-    const protocol = backendUrl.protocol === "https:" ? "wss:" : "ws:";
-    const socketUrl = `${protocol}//${backendUrl.host}/ws/services/logs/${id}/?token=${encodeURIComponent(token)}`;
-    const socket = new WebSocket(socketUrl);
-    serviceLogSocketRef.current = socket;
-
-    socket.onopen = () => {
-      if (!mountedRef.current) return;
-      serviceLogReconnectAttemptRef.current = 0;
-      setServiceLogsConnected(true);
-      setServiceLogsError(null);
-    };
-
-    socket.onmessage = (event) => {
-      if (!mountedRef.current) return;
-      if (serviceLogPausedRef.current) return;
-
-      let payload;
-      try { payload = JSON.parse(event.data); } catch { payload = { type: "log.raw", message: String(event.data) }; }
-
-      if (payload.type === "log.line") appendServiceLogEntries(payload.line ?? "");
-      else if (payload.type === "error") setServiceLogsError(payload.message || "Live log stream error.");
-      else if (payload.type === "deployment.event") appendServiceLogEntries(typeof payload.event === "string" ? payload.event : JSON.stringify(payload.event ?? {}, null, 2));
-      else appendServiceLogEntries(String(payload.message ?? event.data));
-    };
-
-    socket.onerror = () => {
-      if (!mountedRef.current) return;
-      setServiceLogsConnected(false);
-      setServiceLogsError("Live log connection error.");
-    };
-
-    socket.onclose = (evt) => {
-      if (!mountedRef.current) return;
-      setServiceLogsConnected(false);
-      if (!serviceLogShouldReconnectRef.current || evt.wasClean) return;
-
-      serviceLogReconnectAttemptRef.current += 1;
-      const attempt = serviceLogReconnectAttemptRef.current;
-      const delay = Math.min(15000, 1000 * 2 ** Math.max(0, attempt - 1));
-
-      serviceLogReconnectTimerRef.current = setTimeout(() => {
-        if (!mountedRef.current || !serviceLogShouldReconnectRef.current) return;
-        connectServiceLogStream();
-      }, delay);
-
-      setServiceLogsError(`Live log stream disconnected. Reconnecting in ${Math.round(delay / 1000)}s...`);
-    };
-  }, [id, appendServiceLogEntries]);
-
-  const refreshServiceLogs = useCallback(async () => {
-    stopServiceLogConnection();
-    await fetchServiceLogs();
-    connectServiceLogStream();
-  }, [stopServiceLogConnection, fetchServiceLogs, connectServiceLogStream]);
-
-  const fetchDeployLogsInitial = useCallback(async (deployId) => {
-    if (!deployId) return;
-    setDeployLogLoading(true); setDeployLogError(null); setDeployLogEntries([]);
-    deployLogOldestCursorRef.current = null; deployLogNewestCursorRef.current = null; deployLogHasMoreOlderRef.current = false;
-
-    try {
-      const resp = await apiRequest({ method: "GET", url: `${DEPLOY_BASE}${deployId}/logs/`, params: { limit: DEPLOY_LOG_PAGE_SIZE } });
-      setDeployLogEntries(normalizeTextEntries(resp.data?.logs));
-      deployLogOldestCursorRef.current = resp.data?.next_before || null;
-      deployLogNewestCursorRef.current = resp.data?.latest_after || null;
-      deployLogHasMoreOlderRef.current = Boolean(resp.data?.has_more_older);
-    } catch (err) {
-      if (!mountedRef.current) return;
-      setDeployLogError(err.response?.data?.detail || "Unable to load deploy history.");
-    } finally {
-      if (mountedRef.current) setDeployLogLoading(false);
-    }
-  }, []);
-
-  const loadOlderDeployLogs = useCallback(async () => {
-    if (!deployLogDeployId || !deployLogHasMoreOlderRef.current || !deployLogOldestCursorRef.current || deployLogLoadingOlder) return;
-
-    const scroller = deployLogScrollRef.current;
-    const prevHeight = scroller?.scrollHeight || 0;
-    const prevTop = scroller?.scrollTop || 0;
-
-    setDeployLogLoadingOlder(true);
-    try {
-      const resp = await apiRequest({
-        method: "GET", url: `${DEPLOY_BASE}${deployLogDeployId}/logs/`,
-        params: { limit: DEPLOY_LOG_PAGE_SIZE, before: deployLogOldestCursorRef.current },
-      });
-      const older = normalizeTextEntries(resp.data?.logs);
-      if (older.length) setDeployLogEntries((prev) => mergeEntriesPrepend(prev, older));
-
-      deployLogOldestCursorRef.current = resp.data?.next_before || deployLogOldestCursorRef.current;
-      deployLogNewestCursorRef.current = resp.data?.latest_after || deployLogNewestCursorRef.current;
-      deployLogHasMoreOlderRef.current = Boolean(resp.data?.has_more_older);
-
-      requestAnimationFrame(() => {
-        if (scroller) scroller.scrollTop = scroller.scrollHeight - prevHeight + prevTop;
-      });
-    } catch (err) {
-      if (mountedRef.current) setDeployLogError(err.response?.data?.detail || "Unable to load older deploy logs.");
-    } finally {
-      if (mountedRef.current) setDeployLogLoadingOlder(false);
-    }
-  }, [deployLogDeployId, deployLogLoadingOlder]);
-
-  const pollNewDeployLogs = useCallback(async () => {
-    if (!deployLogDeployId || deployLogPollLockRef.current) return;
-
-    deployLogPollLockRef.current = true;
-    try {
-      const params = { limit: 100 };
-      if (deployLogNewestCursorRef.current) {
-        params.after = deployLogNewestCursorRef.current;
-      }
-      const resp = await apiRequest({
-        method: "GET",
-        url: `${DEPLOY_BASE}${deployLogDeployId}/logs/`,
-        params,
-      });
-      const fresh = normalizeTextEntries(resp.data?.logs);
-      if (fresh.length) {
-        setDeployLogEntries((prev) => mergeEntries(prev, fresh));
-        deployLogNewestCursorRef.current =
-          resp.data?.next_after ||
-          resp.data?.latest_after ||
-          deployLogNewestCursorRef.current;
-      } else if (!deployLogNewestCursorRef.current) {
-        deployLogNewestCursorRef.current =
-          resp.data?.latest_after || resp.data?.next_after || null;
-      }
-    } catch (err) {
-      /* silent poll failure */
-    } finally {
-      deployLogPollLockRef.current = false;
-    }
-  }, [deployLogDeployId]);
-
   const selectedDeployId = service?.selected_deploy ? String(service.selected_deploy.id ?? service.selected_deploy) : "";
   const selectedDeploy = useMemo(() => {
     if (!selectedDeployId) return null;
@@ -897,63 +524,6 @@ export default function ServiceDetail() {
       if (nextId && nextId !== deployLogDeployId) setDeployLogDeployId(nextId);
     }
   }, [deploys, selectedDeployId, deployLogDeployId]);
-
-  useEffect(() => {
-    if (!deployLogDeployId || activeTab !== "logs") return;
-    fetchDeployLogsInitial(deployLogDeployId);
-  }, [deployLogDeployId, activeTab, fetchDeployLogsInitial]);
-
-  // Live deploy events via DeploymentConsumer WebSocket
-  useEffect(() => {
-    if (activeTab !== "logs" || !deployLogDeployId) {
-      stopDeployLogWs();
-      return undefined;
-    }
-    connectDeployLogStream(deployLogDeployId);
-    return () => stopDeployLogWs();
-  }, [activeTab, deployLogDeployId, connectDeployLogStream, stopDeployLogWs]);
-
-  useEffect(() => {
-    if (activeTab !== "logs") {
-      stopServiceLogConnection();
-      if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; }
-      return;
-    }
-    fetchServiceLogs();
-    connectServiceLogStream();
-    return () => stopServiceLogConnection();
-  }, [activeTab, fetchServiceLogs, connectServiceLogStream, stopServiceLogConnection]);
-
-  useEffect(() => {
-    if (activeTab !== "logs" || !deployLogDeployId) {
-      if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; }
-      return;
-    }
-    // Poll as fallback even without cursor; live WS is primary while connected
-    const active = ["queued", "deploying", "running", "stopping", "pending"].includes(
-      String(service?.status || "").toLowerCase()
-    );
-    const deployActive = ["pending", "running", "rolling_back"].includes(
-      String(
-        (deploys.find((d) => String(d.id ?? d.pk) === String(deployLogDeployId)) || {})
-          .status || ""
-      ).toLowerCase()
-    );
-    if (!active && !deployActive) {
-      if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; }
-      return;
-    }
-    if (deployLogPollTimerRef.current) { clearInterval(deployLogPollTimerRef.current); deployLogPollTimerRef.current = null; }
-    deployLogPollTimerRef.current = setInterval(() => {
-      if (!document.hidden) pollNewDeployLogs();
-    }, DEPLOY_LOG_POLL_INTERVAL);
-    return () => {
-      if (deployLogPollTimerRef.current) {
-        clearInterval(deployLogPollTimerRef.current);
-        deployLogPollTimerRef.current = null;
-      }
-    };
-  }, [activeTab, deployLogDeployId, service?.status, deploys, pollNewDeployLogs]);
 
   useEffect(() => {
     if (!isDesktop) setActiveTab((current) => current || "overview");
@@ -1707,9 +1277,6 @@ export default function ServiceDetail() {
     } catch { safeSetSnackbar("error", "Copy failed."); }
   }, [safeSetSnackbar]);
 
-  const clearServiceLogs = () => setServiceLogsEntries([]);
-  const clearDeployLogs = () => setDeployLogEntries([]);
-
   const handlePrev = () => {
     if (!pageInfo.previous) return;
     try { fetchDeploys(parseInt(new URL(pageInfo.previous).searchParams.get("page") || "1", 10)); }
@@ -1852,10 +1419,67 @@ export default function ServiceDetail() {
 
           {activeTab === "logs" && (
             <LogsPanel
-              serviceLogs={{ entries: serviceLogsEntries, loading: serviceLogsLoading, error: serviceLogsError, connected: serviceLogsConnected, paused: serviceLogsPaused, filter: serviceLogsFilter, level: serviceLogsLevel }}
-              serviceLogActions={{ setFilter: setServiceLogsFilter, setLevel: setServiceLogsLevel, onTogglePaused: () => setServiceLogsPaused((v) => !v), refresh: refreshServiceLogs, clear: clearServiceLogs, scrollRef: serviceLogScrollRef }}
-              deployLogs={{ entries: deployLogEntries, loading: deployLogLoading, loadingOlder: deployLogLoadingOlder, error: deployLogError, filter: deployLogFilter, level: deployLogLevel, deployId: deployLogDeployId, hasMoreOlder: deployLogHasMoreOlderRef.current, connected: deployLogLiveConnected }}
-              deployLogActions={{ setFilter: setDeployLogFilter, setLevel: setDeployLogLevel, setDeployId: (val) => { deployLogManualSelectRef.current = true; setDeployLogDeployId(String(val)); }, refresh: fetchDeployLogsInitial, clear: clearDeployLogs, loadOlder: loadOlderDeployLogs, scrollRef: deployLogScrollRef }}
+              serviceLogs={{
+                entries: serviceLogs.entries,
+                loading: serviceLogs.loading || serviceLogs.searching,
+                error: serviceLogs.error,
+                connected: serviceLogs.connected,
+                reconnecting: serviceLogs.reconnecting,
+                paused: serviceLogs.paused,
+                filter: serviceLogs.filter,
+                level: serviceLogs.level,
+                searchMode: serviceLogs.searchMode,
+                historyQInput: serviceLogs.historyQInput,
+                gap: serviceLogs.gap,
+                usage: serviceLogs.usage,
+                policy: serviceLogs.policy,
+                hasMoreOlder: serviceLogs.hasMoreOlder,
+                loadingOlder: serviceLogs.loadingOlder,
+                exporting: serviceLogs.exporting,
+                searching: serviceLogs.searching,
+              }}
+              serviceLogActions={{
+                setFilter: serviceLogs.setFilter,
+                setLevel: serviceLogs.setLevel,
+                setSearchMode: serviceLogs.setSearchMode,
+                setHistoryQInput: serviceLogs.setHistoryQInput,
+                onTogglePaused: () => serviceLogs.setPaused((p) => !p),
+                refresh: serviceLogs.refresh,
+                clear: serviceLogs.clear,
+                scrollRef: serviceLogs.scrollRef,
+                loadOlder: serviceLogs.loadOlder,
+                jumpToLatest: serviceLogs.jumpToLatest,
+                download: serviceLogs.download,
+                setGap: serviceLogs.setGap,
+                retryConnection: serviceLogs.retryConnection,
+              }}
+              deployLogs={{
+                entries: deployLogsHook.entries,
+                loading: deployLogsHook.loading,
+                loadingOlder: deployLogsHook.loadingOlder,
+                error: deployLogsHook.error,
+                filter: deployLogsHook.filter,
+                level: deployLogsHook.level,
+                deployId: deployLogDeployId,
+                hasMoreOlder: deployLogsHook.hasMoreOlder,
+                connected: deployLogsHook.connected,
+                reconnecting: deployLogsHook.reconnecting,
+                exporting: deployLogsHook.exporting,
+              }}
+              deployLogActions={{
+                download: deployLogsHook.download,
+                setFilter: deployLogsHook.setFilter,
+                setLevel: deployLogsHook.setLevel,
+                setDeployId: (val) => {
+                  deployLogManualSelectRef.current = true;
+                  setDeployLogDeployId(String(val));
+                },
+                refresh: deployLogsHook.refresh,
+                clear: deployLogsHook.clear,
+                loadOlder: deployLogsHook.loadOlder,
+                scrollRef: deployLogsHook.scrollRef,
+                retryConnection: deployLogsHook.retryConnection,
+              }}
               deploys={deploys}
               currentDeployForLogs={currentDeployForLogs}
               id={id}

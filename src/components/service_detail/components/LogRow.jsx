@@ -1,7 +1,7 @@
 import React, { memo, useState, useMemo } from "react";
-import { Box, Typography, Chip, Button, IconButton, useTheme, useMediaQuery } from "@mui/material";
-import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import { Box, Typography, Chip, Button, useTheme, useMediaQuery } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { inferLogLevel, formatLogTime } from "../utils";
 import { LOG_COLLAPSE_CHARS, LOG_COLLAPSE_LINES } from "../constants";
 
@@ -9,9 +9,9 @@ export default memo(function LogRow({ entry }) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [expanded, setExpanded] = useState(false);
-  const level = entry?.level || inferLogLevel(entry?.text);
-  const timeLabel = formatLogTime(entry?.timestamp);
-  const fullText = String(entry?.text || "");
+  const level = entry?.level || inferLogLevel(entry?.text || entry?.message);
+  const timeLabel = formatLogTime(entry?.timestamp || entry?.ts);
+  const fullText = String(entry?.text || entry?.message || "");
 
   const lineCount = useMemo(
     () => (fullText ? fullText.split(/\r?\n/).length : 0),
@@ -57,10 +57,10 @@ export default memo(function LogRow({ entry }) {
         bgcolor: bg,
         borderRadius: 1.5,
         px: { xs: 1, sm: 1.25 },
-        py: { xs: 0.75, sm: 0.85 },
+        py: { xs: 0.65, sm: 0.75 },
         display: "flex",
         flexDirection: isMobile ? "column" : "row",
-        gap: isMobile ? 0.5 : 1.25,
+        gap: isMobile ? 0.35 : 1,
         alignItems: isMobile ? "stretch" : "flex-start",
         width: "100%",
         maxWidth: "100%",
@@ -68,17 +68,16 @@ export default memo(function LogRow({ entry }) {
         overflow: "hidden",
       }}
     >
-      {/* Meta row: time + level — full width on mobile, side column on desktop */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 0.75,
+          gap: 0.5,
           flexShrink: 0,
           flexWrap: "wrap",
           ...(isMobile
             ? { width: "100%" }
-            : { flexDirection: "column", alignItems: "flex-start", minWidth: 72 }),
+            : { flexDirection: "column", alignItems: "flex-start", minWidth: 68 }),
         }}
       >
         {timeLabel ? (
@@ -87,7 +86,7 @@ export default memo(function LogRow({ entry }) {
             color="text.secondary"
             sx={{
               ...mono,
-              fontSize: 11,
+              fontSize: 10.5,
               lineHeight: 1.2,
               whiteSpace: "nowrap",
             }}
@@ -96,15 +95,16 @@ export default memo(function LogRow({ entry }) {
           </Typography>
         ) : null}
         <Chip
-          label={level.toUpperCase()}
+          label={String(level || "info").toUpperCase()}
           size="small"
           color={levelColor}
           variant="outlined"
           sx={{
-            height: 20,
-            fontSize: 10,
+            height: 18,
+            fontSize: 9.5,
             fontWeight: 700,
             flexShrink: 0,
+            "& .MuiChip-label": { px: 0.75 },
           }}
         />
         {entry?.stage ? (
@@ -112,17 +112,21 @@ export default memo(function LogRow({ entry }) {
             label={entry.stage}
             size="small"
             variant="outlined"
-            sx={{ height: 20, fontSize: 10, maxWidth: 140 }}
+            sx={{
+              height: 18,
+              fontSize: 9.5,
+              maxWidth: isMobile ? 120 : 140,
+              "& .MuiChip-label": { px: 0.75 },
+            }}
           />
         ) : null}
         {entry?.progress != null && entry.progress !== "" ? (
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10.5 }}>
             {entry.progress}%
           </Typography>
         ) : null}
       </Box>
 
-      {/* Message — takes remaining width, wraps properly on mobile */}
       <Box sx={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : "auto" }}>
         <Box
           component="pre"
@@ -131,8 +135,8 @@ export default memo(function LogRow({ entry }) {
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
             overflowWrap: "anywhere",
-            fontSize: { xs: 12, sm: 12.5 },
-            lineHeight: 1.55,
+            fontSize: { xs: 11.5, sm: 12.5 },
+            lineHeight: 1.5,
             ...mono,
             width: "100%",
             maxWidth: "100%",
@@ -150,45 +154,30 @@ export default memo(function LogRow({ entry }) {
         </Box>
 
         {isLong ? (
-          <Box sx={{ mt: 0.5, display: "flex", justifyContent: "flex-end" }}>
-            {expanded ? (
-              <Button
-                size="small"
-                variant="text"
-                onClick={() => setExpanded(false)}
-                startIcon={<UnfoldLessIcon sx={{ fontSize: 16 }} />}
-                sx={{
-                  minWidth: 0,
-                  px: 1,
-                  py: 0.15,
-                  fontSize: 11,
-                  textTransform: "none",
-                  color: "text.secondary",
-                }}
-              >
-                Collapse
-              </Button>
-            ) : (
-              <IconButton
-                size="small"
-                onClick={() => setExpanded(true)}
-                aria-label="Expand log"
-                title="Expand"
-                sx={{
-                  p: 0.35,
-                  color: "text.secondary",
-                  borderRadius: 1,
-                  "&:hover": {
-                    bgcolor:
-                      theme.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.08)"
-                        : "rgba(0,0,0,0.06)",
-                  },
-                }}
-              >
-                <MoreHorizIcon sx={{ fontSize: 18 }} />
-              </IconButton>
-            )}
+          <Box sx={{ mt: 0.35, display: "flex", justifyContent: "flex-start" }}>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setExpanded((v) => !v)}
+              startIcon={
+                expanded ? (
+                  <ExpandLessIcon sx={{ fontSize: 16 }} />
+                ) : (
+                  <ExpandMoreIcon sx={{ fontSize: 16 }} />
+                )
+              }
+              sx={{
+                minWidth: 0,
+                px: 0.75,
+                py: 0.1,
+                fontSize: 11,
+                textTransform: "none",
+                color: "text.secondary",
+                fontWeight: 600,
+              }}
+            >
+              {expanded ? "Show less" : "Show more"}
+            </Button>
           </Box>
         ) : null}
       </Box>

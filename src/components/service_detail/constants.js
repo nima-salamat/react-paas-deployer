@@ -7,10 +7,17 @@ export const NETWORK_API_ROOT = `${API_BASE}/api/networks/`;
 export const VOLUME_API_ROOT = `${API_BASE}/api/volumes/`;
 export const PLANS_BASE = `${API_BASE}/plans/`;
 
-export const SERVICE_LOG_MAX_LINES = 5000;
-export const DEPLOY_LOG_PAGE_SIZE = 10;
+/** Max entries kept in the client-side live/history buffer (service + deploy). */
+export const LOG_BUFFER_MAX = 3000;
+/** Page size when loading history / older pages from the API. */
+export const LOG_PAGE_SIZE = 100;
+/** Deploy history page size (backend may return fewer stage events). */
+export const DEPLOY_LOG_PAGE_SIZE = 50;
+/** Poll interval fallback for deploy logs while a deploy is active. */
 export const DEPLOY_LOG_POLL_INTERVAL = 4000;
 export const DEFAULT_REFRESH_INTERVAL_MS = 2000;
+/** @deprecated use LOG_BUFFER_MAX */
+export const SERVICE_LOG_MAX_LINES = LOG_BUFFER_MAX;
 
 export const REFRESH_INTERVAL_OPTIONS = [
   { label: "2s", value: 2000 },
