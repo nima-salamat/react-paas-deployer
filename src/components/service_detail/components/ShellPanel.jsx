@@ -316,7 +316,33 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     requestAnimationFrame(() => updateHelperPosition());
   }, [updateHelperPosition]);
 
+  const formatShellError = useCallback((err) => {
+    const data = err?.response?.data || {};
+    const code = data.code || err?.code || "";
+    const detail = data.detail || err?.message || "Command failed.";
+    const labels = {
+      AUTHORIZATION_FAILED: "Permission denied",
+      POLICY_REJECTED: "Blocked by security policy",
+      CONFIRMATION_REQUIRED: "Confirmation required",
+      COMMAND_NOT_FOUND: "Command not found",
+      INVALID_WORKDIR: "Invalid working directory",
+      RUNTIME_ERROR: "Runtime error",
+      TIMEOUT: "Command timed out",
+      RESOURCE_LIMIT_EXCEEDED: "Resource limit exceeded",
+      COMMAND_BUSY: "Command already running",
+      PROCESS_EXITED_NONZERO: "Process exited with an error",
+    };
+    if (code && labels[code]) {
+      return `${labels[code]}: ${detail}`;
+    }
+    if (code) {
+      return `[${code}] ${detail}`;
+    }
+    return detail;
+  }, []);
+
   const handleError = useCallback((message) => {
+
     appendHistory({ type: "error", text: String(message || "Unknown shell error.") });
     onError?.(message);
     focusTerminal();
@@ -474,9 +500,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         return;
       }
       if (message.type === "error") {
-        appendHistory({ type: "error", text: message.message || "Interactive shell error." });
-        // If we were waiting to start / run, release the outer prompt.
+        const code = message.code || "";
+        const labels = {
+          AUTHORIZATION_FAILED: "Permission denied",
+          POLICY_REJECTED: "Blocked by security policy",
+          CONFIRMATION_REQUIRED: "Confirmation required",
+          COMMAND_BUSY: "Command already running",
+          RUNTIME_ERROR: "Runtime error",
+        };
+        const prefix = code && labels[code] ? `${labels[code]}: ` : code ? `[${code}] ` : "";
+        appendHistory({ type: "error", text: `${prefix}${message.message || "Interactive shell error."}` });
         setCommandRunning(false);
+        setInteractiveRunning(false);
       }
     };
     socket.onerror = () => { /* Basic command API remains available when PTY is unavailable. */ };
@@ -887,14 +922,21 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       else if (cmd.startsWith("rm ") || cmd.startsWith("rmdir ") || cmd.startsWith("mv ") || cmd.startsWith("cp ") || cmd.startsWith("mkdir ") || cmd.startsWith("touch ")) await refreshDirectory();
       return true;
     } catch (err) {
-      setHistory((prev) => [...prev, { id: `${Date.now()}-err`, type: "error", text: err?.response?.data?.detail || err?.message || "Command failed." }].slice(-HISTORY_LIMIT));
+      const data = err?.response?.data || {};
+      // Destructive commands return 409 CONFIRMATION_REQUIRED — open confirm dialog.
+      if (data.code === "CONFIRMATION_REQUIRED" || (err?.response?.status === 409 && /confirm/i.test(String(data.detail || "")))) {
+        setConfirmCommand(cmd);
+        setHistory((prev) => [...prev, { id: `${Date.now()}-confirm`, type: "system", text: data.detail || "Confirmation required before running this destructive command." }].slice(-HISTORY_LIMIT));
+        return false;
+      }
+      setHistory((prev) => [...prev, { id: `${Date.now()}-err`, type: "error", text: formatShellError(err) }].slice(-HISTORY_LIMIT));
       return false;
     } finally {
       runningRef.current = false;
       setCommandRunning(false);
       focusTerminal();
     }
-  }, [apiRoot, command, currentCwd, dryRun, focusTerminal, handleError, isInteractiveCommand, parseSingleEditorArgument, refreshDirectory, session?.token]);
+  }, [apiRoot, command, currentCwd, dryRun, focusTerminal, formatShellError, handleError, isInteractiveCommand, parseSingleEditorArgument, refreshDirectory, session?.token]);
 
   const runningRef = useRef(false);
 
