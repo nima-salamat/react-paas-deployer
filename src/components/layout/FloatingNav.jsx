@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import apiRequest from "../customHooks/apiRequest.jsx";
 import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -23,6 +24,8 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 
 import { motion } from "framer-motion";
+
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
 
 function AnimatedMenuIcon({ open = false, size = 22, stroke = "currentColor", strokeWidth = 2.2 }) {
   const transition = { duration: 0.22, ease: "easeInOut" };
@@ -124,13 +127,8 @@ export default function FloatingNav({
     const check = async () => {
       if (!readLoggedIn()) { if (!cancelled) setIsStaff(false); return; }
       try {
-        const base = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
-        const token = localStorage.getItem("access");
-        const res = await fetch(`${base}/auth/api/validateToken/`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!res.ok) throw new Error("auth");
-        const data = await res.json();
+        const res = await apiRequest({ method: "GET", url: `${API_BASE}/auth/api/validateToken/` });
+        const data = res.data;
         const u = data?.user || data?.data?.user || data;
         if (!cancelled) setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
       } catch (firstError) {
@@ -140,13 +138,8 @@ export default function FloatingNav({
           return;
         }
         try {
-          const base = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
-          const token = localStorage.getItem("access");
-          const res = await fetch(`${base}/api/users/user/`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          });
-          if (!res.ok) return;
-          const data = await res.json();
+          const res = await apiRequest({ method: "GET", url: `${API_BASE}/api/users/user/` });
+          const data = res.data;
           const u = data?.user || data?.data || data;
           if (!cancelled) setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
         } catch (fallbackError) {

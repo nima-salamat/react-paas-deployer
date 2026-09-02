@@ -2,7 +2,9 @@ import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import {
   Routes,
   Route,
-  Outlet
+  Outlet,
+  useLocation,
+  useNavigationType,
 } from "react-router-dom";
 import {
   Box,
@@ -82,6 +84,22 @@ const getSystemTheme = () => {
     ? "dark"
     : "light";
 };
+
+function RouteScrollManager() {
+  const location = useLocation();
+  const navigationType = useNavigationType();
+
+  useEffect(() => {
+    // Preserve browser history restoration for Back/Forward, but never carry a
+    // previous page's scroll position into a new route pushed by the app.
+    if (navigationType === "POP" || location.hash) return;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  }, [location.pathname, location.hash, navigationType]);
+
+  return null;
+}
 
 const Layout = ({
   themeMode,
@@ -308,6 +326,7 @@ export function App() {
         <CssBaseline enableColorScheme />
 
         <TicketNotifyProvider>
+          <RouteScrollManager />
           <SEO />
 
           <Suspense fallback={null}>

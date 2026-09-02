@@ -15,6 +15,7 @@ import { hostBase } from "../adminUtils";
 const emptyDoc = () => ({ title: "", slug: "", description: "", section: "Getting started", icon: "description", order: 0, status: "draft", content: [] });
 const TYPES = ["heading", "paragraph", "list", "code", "image", "callout", "quote", "link", "divider"];
 const API = () => `${hostBase()}/api/docs/admin/documents`;
+const ASSET_API = () => `${hostBase()}/api/docs/admin/assets/`;
 
 function makeBlock(type) {
   switch (type) {
@@ -37,7 +38,8 @@ export default function DocumentationPanel() {
   const save = async () => { if (!doc?.title?.trim()) return setError("Title is required."); setLoading(true); setError(""); try { const method = doc.id ? "PATCH" : "POST"; const url = doc.id ? `${API()}/${doc.id}/` : `${API()}/`; const r = await apiRequest({ method, url, data: doc }); const saved = r.data; setDoc(saved); await load(); } catch (e) { setError(e?.response?.data?.detail || JSON.stringify(e?.response?.data?.errors || e?.response?.data || {}) || "Save failed."); } finally { setLoading(false); } };
   const remove = async () => { if (!doc?.id || !window.confirm("Delete this documentation page?")) return; setLoading(true); try { await apiRequest({ method: "DELETE", url: `${API()}/${doc.id}/` }); setDoc(null); await load(); } catch (e) { setError(e?.response?.data?.detail || "Delete failed."); } finally { setLoading(false); } };
   const publish = async () => { if (!doc?.id) return save(); setLoading(true); try { const r = await apiRequest({ method: "POST", url: `${API()}/${doc.id}/publish/`, data: {} }); setDoc(r.data); await load(); } catch (e) { setError(e?.response?.data?.detail || "Publish failed."); } finally { setLoading(false); } };
-  const upload = async (block, file) => { if (!doc?.id || !file) return setError("Save the document before uploading an image."); const form = new FormData(); form.append("image", file); form.append("alt", block.alt || ""); try { const r = await apiRequest({ method: "POST", url: `${API()}/${doc.id}/assets/`, data: form }); setDoc(d => ({ ...d, content: d.content.map(b => b === block ? { ...b, asset_id: r.data.id, alt: r.data.alt } : b) })); } catch (e) { setError(e?.response?.data?.detail || "Image upload failed."); } };
+  const upload = async (block, file) => { if (!doc?.id || !file) return setError("Save the document before uploading an image."); const form = new FormData(); form.append("file", file);
+    form.append("document", doc.id); form.append("alt", block.alt || ""); try { const r = await apiRequest({ method: "POST", url: ASSET_API(), data: form }); setDoc(d => ({ ...d, content: d.content.map(b => b === block ? { ...b, asset_id: r.data.id, alt: r.data.alt } : b) })); } catch (e) { setError(e?.response?.data?.detail || "Image upload failed."); } };
   const updateBlock = (index, patch) => setDoc(d => ({ ...d, content: d.content.map((b, i) => i === index ? { ...b, ...patch } : b) }));
   const removeBlock = (index) => setDoc(d => ({ ...d, content: d.content.filter((_, i) => i !== index) }));
   const addBlock = () => setDoc(d => ({ ...d, content: [...(d.content || []), makeBlock(newType)] }));

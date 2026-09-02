@@ -14,6 +14,19 @@ const REFRESH_URLS = [
   `${API_HOST}/auth/api/login/token/refresh/`,
 ];
 
+function isAccessTokenExpired(token, leewayMs = 5000) {
+  if (!token) return true;
+  try {
+    const part = token.split(".")[1];
+    if (!part) return true;
+    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    const exp = Number(payload?.exp || 0) * 1000;
+    return !exp || exp <= Date.now() + leewayMs;
+  } catch {
+    return false;
+  }
+}
+
 // Single-flight refresh: many parallel 401s must share one refresh call
 let refreshPromise = null;
 
@@ -125,7 +138,18 @@ function refreshAccessToken() {
 }
 
 const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploadProgress, responseType }) => {
-  const accessToken = localStorage.getItem("access");
+  let accessToken = localStorage.getItem("access");
+
+  // Avoid an avoidable first 401 when a normal access token has already
+  // expired. Refresh before protected requests; the existing 401 path still
+  // handles revoked/invalid tokens that cannot be detected locally.
+  if (accessToken && isAccessTokenExpired(accessToken)) {
+    try {
+      accessToken = await refreshAccessToken();
+    } catch (error) {
+      throw error;
+    }
+  }
 
   try {
     const response = await axios({

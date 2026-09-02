@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import apiRequest from "../customHooks/apiRequest.jsx";
 import { TicketNotifyBell } from "../tickets/TicketNotifyContext.jsx";
 import {
   Link as RouterLink,
@@ -242,45 +243,16 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     if (mountedRef.current) setCheckingAuth(true);
 
     try {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), 5000);
-      let validateRes;
-      try {
-        validateRes = await fetch(`${API_BASE}/auth/api/validateToken/`, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          signal: controller.signal,
-          cache: "no-store",
-        });
-      } finally {
-        window.clearTimeout(timer);
-      }
+      const validateRes = await apiRequest({
+        method: "GET",
+        url: `${API_BASE}/auth/api/validateToken/`,
+      });
 
       if (!mountedRef.current) return false;
 
-      if (!validateRes.ok) {
-        // Only 401 means the access token is invalid. A 403 can be a valid
-        // authenticated user without permission, and 5xx means the backend
-        // is unavailable. Neither should log the user out.
-        if (validateRes.status === 401) {
-          setLoggedIn(false);
-          setIsStaff(false);
-          setUserImage(null);
-          profilesLoadedRef.current = false;
-          currentProfileIdRef.current = null;
-          return false;
-        }
-        if (validateRes.status === 403) {
-          setLoggedIn(true);
-          return true;
-        }
-        setLoggedIn(true);
-        return true;
-      }
-
       setLoggedIn(true);
       try {
-        const body = await validateRes.json();
+        const body = validateRes.data;
         const u = body.user || body;
         setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
       } catch {
@@ -422,38 +394,10 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
     setCheckingAuth(true);
 
     try {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), 5000);
-      let validateRes;
-      try {
-        validateRes = await fetch(`${API_BASE}/auth/api/validateToken/`, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          signal: controller.signal,
-          cache: "no-store",
-        });
-      } finally {
-        window.clearTimeout(timer);
-      }
-
-      if (!validateRes.ok) {
-        if (validateRes.status === 401) {
-          window.localStorage.setItem("auth_mode", "signin_or_signup");
-          setLoggedIn(false);
-          setIsStaff(false);
-          setUserImage(null);
-          profilesLoadedRef.current = false;
-          currentProfileIdRef.current = null;
-          if (fromMenu) closeDrawer();
-          navigate("/signin_or_signup");
-          return;
-        }
-        // 403/5xx are not proof that the session is invalid. Keep the local
-        // authenticated state and let the user continue/retry.
-        setLoggedIn(true);
-        if (fromMenu) closeDrawer();
-        return;
-      }
+      const validateRes = await apiRequest({
+        method: "GET",
+        url: `${API_BASE}/auth/api/validateToken/`,
+      });
 
       setLoggedIn(true);
       await loadProfilesIfNeeded();
@@ -495,19 +439,13 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
         setIsStaff(false);
         return;
       }
-      let res = await fetch(`${API_BASE}/api/users/user/`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (!res.ok) {
-        res = await fetch(`${API_BASE}/users/user/`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+      let response;
+      try {
+        response = await apiRequest({ method: "GET", url: `${API_BASE}/api/users/user/` });
+      } catch {
+        response = await apiRequest({ method: "GET", url: `${API_BASE}/users/user/` });
       }
-      if (!res.ok) {
-        setIsStaff(false);
-        return;
-      }
-      const data = await res.json();
+      const data = response.data;
       const u = data.user || data;
       setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
     } catch {

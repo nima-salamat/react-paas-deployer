@@ -540,7 +540,7 @@ export default function PlatformPlans() {
           {filterTab === 0 ? "No app platforms" : "No database platforms"}
         </Typography>
       ) : (
-        <Stack spacing={0.75} sx={{ maxHeight: { md: "calc(100vh - 280px)" }, overflow: "auto", pr: 0.5 }}>
+        <Stack spacing={0.75} sx={{ pr: 0.5 }}>
           {visiblePlatforms.map(([key, label]) => {
             const selected = selectedPlatforms.includes(String(key));
             return (
@@ -670,7 +670,7 @@ export default function PlatformPlans() {
             top: 88,
             zIndex: 3,
             alignSelf: "start",
-            maxHeight: "calc(100vh - 104px)",
+            minHeight: 0,
           }}
         >
           <Paper
@@ -678,10 +678,9 @@ export default function PlatformPlans() {
             sx={{
               p: 2,
               borderRadius: 2,
+              minWidth: 0,
               border: "1px solid",
               borderColor: "divider",
-              maxHeight: "calc(100vh - 104px)",
-              overflow: "auto",
             }}
           >
             {filterContent}

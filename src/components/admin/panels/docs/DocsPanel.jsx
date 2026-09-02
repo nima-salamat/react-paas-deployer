@@ -56,7 +56,7 @@ import MenuOpenRoundedIcon from "@mui/icons-material/MenuOpenRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import apiRequest from "../../../customHooks/apiRequest";
-import { hostBase, authMediaSrc } from "../../adminUtils";
+import { fetchDocsAssetBlob, hostBase } from "../../adminUtils";
 import MarkdownEditor from "../../../docs/MarkdownEditor";
 
 const base = `${hostBase()}/api/docs`;
@@ -190,6 +190,81 @@ function CategoryTree({ nodes, selectedId, onSelect, onCategoryAction, depth = 0
         </MenuItem>
       </Menu>
     </List>
+  );
+}
+
+function useAdminAssetSrc(asset) {
+  const [src, setSrc] = useState("");
+  useEffect(() => {
+    let active = true;
+    let objectUrl = "";
+    const load = async () => {
+      if (!asset?.id) {
+        setSrc("");
+        return;
+      }
+      if (asset.document_status === "published" && asset.url) {
+        setSrc(asset.url);
+        return;
+      }
+      try {
+        const blob = await fetchDocsAssetBlob(asset.id);
+        objectUrl = URL.createObjectURL(blob);
+        if (active) setSrc(objectUrl);
+      } catch {
+        if (active) setSrc("");
+      }
+    };
+    load();
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [asset?.id, asset?.document_status, asset?.url]);
+  return src;
+}
+
+function AdminAssetPreview({ asset, sx, ...props }) {
+  const src = useAdminAssetSrc(asset);
+  return <Box component="img" src={src} sx={sx} {...props} />;
+}
+
+function AdminAssetMedia({ asset, kind, sx }) {
+  const src = useAdminAssetSrc(asset);
+  if (kind === "video") return <Box component="video" src={src} controls sx={sx} />;
+  if (kind === "audio") return <Box component="audio" src={src} controls sx={sx} />;
+  return <Box component="img" src={src} alt={asset?.alt || asset?.name || ""} sx={sx} />;
+}
+
+function AdminAssetOpenButton({ asset }) {
+  const [busy, setBusy] = useState(false);
+  const open = async () => {
+    if (!asset?.id) return;
+    if (asset.document_status === "published" && asset.url) {
+      window.open(asset.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+    setBusy(true);
+    try {
+      const blob = await fetchDocsAssetBlob(asset.id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = asset.name || "docs-asset";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      // Parent panel displays API errors; opening is best-effort.
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <IconButton size="small" onClick={open} disabled={busy} aria-label="Open file">
+      {busy ? <CircularProgress size={16} /> : <OpenInNewRoundedIcon fontSize="small" />}
+    </IconButton>
   );
 }
 
@@ -331,9 +406,8 @@ function AssetLibrary({
                 }}
               >
                 {asset.kind === "image" ? (
-                  <Box
-                    component="img"
-                    src={authMediaSrc(asset.url)}
+                  <AdminAssetPreview
+                    asset={asset}
                     alt={asset.alt || asset.name}
                     sx={{ width: "100%", height: "100%", objectFit: "cover" }}
                     onError={(e) => {
@@ -383,15 +457,7 @@ function AssetLibrary({
                   </Tooltip>
                 )}
                 <Tooltip title="Open file">
-                  <IconButton
-                    size="small"
-                    component="a"
-                    href={authMediaSrc(asset.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <OpenInNewRoundedIcon fontSize="small" />
-                  </IconButton>
+<AdminAssetOpenButton asset={asset} />
                 </Tooltip>
                 <Tooltip title="Delete file">
                   <IconButton
@@ -437,16 +503,16 @@ function AssetLibrary({
         <DialogTitle sx={{ pr: 7 }}>{previewAsset?.name || "Preview"}</DialogTitle>
         <DialogContent dividers sx={{ display: "grid", placeItems: "center", minHeight: 300 }}>
           {previewAsset?.kind === "image" ? (
-            <Box component="img" src={authMediaSrc(previewAsset.url)} alt={previewAsset.alt || previewAsset.name} sx={{ maxWidth: "100%", maxHeight: "65vh", objectFit: "contain", borderRadius: 0.5 }} />
+            <AdminAssetMedia asset={previewAsset} kind="image" sx={{ maxWidth: "100%", maxHeight: "65vh", objectFit: "contain", borderRadius: 0.5 }} />
           ) : previewAsset?.kind === "video" ? (
-            <Box component="video" src={authMediaSrc(previewAsset.url)} controls sx={{ maxWidth: "100%", maxHeight: "65vh" }} />
+            <AdminAssetMedia asset={previewAsset} kind="video" sx={{ maxWidth: "100%", maxHeight: "65vh" }} />
           ) : previewAsset?.kind === "audio" ? (
-            <Box component="audio" src={authMediaSrc(previewAsset.url)} controls sx={{ width: "100%" }} />
+            <AdminAssetMedia asset={previewAsset} kind="audio" sx={{ width: "100%" }} />
           ) : (
             <Stack alignItems="center" spacing={1}>
               {kindIcon[previewAsset?.kind] || kindIcon.file}
               <Typography color="text.secondary">This file is available as a download.</Typography>
-              <Button component="a" href={authMediaSrc(previewAsset?.url)} target="_blank" rel="noreferrer" variant="contained">Open / Download</Button>
+              <AdminAssetOpenButton asset={previewAsset} />
             </Stack>
           )}
         </DialogContent>

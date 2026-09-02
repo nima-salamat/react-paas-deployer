@@ -30,17 +30,17 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
 import apiRequest from "../customHooks/apiRequest";
-import { authMediaSrc, hostBase } from "../admin/adminUtils";
+import { hostBase, publicDocsAssetSrc } from "../admin/adminUtils";
 import { renderMarkdown } from "./markdown";
 import MarkdownPreview from "./MarkdownPreview";
 
-/** Public docs: resolve relative media paths against API host (token if present). */
+/** Public Docs assets are anonymous resources only when their parent document is published. */
 const resolvePublicUrl = (url) => {
   if (!url || url === "#") return url;
   if (url.startsWith("#") || /^https?:\/\//i.test(url) || url.startsWith("mailto:") || url.startsWith("tel:")) {
     return url;
   }
-  return authMediaSrc(url);
+  return publicDocsAssetSrc(url);
 };
 
 function flatten(nodes, parent = null, out = []) {
@@ -214,7 +214,8 @@ export default function DocsHome() {
       elevation={0}
       sx={{
         width: { xs: "min(88vw, 340px)", md: 320 },
-        height: "100vh",
+        height: "100%",
+        maxHeight: "100vh",
         overflow: "hidden",
         borderRight: 1,
         borderColor: "divider",
@@ -520,12 +521,14 @@ export default function DocsHome() {
                 </Typography>
               )}
               <Divider sx={{ mb: 4 }} />
-              <MarkdownPreview
-                className="docs-markdown-preview docs-article"
-                html={renderMarkdown(selected.content || "", {
-                  resolveUrl: resolvePublicUrl,
-                })}
-              />
+              <Box component="article" sx={{ minWidth: 0 }}>
+                <MarkdownPreview
+                  className="docs-markdown-preview docs-article"
+                  html={renderMarkdown(selected.content || "", {
+                    resolveUrl: resolvePublicUrl,
+                  })}
+                />
+              </Box>
               <Divider sx={{ my: 6 }} />
               <Stack direction="row" justifyContent="space-between">
                 <Button

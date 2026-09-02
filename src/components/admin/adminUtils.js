@@ -59,6 +59,30 @@ export function authMediaSrc(url) {
   }
 }
 
+/** Resolve public Docs asset/media paths without adding credentials to the URL. */
+export function publicDocsAssetSrc(url) {
+  if (!url) return "";
+  const base = hostBase();
+  return url.startsWith("http")
+    ? url
+    : `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+export function docsAssetAdminUrl(assetId) {
+  return `${hostBase()}/api/docs/admin/assets/${assetId}/`;
+}
+
+export async function fetchDocsAssetBlob(assetId) {
+  const token = localStorage.getItem("access");
+  const response = await fetch(docsAssetAdminUrl(assetId), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new Error(`Asset preview failed (${response.status})`);
+  }
+  return response.blob();
+}
+
 export function svcApi() {
   return `${hostBase()}/services`;
 }

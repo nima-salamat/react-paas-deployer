@@ -1316,7 +1316,7 @@ export default function Home() {
                 }}
               >
                 <Typography
-                  component="h2"
+                  component="p"
                   sx={{
                     mt: 2.5,
                     maxWidth: 720,
@@ -1333,8 +1333,8 @@ export default function Home() {
                   }}
                 >
                   A focused platform to <strong>deploy and manage applications</strong> without
-                  infrastructure busywork. Create services, pick CPU and memory, attach volumes,
-                  connect networks, and grow your plan when the workload demands it.
+                  infrastructure busywork. Deploy services, manage resources, and scale when the
+                  workload grows.
                 </Typography>
               </motion.div>
 
@@ -1608,15 +1608,8 @@ export default function Home() {
                         sx={{
                           position:
                             "relative",
-                          aspectRatio: {
-                            xs: "4 / 3",
-                            sm: "16 / 9",
-                          },
-                          minHeight: {
-                            xs: 300,
-                            sm: 350,
-                            md: 470,
-                          },
+                          aspectRatio: "16 / 9",
+                          minHeight: { xs: 0, sm: 0, md: 420 },
                         }}
                       >
                         <Box
@@ -1636,7 +1629,7 @@ export default function Home() {
                             display:
                               "block",
                             objectFit:
-                              "cover",
+                              { xs: "contain", md: "cover" },
                             objectPosition:
                               {
                                 xs: "center 43%",
@@ -1907,7 +1900,7 @@ export default function Home() {
               spacing={1.5}
             >
               <Typography
-                component="h6"
+                component="p"
                 sx={{
                   color:
                     "primary.main",

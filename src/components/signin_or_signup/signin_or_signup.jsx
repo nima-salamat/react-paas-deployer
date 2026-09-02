@@ -401,7 +401,7 @@ export default function SigninOrSignup() {
           background: theme.palette.mode === "dark" ? "rgba(17,24,39,0.6)" : "rgba(255,255,255,0.85)",
           boxShadow: "0 10px 40px rgba(2,6,23,0.3)" }}>
 
-        <Typography variant={isSm ? "h5" : "h4"} align="center" sx={{ fontWeight: 700, mb: 1 }}>
+        <Typography component="h1" variant={isSm ? "h5" : "h4"} align="center" sx={{ fontWeight: 700, mb: 1 }}>
           {stepTitle[step] || "Welcome"}
         </Typography>
         <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, IconButton, InputAdornment, Paper, Stack, Tab, Tabs, TextField,
@@ -17,7 +17,7 @@ import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import { renderMarkdown } from "./markdown";
 import MarkdownPreview from "./MarkdownPreview";
-import { authMediaSrc } from "../admin/adminUtils";
+import { fetchDocsAssetBlob, hostBase, publicDocsAssetSrc } from "../admin/adminUtils";
 import {
   DOCS_HELP_ITEMS,
   buildItemCopyText,
@@ -32,7 +32,36 @@ const kindIcon = {
   file: <InsertDriveFileRoundedIcon fontSize="small" />,
 };
 
-const resolveAdminUrl = (url) => authMediaSrc(url);
+const resolveDocsUrl = (url, privateAssetUrls = {}) => {
+  if (!url || url === "#") return url;
+  const raw = String(url).trim();
+  if (!raw) return "#";
+
+  // Private draft assets are represented by the same canonical API path as
+  // public assets. Check both the original value and its normalized absolute
+  // form BEFORE returning absolute URLs; otherwise an absolute asset.url from
+  // the backend bypasses the authenticated blob preview and hits the public
+  // endpoint, which correctly returns 404 for drafts.
+  const absolute = publicDocsAssetSrc(raw);
+  let path = raw;
+  try {
+    const parsed = new URL(raw, hostBase());
+    path = parsed.pathname + parsed.search + parsed.hash;
+  } catch {
+    // Keep the raw value for non-URL values.
+  }
+  const privateSrc = privateAssetUrls[raw] || privateAssetUrls[absolute] || privateAssetUrls[path];
+  if (privateSrc) return privateSrc;
+
+  if (raw.startsWith("#") || /^https?:\/\//i.test(raw) || raw.startsWith("mailto:") || raw.startsWith("tel:")) {
+    return raw;
+  }
+  return absolute;
+};
+
+// Backward-compatible alias for existing Markdown render/preview call sites.
+// Docs public assets use resolveDocsUrl; private admin assets are resolved separately.
+const resolveAdminUrl = resolveDocsUrl;
 
 async function copyToClipboard(text) {
   if (navigator.clipboard?.writeText) {
@@ -56,7 +85,7 @@ async function copyToClipboard(text) {
 
 function MiniPreview({ snippet }) {
   const html = useMemo(
-    () => renderMarkdown(snippet || "", { resolveUrl: resolveAdminUrl }),
+    () => renderMarkdown(snippet || "", { resolveUrl: (url) => resolveDocsUrl(url) }),
     [snippet]
   );
   return (
@@ -80,6 +109,47 @@ function MiniPreview({ snippet }) {
   );
 }
 
+function AssetThumbnail({ asset }) {
+  const [src, setSrc] = useState("");
+
+  useEffect(() => {
+    let live = true;
+    let objectUrl = null;
+
+    if (!asset?.id || asset?.kind !== "image") {
+      setSrc("");
+      return undefined;
+    }
+
+    // Published assets are public and can be loaded directly. Draft/library
+    // assets must use the authenticated admin preview endpoint, which returns
+    // a Blob so the JWT never appears in the image URL.
+    if (asset.document_status === "published" && asset.url) {
+      setSrc(publicDocsAssetSrc(asset.url));
+      return undefined;
+    }
+
+    setSrc("");
+    fetchDocsAssetBlob(asset.id)
+      .then((blob) => {
+        if (!live) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch(() => {
+        if (live) setSrc("");
+      });
+
+    return () => {
+      live = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [asset?.id, asset?.kind, asset?.url, asset?.document_status]);
+
+  if (!src) return <ImageRoundedIcon fontSize="small" />;
+  return <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />;
+}
+
 export default function MarkdownEditor({ value = "", onChange, assets = [], onUpload, uploadState = null }) {
   const editorRef = useRef(null);
   const [helperOpen, setHelperOpen] = useState(false);
@@ -91,11 +161,60 @@ export default function MarkdownEditor({ value = "", onChange, assets = [], onUp
   const [helperTab, setHelperTab] = useState(0);
   const [toast, setToast] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [privateAssetUrls, setPrivateAssetUrls] = useState({});
 
   const safeValue = typeof value === "string" ? value : String(value || "");
+
+  useEffect(() => {
+    let cancelled = false;
+    const objectUrls = [];
+    const assetMatches = new Map();
+    const re = /(?:https?:\/\/[^\s)\]}"'>]+)?\/api\/docs\/assets\/([0-9a-f-]{36})\//gi;
+    let match;
+    while ((match = re.exec(safeValue))) {
+      const full = match[0];
+      const uuid = match[1];
+      let originalPath = full;
+      try {
+        const parsed = new URL(full, hostBase());
+        originalPath = parsed.pathname + parsed.search + parsed.hash;
+      } catch {
+        // Relative path is already usable.
+      }
+      assetMatches.set(uuid, originalPath);
+    }
+    if (!assetMatches.size) {
+      setPrivateAssetUrls({});
+      return undefined;
+    }
+
+    (async () => {
+      const next = {};
+      await Promise.all(Array.from(assetMatches.entries()).map(async ([assetId, originalPath]) => {
+        try {
+          const blob = await fetchDocsAssetBlob(assetId);
+          if (cancelled) return;
+          const objectUrl = URL.createObjectURL(blob);
+          objectUrls.push(objectUrl);
+          next[originalPath] = objectUrl;
+          next[`${hostBase()}${originalPath}`] = objectUrl;
+        } catch {
+          // Published assets do not need an authenticated preview; their public
+          // URL remains the fallback when the admin endpoint is not necessary.
+        }
+      }));
+      if (!cancelled) setPrivateAssetUrls(next);
+    })();
+
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [safeValue]);
+
   const preview = useMemo(
-    () => renderMarkdown(safeValue, { resolveUrl: resolveAdminUrl }),
-    [safeValue]
+    () => renderMarkdown(safeValue, { resolveUrl: (url) => resolveDocsUrl(url, privateAssetUrls) }),
+    [safeValue, privateAssetUrls]
   );
 
   const notify = (msg) => setToast(msg);
@@ -622,11 +741,7 @@ export default function MarkdownEditor({ value = "", onChange, assets = [], onUp
                       }}
                     >
                       {asset.kind === "image" ? (
-                        <img
-                          src={resolveAdminUrl(asset.url)}
-                          alt=""
-                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                        />
+                        <AssetThumbnail asset={asset} />
                       ) : (
                         kindIcon[asset.kind]
                       )}
