@@ -25,31 +25,27 @@ import {
   TableRow,
   TextField,
   Typography,
+  useMediaQuery,
+  useTheme,
+  Tooltip,
+  Divider,
 } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import StorageIcon from "@mui/icons-material/Storage";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import LinkOffIcon from "@mui/icons-material/LinkOff";
 import apiRequest from "../customHooks/apiRequest";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const VOLUME_ROOT = `${API_BASE}/api/volumes/`;
-const SERVICE_ROOT = `${API_BASE}/services/service/`;
 
 const MODE_OPTIONS = [
   { value: "rw", label: "Read / Write (rw)" },
   { value: "ro", label: "Read Only (ro)" },
 ];
-
-const DEFAULT_FORM = {
-  name: "",
-  default_bind: "/data",
-  default_mode: "rw",
-  size_mb: "1024",
-};
 
 function extractList(data) {
   if (Array.isArray(data?.results)) return data.results;
@@ -62,7 +58,14 @@ function friendlyError(err, fallback = "Something went wrong.") {
   if (!d) return err?.message || fallback;
   if (typeof d === "string") return d;
   if (d.detail) return String(d.detail);
-  if (d.error) return String(d.error);
+  if (d.error) {
+    if (typeof d.error === "string") return d.error;
+    try {
+      return JSON.stringify(d.error);
+    } catch {
+      return String(d.error);
+    }
+  }
   if (d.message) return String(d.message);
   try {
     const parts = Object.entries(d).flatMap(([k, v]) =>
@@ -75,7 +78,58 @@ function friendlyError(err, fallback = "Something went wrong.") {
   return fallback;
 }
 
+/** Volume is exclusive to one service (API model). */
+function getServiceId(volume) {
+  if (volume.service == null || volume.service === "") return null;
+  if (typeof volume.service === "object") {
+    return volume.service.id ?? volume.service.pk ?? null;
+  }
+  return String(volume.service);
+}
+
+function getServiceName(volume) {
+  if (volume.service_name) return volume.service_name;
+  if (typeof volume.service === "object" && volume.service?.name) {
+    return volume.service.name;
+  }
+  const sid = getServiceId(volume);
+  return sid ? String(sid).slice(0, 8) + "…" : null;
+}
+
+function isMounted(volume) {
+  if (typeof volume.is_mounted === "boolean") return volume.is_mounted;
+  const atts = volume.service_attachments;
+  if (atts && typeof atts === "object" && Object.keys(atts).length > 0) {
+    return true;
+  }
+  return false;
+}
+
+function statusInfo(volume) {
+  const sid = getServiceId(volume);
+  const mounted = isMounted(volume);
+  if (!sid) {
+    return { label: "Unused", color: "default", variant: "outlined" };
+  }
+  if (mounted) {
+    return {
+      label: getServiceName(volume) || "Mounted",
+      color: "success",
+      variant: "filled",
+    };
+  }
+  return {
+    label: "Detached (owned)",
+    color: "warning",
+    variant: "outlined",
+  };
+}
+
 export default function Volumes() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
+
   const [volumes, setVolumes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -83,7 +137,12 @@ export default function Volumes() {
   const [success, setSuccess] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentVolume, setCurrentVolume] = useState(null);
-  const [formData, setFormData] = useState(DEFAULT_FORM);
+  const [formData, setFormData] = useState({
+    name: "",
+    default_bind: "/data",
+    default_mode: "rw",
+    size_mb: "",
+  });
   const [fileDialogOpen, setFileDialogOpen] = useState(false);
   const [fileList, setFileList] = useState([]);
   const [fileError, setFileError] = useState(null);
@@ -114,20 +173,14 @@ export default function Volumes() {
     return () => clearTimeout(t);
   }, [success]);
 
-  const openCreateDialog = () => {
-    setCurrentVolume(null);
-    setFormData(DEFAULT_FORM);
-    setDialogOpen(true);
-    setError(null);
-  };
-
   const openEditDialog = (volume) => {
     setCurrentVolume(volume);
     setFormData({
       name: volume.name || "",
-      default_bind: volume.default_bind || volume.bind || "/data",
-      default_mode: volume.default_mode || volume.mode || "rw",
-      size_mb: String(volume.size_mb || ""),
+      default_bind:
+        volume.bind || volume.default_bind || volume.bind_path || "/data",
+      default_mode: volume.mode || volume.default_mode || "rw",
+      size_mb: String(volume.size_mb ?? ""),
     });
     setDialogOpen(true);
     setError(null);
@@ -136,7 +189,12 @@ export default function Volumes() {
   const closeDialog = () => {
     setDialogOpen(false);
     setCurrentVolume(null);
-    setFormData(DEFAULT_FORM);
+    setFormData({
+      name: "",
+      default_bind: "/data",
+      default_mode: "rw",
+      size_mb: "",
+    });
   };
 
   const handleFormChange = (e) => {
@@ -145,19 +203,15 @@ export default function Volumes() {
   };
 
   const handleSaveVolume = async () => {
+    if (!currentVolume) return;
     setSaving(true);
     setError(null);
     try {
       const payload = {
-        name: formData.name.trim(),
         default_bind: formData.default_bind.trim(),
         default_mode: formData.default_mode || "rw",
         size_mb: Number(formData.size_mb),
       };
-      if (!payload.name) {
-        setError("Volume name is required.");
-        return;
-      }
       if (!payload.default_bind || !payload.default_bind.startsWith("/")) {
         setError("Bind path must be an absolute container path (e.g. /data).");
         return;
@@ -167,26 +221,38 @@ export default function Volumes() {
         return;
       }
 
-      if (currentVolume) {
-        const id = currentVolume.id ?? currentVolume.pk;
-        // name is typically immutable
-        const { name, ...patch } = payload;
-        await apiRequest({
-          method: "PATCH",
-          url: `${VOLUME_ROOT}${id}/`,
-          data: patch,
-        });
-        setSuccess("Volume updated.");
-      } else {
-        await apiRequest({ method: "POST", url: VOLUME_ROOT, data: payload });
-        setSuccess("Volume created.");
-      }
+      const id = currentVolume.id ?? currentVolume.pk;
+      await apiRequest({
+        method: "PATCH",
+        url: `${VOLUME_ROOT}${id}/`,
+        data: payload,
+      });
+      setSuccess("Volume updated.");
       closeDialog();
       await loadVolumes();
     } catch (err) {
       setError(friendlyError(err, "Unable to save volume."));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDetachVolume = async (volume, release = false) => {
+    const msg = release
+      ? `Hard-release volume "${volume.name}"? Ownership and quota will be cleared.`
+      : `Soft-detach volume "${volume.name}"? Ownership is kept (quota still counts).`;
+    if (!window.confirm(msg)) return;
+    try {
+      const id = volume.id ?? volume.pk;
+      await apiRequest({
+        method: "POST",
+        url: `${VOLUME_ROOT}${id}/detach/`,
+        data: release ? { release: true } : {},
+      });
+      setSuccess(release ? "Volume released." : "Volume detached.");
+      await loadVolumes();
+    } catch (err) {
+      setError(friendlyError(err, "Unable to detach volume."));
     }
   };
 
@@ -233,7 +299,7 @@ export default function Volumes() {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new Error(body?.detail || "Unable to download archive.");
+        throw new Error(body?.detail || body?.error || "Unable to download archive.");
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -249,102 +315,244 @@ export default function Volumes() {
     }
   };
 
-  const attachedLabel = (v) => {
-    if (v.is_unused) return "Unused";
-    if (v.attached_services_count != null) return `${v.attached_services_count} service(s)`;
-    if (v.service_name) return v.service_name;
-    if (v.attached_services?.length) return `${v.attached_services.length} service(s)`;
-    return "—";
+  const VolumeCard = ({ volume }) => {
+    const bind = volume.bind || volume.default_bind || "—";
+    const mode = volume.mode || volume.default_mode || "rw";
+    const st = statusInfo(volume);
+    const sid = getServiceId(volume);
+    const mounted = isMounted(volume);
+
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          borderRadius: 1,
+          mb: 1.5,
+        }}
+      >
+        <Stack spacing={1.5}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography fontWeight={700} noWrap>
+                {volume.name}
+              </Typography>
+              <Typography
+                variant="body2"
+                fontFamily="monospace"
+                color="text.secondary"
+                sx={{ wordBreak: "break-all", mt: 0.25 }}
+              >
+                {bind}
+              </Typography>
+            </Box>
+            <Chip
+              size="small"
+              label={mode}
+              sx={{ fontWeight: 700, height: 22, flexShrink: 0, ml: 1 }}
+            />
+          </Stack>
+
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip
+              size="small"
+              label={volume.size_mb != null ? `${volume.size_mb} MB` : "—"}
+              variant="outlined"
+              sx={{ fontWeight: 600, height: 22 }}
+            />
+            <Chip
+              size="small"
+              label={st.label}
+              color={st.color}
+              variant={st.variant}
+              sx={{ fontWeight: 700, height: 22 }}
+            />
+            {mounted && (
+              <Chip
+                size="small"
+                label="Mounted"
+                color="info"
+                sx={{ fontWeight: 700, height: 22 }}
+              />
+            )}
+          </Stack>
+
+          {sid && (
+            <Typography variant="caption" color="text.secondary">
+              Service: {getServiceName(volume) || sid}
+            </Typography>
+          )}
+
+          <Divider />
+
+          <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+            <Tooltip title="Files">
+              <IconButton size="small" onClick={() => handleViewFiles(volume)}>
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Download">
+              <IconButton size="small" onClick={() => handleDownloadVolume(volume)}>
+                <DownloadIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Edit metadata (only if not yet in Docker)">
+              <IconButton size="small" onClick={() => openEditDialog(volume)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            {sid && (
+              <Tooltip title="Soft-detach (keep ownership / quota)">
+                <IconButton
+                  size="small"
+                  onClick={() => handleDetachVolume(volume, false)}
+                >
+                  <LinkOffIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title="Delete">
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => handleDeleteVolume(volume)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        </Stack>
+      </Paper>
+    );
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 } }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3 }, px: { xs: 1.5, sm: 3 } }}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
         alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 3 }}
+        spacing={1.5}
+        sx={{ mb: 2.5 }}
       >
-        <Box>
-          <Stack direction="row" spacing={1.25} alignItems="center">
-            <Box
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: 2,
-                display: "grid",
-                placeItems: "center",
-                bgcolor: "primary.main",
-                color: "#fff",
-              }}
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 1,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: "primary.main",
+              color: "#fff",
+              flexShrink: 0,
+            }}
+          >
+            <StorageIcon fontSize="small" />
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              variant={isMobile ? "h6" : "h5"}
+              fontWeight={800}
+              sx={{ letterSpacing: "-0.01em", lineHeight: 1.2 }}
             >
-              <StorageIcon fontSize="small" />
-            </Box>
-            <Box>
-              <Typography variant="h5" fontWeight={900} sx={{ letterSpacing: "-0.02em" }}>
-                Volumes
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Named Docker volumes for your services
-              </Typography>
-            </Box>
-          </Stack>
-        </Box>
-        <Stack direction="row" spacing={1}>
-          <IconButton
-            onClick={loadVolumes}
-            disabled={loading}
-            sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}
-          >
-            <RefreshIcon />
-          </IconButton>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={openCreateDialog}
-            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
-          >
-            Create volume
-          </Button>
+              Volumes
+            </Typography>
+            <Typography variant="body2" color="text.secondary" noWrap>
+              One volume → one service (exclusive)
+            </Typography>
+          </Box>
         </Stack>
+
+        <IconButton
+          onClick={loadVolumes}
+          disabled={loading}
+          size="small"
+          sx={{
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1,
+            alignSelf: { xs: "flex-end", sm: "center" },
+          }}
+        >
+          <RefreshIcon fontSize="small" />
+        </IconButton>
       </Stack>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError(null)}>
+        <Alert
+          severity="error"
+          sx={{ mb: 2, borderRadius: 1 }}
+          onClose={() => setError(null)}
+        >
           {error}
         </Alert>
       )}
       {success && (
-        <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setSuccess(null)}>
+        <Alert
+          severity="success"
+          sx={{ mb: 2, borderRadius: 1 }}
+          onClose={() => setSuccess(null)}
+        >
           {success}
         </Alert>
       )}
 
-      <Paper
-        elevation={0}
-        sx={{
-          borderRadius: 2.5,
-          border: "1px solid",
-          borderColor: "divider",
-          overflow: "hidden",
-        }}
-      >
-        {loading ? (
-          <Box sx={{ py: 8, display: "flex", justifyContent: "center" }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <TableContainer>
-            <Table size="small">
+      {loading ? (
+        <Box sx={{ py: 8, display: "flex", justifyContent: "center" }}>
+          <CircularProgress size={32} />
+        </Box>
+      ) : volumes.length === 0 ? (
+        <Paper
+          elevation={0}
+          sx={{
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 1,
+            py: 6,
+            textAlign: "center",
+          }}
+        >
+          <Typography color="text.secondary">No volumes yet.</Typography>
+        </Paper>
+      ) : isMobile || isTablet ? (
+        <Box>
+          {volumes.map((volume) => (
+            <VolumeCard key={volume.id ?? volume.pk} volume={volume} />
+          ))}
+        </Box>
+      ) : (
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 1,
+            border: "1px solid",
+            borderColor: "divider",
+            overflow: "hidden",
+          }}
+        >
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table size="small" sx={{ minWidth: 720 }}>
               <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 800 }}>Name</TableCell>
-                  <TableCell sx={{ fontWeight: 800 }}>Bind path</TableCell>
-                  <TableCell sx={{ fontWeight: 800 }}>Mode</TableCell>
-                  <TableCell sx={{ fontWeight: 800 }}>Size</TableCell>
-                  <TableCell sx={{ fontWeight: 800 }}>Status</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 800 }}>
+                <TableRow
+                  sx={{
+                    bgcolor: "action.hover",
+                    "& th": {
+                      borderBottom: "1px solid",
+                      borderColor: "divider",
+                      py: 1.25,
+                    },
+                  }}
+                >
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Bind path</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Mode</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Size</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Service</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Status</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, fontSize: 13 }}>
                     Actions
                   </TableCell>
                 </TableRow>
@@ -352,80 +560,149 @@ export default function Volumes() {
               <TableBody>
                 {volumes.map((volume) => {
                   const id = volume.id ?? volume.pk;
-                  const bind = volume.default_bind || volume.bind || "—";
-                  const mode = volume.default_mode || volume.mode || "rw";
+                  const bind = volume.bind || volume.default_bind || "—";
+                  const mode = volume.mode || volume.default_mode || "rw";
+                  const st = statusInfo(volume);
+                  const sid = getServiceId(volume);
+                  const mounted = isMounted(volume);
                   return (
-                    <TableRow key={id} hover>
+                    <TableRow
+                      key={id}
+                      hover
+                      sx={{
+                        "& td": {
+                          borderBottom: "1px solid",
+                          borderColor: "divider",
+                          py: 1,
+                        },
+                        "&:last-child td": { borderBottom: 0 },
+                      }}
+                    >
                       <TableCell>
-                        <Typography fontWeight={700}>{volume.name}</Typography>
+                        <Typography fontWeight={600} fontSize={14}>
+                          {volume.name}
+                        </Typography>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" fontFamily="monospace">
+                        <Typography
+                          variant="body2"
+                          fontFamily="monospace"
+                          fontSize={13}
+                          sx={{ wordBreak: "break-all" }}
+                        >
                           {bind}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip size="small" label={mode} sx={{ fontWeight: 700, height: 22 }} />
-                      </TableCell>
-                      <TableCell>{volume.size_mb != null ? `${volume.size_mb} MB` : "—"}</TableCell>
-                      <TableCell>
                         <Chip
                           size="small"
-                          label={attachedLabel(volume)}
-                          color={volume.is_unused ? "default" : "success"}
-                          variant={volume.is_unused ? "outlined" : "filled"}
+                          label={mode}
                           sx={{ fontWeight: 700, height: 22 }}
                         />
                       </TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <IconButton size="small" onClick={() => handleViewFiles(volume)} title="Files">
-                            <VisibilityIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" onClick={() => handleDownloadVolume(volume)} title="Download">
-                            <DownloadIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton size="small" onClick={() => openEditDialog(volume)} title="Edit">
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
+                      <TableCell sx={{ fontSize: 13 }}>
+                        {volume.size_mb != null ? `${volume.size_mb} MB` : "—"}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 13 }}>
+                        {sid ? (
+                          <Typography fontSize={13} fontWeight={600}>
+                            {getServiceName(volume) || sid}
+                          </Typography>
+                        ) : (
+                          <Typography fontSize={13} color="text.secondary">
+                            —
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Chip
                             size="small"
-                            color="error"
-                            onClick={() => handleDeleteVolume(volume)}
-                            title="Delete"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
+                            label={st.label}
+                            color={st.color}
+                            variant={st.variant}
+                            sx={{ fontWeight: 700, height: 22 }}
+                          />
+                          {mounted && (
+                            <Chip
+                              size="small"
+                              label="Mounted"
+                              color="info"
+                              sx={{ fontWeight: 700, height: 22 }}
+                            />
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+                          <Tooltip title="Files">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewFiles(volume)}
+                            >
+                              <VisibilityIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Download">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleDownloadVolume(volume)}
+                            >
+                              <DownloadIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Edit metadata">
+                            <IconButton
+                              size="small"
+                              onClick={() => openEditDialog(volume)}
+                            >
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          {sid && (
+                            <Tooltip title="Soft-detach">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDetachVolume(volume, false)}
+                              >
+                                <LinkOffIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleDeleteVolume(volume)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         </Stack>
                       </TableCell>
                     </TableRow>
                   );
                 })}
-                {volumes.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
-                      <Typography color="text.secondary">No volumes yet.</Typography>
-                      <Button
-                        sx={{ mt: 1.5, textTransform: "none", fontWeight: 700 }}
-                        startIcon={<AddIcon />}
-                        onClick={openCreateDialog}
-                      >
-                        Create your first volume
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )}
               </TableBody>
             </Table>
           </TableContainer>
-        )}
-      </Paper>
+        </Paper>
+      )}
 
-      <Dialog open={dialogOpen} onClose={closeDialog} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 2.5 } }}>
-        <DialogTitle sx={{ fontWeight: 800 }}>
-          {currentVolume ? "Edit volume" : "Create volume"}
-        </DialogTitle>
+      <Dialog
+        open={dialogOpen}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+        fullScreen={isMobile}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Edit volume</DialogTitle>
         <DialogContent>
+          <Alert severity="info" sx={{ mb: 2, borderRadius: 1 }}>
+            Metadata (path, size, mode) can only change before the volume exists in
+            Docker. After provision, detach/delete and recreate if you need changes.
+          </Alert>
           <Stack spacing={2} sx={{ mt: 0.5 }}>
             <TextField
               fullWidth
@@ -433,9 +710,8 @@ export default function Volumes() {
               label="Name"
               name="name"
               value={formData.name}
-              onChange={handleFormChange}
-              disabled={Boolean(currentVolume)}
-              helperText={currentVolume ? "Name cannot be changed" : "Unique Docker volume name"}
+              disabled
+              helperText="Name cannot be changed here"
             />
             <TextField
               fullWidth
@@ -474,7 +750,7 @@ export default function Volumes() {
             </FormControl>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
           <Button onClick={closeDialog} sx={{ textTransform: "none" }}>
             Cancel
           </Button>
@@ -482,9 +758,9 @@ export default function Volumes() {
             variant="contained"
             onClick={handleSaveVolume}
             disabled={saving}
-            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1 }}
           >
-            {saving ? "Saving…" : currentVolume ? "Save" : "Create"}
+            {saving ? "Saving…" : "Save"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -494,54 +770,115 @@ export default function Volumes() {
         onClose={() => setFileDialogOpen(false)}
         fullWidth
         maxWidth="md"
-        PaperProps={{ sx: { borderRadius: 2.5 } }}
+        fullScreen={isMobile}
+        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 1 } }}
       >
-        <DialogTitle sx={{ fontWeight: 800 }}>
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
           Files — {fileVolumeName || "volume"}
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers>
           {fileLoading ? (
             <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-              <CircularProgress />
+              <CircularProgress size={28} />
             </Box>
           ) : fileError ? (
-            <Alert severity="error" sx={{ borderRadius: 2 }}>
+            <Alert severity="error" sx={{ borderRadius: 1 }}>
               {fileError}
             </Alert>
+          ) : fileList.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
+              No files in this volume.
+            </Typography>
+          ) : isMobile ? (
+            <Stack spacing={1}>
+              {fileList.map((item, index) => (
+                <Paper
+                  key={`${item.path}-${index}`}
+                  elevation={0}
+                  sx={{
+                    p: 1.5,
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography
+                    fontFamily="monospace"
+                    fontSize={13}
+                    sx={{ wordBreak: "break-all" }}
+                  >
+                    {item.path || "./"}
+                  </Typography>
+                  <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
+                    <Chip
+                      size="small"
+                      label={item.type || "file"}
+                      sx={{ height: 20, fontSize: 11 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {item.size != null ? `${item.size} B` : "—"}
+                    </Typography>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
           ) : (
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 800 }}>Path</TableCell>
-                    <TableCell sx={{ fontWeight: 800 }}>Type</TableCell>
-                    <TableCell sx={{ fontWeight: 800 }}>Size</TableCell>
+                  <TableRow
+                    sx={{
+                      bgcolor: "action.hover",
+                      "& th": {
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                        py: 1,
+                      },
+                    }}
+                  >
+                    <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Path</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Size</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {fileList.map((item, index) => (
-                    <TableRow key={`${item.path}-${index}`}>
-                      <TableCell sx={{ fontFamily: "monospace", fontSize: 13 }}>
+                    <TableRow
+                      key={`${item.path}-${index}`}
+                      sx={{
+                        "& td": {
+                          borderBottom: "1px solid",
+                          borderColor: "divider",
+                          py: 0.75,
+                        },
+                        "&:last-child td": { borderBottom: 0 },
+                      }}
+                    >
+                      <TableCell
+                        sx={{
+                          fontFamily: "monospace",
+                          fontSize: 13,
+                          wordBreak: "break-all",
+                        }}
+                      >
                         {item.path || "./"}
                       </TableCell>
-                      <TableCell>{item.type || "file"}</TableCell>
-                      <TableCell>{item.size != null ? `${item.size} B` : "—"}</TableCell>
-                    </TableRow>
-                  ))}
-                  {fileList.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={3} align="center" sx={{ py: 3 }}>
-                        No files in this volume.
+                      <TableCell sx={{ fontSize: 13 }}>{item.type || "file"}</TableCell>
+                      <TableCell sx={{ fontSize: 13 }}>
+                        {item.size != null ? `${item.size} B` : "—"}
                       </TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
             </TableContainer>
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setFileDialogOpen(false)} sx={{ textTransform: "none" }}>
+          <Button
+            onClick={() => setFileDialogOpen(false)}
+            sx={{ textTransform: "none" }}
+          >
             Close
           </Button>
         </DialogActions>

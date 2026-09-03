@@ -1,6 +1,7 @@
 import React, {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -13,6 +14,9 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
   Chip,
@@ -47,6 +51,8 @@ import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
 import StopRoundedIcon from "@mui/icons-material/StopRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import AttachMoneyRoundedIcon from "@mui/icons-material/AttachMoneyRounded";
 import HubRoundedIcon from "@mui/icons-material/HubRounded";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
@@ -115,12 +121,33 @@ const dataStack = [
   },
 ];
 
+const dockerHighlights = [
+  {
+    icon: AppsRoundedIcon,
+    title: "Containerized builds",
+    description:
+      "Every service builds into a clean image.",
+  },
+  {
+    icon: SecurityRoundedIcon,
+    title: "Isolated runs",
+    description:
+      "Workloads stay separate — no shared state.",
+  },
+  {
+    icon: CloudDoneRoundedIcon,
+    title: "Predictable rollouts",
+    description:
+      "The same image from build to production.",
+  },
+];
+
 const workflow = [
   {
     id: "01",
     title: "Choose the resources you need",
     description:
-      "Pick CPU, memory and storage that fit your workload, then change plans whenever your needs change.",
+      "Pick CPU, memory and storage that fit your workload.",
     icon: TuneRoundedIcon,
     accent: "#60a5fa",
   },
@@ -128,7 +155,7 @@ const workflow = [
     id: "02",
     title: "Create a service",
     description:
-      "Set up your application, configuration and runtime without assembling deployment infrastructure by hand.",
+      "Configure app, runtime and settings — no infrastructure assembly.",
     icon: TerminalRoundedIcon,
     accent: "#818cf8",
   },
@@ -136,7 +163,7 @@ const workflow = [
     id: "03",
     title: "Deploy faster",
     description:
-      "Move from configured service to a running deployment with a repeatable workflow and less manual work.",
+      "From configured service to a running deployment.",
     icon: RocketLaunchRoundedIcon,
     accent: "#a78bfa",
   },
@@ -144,7 +171,7 @@ const workflow = [
     id: "04",
     title: "Manage everything in one place",
     description:
-      "Monitor services, manage networks and persistent volumes, restart workloads and adjust resources from one control surface.",
+      "Monitor, restart and scale services — plus volumes and networks — from one place.",
     icon: CloudDoneRoundedIcon,
     accent: "#38bdf8",
   },
@@ -157,26 +184,41 @@ const workflow = [
 function SectionReveal({
   children,
   delay = 0,
-  y = 30,
+  y = 64,
 }) {
+  /* Respect users who prefer reduced motion: skip entrance animation. */
+  const prefersReducedMotion =
+    useMediaQuery(
+      "(prefers-reduced-motion: reduce)"
+    );
+
+  if (prefersReducedMotion) {
+    return <>{children}</>;
+  }
+
+  /* Cinematic scroll reveal: sections glide up from further away and
+     settle with a subtle scale — the "new scene arrives as you scroll"
+     feel of modern scroll-driven landing pages (neuralink.com style). */
   return (
     <motion.div
       initial={{
         opacity: 0,
         y,
+        scale: 0.965,
       }}
       whileInView={{
         opacity: 1,
         y: 0,
+        scale: 1,
       }}
       viewport={{
         once: true,
-        amount: 0.15,
+        amount: 0.2,
       }}
       transition={{
-        duration: 0.65,
+        duration: 0.9,
         delay,
-        ease: [0.22, 1, 0.36, 1],
+        ease: [0.16, 1, 0.3, 1],
       }}
     >
       {children}
@@ -797,81 +839,62 @@ function ServicePreview({
             <ServiceUsage
               label="CPU"
               value={32}
-              iconColor="#60a5fa"
+              iconColor={
+                theme.palette
+                  .primary.main
+              }
               isDark={isDark}
             />
 
             <ServiceUsage
               label="RAM"
               value={48}
-              iconColor="#a78bfa"
+              iconColor={
+                theme.palette
+                  .secondary.main
+              }
               isDark={isDark}
             />
           </Stack>
         </Box>
 
-        {/* Actions */}
+        {/* Preview note — this card is illustrative, so no fake
+            action buttons (they previously looked fully operational). */}
 
         <Stack
-          direction={{
-            xs: "column",
-            sm: "row",
-          }}
+          direction="row"
           spacing={1}
+          alignItems="center"
           sx={{
             mt: 2.25,
+            p: 1.1,
+            borderRadius: 2.25,
+            border: "1px solid",
+            borderColor:
+              subtleBorderFor(
+                isDark
+              ),
+            bgcolor: isDark
+              ? "rgba(255,255,255,.02)"
+              : "rgba(15,23,42,.02)",
           }}
         >
-          <Button
-            variant="contained"
-            color="error"
-            startIcon={
-              <StopRoundedIcon />
-            }
+          <InfoOutlinedIcon
             sx={{
-              flex: 1,
-              borderRadius: 2.25,
-              textTransform:
-                "none",
-              fontWeight: 800,
+              fontSize: 16,
+              color: "text.secondary",
+              flexShrink: 0,
             }}
-          >
-            Stop
-          </Button>
+          />
 
-          <Button
-            variant="contained"
-            startIcon={
-              <LaunchRoundedIcon />
-            }
-            sx={{
-              flex: 1,
-              borderRadius: 2.25,
-              textTransform:
-                "none",
-              fontWeight: 800,
-            }}
+          <Typography
+            variant="caption"
+            color="text.secondary"
           >
-            Open
-          </Button>
-
-          <Button
-            variant="outlined"
-            startIcon={
-              <EditRoundedIcon />
-            }
-            sx={{
-              flex: 1,
-              borderRadius: 2.25,
-              textTransform:
-                "none",
-              fontWeight: 750,
-              borderColor:
-                subtleBorderFor(isDark),
-            }}
-          >
-            Edit
-          </Button>
+            Example service — resources shown for
+            illustration. Sign in to manage real
+            deployments.
+          </Typography>
         </Stack>
       </Box>
     </Paper>
@@ -971,6 +994,12 @@ export default function Home() {
   const isDark =
     theme.palette.mode === "dark";
 
+  /* WCAG 2.3.3 — ask the OS before running heavy motion. */
+  const prefersReducedMotion =
+    useMediaQuery(
+      "(prefers-reduced-motion: reduce)"
+    );
+
   const [loggedIn, setLoggedIn] =
     useState(() => {
       if (typeof window === "undefined") {
@@ -998,21 +1027,55 @@ export default function Home() {
             ORBIT_STORAGE_KEY
           );
 
-        return saved === null
-          ? true
-          : saved === "true";
+        if (saved !== null) {
+          return saved === "true";
+        }
+
+        // Respect users who prefer reduced motion by default.
+        return !prefersReducedMotion;
       } catch {
         return true;
       }
     });
 
-  const { scrollY } = useScroll();
+  const [dockerImageOk, setDockerImageOk] =
+    useState(true);
 
-  /* Only the image moves slightly. */
+  const { scrollY, scrollYProgress } =
+    useScroll();
+
+  /* Cinematic page-progress line — grows across the top edge as the
+     user scrolls, the way scroll-driven sites signal depth. */
+  const progressBarScale = useTransform(
+    scrollYProgress,
+    [0, 1],
+    [0, 1]
+  );
+
+  /* Only the image moves slightly — disabled for reduced motion. */
   const heroImageY = useTransform(
     scrollY,
     [0, 900],
-    [0, 42]
+    [0, prefersReducedMotion ? 0 : 42]
+  );
+
+  /* Docker scene — the image drifts gently while the section crosses
+     the viewport, adding depth to the scroll experience. */
+  const dockerSceneRef =
+    useRef(null);
+
+  const { scrollYProgress: dockerSceneProgress } =
+    useScroll({
+      target: dockerSceneRef,
+      offset: ["start end", "end start"],
+    });
+
+  const dockerImageY = useTransform(
+    dockerSceneProgress,
+    [0, 1],
+    prefersReducedMotion
+      ? [0, 0]
+      : [38, -38]
   );
 
   /* ==========================================================
@@ -1076,7 +1139,7 @@ export default function Home() {
     ? `
       radial-gradient(
         circle at 50% -8%,
-        rgba(37,99,235,0.13),
+        ${alpha(theme.palette.primary.main, 0.13)},
         transparent 30%
       ),
       linear-gradient(
@@ -1090,7 +1153,7 @@ export default function Home() {
     : `
       radial-gradient(
         circle at 50% -8%,
-        rgba(79,70,229,0.09),
+        ${alpha(theme.palette.secondary.main, 0.09)},
         transparent 30%
       ),
       linear-gradient(
@@ -1114,6 +1177,7 @@ export default function Home() {
     <Box
       component="main"
       sx={{
+        position: "relative",
         minHeight: "100vh",
         color: "text.primary",
         background:
@@ -1121,6 +1185,48 @@ export default function Home() {
         overflow: "clip",
       }}
     >
+      {/* SEO — keyword-rich summary kept in the DOM for crawlers,
+          visually hidden so it never competes with the UI. */}
+      <Typography
+        component="p"
+        sx={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          m: -1,
+          p: 0,
+          overflow: "hidden",
+          clip: "rect(0 0 0 0)",
+          clipPath: "inset(50%)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        PassDeployer is an open-source platform as a service for developers:
+        deploy Django, Flask, Node.js and React applications, run PostgreSQL
+        and Redis data services, manage networks and persistent volumes, and
+        scale CPU, RAM and storage with flexible hourly plans — one focused
+        control plane built with Django, React and Docker.
+      </Typography>
+
+      {/* Scroll progress line — thin gradient track at the very top
+          edge that fills as the page is scrolled. Purely decorative. */}
+      <motion.div
+        aria-hidden
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 2.5,
+          background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+          transformOrigin: "0% 50%",
+          scaleX: progressBarScale,
+          zIndex: 1300,
+          pointerEvents: "none",
+        }}
+      />
+
       {/* ======================================================
           HERO
       ======================================================= */}
@@ -1143,9 +1249,8 @@ export default function Home() {
           top="-160px"
           left="50%"
           color={
-            isDark
-              ? "#2563eb"
-              : "#4f46e5"
+            theme.palette
+              .primary.main
           }
           opacity={
             isDark ? 0.11 : 0.06
@@ -1281,21 +1386,21 @@ export default function Home() {
                     mt: 3.2,
                     maxWidth: 1100,
                     fontSize: {
-                      xs: "2.7rem",
-                      sm: "3.8rem",
-                      md: "5.25rem",
+                      xs: "2.6rem",
+                      sm: "3.7rem",
+                      md: "5rem",
                     },
                     lineHeight:
-                      0.94,
+                      1.05,
                     letterSpacing:
-                      "-0.075em",
+                      "-0.045em",
                     fontWeight:
                       950,
                   }}
                 >
                   Deploy faster.
                   <br />
-                  Scale smarter. Ship with confidence.
+                  Scale smarter.
                 </Typography>
               </motion.div>
 
@@ -1332,9 +1437,8 @@ export default function Home() {
                     fontWeight: 450,
                   }}
                 >
-                  A focused platform to <strong>deploy and manage applications</strong> without
-                  infrastructure busywork. Deploy services, manage resources, and scale when the
-                  workload grows.
+                  A focused platform to <strong>deploy and manage services</strong> —
+                  without the infrastructure busywork.
                 </Typography>
               </motion.div>
 
@@ -1369,7 +1473,9 @@ export default function Home() {
                     size="large"
                     onClick={() =>
                       navigate(
-                        "/plans"
+                        loggedIn
+                          ? "/services"
+                          : "/plans"
                       )
                     }
                     endIcon={
@@ -1384,17 +1490,16 @@ export default function Home() {
                         "none",
                       fontWeight:
                         850,
-                      background:
-                        isDark
-                          ? "linear-gradient(135deg,#3b82f6,#2563eb)"
-                          : "linear-gradient(135deg,#4f46e5,#2563eb)",
-                      boxShadow:
-                        isDark
-                          ? "0 16px 42px rgba(37,99,235,.28)"
-                          : "0 16px 42px rgba(79,70,229,.18)",
+                      background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+                      boxShadow: `0 16px 42px ${alpha(
+                        theme.palette.primary.main,
+                        isDark ? 0.3 : 0.2
+                      )}`,
                     }}
                   >
-                    Start deploying
+                    {loggedIn
+                      ? "Go to services"
+                      : "Start deploying"}
                   </Button>
 
                   <Button
@@ -1524,21 +1629,20 @@ export default function Home() {
                         xs: 5,
                         md: 7,
                       },
-                      background:
-                        isDark
+                      background: isDark
                           ? `
                             radial-gradient(
                               ellipse at 50% 45%,
-                              rgba(37,99,235,0.20),
-                              rgba(37,99,235,0.07) 42%,
+                              ${alpha(theme.palette.primary.main, 0.2)},
+                              ${alpha(theme.palette.primary.main, 0.07)} 42%,
                               transparent 72%
                             )
                           `
                           : `
                             radial-gradient(
                               ellipse at 50% 46%,
-                              rgba(37,99,235,0.11),
-                              rgba(99,102,241,0.045) 38%,
+                              ${alpha(theme.palette.primary.main, 0.11)},
+                              ${alpha(theme.palette.secondary.main, 0.045)} 38%,
                               transparent 72%
                             )
                           `,
@@ -1557,9 +1661,10 @@ export default function Home() {
 
                   <OrbitDots
                     color={
-                      isDark
-                        ? "#60a5fa"
-                        : "#2563eb"
+                      theme
+                        .palette
+                        .primary
+                        .main
                     }
                     active={
                       orbitActive
@@ -1618,6 +1723,8 @@ export default function Home() {
                             heroImage
                           }
                           alt="PassDeployer"
+                          fetchPriority="high"
+                          decoding="async"
                           sx={{
                             position:
                               "absolute",
@@ -1782,7 +1889,7 @@ export default function Home() {
                             <Typography
                               sx={{
                                 fontSize:
-                                  "0.72rem",
+                                  "0.78rem",
                                 fontWeight:
                                   800,
                               }}
@@ -1865,6 +1972,53 @@ export default function Home() {
             </Stack>
           </Box>
         </Container>
+
+        {/* Scroll hint — signals there is more below; hidden on small
+            screens (hero already fills them) and for reduced motion. */}
+        {!prefersReducedMotion && (
+          <Stack
+            alignItems="center"
+            spacing={0.25}
+            sx={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 14,
+              display: { xs: "none", md: "flex" },
+              pointerEvents: "none",
+            }}
+          >
+            <Typography
+              variant="caption"
+              sx={{
+                fontSize: "0.66rem",
+                fontWeight: 800,
+                letterSpacing: "0.24em",
+                textTransform: "uppercase",
+                color: "text.secondary",
+                opacity: 0.65,
+              }}
+            >
+              Scroll
+            </Typography>
+
+            <motion.div
+              animate={{ y: [0, 7, 0], opacity: [0.45, 0.9, 0.45] }}
+              transition={{
+                duration: 1.8,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <ExpandMoreRoundedIcon
+                sx={{
+                  fontSize: 20,
+                  color: "text.secondary",
+                }}
+              />
+            </motion.div>
+          </Stack>
+        )}
       </Box>
 
       {/* ======================================================
@@ -1878,15 +2032,21 @@ export default function Home() {
           position: "relative",
           py: {
             xs: 8,
-            md: 15,
+            md: 10,
           },
+          minHeight: { md: "100vh" },
+          display: { md: "flex" },
+          alignItems: { md: "center" },
         }}
       >
         <GlowOrb
           size={340}
           top="16%"
           left="-180px"
-          color="#2563eb"
+          color={
+            theme.palette
+              .primary.main
+          }
           opacity={
             isDark ? 0.08 : 0.045
           }
@@ -1906,7 +2066,7 @@ export default function Home() {
                     "primary.main",
                   fontWeight: 900,
                   fontSize:
-                    "0.72rem",
+                    "0.78rem",
                   letterSpacing:
                     "0.17em",
                   textTransform:
@@ -1944,8 +2104,8 @@ export default function Home() {
                     1.85,
                 }}
               >
-                PassDeployer brings deployment and day-to-day service management together,
-                so you can spend less time setting things up and more time building your application.
+                One control plane for deploying, managing and scaling —
+                less setup, more building.
               </Typography>
             </Stack>
           </SectionReveal>
@@ -2030,8 +2190,8 @@ export default function Home() {
                           linear-gradient(
                             90deg,
                             transparent,
-                            rgba(96,165,250,.20),
-                            rgba(167,139,250,.20),
+                            ${alpha(theme.palette.primary.main, 0.2)},
+                            ${alpha(theme.palette.secondary.main, 0.2)},
                             transparent
                           )
                         `
@@ -2039,8 +2199,8 @@ export default function Home() {
                           linear-gradient(
                             90deg,
                             transparent,
-                            rgba(37,99,235,.12),
-                            rgba(99,102,241,.12),
+                            ${alpha(theme.palette.primary.main, 0.12)},
+                            ${alpha(theme.palette.secondary.main, 0.12)},
                             transparent
                           )
                         `,
@@ -2069,11 +2229,12 @@ export default function Home() {
                     borderRadius:
                       "50%",
                     bgcolor:
-                      isDark
-                        ? "#60a5fa"
-                        : "#3b82f6",
-                    boxShadow:
-                      "0 0 14px rgba(96,165,250,.5)",
+                      theme.palette
+                        .primary.main,
+                    boxShadow: `0 0 14px ${alpha(
+                      theme.palette.primary.main,
+                      0.5
+                    )}`,
                   }}
                 />
 
@@ -2095,11 +2256,12 @@ export default function Home() {
                     borderRadius:
                       "50%",
                     bgcolor:
-                      isDark
-                        ? "#a78bfa"
-                        : "#6366f1",
-                    boxShadow:
-                      "0 0 14px rgba(167,139,250,.5)",
+                      theme.palette
+                        .secondary.main,
+                    boxShadow: `0 0 14px ${alpha(
+                      theme.palette.secondary.main,
+                      0.5
+                    )}`,
                   }}
                 />
 
@@ -2150,14 +2312,14 @@ export default function Home() {
                               borderRadius:
                                 "50%",
                               bgcolor:
-                                "#60a5fa",
+                                "primary.main",
                             }}
                           />
 
                           <Typography
                             sx={{
                               fontSize:
-                                "0.72rem",
+                                "0.78rem",
                               fontWeight:
                                 900,
                               letterSpacing:
@@ -2198,9 +2360,8 @@ export default function Home() {
                           }}
                         >
                           Familiar frameworks
-                          and runtimes, without
-                          forcing a new development
-                          model.
+                          and runtimes — no new
+                          development model.
                         </Typography>
 
                         <Box
@@ -2458,14 +2619,14 @@ export default function Home() {
                               borderRadius:
                                 "50%",
                               bgcolor:
-                                "#a78bfa",
+                                "secondary.main",
                             }}
                           />
 
                           <Typography
                             sx={{
                               fontSize:
-                                "0.72rem",
+                                "0.78rem",
                               fontWeight:
                                 900,
                               letterSpacing:
@@ -2536,16 +2697,6 @@ export default function Home() {
                           )}
                         </Stack>
 
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{
-                            mt: 0.4,
-                          }}
-                        >
-                          Designed to grow with
-                          your service architecture.
-                        </Typography>
                       </Stack>
                     </Box>
                   </Box>
@@ -2589,7 +2740,7 @@ export default function Home() {
                 <Typography
                   sx={{
                     color: "primary.main",
-                    fontSize: "0.72rem",
+                    fontSize: "0.78rem",
                     fontWeight: 900,
                     letterSpacing: "0.13em",
                   }}
@@ -2612,10 +2763,9 @@ export default function Home() {
                   color="text.secondary"
                   sx={{ mt: 1.5, lineHeight: 1.85, maxWidth: 690 }}
                 >
-                  Not every application needs a large plan all the time. With hourly usage,
-                  you can start with the resources that fit your workload, run a short-lived
-                  environment, test an idea, or keep a smaller service online without paying
-                  for capacity you do not need. <strong>You choose the resources, use them for as long as they are useful, and move to a different plan when the workload changes.</strong>
+                  Start with the resources that fit your workload, run a short-lived
+                  environment, or keep a small service online — <strong>and change plans
+                  whenever the workload changes.</strong>
                 </Typography>
               </Box>
 
@@ -2651,15 +2801,21 @@ export default function Home() {
           position: "relative",
           py: {
             xs: 8,
-            md: 14,
+            md: 10,
           },
+          minHeight: { md: "100vh" },
+          display: { md: "flex" },
+          alignItems: { md: "center" },
         }}
       >
         <GlowOrb
           size={320}
           top="10%"
           right="-160px"
-          color="#6366f1"
+          color={
+            theme.palette
+              .secondary.main
+          }
           opacity={
             isDark ? 0.07 : 0.035
           }
@@ -2689,7 +2845,7 @@ export default function Home() {
                     color:
                       "primary.main",
                     fontSize:
-                      "0.72rem",
+                      "0.78rem",
                     fontWeight:
                       900,
                     letterSpacing:
@@ -2729,8 +2885,8 @@ export default function Home() {
                     maxWidth: 620,
                   }}
                 >
-                  Every service gets a clear control surface for status, resources, usage and
-                everyday actions, so routine operations stay simple after deployment.
+                  Status, resources, usage and everyday actions —
+                one clear surface per service.
                 </Typography>
               </Box>
 
@@ -2867,8 +3023,8 @@ export default function Home() {
                           1.75,
                       }}
                     >
-                      Status, resource limits and live usage stay visible from the same service surface,
-                      so you can understand what is running without jumping between tools.
+                      Status, limits and live usage — visible at a
+                      glance, without jumping between tools.
                     </Typography>
                   </Stack>
                 </Paper>
@@ -2902,7 +3058,7 @@ export default function Home() {
                     <Typography
                       sx={{
                         fontSize:
-                          "0.72rem",
+                          "0.78rem",
                         fontWeight:
                           900,
                         letterSpacing:
@@ -2988,13 +3144,6 @@ export default function Home() {
                           )
                         )}
                       </Stack>
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        one surface
-                      </Typography>
                     </Stack>
                   </Stack>
                 </Paper>
@@ -3041,7 +3190,7 @@ export default function Home() {
                   title:
                     "Faster deployment",
                   text:
-                    "Reduce repetitive setup and get from application to running service with fewer manual steps.",
+                    "From code to running service with fewer manual steps.",
                 },
                 {
                   icon:
@@ -3049,7 +3198,7 @@ export default function Home() {
                   title:
                     "Infrastructure, without the busywork",
                   text:
-                    "Manage resources, networks, persistent volumes and service boundaries from one place.",
+                    "Volumes, networks and service boundaries — managed from one place.",
                 },
                 {
                   icon:
@@ -3057,7 +3206,7 @@ export default function Home() {
                   title:
                     "Flexible as you grow",
                   text:
-                    "Change plans when your workload changes instead of rebuilding your deployment setup.",
+                    "Change plans as you grow — no rebuilds.",
                 },
               ].map(
                 (
@@ -3151,8 +3300,11 @@ export default function Home() {
             "relative",
           py: {
             xs: 9,
-            md: 15,
+            md: 10,
           },
+          minHeight: { md: "100vh" },
+          display: { md: "flex" },
+          alignItems: { md: "center" },
           bgcolor:
             isDark
               ? "rgba(255,255,255,.012)"
@@ -3189,7 +3341,7 @@ export default function Home() {
                     color:
                       "primary.main",
                     fontSize:
-                      "0.72rem",
+                      "0.78rem",
                     fontWeight:
                       900,
                     letterSpacing:
@@ -3285,8 +3437,8 @@ export default function Home() {
                 height: 1,
                 background:
                   isDark
-                    ? "linear-gradient(90deg, transparent, rgba(96,165,250,.28), rgba(167,139,250,.28), transparent)"
-                    : "linear-gradient(90deg, transparent, rgba(37,99,235,.16), rgba(99,102,241,.16), transparent)",
+                    ? `linear-gradient(90deg, transparent, ${alpha(theme.palette.primary.main, 0.28)}, ${alpha(theme.palette.secondary.main, 0.28)}, transparent)`
+                    : `linear-gradient(90deg, transparent, ${alpha(theme.palette.primary.main, 0.16)}, ${alpha(theme.palette.secondary.main, 0.16)}, transparent)`,
               }}
             />
 
@@ -3471,6 +3623,375 @@ export default function Home() {
       </Box>
 
       {/* ======================================================
+          DOCKER — UNDER THE HOOD
+          (scene image: /docker-image.jpg from public/; falls back to
+          a styled illustration when the file is absent)
+      ======================================================= */}
+
+      <Box
+        id="docker"
+        component="section"
+        ref={dockerSceneRef}
+        sx={{
+          position: "relative",
+          py: { xs: 8, md: 10 },
+          minHeight: { md: "100vh" },
+          display: { md: "flex" },
+          alignItems: { md: "center" },
+          overflow: "clip",
+        }}
+      >
+        <GlowOrb
+          size={360}
+          top="18%"
+          left="-170px"
+          color={
+            theme.palette
+              .secondary.main
+          }
+          opacity={
+            isDark ? 0.08 : 0.04
+          }
+        />
+
+        <Container maxWidth="xl">
+          <Stack
+            direction={{
+              xs: "column-reverse",
+              md: "row",
+            }}
+            spacing={{
+              xs: 5,
+              md: 8,
+            }}
+            alignItems="center"
+          >
+            {/* SCENE IMAGE */}
+
+            <Box
+              sx={{
+                flex: 1.15,
+                minWidth: 0,
+                width: "100%",
+              }}
+            >
+              <SectionReveal>
+                <motion.div
+                  style={{
+                    y: dockerImageY,
+                  }}
+                >
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      position: "relative",
+                      overflow: "hidden",
+                      borderRadius: {
+                        xs: 3.5,
+                        md: 5,
+                      },
+                      border: "1px solid",
+                      borderColor: subtleBorder,
+                      background: isDark
+                        ? "#08111e"
+                        : "#edf4ff",
+                      boxShadow: isDark
+                        ? "0 30px 90px rgba(0,0,0,.32)"
+                        : "0 26px 70px rgba(30,64,175,.09)",
+                      transform: "translateZ(0)",
+                    }}
+                  >
+                    {dockerImageOk ? (
+                      <Box
+                        component="img"
+                        src="/docker-image.jpg"
+                        alt="PassDeployer — Docker-based deployments"
+                        onError={() =>
+                          setDockerImageOk(
+                            false
+                          )
+                        }
+                        loading="lazy"
+                        decoding="async"
+                        sx={{
+                          display: "block",
+                          width: "100%",
+                          height: "auto",
+                          transform: "translateZ(0)",
+                        }}
+                      />
+                    ) : (
+                      /* Fallback illustration — keeps the scene
+                         intentional even without the image file. */
+
+                      <Box
+                        sx={{
+                          position: "relative",
+                          aspectRatio: "4 / 3",
+                          display: "flex",
+                          flexDirection:
+                            "column",
+                          alignItems:
+                            "center",
+                          justifyContent:
+                            "center",
+                          gap: 2.5,
+                          background: isDark
+                            ? `
+                              radial-gradient(
+                                circle at 50% 30%,
+                                rgba(13,74,156,.38),
+                                transparent 60%
+                              ),
+                              linear-gradient(
+                                160deg,
+                                #0a1526,
+                                #07101b
+                              )
+                            `
+                            : `
+                              radial-gradient(
+                                circle at 50% 30%,
+                                rgba(59,130,246,.16),
+                                transparent 60%
+                              ),
+                              linear-gradient(
+                                160deg,
+                                #f2f7ff,
+                                #e8f1ff
+                              )
+                            `,
+                        }}
+                      >
+                        <Box
+                          aria-hidden
+                          sx={{
+                            display:
+                              "flex",
+                            alignItems:
+                              "center",
+                            justifyContent:
+                              "center",
+                            width: 104,
+                            height: 104,
+                            borderRadius: 5,
+                            border:
+                              "1px solid",
+                            borderColor: isDark
+                              ? "rgba(255,255,255,.12)"
+                              : "rgba(15,23,42,.10)",
+                            bgcolor: isDark
+                              ? "rgba(255,255,255,.04)"
+                              : "rgba(255,255,255,.66)",
+                            backdropFilter:
+                              "blur(14px)",
+                          }}
+                        >
+                          <SiDocker
+                            size={58}
+                          />
+                        </Box>
+
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                        >
+                          {[
+                            "build",
+                            "run",
+                            "manage",
+                          ].map(
+                            (
+                              label
+                            ) => (
+                              <Chip
+                                key={
+                                  label
+                                }
+                                label={
+                                  label
+                                }
+                                size="small"
+                                sx={{
+                                  borderRadius: 999,
+                                  fontWeight: 700,
+                                  fontSize:
+                                    "0.72rem",
+                                }}
+                              />
+                            )
+                          )}
+                        </Stack>
+                      </Box>
+                    )}
+                  </Paper>
+                </motion.div>
+              </SectionReveal>
+            </Box>
+
+            {/* COPY */}
+
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              <SectionReveal
+                delay={0.08}
+              >
+                <Stack spacing={2.5}>
+                  <Box>
+                    <Typography
+                      component="p"
+                      sx={{
+                        color:
+                          "primary.main",
+                        fontWeight: 900,
+                        fontSize:
+                          "0.78rem",
+                        letterSpacing:
+                          "0.17em",
+                        textTransform:
+                          "uppercase",
+                      }}
+                    >
+                      Docker under the hood
+                    </Typography>
+
+                    <Typography
+                      component="h2"
+                      sx={{
+                        mt: 1,
+                        fontSize: {
+                          xs: "2.1rem",
+                          md: "3.15rem",
+                        },
+                        lineHeight: 1.03,
+                        letterSpacing:
+                          "-0.06em",
+                        fontWeight: 950,
+                      }}
+                    >
+                      Every deployment
+                      rides on containers.
+                    </Typography>
+
+                    <Typography
+                      color="text.secondary"
+                      sx={{
+                        mt: 1.5,
+                        lineHeight: 1.85,
+                        maxWidth: 560,
+                      }}
+                    >
+                      Services build and run as containers —
+                      isolated, reproducible and managed
+                      by the platform.
+                    </Typography>
+                  </Box>
+
+                  <Stack spacing={1.1}>
+                    {dockerHighlights.map(
+                      (
+                        item
+                      ) => {
+                        const Icon =
+                          item.icon;
+
+                        return (
+                          <Stack
+                            key={
+                              item.title
+                            }
+                            direction="row"
+                            spacing={1.5}
+                            alignItems="center"
+                            sx={{
+                              p: 1.25,
+                              borderRadius: 3,
+                              border:
+                                "1px solid",
+                              borderColor:
+                                subtleBorder,
+                              bgcolor: isDark
+                                ? "rgba(255,255,255,.025)"
+                                : "rgba(255,255,255,.62)",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 40,
+                                height: 40,
+                                flexShrink: 0,
+                                display:
+                                  "flex",
+                                alignItems:
+                                  "center",
+                                justifyContent:
+                                  "center",
+                                borderRadius: 2.5,
+                                color:
+                                  "primary.main",
+                                bgcolor:
+                                  alpha(
+                                    theme
+                                      .palette
+                                      .primary
+                                      .main,
+                                    isDark
+                                      ? 0.09
+                                      : 0.07
+                                  ),
+                              }}
+                            >
+                              <Icon
+                                sx={{
+                                  fontSize: 20,
+                                }}
+                              />
+                            </Box>
+
+                            <Box>
+                              <Typography
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize:
+                                    "0.92rem",
+                                }}
+                              >
+                                {
+                                  item.title
+                                }
+                              </Typography>
+
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  fontSize:
+                                    "0.82rem",
+                                  lineHeight: 1.6,
+                                }}
+                              >
+                                {
+                                  item.description
+                                }
+                              </Typography>
+                            </Box>
+                          </Stack>
+                        );
+                      }
+                    )}
+                  </Stack>
+                </Stack>
+              </SectionReveal>
+            </Box>
+          </Stack>
+        </Container>
+      </Box>
+
+      {/* ======================================================
           FAQ / SEARCH-INTENT CONTENT
       ======================================================= */}
 
@@ -3479,7 +4000,10 @@ export default function Home() {
         aria-labelledby="deployment-faq-heading"
         sx={{
           position: "relative",
-          py: { xs: 9, md: 14 },
+          py: { xs: 9, md: 10 },
+          minHeight: { md: "100vh" },
+          display: { md: "flex" },
+          alignItems: { md: "center" },
         }}
       >
         <Container maxWidth="lg">
@@ -3501,50 +4025,103 @@ export default function Home() {
                 color="text.secondary"
                 sx={{ mt: 1.6, lineHeight: 1.8, maxWidth: 690, mx: "auto" }}
               >
-                The platform is designed to remove repetitive infrastructure work while keeping
-                the resource and operational controls you need close at hand.
+                Less repetitive infrastructure work — with the controls
+                you need close at hand.
               </Typography>
             </Box>
           </SectionReveal>
 
-          <Stack spacing={1.5}>
+          <Stack spacing={1.2}>
             {[
               {
                 q: "How does PassDeployer make deployment easier?",
-                a: "PassDeployer puts service creation, deployment and everyday management into one workflow, reducing the amount of manual infrastructure setup between your code and a running service.",
+                a: "Service creation, deployment and everyday management in one workflow — less manual setup between your code and a running service.",
               },
               {
                 q: "Can I manage networks and persistent volumes?",
-                a: "Yes. Networks and persistent volumes are part of the service environment, so they can be managed alongside the applications that use them instead of being treated as disconnected infrastructure.",
+                a: "Yes. Networks and persistent volumes live in the same service environment, managed alongside the applications that use them.",
               },
               {
                 q: "Can I use PassDeployer for short or changing workloads?",
-                a: "Yes. Plans support hourly usage, so you can choose resources for the workload you have now, keep a temporary environment running when you need it, and move to a different plan as your application grows.",
+                a: "Yes. Hourly plans let you size resources for today's workload, run temporary environments, and switch plans as you grow.",
               },
               {
                 q: "What can I manage after deployment?",
-                a: "You can monitor service status and resource usage, perform common lifecycle actions, and manage the resources and supporting infrastructure around your services from the same control plane.",
+                a: "Status, usage, lifecycle actions and supporting resources — all from the same control plane.",
               },
-            ].map((item) => (
-              <Paper
+            ].map((item, index) => (
+              <Accordion
                 key={item.q}
                 component="article"
                 elevation={0}
+                disableGutters
                 sx={{
-                  p: { xs: 2.5, md: 3 },
-                  borderRadius: { xs: 3, md: 4 },
+                  borderRadius: {
+                    xs: 2.5,
+                    md: 3,
+                  },
                   border: "1px solid",
                   borderColor: subtleBorder,
                   bgcolor: "background.paper",
+                  overflow: "hidden",
+                  "&:before": {
+                    display: "none",
+                  },
+                  "&.Mui-expanded": {
+                    borderColor: (t) =>
+                      alpha(
+                        t.palette.primary
+                          .main,
+                        0.3
+                      ),
+                  },
                 }}
               >
-                <Typography component="h3" sx={{ fontWeight: 900, mb: 0.8 }}>
-                  {item.q}
-                </Typography>
-                <Typography color="text.secondary" sx={{ lineHeight: 1.8 }}>
-                  {item.a}
-                </Typography>
-              </Paper>
+                <AccordionSummary
+                  expandIcon={
+                    <ExpandMoreRoundedIcon />
+                  }
+                  sx={{
+                    px: {
+                      xs: 2,
+                      md: 2.5,
+                    },
+                    "&.Mui-expanded": {
+                      minHeight: 54,
+                    },
+                  }}
+                >
+                  <Typography
+                    component="h3"
+                    sx={{
+                      fontWeight: 900,
+                      fontSize:
+                        "0.95rem",
+                    }}
+                  >
+                    {item.q}
+                  </Typography>
+                </AccordionSummary>
+
+                <AccordionDetails
+                  sx={{
+                    px: {
+                      xs: 2,
+                      md: 2.5,
+                    },
+                    pt: 0,
+                  }}
+                >
+                  <Typography
+                    color="text.secondary"
+                    sx={{
+                      lineHeight: 1.8,
+                    }}
+                  >
+                    {item.a}
+                  </Typography>
+                </AccordionDetails>
+              </Accordion>
             ))}
           </Stack>
         </Container>
@@ -3561,15 +4138,21 @@ export default function Home() {
             "relative",
           py: {
             xs: 9,
-            md: 15,
+            md: 10,
           },
+          minHeight: { md: "100vh" },
+          display: { md: "flex" },
+          alignItems: { md: "center" },
         }}
       >
         <GlowOrb
           size={350}
           bottom="-140px"
           right="-150px"
-          color="#4f46e5"
+          color={
+            theme.palette
+              .secondary.main
+          }
           opacity={
             isDark ? 0.08 : 0.045
           }
@@ -3655,7 +4238,7 @@ export default function Home() {
                         color:
                           "primary.main",
                         fontSize:
-                          "0.72rem",
+                          "0.78rem",
                         fontWeight:
                           900,
                         letterSpacing:
@@ -3696,9 +4279,8 @@ export default function Home() {
                           570,
                       }}
                     >
-                      Explore the backend and frontend code
-                      that power PassDeployer and see how
-                      the platform is put together.
+                      Read the backend and frontend code
+                      that powers the platform.
                     </Typography>
 
                     <Stack
@@ -3940,10 +4522,13 @@ export default function Home() {
         sx={{
           position:
             "relative",
-          pb: {
+          py: {
             xs: 9,
-            md: 13,
+            md: 10,
           },
+          minHeight: { md: "100vh" },
+          display: { md: "flex" },
+          alignItems: { md: "center" },
         }}
       >
         <Container maxWidth="lg">
@@ -3996,8 +4581,8 @@ export default function Home() {
                     1.8,
                 }}
               >
-                Choose your resources, create a service and let
-                PassDeployer handle the deployment workflow.
+                Pick your resources, create a service —
+                PassDeployer handles the rest.
               </Typography>
 
               <Stack
@@ -4092,72 +4677,10 @@ export default function Home() {
 
       {/* ======================================================
           FOOTER
+          (removed internal footer — the global Footer.jsx from the
+          Layout renders below this page; two stacked footers with
+          different tone felt inconsistent)
       ======================================================= */}
-
-      <Box
-        sx={{
-          pb: 3,
-        }}
-      >
-        <Container maxWidth="xl">
-          <Divider
-            sx={{
-              borderColor:
-                subtleBorder,
-            }}
-          />
-
-          <Stack
-            direction={{
-              xs: "column",
-              sm: "row",
-            }}
-            alignItems={{
-              xs: "flex-start",
-              sm: "center",
-            }}
-            justifyContent="space-between"
-            spacing={1.5}
-            sx={{
-              pt: 2.5,
-            }}
-          >
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-            >
-              <Box
-                component="img"
-                src={DEFAULT_ICON}
-                alt=""
-                sx={{
-                  width: 22,
-                  height: 22,
-                }}
-              />
-
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  fontWeight:
-                    700,
-                }}
-              >
-                PassDeployer
-              </Typography>
-            </Stack>
-
-            <Typography
-              variant="caption"
-              color="text.secondary"
-            >
-              Deploy faster. Manage everything in one place. Scale when you need to.
-            </Typography>
-          </Stack>
-        </Container>
-      </Box>
     </Box>
   );
 }

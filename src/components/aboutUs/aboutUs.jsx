@@ -345,7 +345,7 @@ const AboutUs = () => {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              PaaS Deployer
+              PassDeployer
             </Typography>
 
             <Typography

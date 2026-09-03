@@ -1129,14 +1129,21 @@ function renderDocument(
   }
 
   /*
-   * Replace Vite's empty #root with:
+   * Replace Vite's #root content with the loading shell:
    *
    *   #root
    *     loading shell
    *
    *   noscript
    *     SEO content
+   *
+   * IMPORTANT: never inject a SECOND #root. A duplicate id means React
+   * mounts into the first root while the second one keeps rendering a
+   * ghost spinner below the app forever.
    */
+  const shellStart = '<!-- APP_SHELL_START -->';
+  const shellEnd = '<!-- APP_SHELL_END -->';
+
   const appRootPattern =
     /<div\b[^>]*\bid=["']root["'][^>]*>\s*<\/div>/i;
 
@@ -1152,19 +1159,72 @@ function renderDocument(
     }
   `;
 
-  if (appRootPattern.test(html)) {
+  if (
+    html.includes(shellStart) &&
+    html.includes(shellEnd)
+  ) {
+    /*
+     * Case 1 — Vite kept the static boot shell between markers:
+     * swap it for the dynamic (per-path) loading shell.
+     */
+    html = html.replace(
+      new RegExp(
+        `${shellStart}[\\s\\S]*?${shellEnd}`,
+      ),
+      `${shellStart}${loadingShell}${shellEnd}`,
+    );
+  } else if (appRootPattern.test(html)) {
+    // Case 2 — empty #root: replace it with shell + noscript.
     html = html.replace(
       appRootPattern,
       renderedRoot,
     );
   } else if (
+    /<div\b[^>]*\bid=["']root["'][^>]*>/i.test(
+      html,
+    )
+  ) {
+    /*
+     * Case 3 — #root exists but is NOT empty (it already contains the
+     * static boot shell). Replace the content INSIDE the existing root
+     * with the dynamic shell — do not create another root.
+     */
+    html = html.replace(
+      /(<div\b[^>]*\bid=["']root["'][^>]*>)[\s\S]*?(<\/div>\s*(?=<noscript\b|<script\b|<\/body))/i,
+      (match, open, close) =>
+        `${open}${loadingShell}${close}`,
+    );
+  } else if (
     /<body\b[^>]*>/i.test(html)
   ) {
+    // Case 4 — no #root at all: append one after <body>.
     html = html.replace(
       /<body\b[^>]*>/i,
       (match) =>
         `${match}${renderedRoot}`,
     );
+  }
+
+  /*
+   * Per-path noscript SEO content: replace the static noscript block
+   * from index.html (or add one before </body> when missing).
+   */
+  if (noscriptContent) {
+    if (
+      /<noscript>[\s\S]*?<\/noscript>/i.test(
+        html,
+      )
+    ) {
+      html = html.replace(
+        /<noscript>[\s\S]*?<\/noscript>/i,
+        `<noscript>${noscriptContent}</noscript>`,
+      );
+    } else {
+      html = html.replace(
+        /<\/body>/i,
+        `<noscript>${noscriptContent}</noscript></body>`,
+      );
+    }
   }
 
   return {

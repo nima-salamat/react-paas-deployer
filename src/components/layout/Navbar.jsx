@@ -530,7 +530,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
                 <Box
                   component="img"
                   src={DEFAULT_ICON}
-                  alt="PaaS Deployer"
+                  alt="PassDeployer"
                   sx={{
                     width: 36,
                     height: 36,
@@ -549,7 +549,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
                   }}
                 >
                   <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>
-                    PaaS Deployer
+                    PassDeployer
                   </Typography>
                   <Typography variant="caption" color="text.secondary" noWrap>
                     Modern control panel
@@ -686,7 +686,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
             <Box
               component="img"
               src={DEFAULT_ICON}
-              alt="PaaS Deployer"
+              alt="PassDeployer"
               sx={{
                 width: 44,
                 height: 44,
@@ -703,7 +703,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
 
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>
-                PaaS Deployer
+                PassDeployer
               </Typography>
               <Typography variant="body2" color="text.secondary" noWrap>
                 Navigation & theme controls

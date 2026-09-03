@@ -36,6 +36,8 @@ import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import AppsIcon from "@mui/icons-material/Apps";
 import StorageIcon from "@mui/icons-material/Storage";
+import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
+import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import PlatformIcon from "./PlatformIcon";
 
 const CreateDeploymentModal = lazy(() => import("./CreateDeploymentModal"));
@@ -117,8 +119,67 @@ const isDatabasePlatform = (key, label) =>
 
 /* ─── Plan card ───────────────────────────────────────────────────────── */
 
+/** Hourly price formatting: "$0.018/hr" / "$2.50/hr". */
+const formatHourly = (value) => {
+  if (value == null) return "—";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return n >= 1 ? `$${n.toFixed(2)}/hr` : `$${n.toFixed(3)}/hr`;
+};
+
+/** Rough monthly estimate (730h) so visitors understand the unit. */
+const monthlyEstimate = (value) => {
+  if (value == null) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const monthly = n * 730;
+  return `≈ $${monthly >= 100 ? monthly.toFixed(0) : monthly.toFixed(1)}/mo`;
+};
+
+const formatStorage = (value) => {
+  if (value == null) return null;
+  return typeof value === "number" ? `${value} GB` : String(value);
+};
+
+function SpecRow({ icon, label, value }) {
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Box
+        sx={{
+          width: 26,
+          height: 26,
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+          borderRadius: 1,
+          bgcolor: (t) => alpha(t.palette.primary.main, 0.08),
+          color: "primary.main",
+        }}
+      >
+        {icon}
+      </Box>
+      <Typography variant="body2" sx={{ minWidth: 0 }}>
+        <Box component="span" color="text.secondary">
+          {label}
+        </Box>{" "}
+        <Box component="b" sx={{ fontWeight: 700 }}>
+          {value}
+        </Box>
+      </Typography>
+    </Stack>
+  );
+}
+
 const PlanCard = memo(function PlanCard({ plan, onCreate }) {
   const pKey = plan.platform ?? "";
+  const cpu = plan.max_cpu ?? plan.cpu;
+  const ram = plan.max_ram ?? plan.ram;
+  const storage = formatStorage(
+    plan.max_storage ?? plan.storage ?? plan.disk ?? plan.storage_gb
+  );
+  const price = plan.price_per_hour ?? plan.price;
+  const monthly = monthlyEstimate(price);
+
   return (
     <Paper
       elevation={0}
@@ -132,59 +193,112 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
         border: "1px solid",
         borderColor: "divider",
         bgcolor: "background.paper",
-        transition: "border-color 180ms ease, background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
+        position: "relative",
+        overflow: "hidden",
+        transition:
+          "border-color 180ms ease, background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease",
         "&:hover": {
           borderColor: "primary.main",
           transform: "translateY(-3px)",
-          boxShadow: theme.palette.mode === "dark"
-            ? `0 8px 24px ${alpha(theme.palette.common.black, 0.35)}`
-            : `0 8px 24px ${alpha(theme.palette.primary.main, 0.12)}`,
+          boxShadow:
+            theme.palette.mode === "dark"
+              ? `0 8px 24px ${alpha(theme.palette.common.black, 0.35)}`
+              : `0 8px 24px ${alpha(theme.palette.primary.main, 0.12)}`,
           bgcolor:
             theme.palette.mode === "dark"
               ? alpha(theme.palette.primary.main, 0.06)
               : alpha(theme.palette.primary.main, 0.03),
         },
+        /* Colored top accent that lights up on hover. */
+        "&:before": {
+          content: '""',
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
+          opacity: 0,
+          transition: "opacity 180ms ease",
+        },
+        "&:hover:before": {
+          opacity: 1,
+        },
       })}
     >
       <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-          <Box sx={{ minWidth: 0, display: "flex", gap: 1, alignItems: "flex-start" }}>
-            <PlatformIcon platformKey={pKey} label={pKey} size={28} />
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
-                {plan.platform ?? "Platform"}
-              </Typography>
-              <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.2 }} noWrap>
-                {plan.name ?? "Unnamed"}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" noWrap>
-                {plan.plan_type
-                  ? `${plan.plan_type}${plan.storage_type ? ` · ${plan.storage_type}` : ""}`
-                  : plan.platform}
-              </Typography>
-            </Box>
+        <Stack direction="row" spacing={1} alignItems="flex-start">
+          <PlatformIcon platformKey={pKey} label={pKey} size={28} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
+              {plan.platform ?? "Platform"}
+            </Typography>
+            <Typography
+              component="h3"
+              variant="subtitle1"
+              sx={{ fontWeight: 800, lineHeight: 1.25 }}
+            >
+              {plan.name ?? "Unnamed"}
+            </Typography>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ lineHeight: 1.35 }}
+            >
+              {plan.plan_type
+                ? `${plan.plan_type}${plan.storage_type ? ` · ${plan.storage_type}` : ""}`
+                : plan.platform}
+            </Typography>
           </Box>
         </Stack>
       </Box>
+
       <Box sx={{ p: 2, flex: 1 }}>
-        <Stack spacing={0.75}>
-          {(plan.max_cpu != null || plan.cpu != null) && (
-            <Typography variant="body2" color="text.secondary">
-              CPU: <b>{plan.max_cpu ?? plan.cpu}</b>
-            </Typography>
+        <Stack spacing={1.1}>
+          {cpu != null && (
+            <SpecRow
+              icon={<ComputerRoundedIcon sx={{ fontSize: 15 }} />}
+              label="CPU"
+              value={cpu}
+            />
           )}
-          {(plan.max_ram != null || plan.ram != null) && (
-            <Typography variant="body2" color="text.secondary">
-              RAM: <b>{plan.max_ram ?? plan.ram}</b>
-            </Typography>
+          {ram != null && (
+            <SpecRow
+              icon={<MemoryRoundedIcon sx={{ fontSize: 15 }} />}
+              label="RAM"
+              value={ram}
+            />
           )}
-          {(plan.price_per_hour != null || plan.price != null) && (
-            <Typography variant="body2" color="text.secondary">
-              Price: <b>{plan.price_per_hour ?? plan.price}</b>
-            </Typography>
+          {storage != null && (
+            <SpecRow
+              icon={<StorageIcon sx={{ fontSize: 15 }} />}
+              label="Storage"
+              value={storage}
+            />
           )}
         </Stack>
+
+        {price != null && (
+          <Box
+            sx={{
+              mt: 2,
+              pt: 1.5,
+              borderTop: "1px dashed",
+              borderColor: "divider",
+            }}
+          >
+            <Typography sx={{ fontWeight: 850, fontSize: "1.05rem" }}>
+              {formatHourly(price)}
+            </Typography>
+            {monthly && (
+              <Typography variant="caption" color="text.secondary">
+                {monthly} · billed hourly
+              </Typography>
+            )}
+          </Box>
+        )}
       </Box>
+
       <Box sx={{ p: 1.5, pt: 0 }}>
         <Button
           fullWidth
@@ -195,9 +309,9 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
             e.stopPropagation();
             onCreate(plan);
           }}
-          sx={{ borderRadius: 1 }}
+          sx={{ borderRadius: 1.5 }}
         >
-          Create
+          Create service
         </Button>
       </Box>
     </Paper>
@@ -364,10 +478,14 @@ export default function PlatformPlans() {
     return () => c.abort();
   }, [fetchPlans]);
 
-  // Infinite scroll sentinel
+  // Infinite scroll sentinel — with a manual fallback for browsers
+  // without IntersectionObserver support (or when the observer misses).
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return undefined;
+    if (typeof IntersectionObserver === "undefined") {
+      return undefined; // "Load more" button is rendered instead
+    }
     const obs = new IntersectionObserver(
       (entries) => {
         const hit = entries.some((e) => e.isIntersecting);
@@ -395,12 +513,16 @@ export default function PlatformPlans() {
       lastPlansSig.current = null;
       return next;
     });
+    // Bring the refreshed list into view instead of leaving the user
+    // scrolled deep into the previous results.
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const clearFilters = () => {
     setSelectedPlatforms([]);
     setPage(1);
     lastPlansSig.current = null;
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const toggleSelectAllInTab = () => {
@@ -419,6 +541,7 @@ export default function PlatformPlans() {
       lastPlansSig.current = null;
       return next;
     });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const openCreate = (plan) => {
@@ -442,8 +565,10 @@ export default function PlatformPlans() {
   };
 
   const handleCreated = (r) => {
-    if (r?.ok) {
-      console.log("Deployment created successfully.");
+    /* Success feedback is handled inside CreateDeploymentModal
+       (notifyOnSuccess). Nothing to do here besides staying quiet. */
+    if (r && r.ok === false) {
+      // Errors are surfaced by the modal itself.
     }
   };
 
@@ -465,7 +590,7 @@ export default function PlatformPlans() {
       sx={{
         minHeight: 36,
         mb: 1.25,
-        "& .MuiTab-root": { minHeight: 36, py: 0.5, fontWeight: 700, fontSize: 13 },
+        "& .MuiTab-root": { minHeight: 36, py: 0.5, fontWeight: 700, fontSize: 13.5 },
       }}
     >
       <Tab
@@ -490,6 +615,9 @@ export default function PlatformPlans() {
           variant="subtitle2"
           sx={{
             fontWeight: 800,
+            /* Solid fallback first: if background-clip:text is
+               unsupported the text stays visible instead of transparent. */
+            color: (t) => t.palette.primary.main,
             background: (t) =>
               `linear-gradient(90deg, ${t.palette.primary.main}, ${t.palette.secondary.main}, ${t.palette.primary.main})`,
             backgroundSize: "200% auto",
@@ -512,7 +640,7 @@ export default function PlatformPlans() {
             variant="outlined"
             onClick={toggleSelectAllInTab}
             disabled={!visiblePlatforms.length || loadingPlatforms}
-            sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 11 }}
+            sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 12 }}
           >
             {allSelectedInTab ? "Deselect" : "Select all"}
           </Button>
@@ -520,7 +648,7 @@ export default function PlatformPlans() {
             size="small"
             onClick={clearFilters}
             disabled={!selectedPlatforms.length}
-            sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 11 }}
+            sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 12 }}
           >
             Clear
           </Button>
@@ -645,7 +773,9 @@ export default function PlatformPlans() {
           Available deployment plans
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, maxWidth: 760 }}>
-          Compare application and data-service resources and choose the plan that fits your workload.
+          Compare application and data-service resources and choose the plan that fits your
+          workload. Plans are billed by the hour — start small, scale up, and pay only while a
+          service is running.
         </Typography>
       </Box>
 
@@ -706,6 +836,7 @@ export default function PlatformPlans() {
             <IconButton
               onClick={retryAll}
               disabled={loadingPlatforms || loadingPlans}
+              aria-label="Refresh plans"
               sx={{ borderRadius: 1, border: "1px solid", borderColor: "divider" }}
             >
               <RefreshIcon />
@@ -740,7 +871,12 @@ export default function PlatformPlans() {
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                 {selectedPlatforms.length > 0 ? "Filtered plans" : "All plans"}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                aria-live="polite"
+                aria-atomic="true"
+              >
                 {loadingPlans ? "Loading…" : `${plans.length} result${plans.length === 1 ? "" : "s"}`}
               </Typography>
             </Stack>
@@ -781,14 +917,25 @@ export default function PlatformPlans() {
             ) : plans.length === 0 && !fetchError ? (
               <Box sx={{ py: 6, textAlign: "center" }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                  No plans found
+                  No plans match your filters
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Change filters or refresh.
+                  Try clearing the platform filters, or refresh to see every
+                  available plan.
                 </Typography>
-                <Button variant="contained" onClick={retryAll} sx={{ borderRadius: 1 }}>
-                  Refresh
-                </Button>
+                <Stack direction="row" spacing={1} justifyContent="center">
+                  <Button
+                    variant="outlined"
+                    onClick={clearFilters}
+                    disabled={!selectedPlatforms.length}
+                    sx={{ borderRadius: 1.5 }}
+                  >
+                    Clear filters
+                  </Button>
+                  <Button variant="contained" onClick={retryAll} sx={{ borderRadius: 1.5 }}>
+                    Refresh
+                  </Button>
+                </Stack>
               </Box>
             ) : (
               <Box
@@ -805,13 +952,30 @@ export default function PlatformPlans() {
               </Box>
             )}
 
-            {/* Infinite-scroll sentinel (replaces Load more button) */}
+            {/* Infinite scroll sentinel + manual fallback button */}
             {hasNext && selectedPlatforms.length === 0 && (
               <Box
                 ref={sentinelRef}
-                sx={{ display: "flex", justifyContent: "center", py: 3, minHeight: 48 }}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 1.5,
+                  py: 3,
+                  minHeight: 48,
+                }}
               >
                 {(loadingMore || loadingPlans) && <CircularProgress size={24} />}
+
+                {!(loadingMore || loadingPlans) && (
+                  <Button
+                    variant="outlined"
+                    onClick={() => setPage((p) => p + 1)}
+                    sx={{ borderRadius: 1.5 }}
+                  >
+                    Load more plans
+                  </Button>
+                )}
               </Box>
             )}
           </Paper>
@@ -835,7 +999,11 @@ export default function PlatformPlans() {
           <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
             Filters
           </Typography>
-          <IconButton onClick={() => setMobileFilterOpen(false)} size="small">
+          <IconButton
+            onClick={() => setMobileFilterOpen(false)}
+            size="small"
+            aria-label="Close filters"
+          >
             <CloseIcon />
           </IconButton>
         </Stack>
