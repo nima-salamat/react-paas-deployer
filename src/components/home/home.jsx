@@ -1,18 +1,6 @@
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-
-import {
-  motion,
-  useScroll,
-  useTransform,
-} from "framer-motion";
-
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useScroll, useTransform } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-
 import {
   Accordion,
   AccordionDetails,
@@ -22,4665 +10,1420 @@ import {
   Chip,
   Container,
   Divider,
-  IconButton,
   Paper,
   Stack,
-  Tooltip,
   Typography,
-  useMediaQuery,
-  useTheme,
   alpha,
+  useTheme,
 } from "@mui/material";
-
-import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
-import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
-import GitHubIcon from "@mui/icons-material/GitHub";
-import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import EastRoundedIcon from "@mui/icons-material/EastRounded";
-import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
-import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
-import CloudDoneRoundedIcon from "@mui/icons-material/CloudDoneRounded";
+import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
+import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
+import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
+import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import SpeedRoundedIcon from "@mui/icons-material/SpeedRounded";
-import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
-import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
-import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
+import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
+import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
-import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
-import StopRoundedIcon from "@mui/icons-material/StopRounded";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import AttachMoneyRoundedIcon from "@mui/icons-material/AttachMoneyRounded";
-import HubRoundedIcon from "@mui/icons-material/HubRounded";
-import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import StopIcon from "@mui/icons-material/Stop";
+import GitHubIcon from "@mui/icons-material/GitHub";
+import { SiDjango, SiDocker, SiFlask, SiNodedotjs, SiPostgresql, SiReact, SiRedis } from "react-icons/si";
 
-import {
-  SiReact,
-  SiDjango,
-  SiNodedotjs,
-  SiFlask,
-  SiPostgresql,
-  SiRedis,
-  SiDocker,
-} from "react-icons/si";
+import heroNetwork from "../../assets/home/hero-network.svg";
+import deployFlow from "../../assets/home/deploy-flow.svg";
+import deployPipeline from "../../assets/home/deploy-pipeline.svg";
+import productionNetwork from "../../assets/home/production-network.svg";
 
-import heroImage from "../../assets/main-image.webp";
+const GITHUB_API = "https://github.com/nima-salamat/django-paas-deployer";
+const GITHUB_FRONTEND = "https://github.com/nima-salamat/react-paas-deployer";
 
-const GITHUB_API =
-  "https://github.com/nima-salamat/django-paas-deployer";
-
-const GITHUB_FRONTEND =
-  "https://github.com/nima-salamat/react-paas-deployer";
-
-const DEFAULT_ICON = "/icon.svg";
-
-const ORBIT_STORAGE_KEY =
-  "home_orbit_animation";
-
-/* ============================================================
-   DATA
-============================================================ */
-
-const applicationStack = [
+const faqs = [
   {
-    name: "React",
-    role: "Frontend",
-    icon: SiReact,
+    q: "What can I deploy?",
+    a: "PassDeployer is designed for modern web workloads, including React frontends, Node.js services, Django and Flask applications, databases, caches, and Docker-based workloads.",
   },
   {
-    name: "Django",
-    role: "Backend",
-    icon: SiDjango,
+    q: "Do I need to manage Docker manually?",
+    a: "No. Docker is the execution layer underneath the platform. The control plane handles service creation, builds, deployments, networking, logs, and the day-to-day workflow.",
   },
   {
-    name: "Node.js",
-    role: "Runtime",
-    icon: SiNodedotjs,
+    q: "Can resources be changed later?",
+    a: "Yes. The platform is structured around service-level resources, so CPU, memory, storage, and runtime configuration can be managed without rebuilding the entire application workflow.",
   },
   {
-    name: "Flask",
-    role: "Python API",
-    icon: SiFlask,
+    q: "Is the platform open source?",
+    a: "The frontend and backend are maintained as separate repositories, making the control plane easier to inspect, adapt, and self-host.",
   },
 ];
 
-const dataStack = [
+const stackGroups = [
   {
-    name: "PostgreSQL",
-    role: "Database",
-    icon: SiPostgresql,
+    title: "Application runtime",
+    items: [
+      ["React", SiReact],
+      ["Node.js", SiNodedotjs],
+      ["Django", SiDjango],
+      ["Flask", SiFlask],
+    ],
   },
   {
-    name: "Redis",
-    role: "Cache & queues",
-    icon: SiRedis,
-  },
-];
-
-const dockerHighlights = [
-  {
-    icon: AppsRoundedIcon,
-    title: "Containerized builds",
-    description:
-      "Every service builds into a clean image.",
-  },
-  {
-    icon: SecurityRoundedIcon,
-    title: "Isolated runs",
-    description:
-      "Workloads stay separate — no shared state.",
-  },
-  {
-    icon: CloudDoneRoundedIcon,
-    title: "Predictable rollouts",
-    description:
-      "The same image from build to production.",
+    title: "Data & infrastructure",
+    items: [
+      ["PostgreSQL", SiPostgresql],
+      ["Redis", SiRedis],
+      ["Docker", SiDocker],
+    ],
   },
 ];
 
-const workflow = [
-  {
-    id: "01",
-    title: "Choose the resources you need",
-    description:
-      "Pick CPU, memory and storage that fit your workload.",
-    icon: TuneRoundedIcon,
-    accent: "#60a5fa",
-  },
-  {
-    id: "02",
-    title: "Create a service",
-    description:
-      "Configure app, runtime and settings — no infrastructure assembly.",
-    icon: TerminalRoundedIcon,
-    accent: "#818cf8",
-  },
-  {
-    id: "03",
-    title: "Deploy faster",
-    description:
-      "From configured service to a running deployment.",
-    icon: RocketLaunchRoundedIcon,
-    accent: "#a78bfa",
-  },
-  {
-    id: "04",
-    title: "Manage everything in one place",
-    description:
-      "Monitor, restart and scale services — plus volumes and networks — from one place.",
-    icon: CloudDoneRoundedIcon,
-    accent: "#38bdf8",
-  },
+const lifecycleSteps = [
+  { title: "Connect source", body: "Point a service at your repository and let the platform own the rest of the path." },
+  { title: "Build image", body: "Consistent Docker builds turn application code into a deployable runtime unit." },
+  { title: "Ship release", body: "Promote a release into the environment with clear status, logs and health signals." },
+  { title: "Observe & scale", body: "Keep networking, storage and resource controls close to the service itself." },
 ];
 
-/* ============================================================
-   SECTION REVEAL
-============================================================ */
+/** Bidirectional, GPU-cheap enter/leave (transform + opacity only). */
+/**
+ * Cards: expand from a single point, collapse back into the same point
+ * when leaving the viewport (works both scroll directions).
+ */
+/** Different motions for different roles — not one animation for everything. */
+const textVariants = {
+  hidden: { opacity: 0, y: 28 },
+  show: { opacity: 1, y: 0 },
+};
 
-function SectionReveal({
-  children,
-  delay = 0,
-  y = 64,
-}) {
-  /* Respect users who prefer reduced motion: skip entrance animation. */
-  const prefersReducedMotion =
-    useMediaQuery(
-      "(prefers-reduced-motion: reduce)"
-    );
+const cardVariants = {
+  hidden: { opacity: 0, scale: 0.14 },
+  show: { opacity: 1, scale: 1 },
+};
 
-  if (prefersReducedMotion) {
-    return <>{children}</>;
-  }
+const slideVariants = {
+  hidden: { opacity: 0, x: -28 },
+  show: { opacity: 1, x: 0 },
+};
 
-  /* Cinematic scroll reveal: sections glide up from further away and
-     settle with a subtle scale — the "new scene arrives as you scroll"
-     feel of modern scroll-driven landing pages (neuralink.com style). */
+function Reveal({ children, delay = 0, className, variant = "text", origin = "50% 55%" }) {
+  const variants =
+    variant === "card" ? cardVariants : variant === "slide" ? slideVariants : textVariants;
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        y,
-        scale: 0.965,
-      }}
-      whileInView={{
-        opacity: 1,
-        y: 0,
-        scale: 1,
-      }}
-      viewport={{
-        once: true,
-        amount: 0.2,
-      }}
-      transition={{
-        duration: 0.9,
-        delay,
-        ease: [0.16, 1, 0.3, 1],
-      }}
+      className={className}
+      variants={variants}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: false, amount: 0.32, margin: "0px 0px -6% 0px" }}
+      transition={{ duration: 0.48, delay, ease: [0.22, 1, 0.36, 1] }}
+      style={
+        variant === "card"
+          ? { transformOrigin: origin, willChange: "transform, opacity" }
+          : { willChange: "transform, opacity" }
+      }
     >
       {children}
     </motion.div>
   );
 }
 
-/* ============================================================
-   GLOW ORB
-============================================================ */
-
-function GlowOrb({
-  size = 300,
-  top,
-  left,
-  right,
-  bottom,
-  color,
-  opacity = 0.12,
-}) {
-  return (
-    <Box
-      aria-hidden
-      sx={{
-        position: "absolute",
-        width: size,
-        height: size,
-        top,
-        left,
-        right,
-        bottom,
-        borderRadius: "50%",
-        background: color,
-        opacity,
-        filter: "blur(80px)",
-        pointerEvents: "none",
-      }}
-    />
+/** SVG curtain panel — progress 0→1 opens then can close; reverse scroll closes. */
+function CurtainPanel({ side, progress, dark }) {
+  const uid = `${side}-${dark ? "d" : "l"}`;
+  // 0 = closed (covering), mid = open (aside), 1 = closed again
+  const tx = useTransform(
+    progress,
+    [0, 0.18, 0.35, 0.65, 0.82, 1],
+    side === "left"
+      ? ["0%", "0%", "-102%", "-102%", "0%", "0%"]
+      : ["0%", "0%", "102%", "102%", "0%", "0%"]
   );
-}
-
-/* ============================================================
-   ORBIT DOTS
-============================================================ */
-
-function OrbitDots({
-  color,
-  count = 18,
-  active = true,
-}) {
-  const dots = useMemo(
-    () =>
-      Array.from(
-        { length: count },
-        (_, index) => ({
-          index,
-          size:
-            4 + (index % 3) * 2,
-          radius:
-            46 + (index % 4) * 4,
-          duration:
-            12 + (index % 5) * 2.5,
-          delay:
-            -(index * 0.45),
-          opacity:
-            0.35 +
-            (index % 4) * 0.12,
-        })
-      ),
-    [count]
-  );
+  const c0 = dark ? (side === "left" ? "#070f1c" : "#120a1c") : (side === "left" ? "#e8eef8" : "#efe8f8");
+  const c1 = dark ? (side === "left" ? "#0f1c32" : "#1c1430") : (side === "left" ? "#d0dceb" : "#ddd0f0");
+  const fold = dark ? "#7dd3fc" : "#3b82f6";
 
   return (
     <Box
+      component={motion.div}
       aria-hidden
+      style={{ x: tx }}
       sx={{
         position: "absolute",
-        inset: 0,
+        top: 0,
+        bottom: 0,
+        [side]: 0,
+        width: "50%",
+        zIndex: 8,
         pointerEvents: "none",
-        opacity: active ? 1 : 0.25,
-        transition:
-          "opacity 350ms ease",
+        display: { xs: "none", md: "block" },
       }}
     >
-      {dots.map((dot) => (
-        <Box
-          key={dot.index}
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            width: {
-              xs: `${dot.radius * 1.28}%`,
-              md: `${dot.radius}%`,
-            },
-            height: 0,
-            transformOrigin:
-              "left center",
-          }}
-        >
-          <motion.div
-            animate={
-              active
-                ? { rotate: 360 }
-                : { rotate: 0 }
-            }
-            transition={{
-              duration:
-                dot.duration,
-              delay: dot.delay,
-              repeat: active
-                ? Infinity
-                : 0,
-              ease: "linear",
-            }}
-            style={{
-              position:
-                "absolute",
-              inset: 0,
-              transformOrigin:
-                "left center",
-            }}
-          >
-            <Box
-              sx={{
-                position:
-                  "absolute",
-                right: 0,
-                top: "50%",
-                width: dot.size,
-                height: dot.size,
-                transform:
-                  "translate(50%, -50%)",
-                borderRadius: "50%",
-                bgcolor: color,
-                opacity: active
-                  ? dot.opacity
-                  : dot.opacity * 0.4,
-                boxShadow: active
-                  ? `0 0 18px ${alpha(
-                      color,
-                      0.72
-                    )}`
-                  : `0 0 8px ${alpha(
-                      color,
-                      0.25
-                    )}`,
-              }}
-            />
-          </motion.div>
-        </Box>
-      ))}
+      <svg width="100%" height="100%" viewBox="0 0 400 900" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`cg-${uid}`} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={c0} stopOpacity="0.98" />
+            <stop offset="100%" stopColor={c1} stopOpacity="0.94" />
+          </linearGradient>
+        </defs>
+        <rect width="400" height="900" fill={`url(#cg-${uid})`} />
+        <path
+          d="M50 0v900M100 0v900M150 0v900M200 0v900M250 0v900M300 0v900M350 0v900"
+          stroke={fold}
+          strokeOpacity="0.12"
+          strokeWidth="1.5"
+        />
+      </svg>
     </Box>
   );
 }
 
-/* ============================================================
-   STACK ITEM
-============================================================ */
+/**
+ * page  → full-viewport + snap (only for selected sections)
+ * curtain → dual SVG curtains (open on enter, close on leave / scroll back)
+ */
+function ScrollScene({ children, sx = {}, page = false, curtain = false, stack = false, stackZ = 2, ...props }) {
+  const theme = useTheme();
+  const dark = theme.palette.mode === "dark";
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
 
-function StackItem({
-  item,
-  theme,
-  isDark,
-  direction = "left",
-}) {
-  const Icon = item.icon;
+  // mild motion — stack pages use less fade so the cover feels solid
+  const opacity = useTransform(
+    scrollYProgress,
+    page && !stack ? [0, 0.15, 0.85, 1] : [0, 1],
+    page && !stack ? [0.4, 1, 1, 0.4] : [1, 1]
+  );
+  const y = useTransform(
+    scrollYProgress,
+    page && !stack ? [0, 0.15, 0.85, 1] : [0, 1],
+    page && !stack ? [24, 0, 0, -24] : [0, 0]
+  );
 
   return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        x:
-          direction === "left"
-            ? -18
-            : 18,
+    <Box
+      ref={ref}
+      component="section"
+      sx={{
+        position: stack ? { xs: "relative", md: "sticky" } : "relative",
+        top: stack ? { md: 0 } : undefined,
+        zIndex: stack ? stackZ : "auto",
+        minHeight: page || stack ? { xs: "auto", md: "100vh" } : "auto",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: page || stack ? "center" : "flex-start",
+        py: page || stack ? { xs: 7, md: 4 } : { xs: 8, md: 12 },
+        scrollSnapAlign: page || stack ? { md: "start" } : undefined,
+        scrollSnapStop: page || stack ? { md: "always" } : undefined,
+        overflow: curtain ? "hidden" : "visible",
+        // solid surface so the lower page can cover the upper one cleanly
+        bgcolor: stack
+          ? dark
+            ? "#030712"
+            : "#ffffff"
+          : "transparent",
+        ...sx,
       }}
-      whileInView={{
-        opacity: 1,
-        x: 0,
-      }}
-      viewport={{
-        once: true,
-        amount: 0.25,
-      }}
-      transition={{
-        duration: 0.5,
-      }}
-      whileHover={{
-        y: -3,
-      }}
+      {...props}
     >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1.5,
-          px: 1.5,
-          py: 1.35,
-          borderRadius: 3,
-          border: "1px solid",
-          borderColor: isDark
-            ? "rgba(255,255,255,0.07)"
-            : "rgba(15,23,42,0.07)",
-          bgcolor: isDark
-            ? "rgba(255,255,255,0.025)"
-            : "rgba(255,255,255,0.62)",
-          transition:
-            "all 180ms ease",
-          "&:hover": {
-            borderColor: alpha(
-              theme.palette.primary.main,
-              0.24
-            ),
-            bgcolor: alpha(
-              theme.palette.primary.main,
-              isDark ? 0.045 : 0.03
-            ),
-          },
-        }}
-      >
-        <Box
-          sx={{
-            width: 46,
-            height: 46,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 2.5,
-            border: "1px solid",
-            borderColor: isDark
-              ? "rgba(255,255,255,0.07)"
-              : "rgba(15,23,42,0.06)",
-            bgcolor: isDark
-              ? "rgba(255,255,255,0.045)"
-              : "rgba(255,255,255,0.8)",
-          }}
-        >
-          <Icon size="1.85rem" />
-        </Box>
-
-        <Box sx={{ minWidth: 0 }}>
-          <Typography
-            sx={{
-              fontSize: "0.92rem",
-              fontWeight: 850,
-              lineHeight: 1.2,
-            }}
-          >
-            {item.name}
-          </Typography>
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
-            {item.role}
-          </Typography>
-        </Box>
-      </Box>
-    </motion.div>
+      {curtain && (
+        <>
+          <CurtainPanel side="left" progress={scrollYProgress} dark={dark} />
+          <CurtainPanel side="right" progress={scrollYProgress} dark={dark} />
+        </>
+      )}
+      <motion.div style={{ opacity, y, width: "100%", position: "relative", zIndex: 2 }}>
+        {children}
+      </motion.div>
+    </Box>
   );
 }
 
-/* ============================================================
-   HELPERS
-============================================================ */
+function ParallaxVisual({ src, alt, depth = 1, className, objectFit = "contain" }) {
+  const ref = useRef(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const y = useTransform(scrollYProgress, [0, 1], [12 * depth, -12 * depth]);
 
-function subtleBorderFor(isDark) {
-  return isDark
-    ? "rgba(255,255,255,0.07)"
-    : "rgba(15,23,42,0.07)";
+  return (
+    <Box ref={ref} className={className} sx={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+      <motion.img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        style={{ y, width: "100%", height: "100%", objectFit }}
+      />
+    </Box>
+  );
 }
 
-/* ============================================================
-   SERVICE PREVIEW
-============================================================ */
+function ServiceControlButtons({ size = "small" }) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
+      <Button
+        size={size}
+        variant="contained"
+        color="success"
+        startIcon={<PlayArrowIcon sx={{ fontSize: 18 }} />}
+        sx={{
+          borderRadius: 1.5,
+          fontWeight: 700,
+          textTransform: "none",
+          py: 0.75,
+          px: 1.5,
+          boxShadow: "none",
+          minWidth: 0,
+        }}
+      >
+        Start
+      </Button>
+      <Button
+        size={size}
+        variant="outlined"
+        color="error"
+        startIcon={<StopIcon sx={{ fontSize: 18 }} />}
+        sx={{
+          borderRadius: 1.5,
+          fontWeight: 600,
+          textTransform: "none",
+          py: 0.75,
+          px: 1.5,
+          minWidth: 0,
+        }}
+      >
+        Stop
+      </Button>
+    </Stack>
+  );
+}
 
-function ServicePreview({
-  theme,
-  isDark,
-}) {
+function GlassPanel({ children, sx = {}, ...props }) {
+  const theme = useTheme();
+  const dark = theme.palette.mode === "dark";
   return (
     <Paper
       elevation={0}
+      {...props}
       sx={{
-        position: "relative",
-        overflow: "hidden",
-        borderRadius: {
-          xs: 4,
-          md: 5,
-        },
         border: "1px solid",
-        borderColor: isDark
-          ? "rgba(255,255,255,0.075)"
-          : "rgba(15,23,42,0.075)",
-        background: isDark
-          ? `
-            radial-gradient(
-              circle at 85% 0%,
-              rgba(59,130,246,.11),
-              transparent 27%
-            ),
-            linear-gradient(
-              145deg,
-              rgba(14,24,40,.98),
-              rgba(7,14,25,.99)
-            )
-          `
-          : `
-            radial-gradient(
-              circle at 85% 0%,
-              rgba(59,130,246,.065),
-              transparent 27%
-            ),
-            linear-gradient(
-              145deg,
-              #ffffff,
-              #f7faff
-            )
-          `,
-        boxShadow: isDark
-          ? "0 30px 90px rgba(0,0,0,.26)"
-          : "0 30px 90px rgba(15,23,42,.08)",
+        borderColor: dark ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.08)",
+        background: dark
+          ? "linear-gradient(145deg, rgba(15,24,39,.82), rgba(7,14,25,.76))"
+          : "linear-gradient(145deg, rgba(255,255,255,.9), rgba(246,249,255,.88))",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        boxShadow: dark ? "0 16px 48px rgba(0,0,0,.22)" : "0 16px 48px rgba(15,23,42,.07)",
+        ...sx,
       }}
     >
-      <Box
-        aria-hidden
-        sx={{
-          position: "absolute",
-          width: 240,
-          height: 240,
-          top: -150,
-          right: -90,
-          borderRadius: "50%",
-          background: alpha(
-            theme.palette.primary.main,
-            isDark ? 0.09 : 0.05
-          ),
-          filter: "blur(55px)",
-          pointerEvents: "none",
-        }}
-      />
-
-      <Box
-        sx={{
-          position: "relative",
-          p: {
-            xs: 2,
-            sm: 2.5,
-            md: 3,
-          },
-        }}
-      >
-        {/* Header */}
-
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          spacing={2}
-        >
-          <Stack
-            direction="row"
-            spacing={1.5}
-            alignItems="center"
-            sx={{
-              minWidth: 0,
-            }}
-          >
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: 2.5,
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
-                bgcolor: isDark
-                  ? "rgba(99,102,241,.15)"
-                  : "rgba(99,102,241,.09)",
-                color:
-                  "primary.main",
-                border: "1px solid",
-                borderColor: isDark
-                  ? "rgba(255,255,255,.06)"
-                  : "rgba(15,23,42,.055)",
-              }}
-            >
-              <AppsRoundedIcon />
-            </Box>
-
-            <Box
-              sx={{
-                minWidth: 0,
-              }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: "1rem",
-                  lineHeight: 1.25,
-                  wordBreak:
-                    "break-word",
-                }}
-              >
-                api-service
-              </Typography>
-
-              <Stack
-                direction="row"
-                spacing={0.7}
-                alignItems="center"
-                flexWrap="wrap"
-                useFlexGap
-                sx={{
-                  mt: 0.5,
-                }}
-              >
-                <Chip
-                  size="small"
-                  icon={
-                    <AppsRoundedIcon
-                      sx={{
-                        fontSize: 13,
-                      }}
-                    />
-                  }
-                  label="App · django"
-                  sx={{
-                    height: 22,
-                    fontSize:
-                      "10.5px",
-                    fontWeight: 800,
-                  }}
-                />
-
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                >
-                  production
-                </Typography>
-              </Stack>
-            </Box>
-          </Stack>
-
-          <Chip
-            label="Running"
-            color="success"
-            size="small"
-            sx={{
-              height: 24,
-              fontWeight: 850,
-              flexShrink: 0,
-            }}
-          />
-        </Stack>
-
-        <Divider
-          sx={{
-            my: 2.25,
-            borderColor:
-              isDark
-                ? "rgba(255,255,255,.07)"
-                : "rgba(15,23,42,.07)",
-          }}
-        />
-
-        {/* Network */}
-
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          sx={{
-            color:
-              "text.secondary",
-          }}
-        >
-          <HubRoundedIcon
-            sx={{
-              fontSize: 16,
-            }}
-          />
-
-          <Typography
-            variant="body2"
-            fontWeight={700}
-          >
-            production-network
-          </Typography>
-
-          <Box
-            sx={{
-              width: 4,
-              height: 4,
-              borderRadius:
-                "50%",
-              bgcolor:
-                "text.disabled",
-            }}
-          />
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
-            healthy
-          </Typography>
-        </Stack>
-
-        {/* Resources */}
-
-        <Box
-          sx={{
-            mt: 2,
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "1fr 1fr",
-              sm: "repeat(4, 1fr)",
-            },
-            gap: 1,
-          }}
-        >
-          {[
-            [
-              "CPU",
-              "1 CPU",
-              ComputerRoundedIcon,
-            ],
-            [
-              "RAM",
-              "512 MB",
-              MemoryRoundedIcon,
-            ],
-            [
-              "Storage",
-              "10 GB",
-              StorageRoundedIcon,
-            ],
-            [
-              "Price",
-              "$0.018/hr",
-              AttachMoneyRoundedIcon,
-            ],
-          ].map(
-            ([label, value, Icon]) => (
-              <Box
-                key={label}
-                sx={{
-                  p: 1.35,
-                  borderRadius: 2.5,
-                  border: "1px solid",
-                  borderColor:
-                    subtleBorderFor(
-                      isDark
-                    ),
-                  bgcolor: isDark
-                    ? "rgba(255,255,255,.025)"
-                    : "rgba(15,23,42,.02)",
-                }}
-              >
-                <Stack
-                  direction="row"
-                  spacing={0.7}
-                  alignItems="center"
-                >
-                  <Icon
-                    sx={{
-                      fontSize: 15,
-                      color:
-                        "text.secondary",
-                    }}
-                  />
-
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                  >
-                    {label}
-                  </Typography>
-                </Stack>
-
-                <Typography
-                  sx={{
-                    mt: 0.7,
-                    fontWeight: 850,
-                    fontSize:
-                      "0.82rem",
-                  }}
-                >
-                  {value}
-                </Typography>
-              </Box>
-            )
-          )}
-        </Box>
-
-        {/* Usage */}
-
-        <Box
-          sx={{
-            mt: 2.2,
-          }}
-        >
-          <Stack
-            direction={{
-              xs: "column",
-              sm: "row",
-            }}
-            spacing={{
-              xs: 1.4,
-              sm: 2,
-            }}
-          >
-            <ServiceUsage
-              label="CPU"
-              value={32}
-              iconColor={
-                theme.palette
-                  .primary.main
-              }
-              isDark={isDark}
-            />
-
-            <ServiceUsage
-              label="RAM"
-              value={48}
-              iconColor={
-                theme.palette
-                  .secondary.main
-              }
-              isDark={isDark}
-            />
-          </Stack>
-        </Box>
-
-        {/* Preview note — this card is illustrative, so no fake
-            action buttons (they previously looked fully operational). */}
-
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          sx={{
-            mt: 2.25,
-            p: 1.1,
-            borderRadius: 2.25,
-            border: "1px solid",
-            borderColor:
-              subtleBorderFor(
-                isDark
-              ),
-            bgcolor: isDark
-              ? "rgba(255,255,255,.02)"
-              : "rgba(15,23,42,.02)",
-          }}
-        >
-          <InfoOutlinedIcon
-            sx={{
-              fontSize: 16,
-              color: "text.secondary",
-              flexShrink: 0,
-            }}
-          />
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
-            Example service — resources shown for
-            illustration. Sign in to manage real
-            deployments.
-          </Typography>
-        </Stack>
-      </Box>
+      {children}
     </Paper>
   );
 }
 
-function ServiceUsage({
-  label,
-  value,
-  iconColor,
-  isDark,
-}) {
+function Metric({ value, label, accent }) {
   return (
-    <Box sx={{ flex: 1 }}>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
+    <Box sx={{ minWidth: 0 }}>
+      <Typography
         sx={{
-          mb: 0.7,
+          fontWeight: 900,
+          fontSize: { xs: "1.45rem", md: "1.9rem" },
+          letterSpacing: "-.045em",
+          background: `linear-gradient(90deg, ${accent}, ${alpha(accent, 0.55)})`,
+          WebkitBackgroundClip: "text",
+          WebkitTextFillColor: "transparent",
         }}
       >
-        <Typography
-          variant="caption"
-          color="text.secondary"
-        >
-          {label}
-        </Typography>
-
-        <Typography
-          variant="caption"
-          sx={{
-            fontWeight: 850,
-          }}
-        >
-          {value}%
-        </Typography>
-      </Stack>
-
-      <Box
-        sx={{
-          height: 6,
-          borderRadius: 999,
-          bgcolor: isDark
-            ? "rgba(255,255,255,.07)"
-            : "rgba(15,23,42,.07)",
-          overflow: "hidden",
-        }}
-      >
-        <motion.div
-          initial={{
-            width: 0,
-          }}
-          whileInView={{
-            width: `${value}%`,
-          }}
-          viewport={{
-            once: true,
-          }}
-          transition={{
-            duration: 0.8,
-            ease: [
-              0.22,
-              1,
-              0.36,
-              1,
-            ],
-          }}
-          style={{
-            height: "100%",
-            borderRadius: 999,
-            background:
-              `linear-gradient(90deg, ${iconColor}, ${iconColor}cc)`,
-          }}
-        />
-      </Box>
+        {value}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+        {label}
+      </Typography>
     </Box>
   );
 }
 
-/* ============================================================
-   HOME
-============================================================ */
+function FeatureCard({ icon: Icon, number, title, body }) {
+  const theme = useTheme();
+  return (
+    <GlassPanel
+      sx={{
+        height: "100%",
+        p: { xs: 2.2, md: 3 },
+        borderRadius: { xs: 2, md: 2.5 },
+        position: "relative",
+        overflow: "hidden",
+        transition: "transform .2s ease, border-color .2s ease, box-shadow .2s ease",
+        "&:hover": {
+          transform: "translateY(-8px)",
+          borderColor: alpha(theme.palette.primary.main, 0.32),
+          boxShadow: `0 34px 80px ${alpha(theme.palette.primary.main, 0.14)}`,
+        },
+        "&::after": {
+          content: "''",
+          position: "absolute",
+          width: 180,
+          height: 180,
+          borderRadius: "50%",
+          right: -90,
+          top: -90,
+          background: `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.12)}, transparent 70%)`,
+          pointerEvents: "none",
+        },
+      }}
+    >
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: 2.5,
+            display: "grid",
+            placeItems: "center",
+            color: "primary.main",
+            border: "1px solid",
+            borderColor: alpha(theme.palette.primary.main, 0.17),
+            background: alpha(theme.palette.primary.main, 0.07),
+          }}
+        >
+          <Icon />
+        </Box>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 900, letterSpacing: ".12em" }}>
+          {number}
+        </Typography>
+      </Stack>
+      <Typography sx={{ mt: 3, fontWeight: 900, fontSize: "1.05rem" }}>{title}</Typography>
+      <Typography color="text.secondary" sx={{ mt: 1.1, lineHeight: 1.75 }}>
+        {body}
+      </Typography>
+    </GlassPanel>
+  );
+}
+
+function FloatingBadge({ children, sx = {} }) {
+  const theme = useTheme();
+  const dark = theme.palette.mode === "dark";
+  return (
+    <Box
+      sx={{
+        px: 1.4,
+        py: 0.9,
+        borderRadius: 99,
+        border: "1px solid",
+        borderColor: dark ? "rgba(255,255,255,.1)" : "rgba(15,23,42,.08)",
+        bgcolor: dark ? "rgba(255,255,255,.04)" : "rgba(15,23,42,.03)",
+        backdropFilter: "blur(16px)",
+        fontSize: ".72rem",
+        fontWeight: 850,
+        letterSpacing: ".02em",
+        ...sx,
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
 
 export default function Home() {
   const theme = useTheme();
   const navigate = useNavigate();
-
-  const isXs = useMediaQuery(
-    theme.breakpoints.down("sm")
-  );
-
-  const isMdDown = useMediaQuery(
-    theme.breakpoints.down("md")
-  );
-
-  const isDark =
-    theme.palette.mode === "dark";
-
-  /* WCAG 2.3.3 — ask the OS before running heavy motion. */
-  const prefersReducedMotion =
-    useMediaQuery(
-      "(prefers-reduced-motion: reduce)"
-    );
-
-  const [loggedIn, setLoggedIn] =
-    useState(() => {
-      if (typeof window === "undefined") {
-        return false;
-      }
-
-      try {
-        return Boolean(
-          window.localStorage.getItem("access")
-        );
-      } catch {
-        return false;
-      }
-    });
-
-  const [orbitActive, setOrbitActive] =
-    useState(() => {
-      if (typeof window === "undefined") {
-        return true;
-      }
-
-      try {
-        const saved =
-          window.localStorage.getItem(
-            ORBIT_STORAGE_KEY
-          );
-
-        if (saved !== null) {
-          return saved === "true";
-        }
-
-        // Respect users who prefer reduced motion by default.
-        return !prefersReducedMotion;
-      } catch {
-        return true;
-      }
-    });
-
-  const [dockerImageOk, setDockerImageOk] =
-    useState(true);
-
-  const { scrollY, scrollYProgress } =
-    useScroll();
-
-  /* Cinematic page-progress line — grows across the top edge as the
-     user scrolls, the way scroll-driven sites signal depth. */
-  const progressBarScale = useTransform(
-    scrollYProgress,
-    [0, 1],
-    [0, 1]
-  );
-
-  /* Only the image moves slightly — disabled for reduced motion. */
-  const heroImageY = useTransform(
-    scrollY,
-    [0, 900],
-    [0, prefersReducedMotion ? 0 : 42]
-  );
-
-  /* Docker scene — the image drifts gently while the section crosses
-     the viewport, adding depth to the scroll experience. */
-  const dockerSceneRef =
-    useRef(null);
-
-  const { scrollYProgress: dockerSceneProgress } =
-    useScroll({
-      target: dockerSceneRef,
-      offset: ["start end", "end start"],
-    });
-
-  const dockerImageY = useTransform(
-    dockerSceneProgress,
-    [0, 1],
-    prefersReducedMotion
-      ? [0, 0]
-      : [38, -38]
-  );
-
-  /* ==========================================================
-     AUTH
-  ========================================================== */
+  const dark = theme.palette.mode === "dark";
+  const [loggedIn, setLoggedIn] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return Boolean(window.localStorage.getItem("access"));
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
-    const syncAuth = () => {
-      setLoggedIn(
-        Boolean(
-          window.localStorage.getItem(
-            "access"
-          )
-        )
-      );
+    const sync = () => {
+      try {
+        setLoggedIn(Boolean(window.localStorage.getItem("access")));
+      } catch {
+        setLoggedIn(false);
+      }
     };
-
-    window.addEventListener(
-      "auth-changed",
-      syncAuth
-    );
-
-    window.addEventListener(
-      "storage",
-      syncAuth
-    );
-
+    window.addEventListener("auth-changed", sync);
+    window.addEventListener("storage", sync);
     return () => {
-      window.removeEventListener(
-        "auth-changed",
-        syncAuth
-      );
-
-      window.removeEventListener(
-        "storage",
-        syncAuth
-      );
+      window.removeEventListener("auth-changed", sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
+  // Smooth scrolling on <html> + page snap on desktop
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        ORBIT_STORAGE_KEY,
-        String(orbitActive)
-      );
-    } catch {
-      // Ignore storage errors.
-    }
-  }, [orbitActive]);
+    const root = document.documentElement;
+    const prevBehavior = root.style.scrollBehavior;
+    const prevSnap = root.style.scrollSnapType;
+    root.style.scrollBehavior = "smooth";
 
-  /* ==========================================================
-     COLORS
-  ========================================================== */
+    const mq = window.matchMedia("(min-width: 900px)");
+    const apply = () => {
+      root.style.scrollSnapType = mq.matches ? "y proximity" : "";
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => {
+      mq.removeEventListener("change", apply);
+      root.style.scrollBehavior = prevBehavior;
+      root.style.scrollSnapType = prevSnap;
+    };
+  }, []);
 
-  const subtleBorder = isDark
-    ? "rgba(255,255,255,0.075)"
-    : "rgba(15,23,42,0.075)";
 
-  const pageBackground = isDark
-    ? `
-      radial-gradient(
-        circle at 50% -8%,
-        ${alpha(theme.palette.primary.main, 0.13)},
-        transparent 30%
-      ),
-      linear-gradient(
-        180deg,
-        #040811 0%,
-        #07101c 30%,
-        #06101a 67%,
-        #040911 100%
-      )
-    `
-    : `
-      radial-gradient(
-        circle at 50% -8%,
-        ${alpha(theme.palette.secondary.main, 0.09)},
-        transparent 30%
-      ),
-      linear-gradient(
-        180deg,
-        #fbfdff 0%,
-        #f3f7ff 30%,
-        #eef5ff 67%,
-        #f8fbff 100%
-      )
-    `;
+  // Top progress: window scroll (works even if layout wrappers are odd)
+  const [scrollProgress, setScrollProgress] = useState(0);
+  useEffect(() => {
+    const update = () => {
+      const el = document.documentElement;
+      const max = el.scrollHeight - window.innerHeight;
+      setScrollProgress(max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
 
-  const heroMask = isDark
-    ? isXs
-      ? "radial-gradient(ellipse 98% 94% at 50% 48%, #000 68%, transparent 96%)"
-      : isMdDown
-      ? "radial-gradient(ellipse 94% 88% at 50% 48%, #000 72%, transparent 95%)"
-      : "radial-gradient(ellipse 92% 86% at 50% 48%, #000 75%, transparent 94%)"
-    : "none";
+  const { scrollYProgress } = useScroll();
+  const heroTitleY = useTransform(scrollYProgress, [0, 0.4], [0, -12]);
+
+  const surface = dark ? "rgba(255,255,255,.035)" : "rgba(15,23,42,.025)";
+  const border = dark ? "rgba(255,255,255,.075)" : "rgba(15,23,42,.075)";
+
+  const headline = useMemo(
+    () => (
+      <>
+        <span>From commit</span>
+        <Box
+          component="span"
+          sx={{
+            display: "block",
+            background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary?.main || theme.palette.info.main})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          to production.
+        </Box>
+      </>
+    ),
+    [theme.palette.primary.main, theme.palette.secondary?.main, theme.palette.info.main]
+  );
 
   return (
     <Box
       component="main"
       sx={{
         position: "relative",
-        minHeight: "100vh",
-        color: "text.primary",
-        background:
-          pageBackground,
-        overflow: "clip",
+        background: dark
+          ? "linear-gradient(180deg,#030712 0%,#06101b 34%,#050b14 70%,#03060c 100%)"
+          : "linear-gradient(180deg,#ffffff 0%,#f3f7ff 34%,#eef4fc 70%,#ffffff 100%)",
       }}
     >
-      {/* SEO — keyword-rich summary kept in the DOM for crawlers,
-          visually hidden so it never competes with the UI. */}
+      {/* Top reading progress — track + fill (scaleX grows with scroll) */}
+      <Box
+        aria-hidden
+        sx={{
+          position: "fixed",
+          left: 0,
+          top: 0,
+          right: 0,
+          height: 3,
+          zIndex: 1400,
+          bgcolor: dark ? "rgba(255,255,255,.08)" : "rgba(15,23,42,.08)",
+          pointerEvents: "none",
+        }}
+      >
+        <Box
+          sx={{
+            height: "100%",
+            width: `${scrollProgress * 100}%`,
+            background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary?.main || theme.palette.info.main})`,
+            transition: "width 60ms linear",
+          }}
+        />
+      </Box>
+
+      {/* SEO content remains in the DOM without cluttering the visual UI. */}
       <Typography
         component="p"
         sx={{
           position: "absolute",
           width: 1,
           height: 1,
-          m: -1,
-          p: 0,
           overflow: "hidden",
           clip: "rect(0 0 0 0)",
           clipPath: "inset(50%)",
           whiteSpace: "nowrap",
-          border: 0,
         }}
       >
-        PassDeployer is an open-source platform as a service for developers:
-        deploy Django, Flask, Node.js and React applications, run PostgreSQL
-        and Redis data services, manage networks and persistent volumes, and
-        scale CPU, RAM and storage with flexible hourly plans — one focused
-        control plane built with Django, React and Docker.
+        PassDeployer is a self-hosted platform as a service for deploying React, Node.js, Django and Flask applications
+        with Docker, PostgreSQL, Redis, networking, persistent storage, logs and service management in one control plane.
       </Typography>
 
-      {/* Scroll progress line — thin gradient track at the very top
-          edge that fills as the page is scrolled. Purely decorative. */}
-      <motion.div
-        aria-hidden
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 2.5,
-          background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-          transformOrigin: "0% 50%",
-          scaleX: progressBarScale,
-          zIndex: 1300,
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* ======================================================
-          HERO
-      ======================================================= */}
-
+      {/* ───────────────── HERO ───────────────── */}
       <Box
         component="section"
         sx={{
           position: "relative",
-          minHeight: {
-            xs: "auto",
-            md: "92vh",
-          },
+          minHeight: { xs: "auto", md: "100vh" },
           display: "flex",
           alignItems: "center",
-          overflow: "hidden",
+          overflow: "visible",
+          scrollSnapAlign: { md: "start" },
+          scrollSnapStop: { md: "always" },
         }}
       >
-        <GlowOrb
-          size={420}
-          top="-160px"
-          left="50%"
-          color={
-            theme.palette
-              .primary.main
-          }
-          opacity={
-            isDark ? 0.11 : 0.06
-          }
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 0,
+            background: `radial-gradient(circle at 68% 32%, ${alpha(theme.palette.primary.main, dark ? 0.14 : 0.09)}, transparent 28%), radial-gradient(circle at 18% 66%, ${alpha(theme.palette.secondary?.main || theme.palette.info.main, dark ? 0.1 : 0.06)}, transparent 25%)`,
+          }}
+        />
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 0,
+            opacity: dark ? 0.28 : 0.12,
+            backgroundImage:
+              "linear-gradient(rgba(120,160,220,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(120,160,220,.08) 1px, transparent 1px)",
+            backgroundSize: { xs: "44px 44px", md: "76px 76px" },
+            maskImage: "linear-gradient(to bottom, black 0%, transparent 92%)",
+          }}
         />
 
-        <Container
-          maxWidth={false}
-          sx={{
-            position: "relative",
-            zIndex: 2,
-            px: { xs: 2, sm: 3, md: 6, lg: 8, xl: 10 },
-          }}
-        >
-          <Box>
-            <Stack
-              alignItems="center"
-              textAlign="center"
+        <Container maxWidth="xl" sx={{ position: "relative", zIndex: 2, py: { xs: 7, sm: 9, md: 12 } }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "minmax(0, .92fr) minmax(420px, 1.08fr)" },
+              alignItems: "center",
+              gap: { xs: 5, md: 3 },
+            }}
+          >
+            <motion.div style={{ y: heroTitleY }}>
+              <Chip
+                label="Open-source PaaS · Docker-native"
+                sx={{
+                  mb: 2.5,
+                  fontWeight: 850,
+                  border: "1px solid",
+                  borderColor: alpha(theme.palette.primary.main, 0.17),
+                  bgcolor: alpha(theme.palette.primary.main, 0.06),
+                }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 950,
+                  fontSize: { xs: "3.2rem", sm: "4.5rem", md: "5.8rem", lg: "6.7rem" },
+                  lineHeight: 0.92,
+                  letterSpacing: "-.065em",
+                  maxWidth: 820,
+                }}
+              >
+                {headline}
+              </Typography>
+              <Typography
+                sx={{ mt: 3, maxWidth: 650, fontSize: { xs: "1rem", sm: "1.12rem", md: "1.22rem" }, lineHeight: 1.8 }}
+                color="text.secondary"
+              >
+                Build, ship and operate modern applications without assembling infrastructure by hand. One focused
+                control plane for code, services, networks, storage and deployments.
+              </Typography>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 3.2 }}>
+                <Button
+                  onClick={() => navigate(loggedIn ? "/services" : "/signin_or_signup")}
+                  size="large"
+                  variant="contained"
+                  endIcon={<ArrowForwardRoundedIcon />}
+                  sx={{
+                    minHeight: 54,
+                    px: 2.8,
+                    borderRadius: 999,
+                    fontWeight: 900,
+                    boxShadow: `0 15px 40px ${alpha(theme.palette.primary.main, 0.24)}`,
+                  }}
+                >
+                  {loggedIn ? "Open dashboard" : "Start deploying"}
+                </Button>
+                <Button
+                  onClick={() => navigate("/docs")}
+                  size="large"
+                  variant="outlined"
+                  endIcon={<ArrowDownwardRoundedIcon />}
+                  sx={{ minHeight: 54, px: 2.6, borderRadius: 999, fontWeight: 850 }}
+                >
+                  Explore docs
+                </Button>
+              </Stack>
+              <Stack direction="row" spacing={2.2} flexWrap="wrap" useFlexGap sx={{ mt: 3.2, color: "text.secondary" }}>
+                {["React", "Node.js", "Django", "Flask", "Docker"].map((item) => (
+                  <Typography key={item} variant="caption" sx={{ fontWeight: 800, letterSpacing: ".04em" }}>
+                    {item}
+                  </Typography>
+                ))}
+              </Stack>
+            </motion.div>
+
+            <Box
               sx={{
-                pt: {
-                  xs: 7,
-                  md: 9,
-                },
-                pb: {
-                  xs: 6,
-                  md: 4,
-                },
+                position: "relative",
+                minHeight: { xs: 360, sm: 500, md: 650 },
+                mt: { xs: 1, md: 0 },
+                overflow: "visible",
               }}
             >
-              {/* BRAND */}
-
+              {/* Hero SVG — no scroll-linked parallax so it stays on screen longer */}
               <motion.div
-                initial={{
-                  opacity: 0,
-                  y: -10,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                transition={{
-                  duration: 0.55,
-                }}
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                style={{ position: "absolute", inset: "2% -6% 2% -6%" }}
               >
                 <Box
+                  component="img"
+                  src={heroNetwork}
+                  alt="Abstract PaaS deployment network illustration"
                   sx={{
-                    display:
-                      "inline-flex",
-                    alignItems:
-                      "center",
-                    gap: 1,
-                    px: 1.2,
-                    py: 0.65,
-                    borderRadius: 999,
-                    border: "1px solid",
-                    borderColor:
-                      alpha(
-                        theme.palette
-                          .primary.main,
-                        isDark
-                          ? 0.2
-                          : 0.13
-                      ),
-                    bgcolor:
-                      alpha(
-                        theme.palette
-                          .primary.main,
-                        isDark
-                          ? 0.065
-                          : 0.045
-                      ),
-                    backdropFilter:
-                      "blur(16px)",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    opacity: dark ? 0.95 : 0.88,
+                    display: "block",
+                    pointerEvents: "none",
+                    userSelect: "none",
+                  }}
+                />
+              </motion.div>
+
+              <FloatingBadge sx={{ position: "absolute", top: { xs: 12, md: 42 }, right: { xs: 3, md: 0 }, zIndex: 3 }}>
+                deploy → observe → scale
+              </FloatingBadge>
+
+              {/* Start/Stop card — bottom-left on the first SVG */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.2 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                style={{
+                  position: "absolute",
+                  left: 8,
+                  bottom: 8,
+                  zIndex: 4,
+                  transformOrigin: "0% 100%",
+                  width: "min(300px, 92%)",
+                }}
+              >
+                <GlassPanel sx={{ p: 1.75, borderRadius: 1.5 }}>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography sx={{ fontWeight: 900, fontSize: ".88rem" }}>deployment / production</Typography>
+                    <Chip size="small" label="Healthy" color="success" sx={{ fontWeight: 800, borderRadius: 1 }} />
+                  </Stack>
+                  <Divider sx={{ my: 1.1 }} />
+                  <Stack spacing={0.8}>
+                    {[
+                      ["Build", "Complete"],
+                      ["Container", "Running"],
+                      ["Network", "Healthy"],
+                    ].map(([a, b]) => (
+                      <Stack key={a} direction="row" justifyContent="space-between">
+                        <Typography variant="caption" color="text.secondary">
+                          {a}
+                        </Typography>
+                        <Typography variant="caption" sx={{ fontWeight: 850 }}>
+                          {b}
+                        </Typography>
+                      </Stack>
+                    ))}
+                  </Stack>
+                  <ServiceControlButtons />
+                </GlassPanel>
+              </motion.div>
+            </Box>
+          </Box>
+
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            sx={{ mt: { xs: 3, md: 4 }, pt: 2.2, borderTop: "1px solid", borderColor: border }}
+          >
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
+              Built for teams that want the platform under their control.
+            </Typography>
+            <Stack direction="row" spacing={2.5} sx={{ display: { xs: "none", sm: "flex" } }}>
+              {stackGroups
+                .flatMap((g) => g.items)
+                .slice(0, 5)
+                .map(([name, Icon]) => (
+                  <Stack key={name} direction="row" spacing={0.6} alignItems="center">
+                    <Icon size="1rem" />
+                    <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                      {name}
+                    </Typography>
+                  </Stack>
+                ))}
+            </Stack>
+          </Stack>
+        </Container>
+      </Box>
+
+      {/* ───────────────── METRICS ───────────────── */}
+      <Container maxWidth="xl" sx={{ pb: { xs: 8, md: 12 } }}>
+        <GlassPanel sx={{ borderRadius: { xs: 4, md: 5 }, p: { xs: 2.2, md: 3 }, mt: -1 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" },
+              gap: { xs: 2.5, md: 0 },
+            }}
+          >
+            <Metric value="1 control plane" label="services + infrastructure" accent={theme.palette.primary.main} />
+            <Metric value="Docker-native" label="consistent runtime layer" accent={theme.palette.info.main} />
+            <Metric
+              value="Hourly-ready"
+              label="flexible service economics"
+              accent={theme.palette.secondary?.main || theme.palette.warning.main}
+            />
+            <Metric value="Self-hosted" label="your infrastructure, your rules" accent={theme.palette.success.main} />
+          </Box>
+        </GlassPanel>
+      </Container>
+
+      {/* ───────────────── FEATURES (page) ───────────────── */}
+      <ScrollScene page>
+        <Container maxWidth="lg">
+          <Reveal>
+            <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: ".18em", color: "primary.main" }}>
+              A calmer way to operate
+            </Typography>
+            <Typography
+              component="h2"
+              sx={{
+                mt: 1,
+                fontWeight: 950,
+                fontSize: { xs: "2.4rem", md: "4rem" },
+                letterSpacing: "-.055em",
+                lineHeight: 0.98,
+                maxWidth: 850,
+              }}
+            >
+              Less infrastructure assembly. More time shipping.
+            </Typography>
+            <Typography sx={{ mt: 2, maxWidth: 720, lineHeight: 1.8 }} color="text.secondary">
+              PassDeployer keeps the operational surface area small: one place to create services, ship releases, read
+              logs and manage the runtime boundary around your workloads.
+            </Typography>
+          </Reveal>
+
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2, mt: 5 }}>
+            <Reveal delay={0.04} variant="card">
+              <FeatureCard
+                number="01"
+                icon={RocketLaunchRoundedIcon}
+                title="Ship from one workflow"
+                body="Create a service, connect code, deploy, inspect logs and manage the runtime without jumping between disconnected tools."
+              />
+            </Reveal>
+            <Reveal delay={0.1} variant="card">
+              <FeatureCard
+                number="02"
+                icon={SecurityRoundedIcon}
+                title="Keep workloads isolated"
+                body="Docker-backed services provide a predictable boundary for applications, data services and supporting workloads."
+              />
+            </Reveal>
+            <Reveal delay={0.16} variant="card">
+              <FeatureCard
+                number="03"
+                icon={SpeedRoundedIcon}
+                title="Operate with less friction"
+                body="See resource usage, service health, networking and persistent data from one focused control plane."
+              />
+            </Reveal>
+          </Box>
+        </Container>
+      </ScrollScene>
+
+{/* ───────────────── DEPLOYMENT FLOW (page + curtain) ───────────────── */}
+      <ScrollScene page curtain>
+        <Container maxWidth="xl">
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "0.85fr 1.15fr" },
+              gap: { xs: 5, md: 7 },
+              alignItems: "center",
+            }}
+          >
+            <Reveal>
+              <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: ".18em", color: "secondary.main" }}>
+                Deployment flow
+              </Typography>
+              <Typography
+                component="h2"
+                sx={{
+                  mt: 1,
+                  fontWeight: 950,
+                  fontSize: { xs: "2.55rem", md: "4rem" },
+                  letterSpacing: "-.055em",
+                  lineHeight: 0.98,
+                }}
+              >
+                Code moves forward. The platform does the heavy lifting.
+              </Typography>
+              <Typography sx={{ mt: 2.4, lineHeight: 1.8, maxWidth: 650 }} color="text.secondary">
+                A deployment should feel like a path, not a maze. Each step stays visible so you always know where the
+                release is and what happens next.
+              </Typography>
+              <Stack spacing={1.25} sx={{ mt: 3 }}>
+                {lifecycleSteps.map((step, i) => (
+                  <Reveal key={step.title} delay={i * 0.06} variant="slide">
+                    <Stack direction="row" spacing={1.1} alignItems="flex-start">
+                      <Box
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          display: "grid",
+                          placeItems: "center",
+                          border: "1px solid",
+                          borderColor: alpha(theme.palette.primary.main, 0.2),
+                          bgcolor: alpha(theme.palette.primary.main, 0.06),
+                          color: "primary.main",
+                          fontSize: ".72rem",
+                          fontWeight: 900,
+                          flex: "0 0 auto",
+                          mt: 0.2,
+                        }}
+                      >
+                        {String(i + 1).padStart(2, "0")}
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontWeight: 750 }}>{step.title}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.3, lineHeight: 1.65 }}>
+                          {step.body}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </Reveal>
+                ))}
+              </Stack>
+            </Reveal>
+
+            <Reveal delay={0.08}>
+              <Box
+                sx={{
+                  position: "relative",
+                  minHeight: { xs: 360, sm: 480, md: 560 },
+                  borderRadius: { xs: 4, md: 6 },
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: border,
+                  background: dark ? "rgba(4,10,18,.7)" : "rgba(255,255,255,.68)",
+                }}
+              >
+                <ParallaxVisual src={deployFlow} alt="Abstract deployment lifecycle visual" depth={0.6} />
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    background: `radial-gradient(circle at 50% 50%, ${alpha(theme.palette.primary.main, 0.08)}, transparent 40%)`,
+                  }}
+                />
+                <GlassPanel
+                  sx={{
+                    position: "absolute",
+                    right: { xs: 12, md: 22 },
+                    top: { xs: 12, md: 22 },
+                    width: { xs: 180, md: 240 },
+                    p: 1.5,
+                    borderRadius: 1.5,
                   }}
                 >
-                  <Box
-                    component="img"
-                    src={DEFAULT_ICON}
-                    alt=""
-                    sx={{
-                      width: 22,
-                      height: 22,
-                    }}
-                  />
-
-                  <Typography
-                    sx={{
-                      fontSize:
-                        "0.78rem",
-                      fontWeight:
-                        850,
-                      color:
-                        "primary.main",
-                    }}
-                  >
-                    PassDeployer
-                  </Typography>
-
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="caption" sx={{ fontWeight: 900 }}>
+                      release
+                    </Typography>
+                    <Typography variant="caption" color="success.main">
+                      ready
+                    </Typography>
+                  </Stack>
+                  <Typography sx={{ mt: 0.8, fontSize: ".78rem", color: "text.secondary" }}>main → production</Typography>
                   <Box
                     sx={{
-                      width: 5,
+                      mt: 1.1,
                       height: 5,
-                      borderRadius:
-                        "50%",
-                      bgcolor:
-                        "success.main",
-                      boxShadow:
-                        "0 0 10px rgba(34,197,94,.65)",
+                      borderRadius: 99,
+                      bgcolor: dark ? "rgba(255,255,255,.07)" : "rgba(15,23,42,.06)",
+                      overflow: "hidden",
                     }}
-                  />
-                </Box>
-              </motion.div>
+                  >
+                    <Box
+                      sx={{
+                        width: "86%",
+                        height: "100%",
+                        background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary?.main || theme.palette.info.main})`,
+                      }}
+                    />
+                  </Box>
+                </GlassPanel>
+              </Box>
+            </Reveal>
+          </Box>
+        </Container>
+      </ScrollScene>
 
-              {/* TITLE */}
 
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 22,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                transition={{
-                  duration: 0.7,
-                  delay: 0.08,
+
+      {/* ───────────────── HOW IT WORKS (page) ───────────────── */}
+      <ScrollScene page>
+        <Container maxWidth="xl">
+          <Reveal>
+            <Box sx={{ textAlign: { xs: "left", md: "center" }, maxWidth: 820, mx: "auto", mb: 6 }}>
+              <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: ".18em", color: "primary.main" }}>
+                How it works
+              </Typography>
+              <Typography
+                component="h2"
+                sx={{
+                  mt: 1,
+                  fontWeight: 950,
+                  fontSize: { xs: "2.4rem", md: "3.8rem" },
+                  letterSpacing: "-.05em",
+                  lineHeight: 1,
                 }}
               >
-                <Typography
-                  component="h1"
+                A clear path from repository to running service.
+              </Typography>
+            </Box>
+          </Reveal>
+
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1.15fr" },
+              gap: { xs: 4, md: 5 },
+              alignItems: "stretch",
+            }}
+          >
+            <Reveal>
+              <Box
+                sx={{
+                  position: "relative",
+                  minHeight: { xs: 280, md: 420 },
+                  borderRadius: { xs: 4, md: 5 },
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: border,
+                  background: dark ? "rgba(5,11,20,.75)" : "rgba(255,255,255,.7)",
+                }}
+              >
+                <ParallaxVisual src={deployPipeline} alt="Deployment pipeline illustration" depth={0.5} />
+                <Box
                   sx={{
-                    mt: 3.2,
-                    maxWidth: 1100,
-                    fontSize: {
-                      xs: "2.6rem",
-                      sm: "3.7rem",
-                      md: "5rem",
-                    },
-                    lineHeight:
-                      1.05,
-                    letterSpacing:
-                      "-0.045em",
-                    fontWeight:
-                      950,
+                    position: "absolute",
+                    inset: 0,
+                    background: `linear-gradient(180deg, transparent 40%, ${dark ? "rgba(3,7,14,.85)" : "rgba(255,255,255,.75)"} 100%)`,
                   }}
-                >
-                  Deploy faster.
-                  <br />
-                  Scale smarter.
+                />
+                <FloatingBadge sx={{ position: "absolute", left: 16, bottom: 16, zIndex: 2 }}>
+                  pipeline · build · release
+                </FloatingBadge>
+              </Box>
+            </Reveal>
+
+            <Stack spacing={1.5}>
+              {lifecycleSteps.map((step, i) => (
+                <Reveal key={step.title} delay={i * 0.05}>
+                  <GlassPanel
+                    sx={{
+                      p: { xs: 2, md: 2.4 },
+                      borderRadius: 4,
+                      transition: "border-color .25s ease, transform .25s ease",
+                      "&:hover": {
+                        borderColor: alpha(theme.palette.primary.main, 0.28),
+                        transform: "translateX(4px)",
+                      },
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.6} alignItems="flex-start">
+                      <Box
+                        sx={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 2.2,
+                          display: "grid",
+                          placeItems: "center",
+                          flex: "0 0 auto",
+                          fontWeight: 900,
+                          fontSize: ".85rem",
+                          color: "primary.main",
+                          bgcolor: alpha(theme.palette.primary.main, 0.08),
+                          border: "1px solid",
+                          borderColor: alpha(theme.palette.primary.main, 0.16),
+                        }}
+                      >
+                        {String(i + 1).padStart(2, "0")}
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontWeight: 900 }}>{step.title}</Typography>
+                        <Typography color="text.secondary" sx={{ mt: 0.4, lineHeight: 1.7, fontSize: ".95rem" }}>
+                          {step.body}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  </GlassPanel>
+                </Reveal>
+              ))}
+            </Stack>
+          </Box>
+        </Container>
+      </ScrollScene>
+
+      {/* ───────────────── STACK ───────────────── */}
+      <ScrollScene>
+        <Container maxWidth="xl">
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr 1.2fr" },
+              gap: { xs: 5, md: 6 },
+              alignItems: "center",
+            }}
+          >
+            <Reveal>
+              <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: ".18em", color: "primary.main" }}>
+                Bring your stack
+              </Typography>
+              <Typography
+                component="h2"
+                sx={{
+                  mt: 1,
+                  fontWeight: 950,
+                  fontSize: { xs: "2.5rem", md: "4rem" },
+                  letterSpacing: "-.055em",
+                  lineHeight: 0.98,
+                }}
+              >
+                Your applications. Your runtime. Your infrastructure.
+              </Typography>
+              <Typography sx={{ mt: 2.3, lineHeight: 1.8 }} color="text.secondary">
+                PassDeployer is intentionally broad enough to support the application layer and focused enough to keep
+                the operations experience understandable.
+              </Typography>
+              <Stack spacing={1.2} sx={{ mt: 3 }}>
+                {[
+                  ["Frontend", "React and static web workloads"],
+                  ["Backend", "Django, Flask, Node.js and Docker services"],
+                  ["Data", "PostgreSQL, Redis and persistent storage"],
+                ].map(([title, body]) => (
+                  <Stack key={title} direction="row" spacing={1.2} alignItems="flex-start">
+                    <CheckRoundedIcon sx={{ color: "success.main", mt: 0.15 }} />
+                    <Box>
+                      <Typography sx={{ fontWeight: 850 }}>{title}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {body}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                ))}
+              </Stack>
+            </Reveal>
+
+            <Reveal delay={0.08}>
+              <Box
+                sx={{
+                  position: "relative",
+                  minHeight: { xs: 360, sm: 470, md: 590 },
+                  borderRadius: { xs: 4, md: 6 },
+                  overflow: "hidden",
+                  border: "1px solid",
+                  borderColor: border,
+                  background: dark ? "rgba(5,11,20,.7)" : "rgba(255,255,255,.68)",
+                }}
+              >
+                <ParallaxVisual
+                  src={productionNetwork}
+                  alt="Three services on a shared network connected to the internet"
+                  depth={0.55}
+                />
+              </Box>
+            </Reveal>
+          </Box>
+        </Container>
+      </ScrollScene>
+
+      {/* ───────────────── PLATFORM CAPABILITIES (stack layer 1) ───────────────── */}
+      <ScrollScene page stack stackZ={1}>
+        <Container maxWidth="lg">
+          <Reveal>
+            <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: ".18em", color: "secondary.main" }}>
+              Control plane
+            </Typography>
+            <Typography
+              component="h2"
+              sx={{ mt: 1, fontWeight: 950, fontSize: { xs: "2.4rem", md: "3.8rem" }, letterSpacing: "-.05em" }}
+            >
+              The boring parts should stay boring.
+            </Typography>
+            <Typography sx={{ mt: 1.5, maxWidth: 640, lineHeight: 1.75 }} color="text.secondary">
+              Everything you need to run day-to-day operations lives in one place — so you spend less time wiring tools
+              and more time shipping product.
+            </Typography>
+          </Reveal>
+          <Box sx={{ mt: 5, display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2,1fr)" }, gap: 2 }}>
+            {[
+              ["Services", TerminalRoundedIcon, "Create and manage runtime services from a single place."],
+              ["Deployments", RocketLaunchRoundedIcon, "Track releases, build state, logs and rollout health."],
+              ["Storage", StorageRoundedIcon, "Persistent volumes remain first-class resources in the platform."],
+              ["Resource controls", MemoryRoundedIcon, "Keep CPU, memory and storage close to the service definition."],
+              ["Security", SecurityRoundedIcon, "Use isolated containers and clear service boundaries as the execution model."],
+              ["Automation", AutoAwesomeRoundedIcon, "Reduce repeated operational work by keeping the lifecycle in one control plane."],
+            ].map(([title, Icon, body], i) => (
+              <Reveal key={title} delay={i * 0.045}>
+                <GlassPanel sx={{ p: { xs: 2.1, md: 2.7 }, borderRadius: 4.5, height: "100%" }}>
+                  <Stack direction="row" spacing={1.5}>
+                    <Box
+                      sx={{
+                        width: 46,
+                        height: 46,
+                        borderRadius: 2.5,
+                        display: "grid",
+                        placeItems: "center",
+                        color: "primary.main",
+                        bgcolor: alpha(theme.palette.primary.main, 0.07),
+                        flex: "0 0 auto",
+                      }}
+                    >
+                      <Icon />
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontWeight: 900 }}>{title}</Typography>
+                      <Typography sx={{ mt: 0.5, lineHeight: 1.7 }} color="text.secondary">
+                        {body}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </GlassPanel>
+              </Reveal>
+            ))}
+          </Box>
+        </Container>
+      </ScrollScene>
+
+      {/* ───────────────── REPOSITORIES (stack layer 2 — covers control plane) ───────────────── */}
+      <ScrollScene page stack stackZ={2}>
+        <Container maxWidth="lg">
+        <Reveal>
+          <GlassPanel sx={{ borderRadius: { xs: 5, md: 6 }, p: { xs: 2.5, md: 5 }, position: "relative", overflow: "hidden" }}>
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                background: `radial-gradient(circle at 100% 0%, ${alpha(theme.palette.secondary?.main || theme.palette.info.main, dark ? 0.12 : 0.07)}, transparent 30%)`,
+              }}
+            />
+            <Box
+              sx={{
+                position: "relative",
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "1.2fr .8fr" },
+                gap: 4,
+                alignItems: "center",
+              }}
+            >
+              <Box>
+                <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: ".18em", color: "primary.main" }}>
+                  Built in public
                 </Typography>
-              </motion.div>
-
-              {/* SUBTITLE */}
-
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 18,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                transition={{
-                  duration: 0.65,
-                  delay: 0.18,
-                }}
-              >
                 <Typography
-                  component="p"
+                  component="h2"
                   sx={{
-                    mt: 2.5,
-                    maxWidth: 720,
-                    fontSize: {
-                      xs: "0.98rem",
-                      sm: "1.05rem",
-                      md: "1.15rem",
-                    },
-                    lineHeight:
-                      1.8,
-                    color:
-                      "text.secondary",
-                    fontWeight: 450,
+                    mt: 1,
+                    fontWeight: 950,
+                    fontSize: { xs: "2.35rem", md: "3.6rem" },
+                    letterSpacing: "-.05em",
+                    lineHeight: 1,
                   }}
                 >
-                  A focused platform to <strong>deploy and manage services</strong> —
-                  without the infrastructure busywork.
+                  Inspect it. Adapt it. Run it yourself.
                 </Typography>
-              </motion.div>
+                <Typography sx={{ mt: 2, lineHeight: 1.8 }} color="text.secondary">
+                  The UI and API are separate so you can understand the pieces and evolve the control plane around your
+                  own infrastructure.
+                </Typography>
+              </Box>
+              <Stack spacing={1.2}>
+                <Button
+                  variant="contained"
+                  href={GITHUB_FRONTEND}
+                  target="_blank"
+                  rel="noreferrer"
+                  startIcon={<GitHubIcon />}
+                  endIcon={<LaunchRoundedIcon />}
+                  sx={{ minHeight: 54, borderRadius: 999, fontWeight: 850 }}
+                >
+                  Frontend repository
+                </Button>
+                <Button
+                  variant="outlined"
+                  href={GITHUB_API}
+                  target="_blank"
+                  rel="noreferrer"
+                  startIcon={<GitHubIcon />}
+                  endIcon={<LaunchRoundedIcon />}
+                  sx={{ minHeight: 54, borderRadius: 999, fontWeight: 850 }}
+                >
+                  Backend repository
+                </Button>
+              </Stack>
+            </Box>
+          </GlassPanel>
+        </Reveal>
+        </Container>
+      </ScrollScene>
 
-              {/* ACTIONS */}
-
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  y: 16,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                transition={{
-                  duration: 0.65,
-                  delay: 0.28,
-                }}
-              >
-                <Stack
-                  direction={{
-                    xs: "column",
-                    sm: "row",
-                  }}
-                  spacing={1.25}
+      {/* ───────────────── FAQ ───────────────── */}
+      <ScrollScene>
+        <Container maxWidth="md">
+          <Reveal>
+            <Typography variant="overline" sx={{ fontWeight: 900, letterSpacing: ".18em", color: "primary.main" }}>
+              FAQ
+            </Typography>
+            <Typography
+              component="h2"
+              sx={{
+                mt: 1,
+                fontWeight: 950,
+                fontSize: { xs: "2.3rem", md: "3.8rem" },
+                letterSpacing: "-.05em",
+                lineHeight: 1,
+              }}
+            >
+              Questions before you deploy.
+            </Typography>
+          </Reveal>
+          <Box sx={{ mt: 4 }}>
+            {faqs.map((faq, i) => (
+              <Reveal key={faq.q} delay={i * 0.04}>
+                <Accordion
+                  disableGutters
+                  elevation={0}
                   sx={{
-                    mt: 3.2,
+                    background: "transparent",
+                    borderTop: "1px solid",
+                    borderColor: border,
+                    "&:last-of-type": { borderBottom: "1px solid", borderColor: border },
+                    "&::before": { display: "none" },
                   }}
                 >
+                  <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />} sx={{ px: 0, py: 1.1 }}>
+                    <Typography sx={{ fontWeight: 850 }}>{faq.q}</Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ px: 0, pb: 2.8 }}>
+                    <Typography color="text.secondary" sx={{ lineHeight: 1.8, maxWidth: 750 }}>
+                      {faq.a}
+                    </Typography>
+                  </AccordionDetails>
+                </Accordion>
+              </Reveal>
+            ))}
+          </Box>
+        </Container>
+      </ScrollScene>
+
+      {/* ───────────────── FINAL CTA (page) ───────────────── */}
+      <ScrollScene page>
+        <Container maxWidth="lg">
+          <Reveal>
+            <Box
+              sx={{
+                position: "relative",
+                overflow: "hidden",
+                borderRadius: { xs: 5, md: 7 },
+                border: "1px solid",
+                borderColor: alpha(theme.palette.primary.main, 0.16),
+                p: { xs: 3, sm: 5, md: 8 },
+                textAlign: "center",
+                background: dark
+                  ? "linear-gradient(145deg, rgba(16,27,44,.95), rgba(7,12,21,.97))"
+                  : "linear-gradient(145deg, #ffffff, #eef5ff)",
+              }}
+            >
+              <Box
+                sx={{
+                  position: "absolute",
+                  width: 420,
+                  height: 420,
+                  borderRadius: "50%",
+                  right: -180,
+                  top: -240,
+                  background: `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.18)}, transparent 68%)`,
+                }}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  width: 340,
+                  height: 340,
+                  borderRadius: "50%",
+                  left: -160,
+                  bottom: -220,
+                  background: `radial-gradient(circle, ${alpha(theme.palette.secondary?.main || theme.palette.info.main, 0.14)}, transparent 68%)`,
+                }}
+              />
+              <Box sx={{ position: "relative" }}>
+                <Typography
+                  sx={{
+                    fontWeight: 950,
+                    fontSize: { xs: "2.4rem", md: "4.3rem" },
+                    letterSpacing: "-.06em",
+                    lineHeight: 0.98,
+                  }}
+                >
+                  Ready to move the next deployment?
+                </Typography>
+                <Typography sx={{ mt: 2, maxWidth: 680, mx: "auto", lineHeight: 1.8 }} color="text.secondary">
+                  Start with the control plane, then make the infrastructure as custom as your workload demands.
+                </Typography>
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="center" spacing={1.2} sx={{ mt: 3.1 }}>
                   <Button
+                    size="large"
                     variant="contained"
-                    size="large"
-                    onClick={() =>
-                      navigate(
-                        loggedIn
-                          ? "/services"
-                          : "/plans"
-                      )
-                    }
-                    endIcon={
-                      <ArrowForwardRoundedIcon />
-                    }
-                    sx={{
-                      minWidth: 188,
-                      minHeight: 52,
-                      px: 3,
-                      borderRadius: 3,
-                      textTransform:
-                        "none",
-                      fontWeight:
-                        850,
-                      background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                      boxShadow: `0 16px 42px ${alpha(
-                        theme.palette.primary.main,
-                        isDark ? 0.3 : 0.2
-                      )}`,
-                    }}
+                    onClick={() => navigate(loggedIn ? "/services" : "/signin_or_signup")}
+                    endIcon={<ArrowForwardRoundedIcon />}
+                    sx={{ minHeight: 56, px: 3, borderRadius: 999, fontWeight: 900 }}
                   >
-                    {loggedIn
-                      ? "Go to services"
-                      : "Start deploying"}
+                    Start deploying
                   </Button>
-
                   <Button
+                    size="large"
                     variant="outlined"
-                    size="large"
-                    onClick={() =>
-                      document
-                        .getElementById(
-                          "stack"
-                        )
-                        ?.scrollIntoView({
-                          behavior:
-                            "smooth",
-                        })
-                    }
-                    endIcon={
-                      <EastRoundedIcon />
-                    }
-                    sx={{
-                      minWidth: 188,
-                      minHeight: 52,
-                      px: 3,
-                      borderRadius: 3,
-                      textTransform:
-                        "none",
-                      fontWeight:
-                        750,
-                      borderColor:
-                        subtleBorder,
-                      bgcolor:
-                        alpha(
-                          theme.palette
-                            .background
-                            .paper,
-                          isDark
-                            ? 0.24
-                            : 0.58
-                        ),
-                      backdropFilter:
-                        "blur(14px)",
-                    }}
-                  >
-                    Explore platform
-                  </Button>
-
-                  <Button
-                    variant="text"
-                    size="large"
-                    onClick={() =>
-                      navigate("/docs")
-                    }
-                    endIcon={
-                      <EastRoundedIcon />
-                    }
-                    sx={{
-                      minWidth: 160,
-                      minHeight: 52,
-                      px: 2.5,
-                      borderRadius: 3,
-                      textTransform:
-                        "none",
-                      fontWeight:
-                        750,
-                    }}
+                    onClick={() => navigate("/docs")}
+                    sx={{ minHeight: 56, px: 3, borderRadius: 999, fontWeight: 850 }}
                   >
                     Read the docs
                   </Button>
                 </Stack>
-              </motion.div>
-
-              {/* HERO IMAGE */}
-
-              <motion.div
-                initial={{
-                  opacity: 0,
-                  scale: 0.975,
-                  y: 24,
-                }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                  y: 0,
-                }}
-                transition={{
-                  duration: 0.9,
-                  delay: 0.38,
-                  ease: [
-                    0.22,
-                    1,
-                    0.36,
-                    1,
-                  ],
-                }}
-                style={{
-                  width: "100%",
-                }}
-              >
-                <Box
-                  sx={{
-                    position:
-                      "relative",
-                    width: {
-                      xs: "100%",
-                      md: "89%",
-                      lg: "82%",
-                    },
-                    maxWidth: 1120,
-                    mx: "auto",
-                    mt: {
-                      xs: 4,
-                      md: 5.5,
-                    },
-                  }}
-                >
-                  {/* HALO */}
-
-                  <Box
-                    aria-hidden
-                    sx={{
-                      position:
-                        "absolute",
-                      inset: {
-                        xs: -14,
-                        md: -28,
-                      },
-                      borderRadius: {
-                        xs: 5,
-                        md: 7,
-                      },
-                      background: isDark
-                          ? `
-                            radial-gradient(
-                              ellipse at 50% 45%,
-                              ${alpha(theme.palette.primary.main, 0.2)},
-                              ${alpha(theme.palette.primary.main, 0.07)} 42%,
-                              transparent 72%
-                            )
-                          `
-                          : `
-                            radial-gradient(
-                              ellipse at 50% 46%,
-                              ${alpha(theme.palette.primary.main, 0.11)},
-                              ${alpha(theme.palette.secondary.main, 0.045)} 38%,
-                              transparent 72%
-                            )
-                          `,
-                      filter: {
-                        xs: "blur(22px)",
-                        md: "blur(34px)",
-                      },
-                      opacity:
-                        isDark
-                          ? 0.9
-                          : 0.8,
-                      pointerEvents:
-                        "none",
-                    }}
-                  />
-
-                  <OrbitDots
-                    color={
-                      theme
-                        .palette
-                        .primary
-                        .main
-                    }
-                    active={
-                      orbitActive
-                    }
-                  />
-
-                  {/* IMAGE PARALLAX */}
-
-                  <motion.div
-                    style={{
-                      y: heroImageY,
-                      position:
-                        "relative",
-                      zIndex: 2,
-                    }}
-                  >
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        position:
-                          "relative",
-                        overflow:
-                          "hidden",
-                        borderRadius: {
-                          xs: 3.5,
-                          md: 5.5,
-                        },
-                        border: "1px solid",
-                        borderColor:
-                          isDark
-                            ? "rgba(255,255,255,0.075)"
-                            : "rgba(15,23,42,0.07)",
-                        background:
-                          isDark
-                            ? "#08111e"
-                            : "#edf4ff",
-                        boxShadow:
-                          isDark
-                            ? "0 35px 100px rgba(0,0,0,0.36)"
-                            : "0 30px 80px rgba(30,64,175,0.10)",
-                        transform:
-                          "translateZ(0)",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          position:
-                            "relative",
-                          aspectRatio: "16 / 9",
-                          minHeight: { xs: 0, sm: 0, md: 420 },
-                        }}
-                      >
-                        <Box
-                          component="img"
-                          src={
-                            heroImage
-                          }
-                          alt="PassDeployer"
-                          fetchPriority="high"
-                          decoding="async"
-                          sx={{
-                            position:
-                              "absolute",
-                            inset: 0,
-                            width:
-                              "100%",
-                            height:
-                              "100%",
-                            display:
-                              "block",
-                            objectFit:
-                              { xs: "contain", md: "cover" },
-                            objectPosition:
-                              {
-                                xs: "center 43%",
-                                sm: "center center",
-                                md: "center center",
-                              },
-                            WebkitMaskImage:
-                              heroMask,
-                            maskImage:
-                              heroMask,
-                            transform:
-                              "translateZ(0)",
-                          }}
-                        />
-
-                        {/* OVERLAY */}
-
-                        <Box
-                          sx={{
-                            position:
-                              "absolute",
-                            inset: 0,
-                            pointerEvents:
-                              "none",
-                            background:
-                              isDark
-                                ? `
-                                  linear-gradient(
-                                    180deg,
-                                    rgba(3,8,16,0.00) 0%,
-                                    rgba(3,8,16,0.02) 42%,
-                                    rgba(3,8,16,0.72) 100%
-                                  )
-                                `
-                                : `
-                                  linear-gradient(
-                                    180deg,
-                                    rgba(255,255,255,0.00) 0%,
-                                    rgba(255,255,255,0.00) 72%,
-                                    rgba(235,243,255,0.16) 100%
-                                  )
-                                `,
-                          }}
-                        />
-
-                        {/* LIGHT INNER GLOW */}
-
-                        {!isDark && (
-                          <Box
-                            aria-hidden
-                            sx={{
-                              position:
-                                "absolute",
-                              inset: 0,
-                              pointerEvents:
-                                "none",
-                              background:
-                                `
-                                  radial-gradient(
-                                    ellipse at center,
-                                    transparent 50%,
-                                    rgba(255,255,255,0.05) 82%,
-                                    rgba(255,255,255,0.09) 100%
-                                  )
-                                `,
-                              opacity: 0.55,
-                            }}
-                          />
-                        )}
-
-                        {/* DARK BOTTOM */}
-
-                        {isDark && (
-                          <Box
-                            aria-hidden
-                            sx={{
-                              position:
-                                "absolute",
-                              left: 0,
-                              right: 0,
-                              bottom: 0,
-                              height: {
-                                xs: 80,
-                                md: 120,
-                              },
-                              background:
-                                "linear-gradient(180deg, transparent, rgba(3,8,15,0.55))",
-                              pointerEvents:
-                                "none",
-                            }}
-                          />
-                        )}
-
-                        {/* STATUS */}
-
-                        <Paper
-                          elevation={0}
-                          sx={{
-                            position:
-                              "absolute",
-                            left: {
-                              xs: 12,
-                              md: 22,
-                            },
-                            bottom: {
-                              xs: 12,
-                              md: 22,
-                            },
-                            px: 1.35,
-                            py: 1,
-                            borderRadius:
-                              2.5,
-                            border:
-                              "1px solid",
-                            borderColor:
-                              isDark
-                                ? "rgba(255,255,255,.13)"
-                                : "rgba(15,23,42,.10)",
-                            bgcolor:
-                              isDark
-                                ? "rgba(5,12,24,.62)"
-                                : "rgba(255,255,255,.78)",
-                            color:
-                              isDark
-                                ? "#fff"
-                                : "#0f172a",
-                            backdropFilter:
-                              "blur(18px)",
-                            zIndex: 4,
-                          }}
-                        >
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                          >
-                            <Box
-                              sx={{
-                                width: 7,
-                                height: 7,
-                                borderRadius:
-                                  "50%",
-                                bgcolor:
-                                  "#22c55e",
-                                boxShadow:
-                                  "0 0 12px rgba(34,197,94,.7)",
-                              }}
-                            />
-
-                            <Typography
-                              sx={{
-                                fontSize:
-                                  "0.78rem",
-                                fontWeight:
-                                  800,
-                              }}
-                            >
-                              deployment
-                              ready
-                            </Typography>
-                          </Stack>
-                        </Paper>
-                      </Box>
-                    </Paper>
-                  </motion.div>
-
-                  {/* PLAY / PAUSE */}
-
-                  <Tooltip
-                    title={
-                      orbitActive
-                        ? "Pause animation"
-                        : "Play animation"
-                    }
-                  >
-                    <IconButton
-                      aria-label={
-                        orbitActive
-                          ? "Pause animation"
-                          : "Play animation"
-                      }
-                      onClick={() =>
-                        setOrbitActive(
-                          (value) =>
-                            !value
-                        )
-                      }
-                      sx={{
-                        position:
-                          "absolute",
-                        right: {
-                          xs: 10,
-                          md: 18,
-                        },
-                        top: {
-                          xs: 10,
-                          md: 18,
-                        },
-                        zIndex: 6,
-                        width: 36,
-                        height: 36,
-                        bgcolor:
-                          isDark
-                            ? "rgba(5,12,24,.78)"
-                            : "rgba(255,255,255,.88)",
-                        border:
-                          "1px solid",
-                        borderColor:
-                          subtleBorder,
-                        backdropFilter:
-                          "blur(14px)",
-                      }}
-                    >
-                      {orbitActive ? (
-                        <PauseRoundedIcon
-                          sx={{
-                            fontSize:
-                              17,
-                          }}
-                        />
-                      ) : (
-                        <PlayArrowRoundedIcon
-                          sx={{
-                            fontSize:
-                              19,
-                          }}
-                        />
-                      )}
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </motion.div>
-            </Stack>
-          </Box>
-        </Container>
-
-        {/* Scroll hint — signals there is more below; hidden on small
-            screens (hero already fills them) and for reduced motion. */}
-        {!prefersReducedMotion && (
-          <Stack
-            alignItems="center"
-            spacing={0.25}
-            sx={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 14,
-              display: { xs: "none", md: "flex" },
-              pointerEvents: "none",
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{
-                fontSize: "0.66rem",
-                fontWeight: 800,
-                letterSpacing: "0.24em",
-                textTransform: "uppercase",
-                color: "text.secondary",
-                opacity: 0.65,
-              }}
-            >
-              Scroll
-            </Typography>
-
-            <motion.div
-              animate={{ y: [0, 7, 0], opacity: [0.45, 0.9, 0.45] }}
-              transition={{
-                duration: 1.8,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            >
-              <ExpandMoreRoundedIcon
-                sx={{
-                  fontSize: 20,
-                  color: "text.secondary",
-                }}
-              />
-            </motion.div>
-          </Stack>
-        )}
-      </Box>
-
-      {/* ======================================================
-          HOW YOUR APP FITS TOGETHER
-      ======================================================= */}
-
-      <Box
-        id="stack"
-        component="section"
-        sx={{
-          position: "relative",
-          py: {
-            xs: 8,
-            md: 10,
-          },
-          minHeight: { md: "100vh" },
-          display: { md: "flex" },
-          alignItems: { md: "center" },
-        }}
-      >
-        <GlowOrb
-          size={340}
-          top="16%"
-          left="-180px"
-          color={
-            theme.palette
-              .primary.main
-          }
-          opacity={
-            isDark ? 0.08 : 0.045
-          }
-        />
-
-        <Container maxWidth="xl">
-          <SectionReveal>
-            <Stack
-              alignItems="center"
-              textAlign="center"
-              spacing={1.5}
-            >
-              <Typography
-                component="p"
-                sx={{
-                  color:
-                    "primary.main",
-                  fontWeight: 900,
-                  fontSize:
-                    "0.78rem",
-                  letterSpacing:
-                    "0.17em",
-                  textTransform:
-                    "uppercase",
-                }}
-              >
-                How it works
-              </Typography>
-
-              <Typography
-                component="h2"
-                sx={{
-                  maxWidth: 820,
-                  fontSize: {
-                    xs: "2.15rem",
-                    md: "3.35rem",
-                  },
-                  lineHeight:
-                    1.02,
-                  letterSpacing:
-                    "-0.06em",
-                  fontWeight: 950,
-                }}
-              >
-                Your application.
-                <br />
-                One place to run and grow it.
-              </Typography>
-
-              <Typography
-                color="text.secondary"
-                sx={{
-                  maxWidth: 650,
-                  lineHeight:
-                    1.85,
-                }}
-              >
-                One control plane for deploying, managing and scaling —
-                less setup, more building.
-              </Typography>
-            </Stack>
-          </SectionReveal>
-
-          <SectionReveal delay={0.08}>
-            <Box
-              sx={{
-                position:
-                  "relative",
-                mt: {
-                  xs: 5,
-                  md: 7,
-                },
-              }}
-            >
-              <Paper
-                elevation={0}
-                sx={{
-                  position:
-                    "relative",
-                  overflow:
-                    "hidden",
-                  borderRadius: {
-                    xs: 4,
-                    md: 6,
-                  },
-                  border: "1px solid",
-                  borderColor:
-                    subtleBorder,
-                  background:
-                    isDark
-                      ? `
-                        radial-gradient(
-                          circle at 50% 50%,
-                          rgba(37,99,235,.08),
-                          transparent 38%
-                        ),
-                        linear-gradient(
-                          145deg,
-                          rgba(11,20,35,.98),
-                          rgba(5,12,22,.98)
-                        )
-                      `
-                      : `
-                        radial-gradient(
-                          circle at 50% 50%,
-                          rgba(37,99,235,.045),
-                          transparent 38%
-                        ),
-                        linear-gradient(
-                          145deg,
-                          #ffffff,
-                          #f4f8ff
-                        )
-                      `,
-                  boxShadow:
-                    isDark
-                      ? "0 38px 100px rgba(0,0,0,.24)"
-                      : "0 38px 100px rgba(15,23,42,.07)",
-                }}
-              >
-                {/* CONNECTION LINE */}
-
-                <Box
-                  aria-hidden
-                  sx={{
-                    display: {
-                      xs: "none",
-                      md: "block",
-                    },
-                    position:
-                      "absolute",
-                    top: "50%",
-                    left: "17%",
-                    right: "17%",
-                    height: 1,
-                    transform:
-                      "translateY(-50%)",
-                    background:
-                      isDark
-                        ? `
-                          linear-gradient(
-                            90deg,
-                            transparent,
-                            ${alpha(theme.palette.primary.main, 0.2)},
-                            ${alpha(theme.palette.secondary.main, 0.2)},
-                            transparent
-                          )
-                        `
-                        : `
-                          linear-gradient(
-                            90deg,
-                            transparent,
-                            ${alpha(theme.palette.primary.main, 0.12)},
-                            ${alpha(theme.palette.secondary.main, 0.12)},
-                            transparent
-                          )
-                        `,
-                    pointerEvents:
-                      "none",
-                  }}
-                />
-
-                {/* NODES */}
-
-                <Box
-                  aria-hidden
-                  sx={{
-                    display: {
-                      xs: "none",
-                      md: "block",
-                    },
-                    position:
-                      "absolute",
-                    top: "50%",
-                    left: "31%",
-                    width: 6,
-                    height: 6,
-                    transform:
-                      "translate(-50%, -50%)",
-                    borderRadius:
-                      "50%",
-                    bgcolor:
-                      theme.palette
-                        .primary.main,
-                    boxShadow: `0 0 14px ${alpha(
-                      theme.palette.primary.main,
-                      0.5
-                    )}`,
-                  }}
-                />
-
-                <Box
-                  aria-hidden
-                  sx={{
-                    display: {
-                      xs: "none",
-                      md: "block",
-                    },
-                    position:
-                      "absolute",
-                    top: "50%",
-                    right: "31%",
-                    width: 6,
-                    height: 6,
-                    transform:
-                      "translate(50%, -50%)",
-                    borderRadius:
-                      "50%",
-                    bgcolor:
-                      theme.palette
-                        .secondary.main,
-                    boxShadow: `0 0 14px ${alpha(
-                      theme.palette.secondary.main,
-                      0.5
-                    )}`,
-                  }}
-                />
-
-                <Box
-                  sx={{
-                    position:
-                      "relative",
-                    zIndex: 1,
-                    p: {
-                      xs: 2.5,
-                      sm: 3.5,
-                      md: 4.5,
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display:
-                        "grid",
-                      gridTemplateColumns:
-                        {
-                          xs: "1fr",
-                          md: "1fr 220px 1fr",
-                        },
-                      gap: {
-                        xs: 2.5,
-                        md: 3,
-                      },
-                      alignItems:
-                        "center",
-                    }}
-                  >
-                    {/* APPLICATION */}
-
-                    <Box>
-                      <Stack
-                        spacing={1.5}
-                      >
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          alignItems="center"
-                        >
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius:
-                                "50%",
-                              bgcolor:
-                                "primary.main",
-                            }}
-                          />
-
-                          <Typography
-                            sx={{
-                              fontSize:
-                                "0.78rem",
-                              fontWeight:
-                                900,
-                              letterSpacing:
-                                "0.13em",
-                              textTransform:
-                                "uppercase",
-                              color:
-                                "text.secondary",
-                            }}
-                          >
-                            Application
-                          </Typography>
-                        </Stack>
-
-                        <Typography
-                          sx={{
-                            fontSize: {
-                              xs: "1.35rem",
-                              md: "1.5rem",
-                            },
-                            fontWeight:
-                              900,
-                            letterSpacing:
-                              "-0.04em",
-                          }}
-                        >
-                          Build with what
-                          you know.
-                        </Typography>
-
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            maxWidth: 400,
-                            lineHeight:
-                              1.75,
-                          }}
-                        >
-                          Familiar frameworks
-                          and runtimes — no new
-                          development model.
-                        </Typography>
-
-                        <Box
-                          sx={{
-                            display:
-                              "grid",
-                            gridTemplateColumns:
-                              {
-                                xs:
-                                  "1fr 1fr",
-                                sm:
-                                  "1fr 1fr",
-                              },
-                            gap: 1,
-                            mt: 0.7,
-                          }}
-                        >
-                          {applicationStack.map(
-                            (item) => (
-                              <StackItem
-                                key={
-                                  item.name
-                                }
-                                item={
-                                  item
-                                }
-                                theme={
-                                  theme
-                                }
-                                isDark={
-                                  isDark
-                                }
-                                direction="left"
-                              />
-                            )
-                          )}
-                        </Box>
-                      </Stack>
-                    </Box>
-
-                    {/* DEPLOYMENT */}
-
-                    <Box
-                      sx={{
-                        display:
-                          "flex",
-                        justifyContent:
-                          "center",
-                        alignItems:
-                          "center",
-                        py: {
-                          xs: 2,
-                          md: 0,
-                        },
-                      }}
-                    >
-                      <motion.div
-                        initial={{
-                          opacity: 0,
-                          scale: 0.88,
-                        }}
-                        whileInView={{
-                          opacity: 1,
-                          scale: 1,
-                        }}
-                        viewport={{
-                          once: true,
-                          amount: 0.3,
-                        }}
-                        transition={{
-                          duration: 0.55,
-                        }}
-                      >
-                        <Stack
-                          alignItems="center"
-                          spacing={1.4}
-                        >
-                          <Box
-                            sx={{
-                              position:
-                                "relative",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                position:
-                                  "absolute",
-                                inset: -28,
-                                borderRadius:
-                                  "50%",
-                                bgcolor:
-                                  alpha(
-                                    theme
-                                      .palette
-                                      .primary
-                                      .main,
-                                    isDark
-                                      ? 0.11
-                                      : 0.055
-                                  ),
-                                filter:
-                                  "blur(28px)",
-                              }}
-                            />
-
-                            <Box
-                              sx={{
-                                position:
-                                  "relative",
-                                width: {
-                                  xs: 92,
-                                  md: 104,
-                                },
-                                height: {
-                                  xs: 92,
-                                  md: 104,
-                                },
-                                display:
-                                  "flex",
-                                alignItems:
-                                  "center",
-                                justifyContent:
-                                  "center",
-                                borderRadius:
-                                  "30px",
-                                border:
-                                  "1px solid",
-                                borderColor:
-                                  alpha(
-                                    theme
-                                      .palette
-                                      .primary
-                                      .main,
-                                    0.2
-                                  ),
-                                bgcolor:
-                                  isDark
-                                    ? "#091523"
-                                    : "#ffffff",
-                              }}
-                            >
-                              <SiDocker
-                                size="3.15rem"
-                              />
-                            </Box>
-
-                            <Box
-                              sx={{
-                                position:
-                                  "absolute",
-                                right: -4,
-                                bottom: -4,
-                                width: 18,
-                                height: 18,
-                                borderRadius:
-                                  "50%",
-                                bgcolor:
-                                  isDark
-                                    ? "#0a1524"
-                                    : "#ffffff",
-                                border:
-                                  "1px solid",
-                                borderColor:
-                                  subtleBorder,
-                                display:
-                                  "grid",
-                                placeItems:
-                                  "center",
-                              }}
-                            >
-                              <Box
-                                sx={{
-                                  width: 7,
-                                  height: 7,
-                                  borderRadius:
-                                    "50%",
-                                  bgcolor:
-                                    "#22c55e",
-                                  boxShadow:
-                                    "0 0 10px rgba(34,197,94,.7)",
-                                }}
-                              />
-                            </Box>
-                          </Box>
-
-                          <Typography
-                            sx={{
-                              fontWeight:
-                                900,
-                              fontSize:
-                                "0.98rem",
-                            }}
-                          >
-                            Deploy
-                          </Typography>
-
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            textAlign="center"
-                            sx={{
-                              maxWidth: 170,
-                              lineHeight:
-                                1.65,
-                            }}
-                          >
-                            Docker-powered
-                            deployment
-                          </Typography>
-
-                          <Chip
-                            size="small"
-                            label="DOCKER"
-                            sx={{
-                              height: 22,
-                              borderRadius:
-                                999,
-                              fontSize:
-                                "0.6rem",
-                              fontWeight:
-                                900,
-                              letterSpacing:
-                                "0.1em",
-                              bgcolor:
-                                alpha(
-                                  theme
-                                    .palette
-                                    .primary
-                                    .main,
-                                  0.08
-                                ),
-                              color:
-                                "primary.main",
-                            }}
-                          />
-                        </Stack>
-                      </motion.div>
-                    </Box>
-
-                    {/* DATA */}
-
-                    <Box>
-                      <Stack
-                        spacing={1.5}
-                      >
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          alignItems="center"
-                        >
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
-                              borderRadius:
-                                "50%",
-                              bgcolor:
-                                "secondary.main",
-                            }}
-                          />
-
-                          <Typography
-                            sx={{
-                              fontSize:
-                                "0.78rem",
-                              fontWeight:
-                                900,
-                              letterSpacing:
-                                "0.13em",
-                              textTransform:
-                                "uppercase",
-                              color:
-                                "text.secondary",
-                            }}
-                          >
-                            Data layer
-                          </Typography>
-                        </Stack>
-
-                        <Typography
-                          sx={{
-                            fontSize: {
-                              xs: "1.35rem",
-                              md: "1.5rem",
-                            },
-                            fontWeight:
-                              900,
-                            letterSpacing:
-                              "-0.04em",
-                          }}
-                        >
-                          Keep your data close.
-                        </Typography>
-
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            maxWidth: 400,
-                            lineHeight:
-                              1.75,
-                          }}
-                        >
-                          Reliable storage and fast
-                          service infrastructure for
-                          real applications.
-                        </Typography>
-
-                        <Stack
-                          spacing={1}
-                          sx={{
-                            mt: 0.7,
-                          }}
-                        >
-                          {dataStack.map(
-                            (item) => (
-                              <StackItem
-                                key={
-                                  item.name
-                                }
-                                item={
-                                  item
-                                }
-                                theme={
-                                  theme
-                                }
-                                isDark={
-                                  isDark
-                                }
-                                direction="right"
-                              />
-                            )
-                          )}
-                        </Stack>
-
-                      </Stack>
-                    </Box>
-                  </Box>
-                </Box>
-              </Paper>
-            </Box>
-          </SectionReveal>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          PAY AS YOU GO
-      ======================================================= */}
-
-      <Box
-        component="section"
-        sx={{
-          position: "relative",
-          py: { xs: 8, md: 11 },
-        }}
-      >
-        <Container maxWidth="xl">
-          <Paper
-            elevation={0}
-            sx={{
-              p: { xs: 3, md: 5 },
-              borderRadius: { xs: 4, md: 6 },
-              border: "1px solid",
-              borderColor: subtleBorder,
-              bgcolor: alpha(theme.palette.background.paper, isDark ? 0.72 : 0.84),
-              backdropFilter: "blur(18px)",
-            }}
-          >
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={{ xs: 3, md: 5 }}
-              alignItems={{ xs: "flex-start", md: "center" }}
-              justifyContent="space-between"
-            >
-              <Box sx={{ maxWidth: 720 }}>
-                <Typography
-                  sx={{
-                    color: "primary.main",
-                    fontSize: "0.78rem",
-                    fontWeight: 900,
-                    letterSpacing: "0.13em",
-                  }}
-                >
-                  PAY AS YOU GO
-                </Typography>
-                <Typography
-                  component="h2"
-                  sx={{
-                    mt: 1,
-                    fontSize: { xs: "2rem", md: "3rem" },
-                    lineHeight: 1.05,
-                    letterSpacing: "-0.055em",
-                    fontWeight: 950,
-                  }}
-                >
-                  Use what you need. Pay for what you use.
-                </Typography>
-                <Typography
-                  color="text.secondary"
-                  sx={{ mt: 1.5, lineHeight: 1.85, maxWidth: 690 }}
-                >
-                  Start with the resources that fit your workload, run a short-lived
-                  environment, or keep a small service online — <strong>and change plans
-                  whenever the workload changes.</strong>
-                </Typography>
               </Box>
-
-              <Button
-                variant="contained"
-                onClick={() => navigate("/plans")}
-                endIcon={<ArrowForwardRoundedIcon />}
-                sx={{
-                  minWidth: 180,
-                  minHeight: 50,
-                  px: 2.5,
-                  borderRadius: 3,
-                  textTransform: "none",
-                  fontWeight: 850,
-                  flexShrink: 0,
-                }}
-              >
-                See plans
-              </Button>
-            </Stack>
-          </Paper>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          SERVICE PREVIEW
-      ======================================================= */}
-
-      <Box
-        id="service-preview"
-        component="section"
-        sx={{
-          position: "relative",
-          py: {
-            xs: 8,
-            md: 10,
-          },
-          minHeight: { md: "100vh" },
-          display: { md: "flex" },
-          alignItems: { md: "center" },
-        }}
-      >
-        <GlowOrb
-          size={320}
-          top="10%"
-          right="-160px"
-          color={
-            theme.palette
-              .secondary.main
-          }
-          opacity={
-            isDark ? 0.07 : 0.035
-          }
-        />
-
-        <Container maxWidth="xl">
-          <SectionReveal>
-            <Stack
-              direction={{
-                xs: "column",
-                md: "row",
-              }}
-              justifyContent="space-between"
-              alignItems={{
-                xs: "flex-start",
-                md: "flex-end",
-              }}
-              spacing={3}
-            >
-              <Box
-                sx={{
-                  maxWidth: 680,
-                }}
-              >
-                <Typography
-                  sx={{
-                    color:
-                      "primary.main",
-                    fontSize:
-                      "0.78rem",
-                    fontWeight:
-                      900,
-                    letterSpacing:
-                      "0.16em",
-                  }}
-                >
-                  MANAGE YOUR SERVICES
-                </Typography>
-
-                <Typography
-                  component="h2"
-                  sx={{
-                    mt: 1,
-                    fontSize: {
-                      xs: "2.15rem",
-                      md: "3.35rem",
-                    },
-                    lineHeight:
-                      1,
-                    letterSpacing:
-                      "-0.06em",
-                    fontWeight:
-                      950,
-                  }}
-                >
-                  See your services.
-                  <br />
-                  Manage them instantly.
-                </Typography>
-
-                <Typography
-                  color="text.secondary"
-                  sx={{
-                    mt: 1.6,
-                    lineHeight:
-                      1.8,
-                    maxWidth: 620,
-                  }}
-                >
-                  Status, resources, usage and everyday actions —
-                one clear surface per service.
-                </Typography>
-              </Box>
-
-              <Chip
-                icon={
-                  <CloudDoneRoundedIcon
-                    sx={{
-                      fontSize:
-                        17,
-                    }}
-                  />
-                }
-                label="Live service management"
-                sx={{
-                  height: 34,
-                  borderRadius: 999,
-                  px: 0.8,
-                  fontWeight: 800,
-                  bgcolor: alpha(
-                    theme.palette.success.main,
-                    isDark ? 0.08 : 0.055
-                  ),
-                  color:
-                    "success.main",
-                }}
-              />
-            </Stack>
-          </SectionReveal>
-
-          <Box
-            sx={{
-              mt: {
-                xs: 4,
-                md: 6,
-              },
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                md: "1.38fr 0.62fr",
-              },
-              gap: 2,
-              alignItems: "stretch",
-            }}
-          >
-            <SectionReveal delay={0.05}>
-              <ServicePreview
-                theme={theme}
-                isDark={isDark}
-              />
-            </SectionReveal>
-
-            <Stack spacing={2}>
-              <SectionReveal delay={0.1}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    height: "100%",
-                    p: {
-                      xs: 2.5,
-                      md: 3,
-                    },
-                    borderRadius: {
-                      xs: 4,
-                      md: 5,
-                    },
-                    border:
-                      "1px solid",
-                    borderColor:
-                      subtleBorder,
-                    background:
-                      isDark
-                        ? `
-                          linear-gradient(
-                            145deg,
-                            rgba(15,25,42,.9),
-                            rgba(7,14,25,.96)
-                          )
-                        `
-                        : `
-                          linear-gradient(
-                            145deg,
-                            #ffffff,
-                            #f7faff
-                          )
-                        `,
-                  }}
-                >
-                  <Stack
-                    spacing={1.5}
-                  >
-                    <Box
-                      sx={{
-                        width: 44,
-                        height: 44,
-                        borderRadius:
-                          2.5,
-                        display: "grid",
-                        placeItems:
-                          "center",
-                        bgcolor:
-                          alpha(
-                            theme
-                              .palette
-                              .success
-                              .main,
-                            isDark
-                              ? 0.11
-                              : 0.07
-                          ),
-                        color:
-                          "success.main",
-                      }}
-                    >
-                      <CloudDoneRoundedIcon />
-                    </Box>
-
-                    <Typography
-                      sx={{
-                        fontWeight:
-                          900,
-                        fontSize:
-                          "1.05rem",
-                      }}
-                    >
-                      Always know what
-                      is running.
-                    </Typography>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        lineHeight:
-                          1.75,
-                      }}
-                    >
-                      Status, limits and live usage — visible at a
-                      glance, without jumping between tools.
-                    </Typography>
-                  </Stack>
-                </Paper>
-              </SectionReveal>
-
-              <SectionReveal delay={0.15}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: {
-                      xs: 2.5,
-                      md: 3,
-                    },
-                    borderRadius: {
-                      xs: 4,
-                      md: 5,
-                    },
-                    border:
-                      "1px solid",
-                    borderColor:
-                      subtleBorder,
-                    background:
-                      isDark
-                        ? "rgba(255,255,255,.02)"
-                        : "rgba(255,255,255,.72)",
-                  }}
-                >
-                  <Stack
-                    spacing={1.2}
-                  >
-                    <Typography
-                      sx={{
-                        fontSize:
-                          "0.78rem",
-                        fontWeight:
-                          900,
-                        letterSpacing:
-                          "0.12em",
-                        color:
-                          "primary.main",
-                      }}
-                    >
-                      COMMON ACTIONS
-                    </Typography>
-
-                    <Typography
-                      sx={{
-                        fontWeight:
-                          850,
-                      }}
-                    >
-                      Start, stop, restart and change resources.
-                    </Typography>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{
-                        lineHeight:
-                          1.7,
-                      }}
-                    >
-                      Keep the actions you use most
-                      just one click away.
-                    </Typography>
-
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      sx={{
-                        pt: 0.5,
-                      }}
-                    >
-                      <Stack
-                        direction="row"
-                        spacing={0.6}
-                      >
-                        {[
-                          StopRoundedIcon,
-                          LaunchRoundedIcon,
-                          EditRoundedIcon,
-                          MoreHorizRoundedIcon,
-                        ].map(
-                          (
-                            Icon,
-                            index
-                          ) => (
-                            <Box
-                              key={index}
-                              sx={{
-                                width: 31,
-                                height: 31,
-                                display:
-                                  "grid",
-                                placeItems:
-                                  "center",
-                                borderRadius:
-                                  1.8,
-                                border:
-                                  "1px solid",
-                                borderColor:
-                                  subtleBorder,
-                                bgcolor:
-                                  isDark
-                                    ? "rgba(255,255,255,.025)"
-                                    : "rgba(15,23,42,.025)",
-                              }}
-                            >
-                              <Icon
-                                sx={{
-                                  fontSize:
-                                    16,
-                                }}
-                              />
-                            </Box>
-                          )
-                        )}
-                      </Stack>
-                    </Stack>
-                  </Stack>
-                </Paper>
-              </SectionReveal>
-            </Stack>
-          </Box>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          VALUE STRIP
-      ======================================================= */}
-
-      <Box
-        component="section"
-        sx={{
-          pb: {
-            xs: 9,
-            md: 15,
-          },
-        }}
-      >
-        <Container maxWidth="xl">
-          <SectionReveal>
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  md: "repeat(3, 1fr)",
-                },
-                borderTop:
-                  "1px solid",
-                borderBottom:
-                  "1px solid",
-                borderColor:
-                  subtleBorder,
-              }}
-            >
-              {[
-                {
-                  icon:
-                    SpeedRoundedIcon,
-                  title:
-                    "Faster deployment",
-                  text:
-                    "From code to running service with fewer manual steps.",
-                },
-                {
-                  icon:
-                    SecurityRoundedIcon,
-                  title:
-                    "Infrastructure, without the busywork",
-                  text:
-                    "Volumes, networks and service boundaries — managed from one place.",
-                },
-                {
-                  icon:
-                    AutoAwesomeRoundedIcon,
-                  title:
-                    "Flexible as you grow",
-                  text:
-                    "Change plans as you grow — no rebuilds.",
-                },
-              ].map(
-                (
-                  item,
-                  index
-                ) => {
-                  const Icon =
-                    item.icon;
-
-                  return (
-                    <Box
-                      key={
-                        item.title
-                      }
-                      sx={{
-                        p: {
-                          xs: 2.5,
-                          md: 3.5,
-                        },
-                        borderRight: {
-                          xs: "none",
-                          md:
-                            index <
-                            2
-                              ? "1px solid"
-                              : "none",
-                        },
-                        borderBottom:
-                          {
-                            xs:
-                              index <
-                              2
-                                ? "1px solid"
-                                : "none",
-                            md: "none",
-                          },
-                        borderColor:
-                          subtleBorder,
-                      }}
-                    >
-                      <Icon
-                        sx={{
-                          fontSize:
-                            21,
-                          color:
-                            "primary.main",
-                        }}
-                      />
-
-                      <Typography
-                        sx={{
-                          mt: 1.4,
-                          fontWeight:
-                            850,
-                        }}
-                      >
-                        {
-                          item.title
-                        }
-                      </Typography>
-
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{
-                          mt: 0.5,
-                          lineHeight:
-                            1.7,
-                        }}
-                      >
-                        {item.text}
-                      </Typography>
-                    </Box>
-                  );
-                }
-              )}
             </Box>
-          </SectionReveal>
+          </Reveal>
         </Container>
-      </Box>
-
-      {/* ======================================================
-          WORKFLOW
-      ======================================================= */}
-
-      <Box
-        id="quickstart"
-        component="section"
-        sx={{
-          position:
-            "relative",
-          py: {
-            xs: 9,
-            md: 10,
-          },
-          minHeight: { md: "100vh" },
-          display: { md: "flex" },
-          alignItems: { md: "center" },
-          bgcolor:
-            isDark
-              ? "rgba(255,255,255,.012)"
-              : "rgba(37,99,235,.018)",
-          borderTop:
-            "1px solid",
-          borderBottom:
-            "1px solid",
-          borderColor:
-            subtleBorder,
-        }}
-      >
-        <Container maxWidth="xl">
-          <SectionReveal>
-            <Stack
-              direction={{
-                xs: "column",
-                md: "row",
-              }}
-              spacing={4}
-              justifyContent="space-between"
-              alignItems={{
-                xs: "flex-start",
-                md: "flex-end",
-              }}
-            >
-              <Box
-                sx={{
-                  maxWidth: 650,
-                }}
-              >
-                <Typography
-                  sx={{
-                    color:
-                      "primary.main",
-                    fontSize:
-                      "0.78rem",
-                    fontWeight:
-                      900,
-                    letterSpacing:
-                      "0.16em",
-                  }}
-                >
-                  QUICKSTART
-                </Typography>
-
-                <Typography
-                  component="h2"
-                  sx={{
-                    mt: 1,
-                    fontSize: {
-                      xs: "2.2rem",
-                      md: "3.35rem",
-                    },
-                    lineHeight:
-                      1,
-                    letterSpacing:
-                      "-0.06em",
-                    fontWeight:
-                      950,
-                  }}
-                >
-                  From plan to running
-                  service.
-                </Typography>
-
-                <Typography
-                  color="text.secondary"
-                  sx={{
-                    mt: 1.7,
-                    lineHeight:
-                      1.8,
-                    maxWidth: 620,
-                  }}
-                >
-                  A straightforward deployment flow that keeps the setup clear,
-                  while giving you the controls you need to run real services.
-                </Typography>
-              </Box>
-
-              <Button
-                variant="outlined"
-                endIcon={
-                  <ArrowForwardRoundedIcon />
-                }
-                onClick={() =>
-                  navigate(
-                    "/plans"
-                  )
-                }
-                sx={{
-                  minWidth: 160,
-                  height: 48,
-                  borderRadius:
-                    2.75,
-                  textTransform:
-                    "none",
-                  fontWeight:
-                    800,
-                  borderColor:
-                    subtleBorder,
-                }}
-              >
-                View plans
-              </Button>
-            </Stack>
-          </SectionReveal>
-
-          <Box
-            sx={{
-              position:
-                "relative",
-              mt: {
-                xs: 5,
-                md: 7,
-              },
-            }}
-          >
-            <Box
-              sx={{
-                display: {
-                  xs: "none",
-                  md: "block",
-                },
-                position:
-                  "absolute",
-                top: 34,
-                left: "9%",
-                right: "9%",
-                height: 1,
-                background:
-                  isDark
-                    ? `linear-gradient(90deg, transparent, ${alpha(theme.palette.primary.main, 0.28)}, ${alpha(theme.palette.secondary.main, 0.28)}, transparent)`
-                    : `linear-gradient(90deg, transparent, ${alpha(theme.palette.primary.main, 0.16)}, ${alpha(theme.palette.secondary.main, 0.16)}, transparent)`,
-              }}
-            />
-
-            <Box
-              sx={{
-                display:
-                  "grid",
-                gridTemplateColumns:
-                  {
-                    xs: "1fr",
-                    md: "repeat(4, 1fr)",
-                  },
-                gap: {
-                  xs: 2,
-                  md: 2.5,
-                },
-              }}
-            >
-              {workflow.map(
-                (item, index) => {
-                  const Icon =
-                    item.icon;
-
-                  return (
-                    <SectionReveal
-                      key={
-                        item.id
-                      }
-                      delay={
-                        index *
-                        0.06
-                      }
-                    >
-                      <Box
-                        sx={{
-                          position:
-                            "relative",
-                          height:
-                            "100%",
-                        }}
-                      >
-                        <Stack
-                          alignItems={{
-                            xs: "flex-start",
-                            md: "center",
-                          }}
-                          textAlign={{
-                            xs: "left",
-                            md: "center",
-                          }}
-                          spacing={1.5}
-                        >
-                          <Box
-                            sx={{
-                              position:
-                                "relative",
-                              zIndex: 2,
-                              width: 68,
-                              height: 68,
-                              display:
-                                "flex",
-                              alignItems:
-                                "center",
-                              justifyContent:
-                                "center",
-                              borderRadius:
-                                "24px",
-                              bgcolor:
-                                isDark
-                                  ? "#0a1422"
-                                  : "#ffffff",
-                              border:
-                                "1px solid",
-                              borderColor:
-                                alpha(
-                                  item.accent,
-                                  isDark
-                                    ? 0.28
-                                    : 0.18
-                                ),
-                              boxShadow:
-                                isDark
-                                  ? `0 18px 40px ${alpha(
-                                      item.accent,
-                                      0.08
-                                    )}`
-                                  : `0 18px 40px ${alpha(
-                                      item.accent,
-                                      0.06
-                                    )}`,
-                            }}
-                          >
-                            <Icon
-                              sx={{
-                                fontSize:
-                                  26,
-                                color:
-                                  item.accent,
-                              }}
-                            />
-
-                            <Box
-                              sx={{
-                                position:
-                                  "absolute",
-                                top: -8,
-                                right: -7,
-                                minWidth: 24,
-                                height: 24,
-                                px: 0.5,
-                                borderRadius:
-                                  999,
-                                bgcolor:
-                                  isDark
-                                    ? "#0d1726"
-                                    : "#ffffff",
-                                border:
-                                  "1px solid",
-                                borderColor:
-                                  subtleBorder,
-                                display:
-                                  "flex",
-                                alignItems:
-                                  "center",
-                                justifyContent:
-                                  "center",
-                              }}
-                            >
-                              <Typography
-                                sx={{
-                                  fontSize:
-                                    "0.62rem",
-                                  fontWeight:
-                                    900,
-                                  color:
-                                    "text.secondary",
-                                }}
-                              >
-                                {item.id}
-                              </Typography>
-                            </Box>
-                          </Box>
-
-                          <Typography
-                            sx={{
-                              fontSize:
-                                "1rem",
-                              fontWeight:
-                                900,
-                              letterSpacing:
-                                "-0.02em",
-                            }}
-                          >
-                            {
-                              item.title
-                            }
-                          </Typography>
-
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{
-                              maxWidth:
-                                220,
-                              lineHeight:
-                                1.72,
-                            }}
-                          >
-                            {
-                              item.description
-                            }
-                          </Typography>
-                        </Stack>
-                      </Box>
-                    </SectionReveal>
-                  );
-                }
-              )}
-            </Box>
-          </Box>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          DOCKER — UNDER THE HOOD
-          (scene image: /docker-image.jpg from public/; falls back to
-          a styled illustration when the file is absent)
-      ======================================================= */}
-
-      <Box
-        id="docker"
-        component="section"
-        ref={dockerSceneRef}
-        sx={{
-          position: "relative",
-          py: { xs: 8, md: 10 },
-          minHeight: { md: "100vh" },
-          display: { md: "flex" },
-          alignItems: { md: "center" },
-          overflow: "clip",
-        }}
-      >
-        <GlowOrb
-          size={360}
-          top="18%"
-          left="-170px"
-          color={
-            theme.palette
-              .secondary.main
-          }
-          opacity={
-            isDark ? 0.08 : 0.04
-          }
-        />
-
-        <Container maxWidth="xl">
-          <Stack
-            direction={{
-              xs: "column-reverse",
-              md: "row",
-            }}
-            spacing={{
-              xs: 5,
-              md: 8,
-            }}
-            alignItems="center"
-          >
-            {/* SCENE IMAGE */}
-
-            <Box
-              sx={{
-                flex: 1.15,
-                minWidth: 0,
-                width: "100%",
-              }}
-            >
-              <SectionReveal>
-                <motion.div
-                  style={{
-                    y: dockerImageY,
-                  }}
-                >
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      position: "relative",
-                      overflow: "hidden",
-                      borderRadius: {
-                        xs: 3.5,
-                        md: 5,
-                      },
-                      border: "1px solid",
-                      borderColor: subtleBorder,
-                      background: isDark
-                        ? "#08111e"
-                        : "#edf4ff",
-                      boxShadow: isDark
-                        ? "0 30px 90px rgba(0,0,0,.32)"
-                        : "0 26px 70px rgba(30,64,175,.09)",
-                      transform: "translateZ(0)",
-                    }}
-                  >
-                    {dockerImageOk ? (
-                      <Box
-                        component="img"
-                        src="/docker-image.jpg"
-                        alt="PassDeployer — Docker-based deployments"
-                        onError={() =>
-                          setDockerImageOk(
-                            false
-                          )
-                        }
-                        loading="lazy"
-                        decoding="async"
-                        sx={{
-                          display: "block",
-                          width: "100%",
-                          height: "auto",
-                          transform: "translateZ(0)",
-                        }}
-                      />
-                    ) : (
-                      /* Fallback illustration — keeps the scene
-                         intentional even without the image file. */
-
-                      <Box
-                        sx={{
-                          position: "relative",
-                          aspectRatio: "4 / 3",
-                          display: "flex",
-                          flexDirection:
-                            "column",
-                          alignItems:
-                            "center",
-                          justifyContent:
-                            "center",
-                          gap: 2.5,
-                          background: isDark
-                            ? `
-                              radial-gradient(
-                                circle at 50% 30%,
-                                rgba(13,74,156,.38),
-                                transparent 60%
-                              ),
-                              linear-gradient(
-                                160deg,
-                                #0a1526,
-                                #07101b
-                              )
-                            `
-                            : `
-                              radial-gradient(
-                                circle at 50% 30%,
-                                rgba(59,130,246,.16),
-                                transparent 60%
-                              ),
-                              linear-gradient(
-                                160deg,
-                                #f2f7ff,
-                                #e8f1ff
-                              )
-                            `,
-                        }}
-                      >
-                        <Box
-                          aria-hidden
-                          sx={{
-                            display:
-                              "flex",
-                            alignItems:
-                              "center",
-                            justifyContent:
-                              "center",
-                            width: 104,
-                            height: 104,
-                            borderRadius: 5,
-                            border:
-                              "1px solid",
-                            borderColor: isDark
-                              ? "rgba(255,255,255,.12)"
-                              : "rgba(15,23,42,.10)",
-                            bgcolor: isDark
-                              ? "rgba(255,255,255,.04)"
-                              : "rgba(255,255,255,.66)",
-                            backdropFilter:
-                              "blur(14px)",
-                          }}
-                        >
-                          <SiDocker
-                            size={58}
-                          />
-                        </Box>
-
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                        >
-                          {[
-                            "build",
-                            "run",
-                            "manage",
-                          ].map(
-                            (
-                              label
-                            ) => (
-                              <Chip
-                                key={
-                                  label
-                                }
-                                label={
-                                  label
-                                }
-                                size="small"
-                                sx={{
-                                  borderRadius: 999,
-                                  fontWeight: 700,
-                                  fontSize:
-                                    "0.72rem",
-                                }}
-                              />
-                            )
-                          )}
-                        </Stack>
-                      </Box>
-                    )}
-                  </Paper>
-                </motion.div>
-              </SectionReveal>
-            </Box>
-
-            {/* COPY */}
-
-            <Box
-              sx={{
-                flex: 1,
-                minWidth: 0,
-              }}
-            >
-              <SectionReveal
-                delay={0.08}
-              >
-                <Stack spacing={2.5}>
-                  <Box>
-                    <Typography
-                      component="p"
-                      sx={{
-                        color:
-                          "primary.main",
-                        fontWeight: 900,
-                        fontSize:
-                          "0.78rem",
-                        letterSpacing:
-                          "0.17em",
-                        textTransform:
-                          "uppercase",
-                      }}
-                    >
-                      Docker under the hood
-                    </Typography>
-
-                    <Typography
-                      component="h2"
-                      sx={{
-                        mt: 1,
-                        fontSize: {
-                          xs: "2.1rem",
-                          md: "3.15rem",
-                        },
-                        lineHeight: 1.03,
-                        letterSpacing:
-                          "-0.06em",
-                        fontWeight: 950,
-                      }}
-                    >
-                      Every deployment
-                      rides on containers.
-                    </Typography>
-
-                    <Typography
-                      color="text.secondary"
-                      sx={{
-                        mt: 1.5,
-                        lineHeight: 1.85,
-                        maxWidth: 560,
-                      }}
-                    >
-                      Services build and run as containers —
-                      isolated, reproducible and managed
-                      by the platform.
-                    </Typography>
-                  </Box>
-
-                  <Stack spacing={1.1}>
-                    {dockerHighlights.map(
-                      (
-                        item
-                      ) => {
-                        const Icon =
-                          item.icon;
-
-                        return (
-                          <Stack
-                            key={
-                              item.title
-                            }
-                            direction="row"
-                            spacing={1.5}
-                            alignItems="center"
-                            sx={{
-                              p: 1.25,
-                              borderRadius: 3,
-                              border:
-                                "1px solid",
-                              borderColor:
-                                subtleBorder,
-                              bgcolor: isDark
-                                ? "rgba(255,255,255,.025)"
-                                : "rgba(255,255,255,.62)",
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: 40,
-                                height: 40,
-                                flexShrink: 0,
-                                display:
-                                  "flex",
-                                alignItems:
-                                  "center",
-                                justifyContent:
-                                  "center",
-                                borderRadius: 2.5,
-                                color:
-                                  "primary.main",
-                                bgcolor:
-                                  alpha(
-                                    theme
-                                      .palette
-                                      .primary
-                                      .main,
-                                    isDark
-                                      ? 0.09
-                                      : 0.07
-                                  ),
-                              }}
-                            >
-                              <Icon
-                                sx={{
-                                  fontSize: 20,
-                                }}
-                              />
-                            </Box>
-
-                            <Box>
-                              <Typography
-                                sx={{
-                                  fontWeight: 800,
-                                  fontSize:
-                                    "0.92rem",
-                                }}
-                              >
-                                {
-                                  item.title
-                                }
-                              </Typography>
-
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  fontSize:
-                                    "0.82rem",
-                                  lineHeight: 1.6,
-                                }}
-                              >
-                                {
-                                  item.description
-                                }
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        );
-                      }
-                    )}
-                  </Stack>
-                </Stack>
-              </SectionReveal>
-            </Box>
-          </Stack>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          FAQ / SEARCH-INTENT CONTENT
-      ======================================================= */}
-
-      <Box
-        component="section"
-        aria-labelledby="deployment-faq-heading"
-        sx={{
-          position: "relative",
-          py: { xs: 9, md: 10 },
-          minHeight: { md: "100vh" },
-          display: { md: "flex" },
-          alignItems: { md: "center" },
-        }}
-      >
-        <Container maxWidth="lg">
-          <SectionReveal>
-            <Box sx={{ textAlign: "center", mb: { xs: 5, md: 7 } }}>
-              <Typography
-                component="h2"
-                id="deployment-faq-heading"
-                sx={{
-                  fontSize: { xs: "2.1rem", md: "3.15rem" },
-                  lineHeight: 1.05,
-                  letterSpacing: "-0.055em",
-                  fontWeight: 950,
-                }}
-              >
-                A simpler way to deploy and manage services.
-              </Typography>
-              <Typography
-                color="text.secondary"
-                sx={{ mt: 1.6, lineHeight: 1.8, maxWidth: 690, mx: "auto" }}
-              >
-                Less repetitive infrastructure work — with the controls
-                you need close at hand.
-              </Typography>
-            </Box>
-          </SectionReveal>
-
-          <Stack spacing={1.2}>
-            {[
-              {
-                q: "How does PassDeployer make deployment easier?",
-                a: "Service creation, deployment and everyday management in one workflow — less manual setup between your code and a running service.",
-              },
-              {
-                q: "Can I manage networks and persistent volumes?",
-                a: "Yes. Networks and persistent volumes live in the same service environment, managed alongside the applications that use them.",
-              },
-              {
-                q: "Can I use PassDeployer for short or changing workloads?",
-                a: "Yes. Hourly plans let you size resources for today's workload, run temporary environments, and switch plans as you grow.",
-              },
-              {
-                q: "What can I manage after deployment?",
-                a: "Status, usage, lifecycle actions and supporting resources — all from the same control plane.",
-              },
-            ].map((item, index) => (
-              <Accordion
-                key={item.q}
-                component="article"
-                elevation={0}
-                disableGutters
-                sx={{
-                  borderRadius: {
-                    xs: 2.5,
-                    md: 3,
-                  },
-                  border: "1px solid",
-                  borderColor: subtleBorder,
-                  bgcolor: "background.paper",
-                  overflow: "hidden",
-                  "&:before": {
-                    display: "none",
-                  },
-                  "&.Mui-expanded": {
-                    borderColor: (t) =>
-                      alpha(
-                        t.palette.primary
-                          .main,
-                        0.3
-                      ),
-                  },
-                }}
-              >
-                <AccordionSummary
-                  expandIcon={
-                    <ExpandMoreRoundedIcon />
-                  }
-                  sx={{
-                    px: {
-                      xs: 2,
-                      md: 2.5,
-                    },
-                    "&.Mui-expanded": {
-                      minHeight: 54,
-                    },
-                  }}
-                >
-                  <Typography
-                    component="h3"
-                    sx={{
-                      fontWeight: 900,
-                      fontSize:
-                        "0.95rem",
-                    }}
-                  >
-                    {item.q}
-                  </Typography>
-                </AccordionSummary>
-
-                <AccordionDetails
-                  sx={{
-                    px: {
-                      xs: 2,
-                      md: 2.5,
-                    },
-                    pt: 0,
-                  }}
-                >
-                  <Typography
-                    color="text.secondary"
-                    sx={{
-                      lineHeight: 1.8,
-                    }}
-                  >
-                    {item.a}
-                  </Typography>
-                </AccordionDetails>
-              </Accordion>
-            ))}
-          </Stack>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          OPEN SOURCE
-      ======================================================= */}
-
-      <Box
-        component="section"
-        sx={{
-          position:
-            "relative",
-          py: {
-            xs: 9,
-            md: 10,
-          },
-          minHeight: { md: "100vh" },
-          display: { md: "flex" },
-          alignItems: { md: "center" },
-        }}
-      >
-        <GlowOrb
-          size={350}
-          bottom="-140px"
-          right="-150px"
-          color={
-            theme.palette
-              .secondary.main
-          }
-          opacity={
-            isDark ? 0.08 : 0.045
-          }
-        />
-
-        <Container maxWidth="xl">
-          <Paper
-            elevation={0}
-            sx={{
-              position:
-                "relative",
-              overflow:
-                "hidden",
-              borderRadius: {
-                xs: 4,
-                md: 6,
-              },
-              border:
-                "1px solid",
-              borderColor:
-                subtleBorder,
-              background:
-                isDark
-                  ? `
-                    radial-gradient(
-                      circle at 85% 20%,
-                      rgba(79,70,229,.12),
-                      transparent 28%
-                    ),
-                    linear-gradient(
-                      145deg,
-                      #0b1524,
-                      #07101b
-                    )
-                  `
-                  : `
-                    radial-gradient(
-                      circle at 85% 20%,
-                      rgba(79,70,229,.075),
-                      transparent 28%
-                    ),
-                    linear-gradient(
-                      145deg,
-                      #ffffff,
-                      #eff5ff
-                    )
-                  `,
-              boxShadow:
-                isDark
-                  ? "0 35px 100px rgba(0,0,0,.24)"
-                  : "0 35px 100px rgba(15,23,42,.07)",
-            }}
-          >
-            <Box
-              sx={{
-                p: {
-                  xs: 3,
-                  sm: 4,
-                  md: 6,
-                },
-              }}
-            >
-              <Stack
-                direction={{
-                  xs: "column",
-                  md: "row",
-                }}
-                spacing={{
-                  xs: 4,
-                  md: 7,
-                }}
-                alignItems="center"
-              >
-                <Box
-                  sx={{
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  <SectionReveal>
-                    <Typography
-                      sx={{
-                        color:
-                          "primary.main",
-                        fontSize:
-                          "0.78rem",
-                        fontWeight:
-                          900,
-                        letterSpacing:
-                          "0.16em",
-                      }}
-                    >
-                      OPEN SOURCE
-                    </Typography>
-
-                    <Typography
-                      component="h2"
-                      sx={{
-                        mt: 1,
-                        fontSize: {
-                          xs: "2.1rem",
-                          md: "3.15rem",
-                        },
-                        lineHeight:
-                          1.03,
-                        letterSpacing:
-                          "-0.06em",
-                        fontWeight:
-                          950,
-                      }}
-                    >
-                      Built in the open.
-                      <br />
-                      Ready to inspect.
-                    </Typography>
-
-                    <Typography
-                      color="text.secondary"
-                      sx={{
-                        mt: 1.6,
-                        lineHeight:
-                          1.8,
-                        maxWidth:
-                          570,
-                      }}
-                    >
-                      Read the backend and frontend code
-                      that powers the platform.
-                    </Typography>
-
-                    <Stack
-                      direction={{
-                        xs: "column",
-                        sm: "row",
-                      }}
-                      spacing={1.2}
-                      sx={{
-                        mt: 2.5,
-                      }}
-                    >
-                      <Button
-                        component="a"
-                        href={
-                          GITHUB_API
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        variant="contained"
-                        startIcon={
-                          <GitHubIcon />
-                        }
-                        sx={{
-                          minHeight: 46,
-                          px: 2.2,
-                          borderRadius:
-                            2.5,
-                          textTransform:
-                            "none",
-                          fontWeight:
-                            800,
-                        }}
-                      >
-                        Django backend
-                      </Button>
-
-                      <Button
-                        component="a"
-                        href={
-                          GITHUB_FRONTEND
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        variant="outlined"
-                        startIcon={
-                          <GitHubIcon />
-                        }
-                        sx={{
-                          minHeight: 46,
-                          px: 2.2,
-                          borderRadius:
-                            2.5,
-                          textTransform:
-                            "none",
-                          fontWeight:
-                            750,
-                          borderColor:
-                            subtleBorder,
-                        }}
-                      >
-                        React frontend
-                      </Button>
-                    </Stack>
-                  </SectionReveal>
-                </Box>
-
-                <Box
-                  sx={{
-                    width: {
-                      xs: "100%",
-                      md: 350,
-                    },
-                    flexShrink: 0,
-                  }}
-                >
-                  <SectionReveal
-                    delay={0.08}
-                  >
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 2,
-                        borderRadius:
-                          4,
-                        border:
-                          "1px solid",
-                        borderColor:
-                          subtleBorder,
-                        bgcolor:
-                          isDark
-                            ? "rgba(255,255,255,.025)"
-                            : "rgba(255,255,255,.62)",
-                        backdropFilter:
-                          "blur(18px)",
-                      }}
-                    >
-                      <Stack
-                        spacing={1}
-                      >
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          alignItems="center"
-                          sx={{
-                            pb: 1,
-                          }}
-                        >
-                          <Box
-                            component="img"
-                            src={
-                              DEFAULT_ICON
-                            }
-                            alt=""
-                            sx={{
-                              width: 30,
-                              height: 30,
-                            }}
-                          />
-
-                          <Box>
-                            <Typography
-                              sx={{
-                                fontWeight:
-                                  850,
-                                fontSize:
-                                  "0.88rem",
-                              }}
-                            >
-                              PassDeployer
-                            </Typography>
-
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Platform stack
-                            </Typography>
-                          </Box>
-                        </Stack>
-
-                        {[
-                          [
-                            "React",
-                            SiReact,
-                          ],
-                          [
-                            "Django",
-                            SiDjango,
-                          ],
-                          [
-                            "PostgreSQL",
-                            SiPostgresql,
-                          ],
-                          [
-                            "Redis",
-                            SiRedis,
-                          ],
-                          [
-                            "Docker",
-                            SiDocker,
-                          ],
-                        ].map(
-                          ([
-                            name,
-                            Icon,
-                          ]) => (
-                            <Box
-                              key={
-                                name
-                              }
-                              sx={{
-                                display:
-                                  "flex",
-                                alignItems:
-                                  "center",
-                                justifyContent:
-                                  "space-between",
-                                px: 1.3,
-                                py: 1.05,
-                                borderRadius:
-                                  2.5,
-                                bgcolor:
-                                  isDark
-                                    ? "rgba(255,255,255,.025)"
-                                    : "rgba(15,23,42,.025)",
-                              }}
-                            >
-                              <Stack
-                                direction="row"
-                                spacing={1}
-                                alignItems="center"
-                              >
-                                <Icon
-                                  size="1.2rem"
-                                />
-
-                                <Typography
-                                  sx={{
-                                    fontSize:
-                                      "0.8rem",
-                                    fontWeight:
-                                      750,
-                                  }}
-                                >
-                                  {
-                                    name
-                                  }
-                                </Typography>
-                              </Stack>
-
-                              <CheckRoundedIcon
-                                sx={{
-                                  fontSize:
-                                    15,
-                                  color:
-                                    "success.main",
-                                }}
-                              />
-                            </Box>
-                          )
-                        )}
-                      </Stack>
-                    </Paper>
-                  </SectionReveal>
-                </Box>
-              </Stack>
-            </Box>
-          </Paper>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          FINAL CTA
-      ======================================================= */}
-
-      <Box
-        component="section"
-        sx={{
-          position:
-            "relative",
-          py: {
-            xs: 9,
-            md: 10,
-          },
-          minHeight: { md: "100vh" },
-          display: { md: "flex" },
-          alignItems: { md: "center" },
-        }}
-      >
-        <Container maxWidth="lg">
-          <SectionReveal>
-            <Box
-              sx={{
-                textAlign:
-                  "center",
-              }}
-            >
-              <Box
-                component="img"
-                src={DEFAULT_ICON}
-                alt="PassDeployer"
-                sx={{
-                  width: 48,
-                  height: 48,
-                  mx: "auto",
-                  mb: 2,
-                  display:
-                    "block",
-                }}
-              />
-
-              <Typography
-                component="h2"
-                sx={{
-                  fontSize: {
-                    xs: "2.15rem",
-                    md: "3.55rem",
-                  },
-                  lineHeight:
-                    1,
-                  letterSpacing:
-                    "-0.065em",
-                  fontWeight:
-                    950,
-                }}
-              >
-                Ready to ship?
-              </Typography>
-
-              <Typography
-                color="text.secondary"
-                sx={{
-                  maxWidth: 590,
-                  mx: "auto",
-                  mt: 1.5,
-                  lineHeight:
-                    1.8,
-                }}
-              >
-                Pick your resources, create a service —
-                PassDeployer handles the rest.
-              </Typography>
-
-              <Stack
-                direction={{
-                  xs: "column",
-                  sm: "row",
-                }}
-                spacing={1.2}
-                justifyContent="center"
-                sx={{
-                  mt: 2.8,
-                }}
-              >
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={() =>
-                    navigate(
-                      "/plans"
-                    )
-                  }
-                  endIcon={
-                    <ArrowForwardRoundedIcon />
-                  }
-                  sx={{
-                    minWidth: 175,
-                    minHeight: 50,
-                    borderRadius: 3,
-                    textTransform:
-                      "none",
-                    fontWeight:
-                      850,
-                  }}
-                >
-                  View plans
-                </Button>
-
-                {!loggedIn ? (
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    onClick={() =>
-                      navigate(
-                        "/signin_or_signup"
-                      )
-                    }
-                    sx={{
-                      minWidth: 175,
-                      minHeight: 50,
-                      borderRadius:
-                        3,
-                      textTransform:
-                        "none",
-                      fontWeight:
-                        750,
-                      borderColor:
-                        subtleBorder,
-                    }}
-                  >
-                    Create account
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    onClick={() =>
-                      navigate(
-                        "/services"
-                      )
-                    }
-                    sx={{
-                      minWidth: 175,
-                      minHeight: 50,
-                      borderRadius:
-                        3,
-                      textTransform:
-                        "none",
-                      fontWeight:
-                        750,
-                      borderColor:
-                        subtleBorder,
-                    }}
-                  >
-                    My services
-                  </Button>
-                )}
-              </Stack>
-            </Box>
-          </SectionReveal>
-        </Container>
-      </Box>
-
-      {/* ======================================================
-          FOOTER
-          (removed internal footer — the global Footer.jsx from the
-          Layout renders below this page; two stacked footers with
-          different tone felt inconsistent)
-      ======================================================= */}
+      </ScrollScene>
     </Box>
   );
 }

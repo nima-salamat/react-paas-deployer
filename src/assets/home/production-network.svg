@@ -1,0 +1,153 @@
+<svg width="1200" height="780" viewBox="0 0 1200 780" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="netGrad" x1="60" y1="40" x2="1140" y2="740" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#55E3FF"/>
+      <stop offset=".48" stop-color="#7C6BFF"/>
+      <stop offset="1" stop-color="#C46DFF"/>
+    </linearGradient>
+    <linearGradient id="cardFace" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#0E1B2E"/>
+      <stop offset="1" stop-color="#0A1422"/>
+    </linearGradient>
+    <linearGradient id="hubFace" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#101C30"/>
+      <stop offset="1" stop-color="#0B1524"/>
+    </linearGradient>
+    <radialGradient id="inetGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 108) scale(160)">
+      <stop stop-color="#7DD3FC" stop-opacity=".4"/>
+      <stop offset="1" stop-color="#7DD3FC" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="hubGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(600 360) scale(120)">
+      <stop stop-color="#8B7CFF" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#8B7CFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softBlur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <filter id="cardShadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+  </defs>
+
+  <!-- ambient -->
+  <circle cx="600" cy="390" r="260" fill="#7CDFFF" fill-opacity=".045"/>
+  <circle cx="600" cy="108" r="150" fill="url(#inetGlow)" filter="url(#softBlur)"/>
+  <circle cx="600" cy="360" r="110" fill="url(#hubGlow)" filter="url(#softBlur)"/>
+
+  <!-- faint grid -->
+  <g opacity=".07" stroke="#9EC9E8" stroke-width="1">
+    <path d="M80 200h1040M80 320h1040M80 440h1040M80 560h1040M80 680h1040"/>
+    <path d="M200 60v660M360 60v660M520 60v660M680 60v660M840 60v660M1000 60v660"/>
+  </g>
+
+  <!-- INTERNET -->
+  <g>
+    <circle cx="600" cy="108" r="58" fill="#0A1322" stroke="url(#netGrad)" stroke-width="2.6"/>
+    <circle cx="600" cy="108" r="40" fill="none" stroke="#5AE4FF" stroke-width="1.4" stroke-opacity=".32" stroke-dasharray="3 7"/>
+    <ellipse cx="600" cy="108" rx="30" ry="58" fill="none" stroke="#69D7FF" stroke-width="1.15" stroke-opacity=".42"/>
+    <ellipse cx="600" cy="108" rx="58" ry="20" fill="none" stroke="#69D7FF" stroke-width="1.15" stroke-opacity=".42"/>
+    <path d="M554 108h92" stroke="#69D7FF" stroke-width="1.1" stroke-opacity=".32"/>
+    <path d="M600 50v116" stroke="#69D7FF" stroke-width="1.1" stroke-opacity=".32"/>
+    <circle cx="648" cy="78" r="3" fill="#7DD3FC"/>
+    <circle cx="556" cy="140" r="2.5" fill="#BA9CFF"/>
+    <text x="600" y="192" text-anchor="middle" fill="#9EC9E8" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="700" letter-spacing=".12em">INTERNET</text>
+  </g>
+
+  <!-- uplink -->
+  <path d="M600 166 L600 300" stroke="url(#netGrad)" stroke-width="2.4" stroke-opacity=".75" stroke-dasharray="5 7"/>
+  <circle cx="600" cy="220" r="4.5" fill="#7DD3FC"/>
+  <circle cx="600" cy="260" r="3" fill="#B8D8FF" fill-opacity=".7"/>
+
+  <!-- NETWORK HUB -->
+  <g filter="url(#cardShadow)">
+    <rect x="505" y="300" width="190" height="100" rx="22" fill="url(#hubFace)" stroke="url(#netGrad)" stroke-width="2.2"/>
+    <circle cx="528" cy="324" r="5" fill="#62E6A8"/>
+    <circle cx="546" cy="324" r="5" fill="#6AC8FF"/>
+    <circle cx="564" cy="324" r="5" fill="#BA9CFF"/>
+    <text x="600" y="348" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="15" font-weight="800">network · bridge</text>
+    <text x="600" y="372" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="600">3 services · public egress</text>
+    <rect x="530" y="382" width="140" height="6" rx="3" fill="#152438"/>
+    <rect x="530" y="382" width="96" height="6" rx="3" fill="url(#netGrad)" fill-opacity=".85"/>
+  </g>
+
+  <!-- SERVICE A — api -->
+  <path d="M250 470 L505 350" stroke="#5AE4FF" stroke-width="2.1" stroke-opacity=".55"/>
+  <circle cx="360" cy="420" r="4" fill="#5AE4FF"/>
+  <g filter="url(#cardShadow)">
+    <rect x="70" y="400" width="230" height="168" rx="24" fill="url(#cardFace)" stroke="#5AE4FF" stroke-width="2" stroke-opacity=".8"/>
+    <circle cx="100" cy="430" r="5" fill="#62E6A8"/>
+    <text x="116" y="435" fill="#8BE9B8" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="700">healthy</text>
+    <rect x="210" y="418" width="70" height="22" rx="11" fill="#122A3A" stroke="#5AE4FF" stroke-width="1" stroke-opacity=".4"/>
+    <text x="245" y="433" text-anchor="middle" fill="#7DD3FC" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700">:8080</text>
+    <text x="185" y="472" text-anchor="middle" fill="#F0F7FF" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="800">api-service</text>
+    <text x="185" y="494" text-anchor="middle" fill="#6B93B0" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">Django · REST</text>
+    <rect x="92" y="512" width="62" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="123" y="528" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">CPU</text>
+    <text x="123" y="542" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">28%</text>
+    <rect x="162" y="512" width="62" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="193" y="528" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">RAM</text>
+    <text x="193" y="542" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">41%</text>
+    <rect x="232" y="512" width="50" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="257" y="528" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">REQ</text>
+    <text x="257" y="542" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">1.2k</text>
+  </g>
+
+  <!-- SERVICE B — frontend -->
+  <path d="M600 400 L600 500" stroke="#8D77FF" stroke-width="2.1" stroke-opacity=".55"/>
+  <circle cx="600" cy="450" r="4" fill="#8D77FF"/>
+  <g filter="url(#cardShadow)">
+    <rect x="485" y="500" width="230" height="168" rx="24" fill="url(#cardFace)" stroke="#8D77FF" stroke-width="2" stroke-opacity=".85"/>
+    <circle cx="515" cy="530" r="5" fill="#62E6A8"/>
+    <text x="531" y="535" fill="#8BE9B8" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="700">healthy</text>
+    <rect x="625" y="518" width="70" height="22" rx="11" fill="#1A1834" stroke="#8D77FF" stroke-width="1" stroke-opacity=".45"/>
+    <text x="660" y="533" text-anchor="middle" fill="#C4B5FF" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700">:3000</text>
+    <text x="600" y="572" text-anchor="middle" fill="#F0F7FF" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="800">web-frontend</text>
+    <text x="600" y="594" text-anchor="middle" fill="#6B93B0" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">React · static</text>
+    <rect x="507" y="612" width="62" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="538" y="628" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">CPU</text>
+    <text x="538" y="642" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">12%</text>
+    <rect x="577" y="612" width="62" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="608" y="628" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">RAM</text>
+    <text x="608" y="642" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">36%</text>
+    <rect x="647" y="612" width="50" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="672" y="628" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">CDN</text>
+    <text x="672" y="642" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">on</text>
+  </g>
+
+  <!-- SERVICE C — worker/db -->
+  <path d="M950 470 L695 350" stroke="#C46DFF" stroke-width="2.1" stroke-opacity=".55"/>
+  <circle cx="840" cy="420" r="4" fill="#C46DFF"/>
+  <g filter="url(#cardShadow)">
+    <rect x="900" y="400" width="230" height="168" rx="24" fill="url(#cardFace)" stroke="#C46DFF" stroke-width="2" stroke-opacity=".85"/>
+    <circle cx="930" cy="430" r="5" fill="#62E6A8"/>
+    <text x="946" y="435" fill="#8BE9B8" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="700">healthy</text>
+    <rect x="1040" y="418" width="70" height="22" rx="11" fill="#241530" stroke="#C46DFF" stroke-width="1" stroke-opacity=".45"/>
+    <text x="1075" y="433" text-anchor="middle" fill="#E0B3FF" font-family="Segoe UI, system-ui, sans-serif" font-size="11" font-weight="700">:5432</text>
+    <text x="1015" y="472" text-anchor="middle" fill="#F0F7FF" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="800">worker-db</text>
+    <text x="1015" y="494" text-anchor="middle" fill="#6B93B0" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600">Postgres · Redis</text>
+    <rect x="922" y="512" width="62" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="953" y="528" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">CPU</text>
+    <text x="953" y="542" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">47%</text>
+    <rect x="992" y="512" width="62" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="1023" y="528" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">RAM</text>
+    <text x="1023" y="542" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">62%</text>
+    <rect x="1062" y="512" width="50" height="36" rx="10" fill="#0F1C2C" stroke="#1E3348" stroke-width="1"/>
+    <text x="1087" y="528" text-anchor="middle" fill="#7AA8C8" font-family="Segoe UI, system-ui, sans-serif" font-size="9" font-weight="700">DISK</text>
+    <text x="1087" y="542" text-anchor="middle" fill="#E8F4FF" font-family="Segoe UI, system-ui, sans-serif" font-size="13" font-weight="800">8G</text>
+  </g>
+
+  <!-- soft mesh links -->
+  <path d="M185 568 Q380 700 520 640" stroke="#5AE4FF" stroke-width="1.3" stroke-opacity=".22" stroke-dasharray="5 8" fill="none"/>
+  <path d="M680 640 Q820 700 1015 568" stroke="#C46DFF" stroke-width="1.3" stroke-opacity=".22" stroke-dasharray="5 8" fill="none"/>
+  <path d="M300 420 Q600 260 900 420" stroke="#7C6BFF" stroke-width="1.15" stroke-opacity=".16" stroke-dasharray="4 9" fill="none"/>
+
+  <!-- decorative nodes -->
+  <g fill="#BFF4FF" opacity=".4">
+    <circle cx="140" cy="180" r="3"/>
+    <circle cx="1060" cy="190" r="3.5"/>
+    <circle cx="160" cy="700" r="3"/>
+    <circle cx="1040" cy="710" r="3.5"/>
+    <circle cx="420" cy="250" r="2.5"/>
+    <circle cx="780" cy="250" r="2.5"/>
+  </g>
+</svg>

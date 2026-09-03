@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 700" fill="none">
+<defs>
+  <linearGradient id="wave" x1="80" y1="500" x2="1020" y2="200"><stop stop-color="#22D3EE" stop-opacity=".08"/><stop offset=".48" stop-color="#60A5FA" stop-opacity=".2"/><stop offset="1" stop-color="#A78BFA" stop-opacity=".08"/></linearGradient>
+  <linearGradient id="ring" x1="260" y1="470" x2="880" y2="170"><stop stop-color="#60A5FA"/><stop offset="1" stop-color="#A78BFA"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<path d="M38 536C154 472 246 482 352 418C457 355 516 406 624 334C728 265 827 277 1060 154" stroke="url(#wave)" stroke-width="150" stroke-linecap="round"/>
+<path d="M38 536C154 472 246 482 352 418C457 355 516 406 624 334C728 265 827 277 1060 154" stroke="url(#ring)" stroke-opacity=".55" stroke-width="2"/>
+<g opacity=".85" filter="url(#glow)">
+ <circle cx="195" cy="475" r="5" fill="#22D3EE"/><circle cx="372" cy="408" r="4" fill="#60A5FA"/><circle cx="548" cy="380" r="5" fill="#A78BFA"/><circle cx="735" cy="304" r="4" fill="#22D3EE"/><circle cx="930" cy="244" r="5" fill="#60A5FA"/>
+</g>
+<g transform="translate(430 70)">
+ <ellipse cx="125" cy="76" rx="78" ry="34" fill="#0B1628" stroke="#60A5FA" stroke-opacity=".28"/>
+ <circle cx="87" cy="72" r="30" fill="#0E2037" stroke="#60A5FA" stroke-opacity=".35"/><circle cx="137" cy="55" r="39" fill="#0E2037" stroke="#A78BFA" stroke-opacity=".35"/><circle cx="169" cy="78" r="28" fill="#0E2037" stroke="#22D3EE" stroke-opacity=".35"/>
+ <path d="M82 79h95" stroke="#7DD3FC" stroke-opacity=".45" stroke-width="2"/><circle cx="110" cy="79" r="4" fill="#22D3EE"/><circle cx="142" cy="79" r="4" fill="#A78BFA"/><circle cx="170" cy="79" r="4" fill="#60A5FA"/>
+ <text x="75" y="123" font-family="Inter,Arial" font-size="11" font-weight="900" fill="#E2E8F0">CONTROL PLANE</text>
+</g>
+
+<g stroke="#60A5FA" stroke-opacity=".18" stroke-width="1.5">
+ <path d="M125 505L510 148"/><path d="M370 425L510 148"/><path d="M563 375L510 148"/><path d="M744 301L510 148"/><path d="M931 241L510 148"/>
+</g>
+
+<g>
+ <g transform="translate(86 460)"><rect width="154" height="74" rx="18" fill="#081421" stroke="#60A5FA" stroke-opacity=".25"/><text x="18" y="29" font-family="Inter,Arial" font-size="11" font-weight="850" fill="#E2E8F0">REGION A</text><text x="18" y="49" font-family="Inter,Arial" font-size="9" fill="#94A3B8">web · api · worker</text><circle cx="132" cy="26" r="5" fill="#34D399"/></g>
+ <g transform="translate(292 355)"><rect width="154" height="74" rx="18" fill="#081421" stroke="#A78BFA" stroke-opacity=".25"/><text x="18" y="29" font-family="Inter,Arial" font-size="11" font-weight="850" fill="#E2E8F0">REGION B</text><text x="18" y="49" font-family="Inter,Arial" font-size="9" fill="#94A3B8">api · jobs · cache</text><circle cx="132" cy="26" r="5" fill="#34D399"/></g>
+ <g transform="translate(474 320)"><rect width="154" height="74" rx="18" fill="#081421" stroke="#22D3EE" stroke-opacity=".25"/><text x="18" y="29" font-family="Inter,Arial" font-size="11" font-weight="850" fill="#E2E8F0">DATA LAYER</text><text x="18" y="49" font-family="Inter,Arial" font-size="9" fill="#94A3B8">postgres · redis</text><circle cx="132" cy="26" r="5" fill="#34D399"/></g>
+ <g transform="translate(656 248)"><rect width="154" height="74" rx="18" fill="#081421" stroke="#60A5FA" stroke-opacity=".25"/><text x="18" y="29" font-family="Inter,Arial" font-size="11" font-weight="850" fill="#E2E8F0">REGION C</text><text x="18" y="49" font-family="Inter,Arial" font-size="9" fill="#94A3B8">web · api · worker</text><circle cx="132" cy="26" r="5" fill="#34D399"/></g>
+</g>
+
+<g transform="translate(832 105)">
+ <rect width="184" height="108" rx="24" fill="#07111F" stroke="#A78BFA" stroke-opacity=".28"/>
+ <text x="18" y="29" font-family="Inter,Arial" font-size="10" font-weight="900" fill="#E2E8F0">PUBLIC TRAFFIC</text>
+ <path d="M20 70C51 56 63 77 88 61C111 47 129 60 160 39" stroke="#67E8F9" stroke-opacity=".7" stroke-width="2"/>
+ <circle cx="48" cy="62" r="4" fill="#67E8F9"/><circle cx="91" cy="59" r="4" fill="#60A5FA"/><circle cx="130" cy="50" r="4" fill="#A78BFA"/>
+ <text x="18" y="93" font-family="Inter,Arial" font-size="9" fill="#94A3B8">edge → services</text>
+</g>
+</svg>

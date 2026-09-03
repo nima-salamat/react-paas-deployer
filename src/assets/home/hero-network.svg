@@ -1,0 +1,35 @@
+<svg width="1400" height="900" viewBox="0 0 1400 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="g1" x1="160" y1="160" x2="1230" y2="780" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#69D7FF" stop-opacity=".9"/>
+    <stop offset=".52" stop-color="#716BFF" stop-opacity=".65"/>
+    <stop offset="1" stop-color="#C45DFF" stop-opacity=".2"/>
+  </linearGradient>
+  <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1030 260) rotate(120) scale(270)">
+    <stop stop-color="#7DD3FC" stop-opacity=".7"/>
+    <stop offset="1" stop-color="#7DD3FC" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
+</defs>
+<circle cx="1040" cy="255" r="250" fill="url(#orb)" filter="url(#blur)"/>
+<g opacity=".52" stroke="url(#g1)" stroke-width="2">
+  <path d="M70 610C250 510 260 410 410 440C560 470 580 680 765 640C950 600 990 390 1190 350C1290 330 1330 290 1370 230"/>
+  <path d="M10 760C210 700 220 570 390 600C560 630 640 780 820 730C1000 680 1010 520 1170 510C1280 500 1310 420 1370 370" opacity=".55"/>
+  <path d="M120 260C250 340 330 300 440 210C560 110 650 180 760 235C930 320 1030 180 1220 140" opacity=".4"/>
+</g>
+<g fill="#B9F1FF">
+  <circle cx="180" cy="550" r="6"/><circle cx="370" cy="444" r="7"/><circle cx="590" cy="640" r="6"/>
+  <circle cx="770" cy="639" r="7"/><circle cx="980" cy="395" r="5"/><circle cx="1188" cy="352" r="7"/>
+  <circle cx="450" cy="214" r="6"/><circle cx="760" cy="235" r="5"/><circle cx="1218" cy="142" r="6"/>
+</g>
+<g opacity=".92">
+  <rect x="510" y="280" width="315" height="210" rx="28" fill="#0A1322" stroke="#7DD3FC" stroke-opacity=".35"/>
+  <rect x="540" y="310" width="255" height="26" rx="13" fill="#101D31"/>
+  <circle cx="560" cy="323" r="5" fill="#62E6A8"/><circle cx="579" cy="323" r="5" fill="#6AC8FF"/><circle cx="598" cy="323" r="5" fill="#BA9CFF"/>
+  <rect x="540" y="360" width="125" height="92" rx="18" fill="#0E1A2C"/>
+  <rect x="680" y="360" width="115" height="15" rx="7.5" fill="#1A2B46"/>
+  <rect x="680" y="388" width="84" height="15" rx="7.5" fill="#1A2B46"/>
+  <rect x="680" y="416" width="98" height="15" rx="7.5" fill="#1A2B46"/>
+</g>
+<g opacity=".28" stroke="#B8D8FF"><path d="M210 690L310 770L480 735L540 810"/><path d="M900 720L980 780L1090 720L1230 790"/></g>
+</svg>

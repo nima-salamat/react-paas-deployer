@@ -1069,23 +1069,27 @@ export default function DocsHome({ onThemeModeChange }) {
 
         <Box component="section" sx={{ flex: 1, minWidth: 0 }}>
           <Stack
+            className="docs-content-row"
             direction="row"
             alignItems="flex-start"
             sx={{
               maxWidth: 1240,
               mx: "auto",
-              px: { xs: 2, sm: 3, md: 4 },
+              px: { xs: 1.25, sm: 2.5, md: 4 },
               gap: { xl: 5 },
+              width: "100%",
+              boxSizing: "border-box",
             }}
           >
             <Box
+              className="docs-main-column"
               sx={{
                 flex: 1,
                 minWidth: 0,
                 maxWidth: 860,
                 mx: "auto",
                 width: "100%",
-                py: { xs: 3, sm: 4, md: 5 },
+                py: { xs: 2.25, sm: 4, md: 5 },
               }}
             >
               {loading ? (
@@ -1215,8 +1219,17 @@ export default function DocsHome({ onThemeModeChange }) {
                   )}
                 </Box>
               ) : (
-                <Box component="article" ref={articleRef} sx={{ minWidth: 0 }}>
-                  <Breadcrumbs aria-label="breadcrumb" sx={{ mb: 2 }}>
+                <Box component="article" ref={articleRef} className="docs-article-shell" sx={{ minWidth: 0 }}>
+                  <Breadcrumbs
+                    aria-label="breadcrumb"
+                    sx={{
+                      mb: { xs: 1.5, sm: 2 },
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                      "& .MuiBreadcrumbs-ol": { flexWrap: "nowrap" },
+                      "& .MuiBreadcrumbs-li": { minWidth: 0 },
+                    }}
+                  >
                     <Button
                       size="small"
                       component={RouterLink}

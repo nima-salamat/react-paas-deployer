@@ -341,3 +341,195 @@
   }
 }
 \n/* Restricted Shell editor: the textarea is transparent and the highlighted\n   code layer underneath is responsible for visible token colors. */\n.shell-editor-code {\n  color: #e6edf3;\n  background: transparent !important;\n  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;\n}\n.shell-editor-code .hljs-comment, .shell-editor-code .hljs-quote { color: #6b7c93 !important; }\n.shell-editor-code .hljs-keyword, .shell-editor-code .hljs-selector-tag, .shell-editor-code .hljs-literal,\n.shell-editor-code .hljs-section, .shell-editor-code .hljs-doctag, .shell-editor-code .hljs-name { color: #c4b5fd !important; }\n.shell-editor-code .hljs-string, .shell-editor-code .hljs-attr, .shell-editor-code .hljs-template-tag,\n.shell-editor-code .hljs-template-variable, .shell-editor-code .hljs-regexp, .shell-editor-code .hljs-addition { color: #86efac !important; }\n.shell-editor-code .hljs-number, .shell-editor-code .hljs-symbol, .shell-editor-code .hljs-variable,\n.shell-editor-code .hljs-bullet { color: #f9a8d4 !important; }\n.shell-editor-code .hljs-title, .shell-editor-code .hljs-title.class_, .shell-editor-code .hljs-title.function_,\n.shell-editor-code .hljs-function .hljs-title { color: #93c5fd !important; }\n.shell-editor-code .hljs-built_in, .shell-editor-code .hljs-type { color: #67e8f9 !important; }\n.shell-editor-code .hljs-meta, .shell-editor-code .hljs-meta .hljs-keyword { color: #fcd34d !important; }\n.shell-editor-code .hljs-operator, .shell-editor-code .hljs-punctuation { color: #cbd5e1 !important; }\n
+
+/* ============================================================
+   MOBILE DOCS + GLOBAL MOBILE SAFETY
+   ============================================================ */
+.docs-workspace,
+.docs-workspace * {
+  box-sizing: border-box;
+}
+
+.docs-markdown-preview,
+.docs-article-shell {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.docs-markdown-preview {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.docs-markdown-preview .doc-table-wrap,
+.docs-markdown-preview table {
+  max-width: 100%;
+}
+
+.docs-markdown-preview .doc-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.docs-markdown-preview iframe,
+.docs-markdown-preview video,
+.docs-markdown-preview audio,
+.docs-markdown-preview svg,
+.docs-markdown-preview img {
+  max-width: 100%;
+}
+
+.docs-markdown-preview .doc-image img,
+.docs-markdown-preview .doc-figure img {
+  height: auto;
+}
+
+@media (max-width: 767.98px) {
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .docs-workspace {
+    width: 100%;
+    overflow-x: clip;
+  }
+
+  .docs-content-row {
+    width: 100%;
+    padding-inline: 10px !important;
+  }
+
+  .docs-main-column {
+    width: 100%;
+    padding-top: 18px !important;
+    padding-bottom: 34px !important;
+  }
+
+  .docs-article-shell {
+    width: 100%;
+  }
+
+  .docs-article-shell > .MuiBreadcrumbs-root {
+    min-width: 0;
+  }
+
+  .docs-article-shell > .MuiBreadcrumbs-root .MuiTypography-root,
+  .docs-article-shell > .MuiBreadcrumbs-root .MuiButton-root {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .docs-markdown-preview {
+    font-size: 15px !important;
+    line-height: 1.78;
+  }
+
+  .docs-markdown-preview h1,
+  .docs-article-shell h1 {
+    font-size: clamp(1.85rem, 9vw, 2.35rem) !important;
+    line-height: 1.1 !important;
+    letter-spacing: -0.045em !important;
+    margin-bottom: 1rem !important;
+  }
+
+  .docs-markdown-preview h2 {
+    font-size: clamp(1.45rem, 7vw, 1.8rem) !important;
+    line-height: 1.2 !important;
+    margin-top: 2.1rem !important;
+  }
+
+  .docs-markdown-preview h3 {
+    font-size: 1.22rem !important;
+    margin-top: 1.65rem !important;
+  }
+
+  .docs-markdown-preview .doc-heading-anchor {
+    display: none;
+  }
+
+  .docs-markdown-preview p,
+  .docs-markdown-preview li,
+  .docs-markdown-preview blockquote {
+    overflow-wrap: anywhere;
+  }
+
+  .docs-markdown-preview blockquote {
+    margin-inline: 0;
+    padding: .85rem 1rem;
+  }
+
+  .docs-markdown-preview .doc-code {
+    margin-inline: 0;
+    border-radius: 12px;
+  }
+
+  .docs-markdown-preview .doc-code-head {
+    min-height: 40px !important;
+  }
+
+  .docs-markdown-preview .doc-copy-btn {
+    min-width: 64px !important;
+    padding-inline: .55rem !important;
+  }
+
+  .docs-markdown-preview .doc-code pre {
+    max-width: 100%;
+    padding: .82rem !important;
+    font-size: 12px !important;
+    line-height: 1.65 !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .docs-markdown-preview .doc-code pre code,
+  .docs-markdown-preview .doc-code code.hljs {
+    min-width: max-content;
+  }
+
+  .docs-markdown-preview .doc-file-label {
+    max-width: min(62vw, 260px);
+  }
+
+  .docs-markdown-preview .doc-media audio,
+  .docs-markdown-preview .doc-media video {
+    width: 100%;
+  }
+
+  .docs-markdown-preview .doc-embed,
+  .docs-markdown-preview .doc-html,
+  .docs-markdown-preview .doc-mermaid {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .docs-markdown-preview .doc-download,
+  .docs-markdown-preview .doc-qr {
+    max-width: 100%;
+  }
+
+  .docs-markdown-preview .doc-callout {
+    padding: .9rem 1rem;
+  }
+
+  .docs-markdown-preview ul,
+  .docs-markdown-preview ol {
+    padding-left: 1.25rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .docs-content-row {
+    padding-inline: 8px !important;
+  }
+
+  .docs-main-column {
+    padding-top: 14px !important;
+  }
+}

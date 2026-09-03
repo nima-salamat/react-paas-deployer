@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" fill="none">
+<defs>
+  <linearGradient id="line" x1="90" y1="320" x2="910" y2="320" gradientUnits="userSpaceOnUse"><stop stop-color="#60A5FA"/><stop offset=".5" stop-color="#A78BFA"/><stop offset="1" stop-color="#22D3EE"/></linearGradient>
+  <linearGradient id="card" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#122033"/><stop offset="1" stop-color="#07111D"/></linearGradient>
+  <filter id="s" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="15" stdDeviation="18" flood-color="#020617" flood-opacity=".4"/></filter>
+</defs>
+<path d="M85 321H915" stroke="#93C5FD" stroke-opacity=".08" stroke-width="42" stroke-linecap="round"/>
+<path d="M85 321H915" stroke="url(#line)" stroke-width="3" stroke-linecap="round"/>
+<circle cx="85" cy="321" r="8" fill="#60A5FA"/><circle cx="303" cy="321" r="8" fill="#A78BFA"/><circle cx="521" cy="321" r="8" fill="#22D3EE"/><circle cx="739" cy="321" r="8" fill="#60A5FA"/><circle cx="915" cy="321" r="8" fill="#A78BFA"/>
+
+<g filter="url(#s)">
+<g transform="translate(25 185)"><rect width="168" height="145" rx="24" fill="url(#card)" stroke="#60A5FA" stroke-opacity=".28"/><rect x="18" y="18" width="48" height="48" rx="15" fill="#0B1B31"/><path d="M31 52c8-1 16-7 17-17h7c0 15-10 24-24 25v-8Z" fill="#60A5FA"/><text x="18" y="92" font-family="Inter,Arial" font-size="12" font-weight="800" fill="#E2E8F0">1 · SOURCE</text><text x="18" y="112" font-family="Inter,Arial" font-size="10" fill="#94A3B8">Git push detected</text><rect x="18" y="121" width="80" height="10" rx="5" fill="#0C2035"/></g>
+<g transform="translate(225 185)"><rect width="168" height="145" rx="24" fill="url(#card)" stroke="#A78BFA" stroke-opacity=".3"/><rect x="18" y="18" width="48" height="48" rx="15" fill="#211737"/><path d="M29 46h26v8H29zM33 36h18v7H33z" fill="#C4B5FD"/><text x="18" y="92" font-family="Inter,Arial" font-size="12" font-weight="800" fill="#E2E8F0">2 · BUILD</text><text x="18" y="112" font-family="Inter,Arial" font-size="10" fill="#94A3B8">Image created</text><rect x="18" y="121" width="96" height="10" rx="5" fill="#241D40"/></g>
+<g transform="translate(425 185)"><rect width="168" height="145" rx="24" fill="url(#card)" stroke="#22D3EE" stroke-opacity=".3"/><rect x="18" y="18" width="48" height="48" rx="15" fill="#0C2931"/><circle cx="42" cy="42" r="12" fill="#22D3EE"/><path d="M42 34v16M34 42h16" stroke="#07111D" stroke-width="3" stroke-linecap="round"/><text x="18" y="92" font-family="Inter,Arial" font-size="12" font-weight="800" fill="#E2E8F0">3 · RUNTIME</text><text x="18" y="112" font-family="Inter,Arial" font-size="10" fill="#94A3B8">Container started</text><rect x="18" y="121" width="89" height="10" rx="5" fill="#12343A"/></g>
+<g transform="translate(625 185)"><rect width="168" height="145" rx="24" fill="url(#card)" stroke="#60A5FA" stroke-opacity=".28"/><rect x="18" y="18" width="48" height="48" rx="15" fill="#10203A"/><path d="M30 45l8 8 17-18" stroke="#7DD3FC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><text x="18" y="92" font-family="Inter,Arial" font-size="12" font-weight="800" fill="#E2E8F0">4 · HEALTH</text><text x="18" y="112" font-family="Inter,Arial" font-size="10" fill="#94A3B8">Ready for traffic</text><rect x="18" y="121" width="105" height="10" rx="5" fill="#102B3A"/></g>
+<g transform="translate(816 245)"><rect width="140" height="96" rx="22" fill="#07121E" stroke="#A78BFA" stroke-opacity=".32"/><circle cx="28" cy="30" r="14" fill="#11192D"/><circle cx="28" cy="30" r="6" fill="#A78BFA"/><text x="51" y="33" font-family="Inter,Arial" font-size="11" font-weight="800" fill="#E2E8F0">PRODUCTION</text><text x="20" y="58" font-family="Inter,Arial" font-size="9" fill="#94A3B8">v1.4.8 · healthy</text><rect x="20" y="72" width="78" height="8" rx="4" fill="#123126"/></g>
+</g>
+
+<g opacity=".55"><circle cx="172" cy="90" r="2" fill="#60A5FA"/><circle cx="264" cy="120" r="3" fill="#A78BFA"/><circle cx="770" cy="102" r="2" fill="#22D3EE"/><circle cx="864" cy="170" r="3" fill="#60A5FA"/></g>
+</svg>
