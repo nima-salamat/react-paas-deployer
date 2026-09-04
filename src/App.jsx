@@ -413,7 +413,7 @@ export function App() {
               <Route path="service_detail/:id" element={<LegacyServiceRedirect />} />
               <Route path="volumes" element={<Navigate to="/dashboard/volumes" replace />} />
               <Route path="networks" element={<Navigate to="/dashboard/networks" replace />} />
-              <Route path="plans" element={<Navigate to="/dashboard/plans" replace />} />
+              <Route path="plans" element={<Plans />} />
               <Route path="tickets" element={<Navigate to="/dashboard/tickets" replace />} />
               <Route path="tickets/new" element={<Navigate to="/dashboard/tickets/new" replace />} />
               <Route path="tickets/:id" element={<TicketDetailRedirect />} />

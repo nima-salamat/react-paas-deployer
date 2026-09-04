@@ -43,6 +43,7 @@ import heroNetwork from "../../assets/home/hero-network.svg";
 import deployFlow from "../../assets/home/deploy-flow.svg";
 import deployPipeline from "../../assets/home/deploy-pipeline.svg";
 import productionNetwork from "../../assets/home/production-network.svg";
+import PlansPreview from "./PlansPreview.jsx";
 
 /* ───────────────── Constants ───────────────── */
 const GITHUB_API = "https://github.com/nima-salamat/django-paas-deployer";
@@ -997,6 +998,9 @@ export default function Home() {
           </Box>
         </GlassPanel>
       </Container>
+
+      {/* ───────────────── PLANS ───────────────── */}
+      <PlansPreview />
 
       {/* ───────────────── FEATURES ───────────────── */}
       <ScrollScene page>
