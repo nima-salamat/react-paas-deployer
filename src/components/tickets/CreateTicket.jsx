@@ -93,7 +93,7 @@ export default function CreateTicket() {
       files.forEach((f) => form.append("attachments", f));
       const res = await apiRequest({ method: "POST", url: `${TICKETS_API}/`, data: form });
       const ticket = unwrapData(res);
-      navigate(`/tickets/${ticket.id}`);
+      navigate(`/dashboard/tickets/${ticket.id}`);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to create ticket");
     } finally {
@@ -181,7 +181,7 @@ export default function CreateTicket() {
           {files.length > 0 && <Typography variant="body2">{files.map((f) => f.name).join(", ")}</Typography>}
           {loading && <LinearProgress />}
           <Stack direction="row" gap={2} justifyContent="flex-end">
-            <Button onClick={() => navigate("/tickets")}>Cancel</Button>
+            <Button onClick={() => navigate("/dashboard/tickets")}>Cancel</Button>
             <Button type="submit" variant="contained" disabled={loading || !departments.length}>{loading ? "Creating…" : "Create Ticket"}</Button>
           </Stack>
         </Stack>

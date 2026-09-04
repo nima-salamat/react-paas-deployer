@@ -43,6 +43,7 @@ function ServiceItem({
   onEdit,
   onDelete,
   onOpen,
+  onPrefetch = null,
   shareMeta = null, // { shareId, isOwnerShare, isReceived, permissions, label }
   onShare = null,
   onManageShare = null,
@@ -376,6 +377,8 @@ function ServiceItem({
       {myPermsDialog}
       <Paper
         elevation={0}
+        onMouseEnter={() => onPrefetch?.(s)}
+        onFocus={() => onPrefetch?.(s)}
         sx={{
           p: { xs: 1.5, sm: 2 },
           mb: 1.25,
@@ -437,6 +440,8 @@ function ServiceItem({
     {myPermsDialog}
     <Paper
       elevation={0}
+      onMouseEnter={() => onPrefetch?.(s)}
+      onFocus={() => onPrefetch?.(s)}
       sx={{
         width: "100%",
         height: "100%",

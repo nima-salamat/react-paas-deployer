@@ -3,8 +3,10 @@ import {
   Routes,
   Route,
   Outlet,
+  Navigate,
   useLocation,
   useNavigationType,
+  useParams,
 } from "react-router-dom";
 import {
   Box,
@@ -19,6 +21,7 @@ import SEO from "./components/seo/SEO.jsx";
 import Navbar from "./components/layout/Navbar.jsx";
 import Home from "./components/home/home.jsx";
 const Services = lazy(() => import("./components/service/Services.jsx"));
+const Dashboard = lazy(() => import("./components/dashboard/Dashboard.jsx"));
 import SigninOrSignup from "./components/signin_or_signup/signin_or_signup.jsx";
 import Plans from "./components/plans/plans.jsx";
 import Footer from "./components/layout/Footer.jsx";
@@ -85,6 +88,16 @@ const getSystemTheme = () => {
     : "light";
 };
 
+function LegacyServiceRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/dashboard/services/${id}`} replace />;
+}
+
+function TicketDetailRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/dashboard/tickets/${id}`} replace />;
+}
+
 function RouteScrollManager() {
   const location = useLocation();
   const navigationType = useNavigationType();
@@ -105,6 +118,12 @@ const Layout = ({
   themeMode,
   setThemeMode,
 }) => {
+  const location = useLocation();
+  const isDashboardSpace =
+    location.pathname === "/dashboard" ||
+    location.pathname.startsWith("/dashboard/") ||
+    location.pathname.startsWith("/service/") ||
+    location.pathname.startsWith("/services/");
   const loggedIn =
     typeof window !== "undefined" &&
     Boolean(
@@ -123,10 +142,12 @@ const Layout = ({
         color: "text.primary",
       }}
     >
-      <Navbar
-        themeMode={themeMode}
-        onThemeModeChange={setThemeMode}
-      />
+      {!isDashboardSpace && (
+        <Navbar
+          themeMode={themeMode}
+          onThemeModeChange={setThemeMode}
+        />
+      )}
 
       <Box
         component="main"
@@ -139,11 +160,13 @@ const Layout = ({
         <Outlet />
       </Box>
 
-      <Footer />
+      {!isDashboardSpace && <Footer />}
 
-      <FloatingNav
-        loggedIn={loggedIn}
-      />
+      {!isDashboardSpace && (
+        <FloatingNav
+          loggedIn={loggedIn}
+        />
+      )}
     </Box>
   );
 };
@@ -329,7 +352,23 @@ export function App() {
           <RouteScrollManager />
           <SEO />
 
-          <Suspense fallback={null}>
+          <Suspense
+            fallback={
+              <Box
+                sx={{
+                  minHeight: "40vh",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "text.secondary",
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                Loading…
+              </Box>
+            }
+          >
             <Routes>
               {/* Public SEO pages */}
 
@@ -349,87 +388,43 @@ export function App() {
                 element={<Home />}
               />
 
+              <Route path="dashboard" element={<Dashboard />}>
+                <Route index element={<Navigate to="services" replace />} />
+                <Route path="services" element={<Services />} />
+                <Route path="networks" element={<Networks />} />
+                <Route path="volumes" element={<Volumes />} />
+                <Route path="plans" element={<Plans />} />
+                <Route path="tickets" element={<TicketList />} />
+                <Route path="tickets/new" element={<CreateTicket />} />
+                <Route path="tickets/:id" element={<TicketDetail />} />
+                <Route path="profile" element={<Profile embedded />} />
+              </Route>
+
+              {/* Service detail keeps its own chrome (outside the list shell) */}
+              <Route path="dashboard/service/:id" element={<LegacyServiceRedirect />} />
+              <Route path="dashboard/services/:id" element={<ServiceDetail />} />
+
               <Route
                 path="services"
-                element={<Services />}
+                element={<Navigate to="/dashboard/services" replace />}
               />
+              <Route path="services/:id" element={<LegacyServiceRedirect />} />
+              <Route path="service/:id" element={<LegacyServiceRedirect />} />
+              <Route path="service_detail/:id" element={<LegacyServiceRedirect />} />
+              <Route path="volumes" element={<Navigate to="/dashboard/volumes" replace />} />
+              <Route path="networks" element={<Navigate to="/dashboard/networks" replace />} />
+              <Route path="plans" element={<Navigate to="/dashboard/plans" replace />} />
+              <Route path="tickets" element={<Navigate to="/dashboard/tickets" replace />} />
+              <Route path="tickets/new" element={<Navigate to="/dashboard/tickets/new" replace />} />
+              <Route path="tickets/:id" element={<TicketDetailRedirect />} />
+              <Route path="profile" element={<Navigate to="/dashboard/profile" replace />} />
 
-              <Route
-                path="volumes"
-                element={<Volumes />}
-              />
+              <Route path="signin_or_signup" element={<SigninOrSignup />} />
+              <Route path="aboutUs" element={<AboutUs />} />
 
-              <Route
-                path="networks"
-                element={<Networks />}
-              />
-
-              <Route
-                path="plans"
-                element={<Plans />}
-              />
-
-              <Route
-                path="signin_or_signup"
-                element={
-                  <SigninOrSignup />
-                }
-              />
-
-              <Route
-                path="aboutUs"
-                element={<AboutUs />}
-              />
-
-              <Route
-                path="profile"
-                element={<Profile />}
-              />
-
-              <Route
-                path="tickets"
-                element={<TicketList />}
-              />
-
-              <Route
-                path="tickets/new"
-                element={<CreateTicket />}
-              />
-
-              <Route
-                path="tickets/:id"
-                element={
-                  <TicketDetail />
-                }
-              />
-
-              <Route
-                path="staff"
-                element={
-                  <StaffConsole />
-                }
-              />
-
-              <Route
-                path="staff/tickets"
-                element={
-                  <StaffConsole />
-                }
-              />
-
-              <Route
-                path="admin/emails"
-                element={
-                  <EmailManagement />
-                }
-              />
-
-              <Route
-                path="service/:id"
-                element={
-                  <ServiceDetail />
-                }
-              />
+              <Route path="staff" element={<StaffConsole />} />
+              <Route path="staff/tickets" element={<StaffConsole />} />
+              <Route path="admin/emails" element={<EmailManagement />} />
             </Route>
 
             {/* Documentation workspace — intentionally outside the public site layout */}

@@ -59,7 +59,9 @@ import OpenWithIcon from "@mui/icons-material/OpenWith";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import ReactAvatarEditor from "react-avatar-editor";
 import { format, parseISO } from "date-fns";
+import { useLocation, useNavigate } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
+import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
 
 // --- DND-Kit Imports ---
 import {
@@ -500,13 +502,39 @@ const SortablePhoto = ({ id, profile, index, handleDeleteProfile, onPreview }) =
 
 // ─── Profile page ──────────────────────────────────────────────────────────
 
-const Profile = () => {
+const Profile = ({ embedded = false }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
   // Desktop only for OS file drag-and-drop (not tablet / phone)
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
   const isMobileViewport = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
   const prefersFinePointer = useMediaQuery("(pointer: fine)", { noSsr: true });
   const enableFileDrop = isDesktop && prefersFinePointer;
+
+  // When rendered inside the dashboard shell, chrome is provided by the shell.
+  const fromDashboard =
+    embedded ||
+    location.pathname.startsWith("/dashboard/profile") ||
+    Boolean(location.state?.fromDashboard) ||
+    (typeof window !== "undefined" &&
+      window.sessionStorage?.getItem("profileFromDashboard") === "1");
+  const returnTo =
+    location.state?.returnTo ||
+    (typeof window !== "undefined"
+      ? window.sessionStorage?.getItem("profileReturnTo")
+      : null) ||
+    "/dashboard/services";
+
+  const handleBackToDashboard = () => {
+    try {
+      sessionStorage.removeItem("profileFromDashboard");
+      sessionStorage.removeItem("profileReturnTo");
+    } catch {
+      // Ignore storage errors.
+    }
+    navigate(returnTo);
+  };
 
   // Keep crop canvas square and large on mobile (fill nearly full width, never ellipse)
   const [editorSize, setEditorSize] = useState(
@@ -1188,6 +1216,10 @@ const Profile = () => {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
+      {/* Shell already provides navbar when embedded under /dashboard/profile */}
+      {fromDashboard && !embedded && (
+        <DashboardNavbar profileMode onBack={handleBackToDashboard} />
+      )}
       <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
         {/* Hero Section */}
         <Paper elevation={0} sx={{ ...sectionPaper, mb: 3 }}>

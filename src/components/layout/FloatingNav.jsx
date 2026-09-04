@@ -220,7 +220,19 @@ export default function FloatingNav({
   const authItems = [
     { to: "/", label: "Home", icon: <HomeIcon /> },
     { to: "/messenger", label: "Messenger", icon: <ChatBubbleOutlineIcon /> },
-    { to: "/profile", label: "Profile", icon: <AccountCircleIcon /> },
+    {
+      to: "/profile",
+      label: "Profile",
+      icon: <AccountCircleIcon />,
+      onClick: () => {
+        try {
+          sessionStorage.removeItem("profileFromDashboard");
+          sessionStorage.removeItem("profileReturnTo");
+        } catch {
+          // Ignore storage errors.
+        }
+      },
+    },
     ...(isStaff
       ? [{ to: "/admin", label: "Admin", icon: <AdminPanelSettingsOutlinedIcon /> }]
       : []),

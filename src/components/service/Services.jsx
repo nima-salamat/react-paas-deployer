@@ -138,6 +138,8 @@ export default function ServicesListMui({
 
   useEffect(() => {
     mountedRef.current = true;
+    // Warm ServiceDetail chunk while the user is browsing the list.
+    import("../service_detail/ServiceDetail.jsx").catch(() => {});
     return () => {
       mountedRef.current = false;
     };
@@ -671,11 +673,25 @@ export default function ServicesListMui({
 
   const handleOpen = useCallback(
     (s) => {
-      if (typeof onOpen === "function") onOpen(s);
-      else navigate(`/service/${s.id ?? s.pk}`);
+      if (typeof onOpen === "function") {
+        onOpen(s);
+        return;
+      }
+      const id = s.id ?? s.pk;
+      // Warm the ServiceDetail chunk before navigation so the route opens faster.
+      import("../service_detail/ServiceDetail.jsx").catch(() => {});
+      navigate(`/dashboard/services/${id}`, {
+        state: { serviceSeed: s },
+      });
     },
     [navigate, onOpen]
   );
+
+  const handlePrefetchService = useCallback((s) => {
+    if (!s) return;
+    // Prefetch route chunk on hover / focus so open feels instant.
+    import("../service_detail/ServiceDetail.jsx").catch(() => {});
+  }, []);
 
   const handleEdit = useCallback((s) => {
     const planIsObj = s.plan && typeof s.plan === "object";
@@ -1032,6 +1048,7 @@ export default function ServicesListMui({
                   onEdit={handleEdit}
                   onDelete={deleteService}
                   onOpen={handleOpen}
+                  onPrefetch={handlePrefetchService}
                   shareMeta={shareMeta}
                   onShare={(svc) => openShareDialog(svc)}
                   onRestart={handleRestart}
@@ -1083,10 +1100,11 @@ export default function ServicesListMui({
                     onEdit={handleEdit}
                     onDelete={deleteService}
                     onOpen={handleOpen}
+                    onPrefetch={handlePrefetchService}
                     shareMeta={shareMeta}
                     onShare={(svc) => openShareDialog(svc)}
-                  onRestart={handleRestart}
-                  onLeaveShare={handleLeaveShare}
+                    onRestart={handleRestart}
+                    onLeaveShare={handleLeaveShare}
                     onManageShare={(meta) =>
                       openShareDialog(s, meta?.raw || null)
                     }

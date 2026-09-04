@@ -37,9 +37,7 @@ import { useTheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
-import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
-import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
-import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
@@ -61,15 +59,12 @@ const DEFAULT_ICON = "/icon.svg";
 const baseNavItems = [
   { path: "/", label: "Home", icon: HomeOutlinedIcon, guest: true },
   { path: "/docs", label: "Docs", icon: MenuBookOutlinedIcon, guest: true },
-  { path: "/services", label: "Services", icon: MiscellaneousServicesOutlinedIcon, guest: false },
-  { path: "/volumes", label: "Volumes", icon: Inventory2OutlinedIcon, guest: false },
-  { path: "/networks", label: "Networks", icon: LanOutlinedIcon, guest: false },
+  { path: "/dashboard", label: "Dashboard", icon: DashboardOutlinedIcon, guest: false },
   { path: "/tickets", label: "Tickets", icon: ConfirmationNumberOutlinedIcon, guest: false },
   { path: "/messenger", label: "Messenger", icon: ChatBubbleOutlineIcon, guest: false },
   { path: "/admin", label: "Admin", icon: AdminPanelSettingsOutlinedIcon, guest: false, staffOnly: true },
   { path: "/plans", label: "Plans", icon: PaidOutlinedIcon, guest: true },
   { path: "/aboutUs", label: "About us", icon: InfoOutlinedIcon, guest: true },
-  { path: "/profile", label: "Profile", icon: PersonOutlineOutlinedIcon, guest: false },
 ];
 
 const themeChoices = [
@@ -117,8 +112,13 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
 
   const isActive = (path) => {
     if (path === "/") return location.pathname === "/";
-    if (path === "/services") {
-      return location.pathname === "/services" || location.pathname.startsWith("/service/");
+    if (path === "/dashboard") {
+      return (
+        location.pathname === "/dashboard" ||
+        location.pathname.startsWith("/dashboard/") ||
+        location.pathname.startsWith("/service/") ||
+        location.pathname.startsWith("/services/")
+      );
     }
     if (path === "/tickets") {
       return location.pathname === "/tickets" || location.pathname.startsWith("/tickets/");
@@ -564,7 +564,15 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
               <>
               <TicketNotifyBell />
               <IconButton
-                onClick={() => navigate("/profile")}
+                onClick={() => {
+                  try {
+                    sessionStorage.removeItem("profileFromDashboard");
+                    sessionStorage.removeItem("profileReturnTo");
+                  } catch {
+                    // Ignore storage errors.
+                  }
+                  navigate("/profile");
+                }}
                 aria-label="Open profile"
                 sx={{
                   p: 0.25,
@@ -749,7 +757,17 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
                     to={item.path}
                     selected={active}
                     aria-current={active ? "page" : undefined}
-                    onClick={closeDrawer}
+                    onClick={() => {
+                      if (item.path === "/profile") {
+                        try {
+                          sessionStorage.removeItem("profileFromDashboard");
+                          sessionStorage.removeItem("profileReturnTo");
+                        } catch {
+                          // Ignore storage errors.
+                        }
+                      }
+                      closeDrawer();
+                    }}
                     ref={index === 0 ? firstItemRef : null}
                     sx={{
                       mb: 0.75,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import apiRequest from "../customHooks/apiRequest";
 
@@ -29,6 +29,7 @@ import SettingsPanel from "./components/SettingsPanel";
 import ShellPanel from "./components/ShellPanel";
 import MobileNavFab from "./components/MobileNavFab";
 import MobileServiceHeader from "./components/MobileServiceHeader";
+import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
 import useServiceLogs from "./hooks/useServiceLogs";
 import useDeployLogs from "./hooks/useDeployLogs";
 
@@ -58,8 +59,18 @@ import {
 export default function ServiceDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
+
+  // Seed from list navigation so the page paints immediately without waiting for network.
+  const serviceSeed = useMemo(() => {
+    const seed = location.state?.serviceSeed;
+    if (!seed) return null;
+    const seedId = seed.id ?? seed.pk;
+    if (seedId == null || String(seedId) !== String(id)) return null;
+    return seed;
+  }, [location.state, id]);
 
   const [activeTab, setActiveTab] = useState("overview");
   const [shareAccess, setShareAccess] = useState({ loading: true, is_owner: true, permissions: null });
@@ -78,7 +89,7 @@ export default function ServiceDetail() {
   const [refreshIntervalMs, setRefreshIntervalMs] = useState(DEFAULT_REFRESH_INTERVAL_MS);
   const [intervalMenuAnchor, setIntervalMenuAnchor] = useState(null);
 
-  const [service, setService] = useState(null);
+  const [service, setService] = useState(serviceSeed);
   const [planDetail, setPlanDetail] = useState(null);
   const [networkDetail, setNetworkDetail] = useState(null);
   const [attachedVolumes, setAttachedVolumes] = useState([]);
@@ -506,10 +517,27 @@ export default function ServiceDetail() {
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
     const boot = async () => {
-      await Promise.allSettled([fetchService(), fetchDeploys(1), checkServiceRunning(true), fetchAvailableNetworks(), fetchAvailableVolumes(), fetchAttachedVolumes(), fetchPlans()]);
+      // Critical path first so the header/overview can paint with real data ASAP.
+      await fetchService(Boolean(serviceSeed));
+      if (cancelled || !mountedRef.current) return;
+      // Secondary data in parallel — does not block first paint.
+      await Promise.allSettled([
+        fetchDeploys(1),
+        checkServiceRunning(true),
+        fetchAvailableNetworks(),
+        fetchAvailableVolumes(),
+        fetchAttachedVolumes(),
+        fetchPlans(),
+      ]);
     };
     boot();
+    return () => {
+      cancelled = true;
+    };
+    // serviceSeed is only used as a one-shot hint for silent first fetch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAvailableNetworks, fetchAvailableVolumes, fetchAttachedVolumes, fetchPlans]);
 
   useEffect(() => {
@@ -1309,10 +1337,13 @@ export default function ServiceDetail() {
   return (
     <Box
       sx={{
-        p: { xs: 1, sm: 1.5, md: 2 },
-        pb: { xs: 10, md: 2 },
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        pb: { xs: 9, md: 2 },
       }}
     >
+      <DashboardNavbar serviceDetail serviceName={service?.name || "Service"} />
+      <Box sx={{ p: { xs: 1, sm: 1.5, md: 2 }, pt: { xs: 1, md: 2 } }}>
       <ServiceToolbar
           refreshIntervalMs={refreshIntervalMs}
           setRefreshIntervalMs={setRefreshIntervalMs}
@@ -1611,6 +1642,7 @@ export default function ServiceDetail() {
             </Button>
           </DialogActions>
         </Dialog>
+      </Box>
       </Box>
     </Box>
   );

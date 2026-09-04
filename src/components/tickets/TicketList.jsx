@@ -105,7 +105,7 @@ export default function TicketList() {
       saveUnread(next);
       return next;
     });
-    navigate(`/tickets/${id}`);
+    navigate(`/dashboard/tickets/${id}`);
   };
 
   return (
@@ -118,7 +118,7 @@ export default function TicketList() {
             {refreshing ? " · refreshing…" : ""}
           </Typography>
         </Box>
-        <Button variant="contained" onClick={() => navigate("/tickets/new")}>New ticket</Button>
+        <Button variant="contained" onClick={() => navigate("/dashboard/tickets/new")}>New ticket</Button>
       </Stack>
 
       <Stack direction={{ xs: "column", md: "row" }} gap={1.5} mb={2}>

@@ -219,7 +219,7 @@ export default function TicketDetail() {
           flexShrink: 0,
         }}
       >
-        <IconButton onClick={() => navigate("/tickets")} size="small"><ArrowBackIcon /></IconButton>
+        <IconButton onClick={() => navigate("/dashboard/tickets")} size="small"><ArrowBackIcon /></IconButton>
         <Box flex={1} minWidth={0}>
           <Typography variant="subtitle1" fontWeight={700} noWrap>{ticket.subject}</Typography>
           <Typography variant="caption" color="text.secondary">

@@ -70,7 +70,7 @@ export default function ServiceToolbar({
         <Button
           size="small"
           startIcon={<ArrowBackIcon fontSize="small" />}
-          onClick={() => navigate("/services")}
+          onClick={() => navigate("/dashboard/services")}
           variant="text"
           color="inherit"
           sx={{ fontWeight: 600, textTransform: "none" }}
