@@ -383,43 +383,139 @@ function ParallaxVisual({ src, alt, depth = 1, className, objectFit = "contain" 
 }
 
 function ServiceControlButtons({ size = "small" }) {
+  // These controls are intentionally a playful visual demo on the public Home page.
+  // They do not mutate a real service; the animation demonstrates the interaction.
+  const reduceMotion = useReducedMotion();
+  const [running, setRunning] = useState(false);
+  const [pulseKey, setPulseKey] = useState(0);
+
+  const trigger = (next) => {
+    setRunning(next);
+    setPulseKey((key) => key + 1);
+  };
+
+  const orbitTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 2.4, repeat: Infinity, ease: "linear" };
+
   return (
-    <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
-      <Button
-        size={size}
-        variant="contained"
-        color="success"
-        startIcon={<PlayArrowIcon sx={{ fontSize: 18 }} />}
-        sx={{
-          borderRadius: 1.5,
-          fontWeight: 700,
-          textTransform: "none",
-          py: 0.9,
-          px: 1.6,
-          minHeight: 40,
-          boxShadow: "none",
-          minWidth: 0,
-        }}
-      >
-        Start
-      </Button>
-      <Button
-        size={size}
-        variant="outlined"
-        color="error"
-        startIcon={<StopIcon sx={{ fontSize: 18 }} />}
-        sx={{
-          borderRadius: 1.5,
-          fontWeight: 600,
-          textTransform: "none",
-          py: 0.9,
-          px: 1.6,
-          minHeight: 40,
-          minWidth: 0,
-        }}
-      >
-        Stop
-      </Button>
+    <Stack spacing={1} sx={{ mt: 1.25 }}>
+      <Stack direction="row" spacing={1}>
+        <motion.div
+          key={`start-${pulseKey}`}
+          animate={
+            !reduceMotion && running
+              ? {
+                  scale: [1, 1.035, 1],
+                  boxShadow: [
+                    "0 0 0 0 rgba(34,197,94,0)",
+                    "0 0 0 7px rgba(34,197,94,.16)",
+                    "0 0 0 14px rgba(34,197,94,0)",
+                  ],
+                }
+              : { scale: 1, boxShadow: "0 0 0 0 rgba(34,197,94,0)" }
+          }
+          transition={{ duration: 1.25, repeat: running && !reduceMotion ? Infinity : 0, ease: "easeOut" }}
+          style={{ borderRadius: 12 }}
+        >
+          <Button
+            size={size}
+            variant="contained"
+            color="success"
+            onClick={() => trigger(true)}
+            startIcon={
+              <motion.span
+                animate={!reduceMotion && running ? { rotate: 360 } : { rotate: 0 }}
+                transition={orbitTransition}
+                style={{ display: "inline-flex" }}
+              >
+                <PlayArrowIcon sx={{ fontSize: 18 }} />
+              </motion.span>
+            }
+            sx={{
+              borderRadius: 1.5,
+              fontWeight: 800,
+              textTransform: "none",
+              py: 0.9,
+              px: 1.6,
+              minHeight: 40,
+              boxShadow: "none",
+              minWidth: 0,
+              position: "relative",
+              overflow: "hidden",
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                inset: 0,
+                background: "linear-gradient(110deg, transparent 28%, rgba(255,255,255,.28) 48%, transparent 66%)",
+                transform: running ? "translateX(120%)" : "translateX(-120%)",
+                transition: running ? "transform 900ms ease" : "none",
+                pointerEvents: "none",
+              },
+            }}
+          >
+            Start
+          </Button>
+        </motion.div>
+
+        <motion.div
+          whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+          animate={
+            !reduceMotion && !running
+              ? {
+                  boxShadow: [
+                    "0 0 0 0 rgba(239,68,68,0)",
+                    "0 0 0 6px rgba(239,68,68,.10)",
+                    "0 0 0 0 rgba(239,68,68,0)",
+                  ],
+                }
+              : { boxShadow: "0 0 0 0 rgba(239,68,68,0)" }
+          }
+          transition={{ duration: 1.9, repeat: !running && !reduceMotion ? Infinity : 0 }}
+          style={{ borderRadius: 12 }}
+        >
+          <Button
+            size={size}
+            variant="outlined"
+            color="error"
+            onClick={() => trigger(false)}
+            startIcon={<StopIcon sx={{ fontSize: 18 }} />}
+            sx={{
+              borderRadius: 1.5,
+              fontWeight: 700,
+              textTransform: "none",
+              py: 0.9,
+              px: 1.6,
+              minHeight: 40,
+              minWidth: 0,
+              bgcolor: !running ? "rgba(239,68,68,.04)" : "transparent",
+            }}
+          >
+            Stop
+          </Button>
+        </motion.div>
+      </Stack>
+
+      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ px: 0.25 }}>
+        <motion.span
+          animate={
+            !reduceMotion && running
+              ? { scale: [1, 1.35, 1], opacity: [0.75, 1, 0.75] }
+              : { scale: 1, opacity: 0.5 }
+          }
+          transition={{ duration: 1.15, repeat: running && !reduceMotion ? Infinity : 0 }}
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            display: "inline-block",
+            background: running ? "#22c55e" : "#94a3b8",
+          }}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 750 }}>
+          {running ? "Service is warming up…" : "Demo control • click Start"}
+        </Typography>
+      </Stack>
     </Stack>
   );
 }
