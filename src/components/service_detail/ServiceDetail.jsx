@@ -205,17 +205,38 @@ export default function ServiceDetail() {
         });
       } catch {
         if (!cancelled) {
-          // Fail closed — do not treat as owner on error
-          setShareAccess({ loading: false, is_owner: false, permissions: {} });
+          // If access API fails, fall back to comparing service.user with meId
+          // so the real owner is not locked out of Select / Create.
+          setShareAccess((prev) => ({
+            loading: false,
+            is_owner: Boolean(prev?.is_owner),
+            permissions: prev?.permissions || {},
+            share_id: prev?.share_id || null,
+          }));
         }
       }
     })();
     return () => { cancelled = true; };
   }, [id]);
 
+  // True owner: access API says so, OR service.user matches logged-in user.
+  // Prevents lockout when /access/ fails or is_owner is miscomputed.
+  const effectiveIsOwner = useMemo(() => {
+    if (shareAccess.is_owner) return true;
+    if (!meId || !service) return false;
+    const ownerId =
+      service.user_id ??
+      service.user?.id ??
+      service.user?.pk ??
+      (typeof service.user === "string" || typeof service.user === "number"
+        ? service.user
+        : null);
+    return ownerId != null && String(ownerId) === String(meId);
+  }, [shareAccess.is_owner, service, meId]);
+
   const allowedTabs = useMemo(() => {
-    if (shareAccess.loading) return ["overview"];
-    if (shareAccess.is_owner) {
+    if (shareAccess.loading && !effectiveIsOwner) return ["overview"];
+    if (effectiveIsOwner || shareAccess.is_owner) {
       return ["overview", "create", "logs", "settings", "shell"];
     }
     const p = shareAccess.permissions || {};
@@ -226,7 +247,7 @@ export default function ServiceDetail() {
     if (p.can_change_config || p.can_network_change || p.can_volume_attach || p.can_volume_add) tabs.push("settings");
     if (p.can_shell) tabs.push("shell");
     return tabs;
-  }, [shareAccess]);
+  }, [shareAccess, effectiveIsOwner]);
 
   useEffect(() => {
     if (!allowedTabs.includes(activeTab)) {
@@ -1416,8 +1437,8 @@ export default function ServiceDetail() {
 
           {activeTab === "overview" && (
             <OverviewPanel
-              deployPermissions={shareAccess.is_owner ? null : (shareAccess.permissions || {})}
-              isServiceOwner={shareAccess.is_owner}
+              deployPermissions={effectiveIsOwner ? null : (shareAccess.permissions || {})}
+              isServiceOwner={effectiveIsOwner}
               meId={meId}
               service={service}
               serviceRunning={serviceRunning}
@@ -1437,8 +1458,8 @@ export default function ServiceDetail() {
               editActions={{ setEditData, setEditDbFields, setEditZipFile, handleUpdateDeploy, handleCancelEdit }}
               deployState={{ deploys, deploysLoading, pageInfo, selectedDeployId, actionState }}
               deployActions={{ handleSelectDeploy, handleUnselectDeploy, handleEditClick, openConfirm, handlePrev, handleNext, handleDownloadZip }}
-              deployPermissions={shareAccess.is_owner ? null : (shareAccess.permissions || {})}
-              isServiceOwner={Boolean(shareAccess.is_owner)}
+              deployPermissions={effectiveIsOwner ? null : (shareAccess.permissions || {})}
+              isServiceOwner={Boolean(effectiveIsOwner)}
               meId={meId}
               planPlatform={planPlatform}
               planCpu={planDetail?.max_cpu ?? service?.plan?.max_cpu}
@@ -1523,7 +1544,7 @@ export default function ServiceDetail() {
           <Box sx={{ display: activeTab === "shell" ? "block" : "none", minWidth: 0 }}>
             <ShellPanel
               service={service}
-              enabled={Boolean(shareAccess.is_owner || shareAccess.permissions?.can_shell)}
+              enabled={Boolean(effectiveIsOwner || shareAccess.permissions?.can_shell)}
             />
           </Box>
 

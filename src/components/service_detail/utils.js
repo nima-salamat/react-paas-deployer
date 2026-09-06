@@ -82,6 +82,50 @@ export function buildConfigPayload(platform, { configText, dbFields, isDb }) {
       if (obj.beat != null && obj.celery_beat == null) {
         obj.celery_beat = Boolean(obj.beat);
       }
+      if (obj["celery-beat"] != null && obj.celery_beat == null) {
+        obj.celery_beat = Boolean(obj["celery-beat"]);
+        delete obj["celery-beat"];
+      }
+      // working_dir → working_directory
+      if (
+        (obj.working_directory == null || obj.working_directory === "") &&
+        obj.working_dir != null &&
+        obj.working_dir !== ""
+      ) {
+        obj.working_directory = obj.working_dir;
+        delete obj.working_dir;
+      }
+      // celery_module → celery_app
+      if (
+        (obj.celery_app == null || obj.celery_app === "") &&
+        obj.celery_module
+      ) {
+        obj.celery_app = obj.celery_module;
+      }
+      // public_url_mode → url_handling.mode
+      if (obj.public_url_mode) {
+        const uh =
+          obj.url_handling && typeof obj.url_handling === "object"
+            ? { ...obj.url_handling }
+            : {};
+        if (!uh.mode) uh.mode = String(obj.public_url_mode).toLowerCase();
+        if (obj.public_url && !uh.public_url) uh.public_url = obj.public_url;
+        if (obj.asset_url && !uh.asset_url) uh.asset_url = obj.asset_url;
+        obj.url_handling = uh;
+      }
+      // django_settings_module → env
+      if (obj.django_settings_module) {
+        const env =
+          obj.env && typeof obj.env === "object" && !Array.isArray(obj.env)
+            ? { ...obj.env }
+            : {};
+        if (!env.DJANGO_SETTINGS_MODULE) {
+          env.DJANGO_SETTINGS_MODULE = String(obj.django_settings_module).trim();
+        }
+        obj.env = env;
+      }
+      // worker_count is server-owned
+      delete obj.worker_count;
       return obj;
     }
   } catch {

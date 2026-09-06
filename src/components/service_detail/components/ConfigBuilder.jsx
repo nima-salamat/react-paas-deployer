@@ -24,6 +24,15 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import { parseDeployConfig } from "../utils";
 
+/**
+ * Platform field catalog.
+ * Keys must match the backend tenant config contract
+ * (deployments/common/config.py TENANT_CONFIG_KEYS).
+ *
+ * Intentionally excluded from editable UI:
+ *   - worker_count  → server-owned (derived from plan CPU/RAM)
+ *   - resource_*    → blocked by sanitize_tenant_config
+ */
 const PLATFORM_META = {
   laravel: {
     title: "Laravel runtime",
@@ -35,6 +44,13 @@ const PLATFORM_META = {
       ["asset_url", "Asset URL", ""],
       ["static_dir", "Static directory", "public/build"],
       ["media_dir", "Media directory", "storage/app/public"],
+      ["install_command", "Install command", "composer install --no-dev --optimize-autoloader"],
+      ["front_build_platform", "Frontend build kind", "vite"],
+      ["package_manager", "Package manager", "npm"],
+      ["build_command", "Frontend build command", "npm run build"],
+      ["db_connection", "DB connection", "sqlite"],
+      ["working_directory", "Working directory", "/var/www/html"],
+      ["start_command", "Start command override", ""],
     ],
   },
   php: {
@@ -43,6 +59,9 @@ const PLATFORM_META = {
       ["php_version", "PHP version", "8.4"],
       ["document_root", "Document root", "public"],
       ["port", "Port", "80"],
+      ["install_command", "Install command", "composer install --no-dev"],
+      ["working_directory", "Working directory", "/var/www/html"],
+      ["start_command", "Start command override", ""],
     ],
   },
   django: {
@@ -54,7 +73,11 @@ const PLATFORM_META = {
       ["django_settings_module", "Settings module", ""],
       ["static_dir", "Static directory", "/app/static"],
       ["media_dir", "Media directory", "/app/media"],
-      ["worker_count", "Worker count", "1"],
+      ["install_command", "Install command", "pip install -r requirements.txt"],
+      ["working_directory", "Working directory", "/app"],
+      ["port", "Port", "8000"],
+      ["start_command", "Start command override", ""],
+      ["celery_app", "Celery app module", ""],
     ],
   },
   python: {
@@ -62,8 +85,11 @@ const PLATFORM_META = {
     fields: [
       ["python_version", "Python version", "3.11"],
       ["entry_point", "Entry point", ""],
-      ["worker_count", "Worker count", "1"],
+      ["install_command", "Install command", "pip install -r requirements.txt"],
+      ["working_directory", "Working directory", "/app"],
       ["port", "Port", "8000"],
+      ["start_command", "Start command override", ""],
+      ["celery_app", "Celery app module", ""],
     ],
   },
   flask: {
@@ -71,8 +97,23 @@ const PLATFORM_META = {
     fields: [
       ["python_version", "Python version", "3.11"],
       ["entry_point", "Entry point", "app:app"],
-      ["worker_count", "Worker count", "1"],
+      ["install_command", "Install command", "pip install -r requirements.txt"],
+      ["working_directory", "Working directory", "/app"],
       ["port", "Port", "5000"],
+      ["start_command", "Start command override", ""],
+      ["celery_app", "Celery app module", ""],
+    ],
+  },
+  fastapi: {
+    title: "FastAPI runtime",
+    fields: [
+      ["python_version", "Python version", "3.11"],
+      ["entry_point", "Entry point", "main:app"],
+      ["server_type", "Server type", "uvicorn"],
+      ["install_command", "Install command", "pip install -r requirements.txt"],
+      ["working_directory", "Working directory", "/app"],
+      ["port", "Port", "8000"],
+      ["start_command", "Start command override", ""],
     ],
   },
   react: {
@@ -80,10 +121,12 @@ const PLATFORM_META = {
     fields: [
       ["node_version", "Node version", "20"],
       ["package_manager", "Package manager", "npm"],
+      ["install_command", "Install command", ""],
       ["build_command", "Build command", "npm run build"],
       ["build_dir", "Build directory", "dist"],
       ["public_url_mode", "Public URL handling", "auto"],
       ["public_url", "Public URL", ""],
+      ["static_dir", "Static directory", "dist"],
     ],
   },
   vuejs: {
@@ -91,8 +134,12 @@ const PLATFORM_META = {
     fields: [
       ["node_version", "Node version", "20"],
       ["package_manager", "Package manager", "npm"],
+      ["install_command", "Install command", ""],
       ["build_command", "Build command", "npm run build"],
       ["build_dir", "Build directory", "dist"],
+      ["static_dir", "Static directory", "dist"],
+      ["public_url_mode", "Public URL handling", "auto"],
+      ["public_url", "Public URL", ""],
     ],
   },
   angular: {
@@ -100,8 +147,12 @@ const PLATFORM_META = {
     fields: [
       ["node_version", "Node version", "20"],
       ["package_manager", "Package manager", "npm"],
+      ["install_command", "Install command", ""],
       ["build_command", "Build command", "npm run build"],
       ["build_dir", "Build directory", "dist"],
+      ["static_dir", "Static directory", "dist"],
+      ["public_url_mode", "Public URL handling", "auto"],
+      ["public_url", "Public URL", ""],
     ],
   },
   nextjs: {
@@ -109,8 +160,11 @@ const PLATFORM_META = {
     fields: [
       ["node_version", "Node version", "20"],
       ["package_manager", "Package manager", "npm"],
+      ["install_command", "Install command", ""],
+      ["build_command", "Build command", "npm run build"],
       ["port", "Port", "3000"],
       ["start_command", "Start command", "npm start"],
+      ["working_directory", "Working directory", "/app"],
     ],
   },
   nodejs: {
@@ -118,8 +172,11 @@ const PLATFORM_META = {
     fields: [
       ["node_version", "Node version", "20"],
       ["package_manager", "Package manager", "npm"],
+      ["install_command", "Install command", ""],
       ["port", "Port", "3000"],
       ["start_command", "Start command", "npm start"],
+      ["working_directory", "Working directory", "/app"],
+      ["entry_point", "Entry point", ""],
     ],
   },
   go: {
@@ -127,6 +184,9 @@ const PLATFORM_META = {
     fields: [
       ["go_version", "Go version", "1.21"],
       ["port", "Port", "8080"],
+      ["build_command", "Build command", ""],
+      ["start_command", "Start command", ""],
+      ["working_directory", "Working directory", "/app"],
     ],
   },
   dotnet: {
@@ -135,6 +195,16 @@ const PLATFORM_META = {
       ["dotnet_version", ".NET version", "8.0"],
       ["port", "Port", "5000"],
       ["start_command", "Start command", ""],
+      ["working_directory", "Working directory", "/app"],
+    ],
+  },
+  statichtmlcss: {
+    title: "Static site",
+    fields: [
+      ["static_dir", "Static directory", "."],
+      ["public_url_mode", "Public URL handling", "auto"],
+      ["public_url", "Public URL", ""],
+      ["port", "Port", "80"],
     ],
   },
   docker: {
@@ -142,6 +212,8 @@ const PLATFORM_META = {
     fields: [
       ["port", "Port", "80"],
       ["start_command", "Start command", ""],
+      ["working_directory", "Working directory", "/app"],
+      ["entry_point", "Entry point", ""],
     ],
   },
 };
@@ -149,7 +221,10 @@ const PLATFORM_META = {
 const COMMON_FIELDS = [
   ["port", "Port", ""],
   ["healthcheck_path", "Health check path", "/"],
-  ["working_dir", "Working directory", ""],
+  ["working_directory", "Working directory", ""],
+  ["install_command", "Install command", ""],
+  ["start_command", "Start command", ""],
+  ["entry_point", "Entry point", ""],
 ];
 
 function normalizeValue(value) {
@@ -164,12 +239,67 @@ function readConfig(text) {
   return parsed && typeof parsed === "object" ? parsed : {};
 }
 
+/**
+ * Normalize aliases before serializing so backend always sees canonical keys.
+ */
 function toOutputObject(config) {
   const next = {};
   Object.entries(config || {}).forEach(([key, value]) => {
     if (value === "" || value == null) return;
     next[key] = value;
   });
+
+  // working_dir → working_directory
+  if (
+    (next.working_directory == null || next.working_directory === "") &&
+    next.working_dir != null &&
+    next.working_dir !== ""
+  ) {
+    next.working_directory = next.working_dir;
+  }
+  delete next.working_dir;
+
+  // celery-beat → celery_beat
+  if (next["celery-beat"] != null && next.celery_beat == null) {
+    next.celery_beat = Boolean(next["celery-beat"]);
+  }
+  delete next["celery-beat"];
+
+  // celery_module → celery_app
+  if (
+    (next.celery_app == null || next.celery_app === "") &&
+    next.celery_module
+  ) {
+    next.celery_app = next.celery_module;
+  }
+
+  // public_url_mode → url_handling.mode (backend also normalizes this)
+  if (next.public_url_mode) {
+    const uh =
+      next.url_handling && typeof next.url_handling === "object"
+        ? { ...next.url_handling }
+        : {};
+    if (!uh.mode) uh.mode = String(next.public_url_mode).toLowerCase();
+    if (next.public_url && !uh.public_url) uh.public_url = next.public_url;
+    if (next.asset_url && !uh.asset_url) uh.asset_url = next.asset_url;
+    next.url_handling = uh;
+  }
+
+  // django_settings_module → env.DJANGO_SETTINGS_MODULE
+  if (next.django_settings_module) {
+    const env =
+      next.env && typeof next.env === "object" && !Array.isArray(next.env)
+        ? { ...next.env }
+        : {};
+    if (!env.DJANGO_SETTINGS_MODULE) {
+      env.DJANGO_SETTINGS_MODULE = String(next.django_settings_module).trim();
+    }
+    next.env = env;
+  }
+
+  // worker_count is server-owned — never persist from UI
+  delete next.worker_count;
+
   return next;
 }
 
@@ -188,13 +318,26 @@ function detectInitialFields(config, metaFields = []) {
 function ConfigField({ field, config, updateField, removeField, disabled = false }) {
   const [key, label, placeholder] = field;
   const value = config[key];
-  const isSelect = ["public_url_mode", "server_type", "package_manager"].includes(key);
+  const isSelect = [
+    "public_url_mode",
+    "server_type",
+    "package_manager",
+    "front_build_platform",
+    "db_connection",
+  ].includes(key);
+
   const options =
     key === "public_url_mode"
       ? ["auto", "disabled", "custom"]
       : key === "server_type"
-        ? ["gunicorn", "uvicorn", "uwsgi", "daphne"]
-        : ["npm", "yarn", "pnpm"];
+        ? ["gunicorn", "uvicorn", "uwsgi", "daphne", "asgi", "wsgi"]
+        : key === "package_manager"
+          ? ["npm", "yarn", "pnpm", "bun"]
+          : key === "front_build_platform"
+            ? ["vite", "react", "mix", "nextjs", "nuxt", "node"]
+            : key === "db_connection"
+              ? ["sqlite", "mysql", "pgsql", "sqlsrv"]
+              : [];
 
   return (
     <Grid item xs={12} md={6} key={key}>
@@ -211,7 +354,13 @@ function ConfigField({ field, config, updateField, removeField, disabled = false
           helperText={
             key === "public_url_mode"
               ? "Controls only automatic public/asset URL generation."
-              : undefined
+              : key === "celery_app"
+                ? "Dotted path, e.g. myproject.celery"
+                : key === "install_command"
+                  ? "Override auto install (composer/pip/npm)."
+                  : key === "django_settings_module"
+                    ? "Also sets DJANGO_SETTINGS_MODULE in env."
+                    : undefined
           }
         >
           {isSelect &&
@@ -258,11 +407,41 @@ export default function ConfigBuilder({
       "celery",
       "celery_beat",
       "celery-beat",
+      "worker_count",
+      "url_handling",
     ]);
     const extras = Object.keys(config).filter(
       (key) => !excluded.has(key) && !configured.includes(key)
     );
-    return [...configured, ...extras];
+    const metaKeys = meta.fields.map((f) => f[0]);
+    const ordered = [];
+    const seen = new Set();
+    for (const k of configured) {
+      if (!seen.has(k)) {
+        ordered.push(k);
+        seen.add(k);
+      }
+    }
+    for (const k of [
+      "install_command",
+      "start_command",
+      "entry_point",
+      "celery_app",
+      "working_directory",
+      "django_settings_module",
+    ]) {
+      if (metaKeys.includes(k) && !seen.has(k)) {
+        ordered.push(k);
+        seen.add(k);
+      }
+    }
+    for (const k of extras) {
+      if (!seen.has(k)) {
+        ordered.push(k);
+        seen.add(k);
+      }
+    }
+    return ordered;
   }, [config, meta.fields]);
 
   const updateConfig = (updater) => {
@@ -293,9 +472,6 @@ export default function ConfigBuilder({
     onChange(JSON.stringify(toOutputObject(merged), null, 2));
   };
 
-  // Keep a local draft of env rows (including empty key rows) so the user can
-  // type a new variable name without the row disappearing immediately.
-  // Only non-empty keys are written back into config.env.
   const envFromConfig =
     config.env && typeof config.env === "object" && !Array.isArray(config.env)
       ? config.env
@@ -308,9 +484,6 @@ export default function ConfigBuilder({
     }))
   );
 
-  // Re-sync when the parent configText changes (e.g. inspect/suggest applied,
-  // or switching between create/edit). Preserve any in-progress empty rows
-  // only when the serialized env content is unchanged.
   useEffect(() => {
     const next = Object.entries(envFromConfig).map(([key, value]) => ({
       key,
@@ -324,7 +497,6 @@ export default function ConfigBuilder({
       );
       const nextSerialized = JSON.stringify(envFromConfig);
       if (prevSerialized === nextSerialized) {
-        // Keep draft empty rows the user is still editing
         const emptyDrafts = prev.filter((r) => !r.key.trim());
         return [...next, ...emptyDrafts];
       }
@@ -355,6 +527,12 @@ export default function ConfigBuilder({
     commitEnvRows(
       envRows.map((row, i) => (i === index ? { ...row, ...patch } : row))
     );
+
+  const showCelery =
+    platform === "django" ||
+    platform === "python" ||
+    platform === "flask" ||
+    platform === "fastapi";
 
   return (
     <Stack spacing={1.5}>
@@ -404,7 +582,7 @@ export default function ConfigBuilder({
           <Box>
             <Typography sx={{ fontWeight: 750 }}>Runtime & build</Typography>
             <Typography variant="caption" color="text.secondary">
-              Version, ports, build/output and platform-specific settings
+              Version, ports, install/build commands and platform settings
             </Typography>
           </Box>
         </AccordionSummary>
@@ -432,7 +610,7 @@ export default function ConfigBuilder({
                 />
               );
             })}
-            {inferredFields.length === 0 && (
+            {inferredFields.length === 0 && meta.fields.length === 0 && (
               <Grid item xs={12}>
                 <Typography variant="body2" color="text.secondary">
                   No optional settings detected for this platform.
@@ -515,15 +693,14 @@ export default function ConfigBuilder({
         </AccordionDetails>
       </Accordion>
 
-      {(platform === "django" ||
-        platform === "python" ||
-        platform === "flask") && (
+      {showCelery && (
         <Accordion disableGutters>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box>
               <Typography sx={{ fontWeight: 750 }}>Workers & jobs</Typography>
               <Typography variant="caption" color="text.secondary">
-                Enable optional background services without editing JSON
+                Optional background processes (Celery). Set celery_app above if
+                needed.
               </Typography>
             </Box>
           </AccordionSummary>
@@ -546,7 +723,7 @@ export default function ConfigBuilder({
                     onChange={(e) =>
                       updateField("celery_beat", e.target.checked)
                     }
-                    disabled={disabled}
+                    disabled={disabled || !config.celery}
                   />
                 }
                 label="Celery Beat"
@@ -561,8 +738,8 @@ export default function ConfigBuilder({
           <Box>
             <Typography sx={{ fontWeight: 750 }}>Advanced settings</Typography>
             <Typography variant="caption" color="text.secondary">
-              Only use this for supported documented keys; automation remains
-              enabled for everything else.
+              Extra keys from inspect or custom overrides. Worker count is set
+              by the plan automatically.
             </Typography>
           </Box>
         </AccordionSummary>
@@ -572,6 +749,7 @@ export default function ConfigBuilder({
               (key) =>
                 key !== "platform" &&
                 key !== "env" &&
+                key !== "worker_count" &&
                 !inferredFields.includes(key)
             ).length === 0 ? (
               <Typography variant="body2" color="text.secondary">
@@ -583,6 +761,7 @@ export default function ConfigBuilder({
                   ([key]) =>
                     key !== "platform" &&
                     key !== "env" &&
+                    key !== "worker_count" &&
                     !inferredFields.includes(key)
                 )
                 .map(([key, value]) => (
