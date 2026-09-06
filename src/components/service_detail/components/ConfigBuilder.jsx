@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -185,13 +185,16 @@ function detectInitialFields(config, metaFields = []) {
   return rows;
 }
 
-function ConfigField({ field, config, updateField, removeField }) {
+function ConfigField({ field, config, updateField, removeField, disabled = false }) {
   const [key, label, placeholder] = field;
   const value = config[key];
   const isSelect = ["public_url_mode", "server_type", "package_manager"].includes(key);
-  const options = key === "public_url_mode" ? ["auto", "disabled", "custom"]
-    : key === "server_type" ? ["gunicorn", "uvicorn", "uwsgi", "daphne"]
-    : ["npm", "yarn", "pnpm"];
+  const options =
+    key === "public_url_mode"
+      ? ["auto", "disabled", "custom"]
+      : key === "server_type"
+        ? ["gunicorn", "uvicorn", "uwsgi", "daphne"]
+        : ["npm", "yarn", "pnpm"];
 
   return (
     <Grid item xs={12} md={6} key={key}>
@@ -204,12 +207,27 @@ function ConfigField({ field, config, updateField, removeField }) {
           select={isSelect}
           value={normalizeValue(value)}
           onChange={(e) => updateField(key, e.target.value)}
-          helperText={key === "public_url_mode" ? "Controls only automatic public/asset URL generation." : undefined}
+          disabled={disabled}
+          helperText={
+            key === "public_url_mode"
+              ? "Controls only automatic public/asset URL generation."
+              : undefined
+          }
         >
-          {isSelect && options.map((option) => <MenuItem value={option} key={option}>{option}</MenuItem>)}
+          {isSelect &&
+            options.map((option) => (
+              <MenuItem value={option} key={option}>
+                {option}
+              </MenuItem>
+            ))}
         </TextField>
         <Tooltip title="Remove this setting">
-          <IconButton size="small" onClick={() => removeField(key)} sx={{ mt: 0.5 }}>
+          <IconButton
+            size="small"
+            onClick={() => removeField(key)}
+            disabled={disabled}
+            sx={{ mt: 0.5 }}
+          >
             <DeleteOutlineIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -234,9 +252,16 @@ export default function ConfigBuilder({
   const inferredFields = useMemo(() => {
     const configured = detectInitialFields(config, meta.fields);
     const excluded = new Set([
-      "platform", "env", "frontend", "celery", "celery_beat", "celery-beat",
+      "platform",
+      "env",
+      "frontend",
+      "celery",
+      "celery_beat",
+      "celery-beat",
     ]);
-    const extras = Object.keys(config).filter((key) => !excluded.has(key) && !configured.includes(key));
+    const extras = Object.keys(config).filter(
+      (key) => !excluded.has(key) && !configured.includes(key)
+    );
     return [...configured, ...extras];
   }, [config, meta.fields]);
 
@@ -257,36 +282,117 @@ export default function ConfigBuilder({
     });
   };
 
-  const env = config.env && typeof config.env === "object" && !Array.isArray(config.env) ? config.env : {};
-  const envRows = Object.entries(env).map(([key, value]) => ({ key, value: normalizeValue(value) }));
-  const updateEnv = (rows) => updateConfig((next) => ({ ...next, env: Object.fromEntries(rows.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value])) }));
-
-  const addEnv = () => updateEnv([...envRows, { key: "", value: "" }]);
-  const removeEnv = (index) => updateEnv(envRows.filter((_, i) => i !== index));
-  const patchEnv = (index, patch) => updateEnv(envRows.map((row, i) => i === index ? { ...row, ...patch } : row));
-
   const suggested = inspectResult?.suggested_config || null;
   const applyDetected = () => {
     if (!suggested || typeof suggested !== "object") return;
-    const merged = { ...config, ...suggested, platform: platform || suggested.platform || config.platform || "docker" };
+    const merged = {
+      ...config,
+      ...suggested,
+      platform: platform || suggested.platform || config.platform || "docker",
+    };
     onChange(JSON.stringify(toOutputObject(merged), null, 2));
   };
 
+  // Keep a local draft of env rows (including empty key rows) so the user can
+  // type a new variable name without the row disappearing immediately.
+  // Only non-empty keys are written back into config.env.
+  const envFromConfig =
+    config.env && typeof config.env === "object" && !Array.isArray(config.env)
+      ? config.env
+      : {};
+
+  const [envRows, setEnvRows] = useState(() =>
+    Object.entries(envFromConfig).map(([key, value]) => ({
+      key,
+      value: normalizeValue(value),
+    }))
+  );
+
+  // Re-sync when the parent configText changes (e.g. inspect/suggest applied,
+  // or switching between create/edit). Preserve any in-progress empty rows
+  // only when the serialized env content is unchanged.
+  useEffect(() => {
+    const next = Object.entries(envFromConfig).map(([key, value]) => ({
+      key,
+      value: normalizeValue(value),
+    }));
+    setEnvRows((prev) => {
+      const prevSerialized = JSON.stringify(
+        Object.fromEntries(
+          prev.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value])
+        )
+      );
+      const nextSerialized = JSON.stringify(envFromConfig);
+      if (prevSerialized === nextSerialized) {
+        // Keep draft empty rows the user is still editing
+        const emptyDrafts = prev.filter((r) => !r.key.trim());
+        return [...next, ...emptyDrafts];
+      }
+      return next;
+    });
+  }, [configText]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const commitEnvRows = (rows) => {
+    setEnvRows(rows);
+    const envObj = Object.fromEntries(
+      rows.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value])
+    );
+    updateConfig((next) => {
+      const out = { ...next };
+      if (Object.keys(envObj).length === 0) {
+        delete out.env;
+      } else {
+        out.env = envObj;
+      }
+      return out;
+    });
+  };
+
+  const addEnv = () => commitEnvRows([...envRows, { key: "", value: "" }]);
+  const removeEnv = (index) =>
+    commitEnvRows(envRows.filter((_, i) => i !== index));
+  const patchEnv = (index, patch) =>
+    commitEnvRows(
+      envRows.map((row, i) => (i === index ? { ...row, ...patch } : row))
+    );
+
   return (
     <Stack spacing={1.5}>
-      <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: "background.paper" }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
+      <Paper
+        variant="outlined"
+        sx={{ p: 1.5, borderRadius: 2, bgcolor: "background.paper" }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", sm: "center" }}
+        >
           <Box>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{meta.title}</Typography>
-              <Chip size="small" label={platform || "docker"} color="primary" variant="outlined" />
+              <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                {meta.title}
+              </Typography>
+              <Chip
+                size="small"
+                label={platform || "docker"}
+                color="primary"
+                variant="outlined"
+              />
             </Stack>
             <Typography variant="caption" color="text.secondary">
               Configure only what you need. Everything else stays automatic.
             </Typography>
           </Box>
           {suggested && (
-            <Button size="small" variant="outlined" startIcon={<AutoFixHighIcon />} onClick={applyDetected} disabled={disabled} sx={{ textTransform: "none", borderRadius: 1.5 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<AutoFixHighIcon />}
+              onClick={applyDetected}
+              disabled={disabled}
+              sx={{ textTransform: "none", borderRadius: 1.5 }}
+            >
               Apply detected values
             </Button>
           )}
@@ -297,17 +403,41 @@ export default function ConfigBuilder({
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Box>
             <Typography sx={{ fontWeight: 750 }}>Runtime & build</Typography>
-            <Typography variant="caption" color="text.secondary">Version, ports, build/output and platform-specific settings</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Version, ports, build/output and platform-specific settings
+            </Typography>
           </Box>
         </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={1.5}>
-            {(inferredFields.length ? inferredFields : meta.fields.map((item) => item[0])).map((key) => {
-              const metaField = meta.fields.find((item) => item[0] === key) || COMMON_FIELDS.find((item) => item[0] === key) || [key, key.replace(/_/g, " "), ""];
-              return <ConfigField key={key} field={metaField} config={config} updateField={updateField} removeField={removeField} />;
+            {(inferredFields.length
+              ? inferredFields
+              : meta.fields.map((item) => item[0])
+            ).map((key) => {
+              const metaField =
+                meta.fields.find((item) => item[0] === key) ||
+                COMMON_FIELDS.find((item) => item[0] === key) || [
+                  key,
+                  key.replace(/_/g, " "),
+                  "",
+                ];
+              return (
+                <ConfigField
+                  key={key}
+                  field={metaField}
+                  config={config}
+                  updateField={updateField}
+                  removeField={removeField}
+                  disabled={disabled}
+                />
+              );
             })}
             {inferredFields.length === 0 && (
-              <Grid item xs={12}><Typography variant="body2" color="text.secondary">No optional settings detected for this platform.</Typography></Grid>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary">
+                  No optional settings detected for this platform.
+                </Typography>
+              </Grid>
             )}
           </Grid>
         </AccordionDetails>
@@ -316,23 +446,68 @@ export default function ConfigBuilder({
       <Accordion defaultExpanded disableGutters>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Box>
-            <Typography sx={{ fontWeight: 750 }}>Environment variables</Typography>
-            <Typography variant="caption" color="text.secondary">Add key/value pairs with no JSON syntax. Values are shown as plain text.</Typography>
+            <Typography sx={{ fontWeight: 750 }}>
+              Environment variables
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Add key/value pairs with no JSON syntax. Values are shown as plain
+              text.
+            </Typography>
           </Box>
         </AccordionSummary>
         <AccordionDetails>
           <Stack spacing={1.25}>
             {envRows.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">No environment variables yet.</Typography>
-            ) : envRows.map((row, index) => (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} key={`${index}-${row.key}`} alignItems="center">
-                <TextField size="small" fullWidth label="Variable" value={row.key} onChange={(e) => patchEnv(index, { key: e.target.value })} />
-                <TextField size="small" fullWidth label="Value" value={row.value} onChange={(e) => patchEnv(index, { value: e.target.value })} />
-                <IconButton onClick={() => removeEnv(index)} color="error"><DeleteOutlineIcon /></IconButton>
-              </Stack>
-            ))}
+              <Typography variant="body2" color="text.secondary">
+                No environment variables yet.
+              </Typography>
+            ) : (
+              envRows.map((row, index) => (
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  key={`env-${index}`}
+                  alignItems="center"
+                >
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label="Variable"
+                    value={row.key}
+                    onChange={(e) =>
+                      patchEnv(index, { key: e.target.value })
+                    }
+                    disabled={disabled}
+                  />
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label="Value"
+                    value={row.value}
+                    onChange={(e) =>
+                      patchEnv(index, { value: e.target.value })
+                    }
+                    disabled={disabled}
+                  />
+                  <IconButton
+                    onClick={() => removeEnv(index)}
+                    color="error"
+                    disabled={disabled}
+                  >
+                    <DeleteOutlineIcon />
+                  </IconButton>
+                </Stack>
+              ))
+            )}
             <Box>
-              <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={addEnv} disabled={disabled} sx={{ textTransform: "none", borderRadius: 1.5 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={addEnv}
+                disabled={disabled}
+                sx={{ textTransform: "none", borderRadius: 1.5 }}
+              >
                 Add variable
               </Button>
             </Box>
@@ -340,18 +515,42 @@ export default function ConfigBuilder({
         </AccordionDetails>
       </Accordion>
 
-      {(platform === "django" || platform === "python" || platform === "flask") && (
+      {(platform === "django" ||
+        platform === "python" ||
+        platform === "flask") && (
         <Accordion disableGutters>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Box>
               <Typography sx={{ fontWeight: 750 }}>Workers & jobs</Typography>
-              <Typography variant="caption" color="text.secondary">Enable optional background services without editing JSON</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Enable optional background services without editing JSON
+              </Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <FormControlLabel control={<Checkbox checked={Boolean(config.celery)} onChange={(e) => updateField("celery", e.target.checked)} />} label="Celery worker" />
-              <FormControlLabel control={<Checkbox checked={Boolean(config.celery_beat)} onChange={(e) => updateField("celery_beat", e.target.checked)} />} label="Celery Beat" />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(config.celery)}
+                    onChange={(e) => updateField("celery", e.target.checked)}
+                    disabled={disabled}
+                  />
+                }
+                label="Celery worker"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={Boolean(config.celery_beat)}
+                    onChange={(e) =>
+                      updateField("celery_beat", e.target.checked)
+                    }
+                    disabled={disabled}
+                  />
+                }
+                label="Celery Beat"
+              />
             </Stack>
           </AccordionDetails>
         </Accordion>
@@ -361,26 +560,64 @@ export default function ConfigBuilder({
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Box>
             <Typography sx={{ fontWeight: 750 }}>Advanced settings</Typography>
-            <Typography variant="caption" color="text.secondary">Only use this for supported documented keys; automation remains enabled for everything else.</Typography>
+            <Typography variant="caption" color="text.secondary">
+              Only use this for supported documented keys; automation remains
+              enabled for everything else.
+            </Typography>
           </Box>
         </AccordionSummary>
         <AccordionDetails>
           <Stack spacing={1.25}>
-            {Object.keys(config).filter((key) => key !== "platform" && key !== "env" && !inferredFields.includes(key)).length === 0 ? (
-              <Typography variant="body2" color="text.secondary">No additional settings.</Typography>
-            ) : Object.entries(config).filter(([key]) => key !== "platform" && key !== "env" && !inferredFields.includes(key)).map(([key, value]) => (
-              <Stack direction="row" spacing={1} alignItems="center" key={key}>
-                <TextField size="small" fullWidth label={key.replace(/_/g, " ")} value={normalizeValue(value)} onChange={(e) => updateField(key, e.target.value)} />
-                <IconButton onClick={() => removeField(key)} color="error"><DeleteOutlineIcon /></IconButton>
-              </Stack>
-            ))}
+            {Object.keys(config).filter(
+              (key) =>
+                key !== "platform" &&
+                key !== "env" &&
+                !inferredFields.includes(key)
+            ).length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No additional settings.
+              </Typography>
+            ) : (
+              Object.entries(config)
+                .filter(
+                  ([key]) =>
+                    key !== "platform" &&
+                    key !== "env" &&
+                    !inferredFields.includes(key)
+                )
+                .map(([key, value]) => (
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    key={key}
+                  >
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label={key.replace(/_/g, " ")}
+                      value={normalizeValue(value)}
+                      onChange={(e) => updateField(key, e.target.value)}
+                      disabled={disabled}
+                    />
+                    <IconButton
+                      onClick={() => removeField(key)}
+                      color="error"
+                      disabled={disabled}
+                    >
+                      <DeleteOutlineIcon />
+                    </IconButton>
+                  </Stack>
+                ))
+            )}
           </Stack>
         </AccordionDetails>
       </Accordion>
 
       <Divider />
       <Typography variant="caption" color="text.secondary">
-        Changes are serialized automatically when you save. No raw JSON editing is required.
+        Changes are serialized automatically when you save. No raw JSON editing
+        is required.
       </Typography>
     </Stack>
   );
