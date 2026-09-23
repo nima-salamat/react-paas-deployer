@@ -93,6 +93,7 @@ const Layout = ({
     location.pathname.startsWith("/dashboard/") ||
     location.pathname.startsWith("/service/") ||
     location.pathname.startsWith("/services/");
+  const isAuthPage = location.pathname === "/signin_or_signup";
   const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -123,6 +124,7 @@ const Layout = ({
         <Navbar
           themeMode={themeMode}
           onThemeModeChange={setThemeMode}
+          isAuthPage={isAuthPage}
         />
       )}
 
@@ -137,9 +139,9 @@ const Layout = ({
         <Outlet />
       </Box>
 
-      {!isDashboardSpace && <Footer />}
+      {!isDashboardSpace && !isAuthPage && <Footer />}
 
-      {!isDashboardSpace && (
+      {!isDashboardSpace && !isAuthPage && (
         <FloatingNav
           loggedIn={loggedIn}
         />
