@@ -3035,13 +3035,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   }, []);
 
   const openMsgSearch = useCallback(() => {
-    // Hide composer contents: clear pending attachments / reply / edit
-    setFiles([]);
-    setReplyTo(null);
-    setEditingMsg(null);
-    setSendFilesTogether(false);
-    setMediaSpoiler(false);
-    setMediaViewOnce(false);
+    // Search is an overlay, not a composer mode. Never destroy a user's draft,
+    // attachments, reply target, edit state, or media flags just to search.
     setMsgSearchOpen(true);
   }, []);
 
