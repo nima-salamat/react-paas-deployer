@@ -359,7 +359,6 @@ export default function ChatHeader(props) {
 
   </Stack>
 
-  {/* Call surface is mounted at Messenger shell level (below) so the
-      mini bar sits under the settings / list header, not floating over it. */}
   );
+
 }
