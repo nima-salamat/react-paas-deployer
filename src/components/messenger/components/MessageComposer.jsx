@@ -781,8 +781,8 @@ function MessageComposer({
 
   // Right-click format menu on the text field
   const [fmtMenu, setFmtMenu] = useState(null);
+  const [hasTextSelection, setHasTextSelection] = useState(false);
   const selectionRef = useRef({ start: 0, end: 0 });
-  const fmtLongPressTimer = useRef(null);
 
   const [attachMenuAnchor, setAttachMenuAnchor] = useState(null);
   const [attachAccept, setAttachAccept] = useState("image/*,image/gif,.gif,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.md,.csv,.py,.js,.jsx,.ts,.tsx,.json,.html,.css,.scss,.java,.c,.cpp,.h,.cs,.go,.rs,.rb,.php,.swift,.sh,.sql,.yml,.yaml,.toml,.xml,.md,.vue,.dart,.lua,.ipynb");
@@ -1440,10 +1440,12 @@ function MessageComposer({
     if (!ta || typeof ta.selectionStart !== "number") return;
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
-    selectionRef.current = {
+    const nextSelection = {
       start: Math.min(start, end),
       end: Math.max(start, end),
     };
+    selectionRef.current = nextSelection;
+    setHasTextSelection(nextSelection.end > nextSelection.start);
   };
 
   /** Wrap current selection (or insert at cursor) with formatting markers. */
@@ -1514,6 +1516,11 @@ function MessageComposer({
   };
 
   const onTextContextMenu = (e) => {
+    // Mobile browsers own long-press text selection. Do not cancel their native
+    // selection/context actions; formatting is exposed through the selection
+    // toolbar rendered above the composer instead.
+    if (isMobile) return;
+
     e.preventDefault();
     e.stopPropagation();
     const ta = getComposerTextarea() || e.currentTarget?.querySelector?.("textarea") || e.currentTarget;
@@ -1525,7 +1532,6 @@ function MessageComposer({
       start,
       end,
     });
-    // Keep soft-keyboard open on mobile after long-press / context menu
     requestAnimationFrame(() => {
       try {
         ta?.focus?.();
@@ -1924,7 +1930,7 @@ function MessageComposer({
             <Typography variant="caption" fontWeight={700}>
               {editingMsg ? "Edit message" : `Reply to ${replyTo?.sender?.username || ""}`}
             </Typography>
-            <Typography variant="caption" display="block" noWrap color="text.secondary">
+            <Typography variant="caption" display="block" noWrap color="text.secondary" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
               {editingMsg ? editingMsg.body : replyTo?.body}
             </Typography>
           </Box>
@@ -2168,6 +2174,45 @@ function MessageComposer({
           </Box>
         );
       })()}
+
+      {hasTextSelection && !editingMsg && (
+        <Box
+          role="toolbar"
+          aria-label="Text formatting"
+          sx={{
+            px: { xs: 1, sm: 1.25 },
+            py: 0.35,
+            borderTop: "1px solid",
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          <Stack direction="row" spacing={0.25} sx={{ width: "max-content" }}>
+            {[
+              { kind: "spoiler", label: "Spoiler", icon: <VisibilityOffIcon fontSize="small" /> },
+              { kind: "code", label: "Inline code", icon: <CodeIcon fontSize="small" /> },
+              { kind: "codeblock", label: "Code block", icon: <CodeIcon fontSize="small" /> },
+              { kind: "quote", label: "Quote", icon: <FormatQuoteIcon fontSize="small" /> },
+            ].map((item) => (
+              <Tooltip key={item.kind} title={item.label}>
+                <IconButton
+                  size="small"
+                  aria-label={item.label}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyTextFormat(item.kind)}
+                  sx={{ minWidth: 40, minHeight: 40, borderRadius: 1.5 }}
+                >
+                  {item.icon}
+                </IconButton>
+              </Tooltip>
+            ))}
+          </Stack>
+        </Box>
+      )}
 
       <Stack direction="row" alignItems="center" spacing={isMobile ? 0.15 : 0.5}
         sx={{
@@ -2419,35 +2464,6 @@ function MessageComposer({
             updateSuggestionsFromText(el.value, el.selectionStart);
           }}
           onMouseUp={(e) => rememberSelection(e.target)}
-          onTouchStart={(e) => {
-            if (!isMobile) return;
-            const t = e.touches?.[0];
-            if (!t) return;
-            clearTimeout(fmtLongPressTimer.current);
-            const ta = e.target;
-            fmtLongPressTimer.current = setTimeout(() => {
-              rememberSelection(ta);
-              const { start, end } = selectionRef.current;
-              setFmtMenu({
-                mouseX: t.clientX,
-                mouseY: t.clientY,
-                start,
-                end,
-              });
-              try {
-                ta.focus();
-                if (typeof start === "number") ta.setSelectionRange?.(start, end);
-              } catch { /* */ }
-            }, 480);
-          }}
-          onTouchMove={() => { clearTimeout(fmtLongPressTimer.current); }}
-          onTouchEnd={(e) => {
-            clearTimeout(fmtLongPressTimer.current);
-            // mobile: selection often finalizes after touchend
-            const el = e.target;
-            setTimeout(() => rememberSelection(el), 0);
-          }}
-          onTouchCancel={() => { clearTimeout(fmtLongPressTimer.current); }}
           onBlur={(e) => {
             // Keep last range so format buttons still wrap the right text
             rememberSelection(e.target);
