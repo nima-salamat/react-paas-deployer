@@ -221,7 +221,7 @@ export default function ChatHeader(props) {
     </Box>
     <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }}
       onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
-      <Typography fontWeight={600} noWrap fontSize={15}>{convTitle(activeConv, meId)}</Typography>
+      <Typography fontWeight={750} noWrap fontSize={{ xs: 14.5, sm: 15.5 }} sx={{ letterSpacing: -0.15 }}>{title}</Typography>
       <Typography
         variant="caption"
         color={Object.keys(typingUsers).length ? "primary.main" : "text.secondary"}
