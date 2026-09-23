@@ -1120,27 +1120,6 @@ function serveStatic(req, res, pathname) {
     return false;
   }
 
-  if (getContentType(filePath) === 'text/html; charset=utf-8') {
-    let html;
-
-    try {
-      html = fs.readFileSync(
-        filePath,
-        'utf8',
-      );
-    } catch {
-      return false;
-    }
-
-    if (
-      !html.includes(
-        'name="x-prerendered"',
-      )
-    ) {
-      return false;
-    }
-  }
-
   const headers = {
     'X-Content-Type-Options':
       'nosniff',
