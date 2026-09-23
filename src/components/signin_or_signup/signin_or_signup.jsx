@@ -331,7 +331,19 @@ export default function SigninOrSignup() {
 
   if (loginClosed) {
     return (
-      <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", p: 2, background: bgGradient }}>
+      <Box
+        sx={{
+          minHeight: { xs: "calc(100dvh - 64px)", md: "calc(100dvh - 72px)" },
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: { xs: 1, sm: 2 },
+          background: bgGradient,
+          overflowY: "auto",
+          boxSizing: "border-box",
+        }}
+      >
         <MotionPaper initial="hidden" animate="visible" variants={fadeUp} transition={{ duration: 0.45 }} elevation={12}
           sx={{ p: isSm ? 3 : 5, maxWidth: 480, width: "100%", borderRadius: 3, textAlign: "center",
             backdropFilter: "blur(8px)",
@@ -396,10 +408,26 @@ export default function SigninOrSignup() {
         <CircularProgress color="inherit" />
       </Backdrop>
 
-      <MotionPaper initial="hidden" animate="visible" variants={fadeUp} transition={{ duration: 0.45 }} elevation={12}
-        sx={{ p: isSm ? 3 : 5, maxWidth: 480, width: "100%", borderRadius: 3, backdropFilter: "blur(8px)",
-          background: theme.palette.mode === "dark" ? "rgba(17,24,39,0.6)" : "rgba(255,255,255,0.85)",
-          boxShadow: "0 10px 40px rgba(2,6,23,0.3)" }}>
+      <MotionPaper
+        initial="hidden"
+        animate="visible"
+        variants={fadeUp}
+        transition={{ duration: 0.45 }}
+        elevation={12}
+        sx={{
+          p: { xs: 2, sm: 3, md: 4 },
+          maxWidth: 520,
+          width: "100%",
+          my: { xs: 0.5, sm: 1.5 },
+          boxSizing: "border-box",
+          borderRadius: { xs: 2.5, sm: 3 },
+          backdropFilter: "blur(10px)",
+          background: theme.palette.mode === "dark" ? "rgba(17,24,39,0.68)" : "rgba(255,255,255,0.88)",
+          border: "1px solid",
+          borderColor: "divider",
+          boxShadow: "0 18px 50px rgba(2,6,23,0.22)",
+        }}
+      >
 
         <Typography component="h1" variant={isSm ? "h5" : "h4"} align="center" sx={{ fontWeight: 700, mb: 1 }}>
           {stepTitle[step] || "Welcome"}
@@ -454,7 +482,7 @@ export default function SigninOrSignup() {
               <TextField fullWidth label="Phone" name="phone" type="tel" value={form.phone}
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
-            <Button type="submit" fullWidth variant="contained" disabled={loading} sx={{ mt: 3, py: 1.5, borderRadius: 3 }}>
+            <Button type="submit" fullWidth variant="contained" disabled={loading} sx={{ mt: 3, py: 1.5, minHeight: 48, borderRadius: 3 }}>
               {settings.require_otp ? "Send Verification Code" : "Continue"}
             </Button>
             <Divider sx={{ my: 2 }} />
@@ -479,9 +507,9 @@ export default function SigninOrSignup() {
           <Box component="form" onSubmit={handleOtp}>
             <TextField fullWidth label="Verification Code" name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
-            <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ borderRadius: 3 }}>Verify</Button>
+            <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
+              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Verify</Button>
             </Stack>
           </Box>
         )}
@@ -494,11 +522,11 @@ export default function SigninOrSignup() {
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                 {isSetPassword ? "This is a new account. Choose a secure password." : "This account requires a password."}
               </Typography>
-              <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
+              <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
                 <Button fullWidth variant="outlined"
                   onClick={() => setStep(settings.require_otp ? "otp" : "credentials")}
-                  sx={{ borderRadius: 3 }}>Back</Button>
-                <Button type="submit" fullWidth variant="contained" sx={{ borderRadius: 3 }}>
+                  sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
+                <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>
                   {isSetPassword ? "Save & Login" : "Login"}
                 </Button>
               </Stack>
@@ -509,7 +537,22 @@ export default function SigninOrSignup() {
         {step === "recovery" && (
           <Box component="form" onSubmit={handleRecoveryRequest}>
             {showRecoveryMethodToggle && (
-              <ToggleButtonGroup value={method} exclusive onChange={(_, v) => v && setMethod(v)} size="small" sx={{ mb: 2 }}>
+              <ToggleButtonGroup
+                value={method}
+                exclusive
+                onChange={(_, v) => v && setMethod(v)}
+                size="small"
+                fullWidth={isSm}
+                sx={{
+                  mb: 2,
+                  "& .MuiToggleButton-root": {
+                    flex: 1,
+                    minHeight: 42,
+                    px: { xs: 1, sm: 1.5 },
+                    whiteSpace: "nowrap",
+                  },
+                }}
+              >
                 {recoveryEmailOk && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> Email</ToggleButton>}
                 {recoveryPhoneOk && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> Phone</ToggleButton>}
               </ToggleButtonGroup>
@@ -519,9 +562,9 @@ export default function SigninOrSignup() {
             ) : (
               <TextField fullWidth label="Phone" name="phone" value={form.phone} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
-            <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ borderRadius: 3 }}>Send Code</Button>
+            <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
+              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Send Code</Button>
             </Stack>
           </Box>
         )}
@@ -530,9 +573,9 @@ export default function SigninOrSignup() {
           <Box component="form" onSubmit={handleRecoveryConfirm}>
             <TextField fullWidth label="Verification Code" name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
-            <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("recovery")} sx={{ borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ borderRadius: 3 }}>Verify</Button>
+            <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
+              <Button fullWidth variant="outlined" onClick={() => setStep("recovery")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Verify</Button>
             </Stack>
           </Box>
         )}
@@ -566,9 +609,9 @@ export default function SigninOrSignup() {
             ) : (
               <TextField fullWidth label="Phone" name="phone" type="tel" value={form.phone} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
-            <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ borderRadius: 3 }}>Send Reset Code</Button>
+            <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
+              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Send Reset Code</Button>
             </Stack>
           </Box>
         )}
@@ -578,9 +621,9 @@ export default function SigninOrSignup() {
             <TextField fullWidth label="Verification Code" name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             {renderPasswordFields({ isSetPassword: true, autoFocus: false })}
-            <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("password_recovery")} sx={{ borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ borderRadius: 3 }}>Reset & Login</Button>
+            <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
+              <Button fullWidth variant="outlined" onClick={() => setStep("password_recovery")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Reset & Login</Button>
             </Stack>
           </Box>
         )}
