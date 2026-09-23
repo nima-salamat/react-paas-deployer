@@ -17,6 +17,7 @@ import {
 } from "@mui/material";
 
 import SEO from "./components/seo/SEO.jsx";
+import ConnectionReconnectDialog from "./components/layout/ConnectionReconnectDialog.jsx";
 
 import Navbar from "./components/layout/Navbar.jsx";
 import Home from "./components/home/home.jsx";
@@ -324,6 +325,8 @@ export function App() {
     <HelmetProvider>
       <ThemeProvider theme={appTheme}>
         <CssBaseline enableColorScheme />
+
+        <ConnectionReconnectDialog />
 
         <TicketNotifyProvider>
           <RouteScrollManager />
