@@ -1072,7 +1072,7 @@ function serveStatic(req, res, pathname) {
 
     if (
       relativeIndex === '..' ||
-      relativeIndex.startsWith(`..\${path.sep}`) ||
+      relativeIndex.startsWith(`..${path.sep}`) ||
       path.isAbsolute(relativeIndex)
     ) {
       return false;
