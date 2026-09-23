@@ -118,19 +118,25 @@ export default function TicketList() {
             {refreshing ? " · refreshing…" : ""}
           </Typography>
         </Box>
-        <Button variant="contained" onClick={() => navigate("/dashboard/tickets/new")}>New ticket</Button>
+        <Button
+          variant="contained"
+          onClick={() => navigate("/dashboard/tickets/new")}
+          sx={{ minHeight: 44, width: { xs: "100%", sm: "auto" } }}
+        >
+          New ticket
+        </Button>
       </Stack>
 
       <Stack direction={{ xs: "column", md: "row" }} gap={1.5} mb={2}>
         <TextField size="small" label="Search" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} fullWidth />
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ width: { xs: "100%", md: 140 }, minWidth: 0 }}>
           <InputLabel>Status</InputLabel>
           <Select label="Status" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>
             <MenuItem value="">All</MenuItem>
             {Object.keys(STATUS_COLOR).map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" sx={{ width: { xs: "100%", md: 140 }, minWidth: 0 }}>
           <InputLabel>Priority</InputLabel>
           <Select label="Priority" value={priority} onChange={(e) => { setPage(1); setPriority(e.target.value); }}>
             <MenuItem value="">All</MenuItem>
