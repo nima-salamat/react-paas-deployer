@@ -106,6 +106,7 @@ export default function Sidebar({
   const navigate = useNavigate();
   const [listMenuAnchor, setListMenuAnchor] = useState(null);
   const [publicSearchQ, setPublicSearchQ] = useState("");
+  const [chatFilter, setChatFilter] = useState("all");
 
   const onRowContext = (e, conv) => {
     e.preventDefault();
@@ -205,7 +206,7 @@ export default function Sidebar({
         <TextField
           fullWidth
           size="small"
-          placeholder={listTab === 1 ? "Search public groups…" : "Search users…"}
+          placeholder={listTab === 1 ? "Search public groups…" : "Search conversations or people…"}
           value={listTab === 1 ? publicSearchQ : searchQ}
           onChange={(e) => {
             if (listTab === 1) {
@@ -274,42 +275,116 @@ export default function Sidebar({
       </Tabs>
 
       {listTab === 0 && searchQ.trim() ? (
-        <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
-          {searchResults.map((u) => (
-            <ListItemButton
-              key={u.id}
-              onClick={() => onViewUserProfile(u.id)}
-              sx={{ py: 1 }}
-            >
-              <ListItemAvatar>
-                <Avatar src={withTokenQuery(u.avatar) || undefined}>{u.username?.[0]?.toUpperCase()}</Avatar>
-              </ListItemAvatar>
-              <ListItemText
-                primary={u.username}
-                secondary={u.is_contact ? "Contact · tap to view profile" : "Tap to view profile"}
-              />
-              <Stack direction="row" spacing={0.5}>
-                <IconButton
-                  size="small"
-                  title="Start chat"
-                  onClick={(e) => { e.stopPropagation(); startDm(u); }}
-                >
-                  <ChatIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                  size="small"
-                  title="Add to contacts"
-                  onClick={(e) => { e.stopPropagation(); addContact(u.id); }}
-                >
-                  <PersonAddIcon fontSize="small" />
-                </IconButton>
-              </Stack>
-            </ListItemButton>
-          ))}
-          {!searching && !searchResults.length && (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>No users found</Typography>
-          )}
-        </List>
+        (() => {
+          const q = searchQ.trim().toLowerCase();
+          const matchingChats = conversations.filter((c) => {
+            const title = convTitle(c, meId).toLowerCase();
+            const preview = formatLastMessagePreview(c.last_message).toLowerCase();
+            const username = String(c.peer?.username || "").toLowerCase();
+            return title.includes(q) || preview.includes(q) || username.includes(q);
+          });
+          return (
+            <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+              {matchingChats.length > 0 && (
+                <>
+                  <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{ display: "block", px: 2, pt: 1.25, pb: 0.25, letterSpacing: 0.8 }}
+                  >
+                    Conversations
+                  </Typography>
+                  <List dense sx={{ py: 0 }}>
+                    {matchingChats.map((c) => (
+                      <ListItemButton
+                        key={c.id}
+                        selected={c.id === activeId}
+                        onClick={() => openChat(c)}
+                        onContextMenu={(e) => onRowContext(e, c)}
+                        sx={{
+                          mx: 0.75, my: 0.25, borderRadius: 2, py: 0.9,
+                          "&.Mui-selected": {
+                            bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
+                            "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.16) },
+                          },
+                        }}
+                      >
+                        <ListItemAvatar>
+                          <Badge
+                            badgeContent={formatUnread(c.unread_count)}
+                            color="error"
+                            max={999}
+                            overlap="circular"
+                            sx={{ "& .MuiBadge-badge": { fontSize: 10, height: 17, minWidth: 17, px: 0.45 } }}
+                          >
+                            <Box sx={{ position: "relative" }}>
+                              <Avatar src={convAvatar(c, meId)} sx={{ width: 46, height: 46 }}>
+                                {convTitle(c, meId)[0]?.toUpperCase()}
+                              </Avatar>
+                              {c.type === "private" && c.peer?.id && onlineUsers?.has(Number(c.peer.id)) && <OnlineDot />}
+                            </Box>
+                          </Badge>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={
+                            <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                              <Typography noWrap fontWeight={c.unread_count ? 700 : 600} fontSize={14.5}>
+                                {convTitle(c, meId)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">{formatTime(c.last_message_at)}</Typography>
+                            </Stack>
+                          }
+                          secondary={
+                            <Typography noWrap variant="body2" color="text.secondary" fontSize={13}>
+                              {c.draft_text ? `Draft: ${String(c.draft_text).slice(0, 70)}` : formatLastMessagePreview(c.last_message)}
+                            </Typography>
+                          }
+                        />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </>
+              )}
+              <Typography
+                variant="overline"
+                color="text.secondary"
+                sx={{ display: "block", px: 2, pt: matchingChats.length ? 1 : 1.25, pb: 0.25, letterSpacing: 0.8 }}
+              >
+                People
+              </Typography>
+              <List dense sx={{ py: 0 }}>
+                {searchResults.map((u) => (
+                  <ListItemButton key={u.id} onClick={() => onViewUserProfile(u.id)} sx={{ mx: 0.75, my: 0.25, borderRadius: 2, py: 0.85 }}>
+                    <ListItemAvatar>
+                      <Avatar src={withTokenQuery(u.avatar) || undefined}>
+                        {u.username?.[0]?.toUpperCase()}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={u.username}
+                      secondary={u.is_contact ? "Contact · open profile" : "Open profile"}
+                    />
+                    <Stack direction="row" spacing={0.25}>
+                      <IconButton size="small" title="Message" onClick={(e) => { e.stopPropagation(); startDm(u); }}>
+                        <ChatIcon fontSize="small" />
+                      </IconButton>
+                      {!u.is_contact && (
+                        <IconButton size="small" title="Add contact" onClick={(e) => { e.stopPropagation(); addContact(u.id); }}>
+                          <PersonAddIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Stack>
+                  </ListItemButton>
+                ))}
+                {!matchingChats.length && !searching && !searchResults.length && (
+                  <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
+                    Nothing found for "{searchQ.trim()}"
+                  </Typography>
+                )}
+              </List>
+            </Box>
+          );
+        })()
       ) : listTab === 1 ? (
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
@@ -324,12 +399,8 @@ export default function Sidebar({
                     if (isMember) {
                       openChat(g);
                     } else if (!pending && onConfirmJoinPublicGroup) {
-                      // Not a member and no pending request → open the
-                      // "Join this group?" confirmation dialog.
                       onConfirmJoinPublicGroup(g);
                     }
-                    // If pending, do nothing — the user can cancel from the
-                    // "My join requests" panel.
                   }}
                   sx={{ py: 1, opacity: isMember ? 1 : 0.9 }}
                 >
@@ -341,15 +412,8 @@ export default function Sidebar({
                       <Stack direction="row" spacing={0.5} alignItems="center">
                         <Typography component="span" noWrap fontWeight={600}>{g.title}</Typography>
                         {requiresApproval && (
-                          <Typography
-                            component="span"
-                            variant="caption"
-                            sx={{
-                              bgcolor: alpha("#9c27b0", 0.12),
-                              color: "#9c27b0",
-                              px: 0.5, borderRadius: 1, fontSize: 10, lineHeight: "16px",
-                            }}
-                          >
+                          <Typography component="span" variant="caption"
+                            sx={{ bgcolor: alpha("#9c27b0", 0.12), color: "#9c27b0", px: 0.5, borderRadius: 1, fontSize: 10, lineHeight: "16px" }}>
                             approval
                           </Typography>
                         )}
@@ -357,27 +421,20 @@ export default function Sidebar({
                     }
                     secondary={
                       <Typography variant="body2" color="text.secondary" component="span" noWrap>
-                        {(g.participants?.length || 0) + " members"}
-                        {g.description ? ` · ${g.description}` : ""}
+                        {(g.participants?.length || 0) + " members"}{g.description ? ` · ${g.description}` : ""}
                       </Typography>
                     }
                   />
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     {isMember ? (
-                      <Button size="small" color="primary" startIcon={<HowToRegIcon fontSize="small" />}
-                        onClick={(e) => { e.stopPropagation(); openChat(g); }}>
+                      <Button size="small" color="primary" startIcon={<HowToRegIcon fontSize="small"} onClick={(e) => { e.stopPropagation(); openChat(g); }}>
                         Open
                       </Button>
                     ) : pending ? (
-                      <Button size="small" disabled startIcon={<HourglassEmptyIcon fontSize="small" />}>
-                        Pending
-                      </Button>
+                      <Button size="small" disabled startIcon={<HourglassEmptyIcon fontSize="small"}>Pending</Button>
                     ) : (
-                      <Button
-                        size="small"
-                        variant={requiresApproval ? "outlined" : "contained"}
-                        onClick={(e) => { e.stopPropagation(); onJoinPublicGroup(g); }}
-                      >
+                      <Button size="small" variant={requiresApproval ? "outlined" : "contained"}
+                        onClick={(e) => { e.stopPropagation(); onJoinPublicGroup(g); }}>
                         {requiresApproval ? "Request" : "Join"}
                       </Button>
                     )}
@@ -396,7 +453,6 @@ export default function Sidebar({
               </Typography>
             )}
           </List>
-          {/* "My requests" entry — shows pending requests the current user has sent */}
           <Box sx={{ p: 1, borderTop: "1px solid", borderColor: "divider" }}>
             <Button size="small" fullWidth startIcon={<HourglassEmptyIcon fontSize="small" />} onClick={onOpenMyRequests}>
               My join requests
@@ -404,117 +460,121 @@ export default function Sidebar({
           </Box>
         </Box>
       ) : (
-        <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
-          {loadingConvs && <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress size={22} /></Box>}
-          {!loadingConvs && !conversations.length && (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
-              No chats yet. Search a username to start.
-            </Typography>
-          )}
-          {conversations.map((c) => {
-            const unread = formatUnread(c.unread_count);
-            const pinned = Boolean(c.is_pinned);
-            return (
-              <ListItemButton
-                key={c.id}
-                selected={c.id === activeId}
-                onClick={() => openChat(c)}
-                onContextMenu={(e) => onRowContext(e, c)}
-                sx={{
-                  py: 1.1,
-                  "&.Mui-selected": { bgcolor: (t) => alpha(t.palette.primary.main, 0.12) },
-                }}
-              >
-                <ListItemAvatar>
-                  <Badge
-                    badgeContent={unread}
-                    color="error"
-                    max={999}
-                    overlap="circular"
+        <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <Stack direction="row" spacing={0.5} sx={{ px: 1.25, pb: 0.75, overflowX: "auto", "&::-webkit-scrollbar": { display: "none" } }}>
+            {[
+              ["all", "All"],
+              ["unread", "Unread"],
+              ["pinned", "Pinned"],
+            ].map(([value, label]) => (
+              <Chip
+                key={value}
+                label={label}
+                size="small"
+                variant={chatFilter === value ? "filled" : "outlined"}
+                color={chatFilter === value ? "primary" : "default"}
+                onClick={() => setChatFilter(value)}
+                sx={{ borderRadius: 1.5, height: 30, flexShrink: 0 }}
+              />
+            ))}
+          </Stack>
+          <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
+            {loadingConvs && <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress size={22} /></Box>}
+            {!loadingConvs && !conversations.length && (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 3, textAlign: "center" }}>
+                No chats yet. Search a person above to start a conversation.
+              </Typography>
+            )}
+            {(() => {
+              const visible = conversations.filter((c) => (
+                chatFilter === "unread" ? Number(c.unread_count || 0) > 0
+                  : chatFilter === "pinned" ? Boolean(c.is_pinned)
+                    : true
+              ));
+              if (!visible.length && !loadingConvs) {
+                return (
+                  <Box sx={{ px: 2, py: 5, textAlign: "center" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {chatFilter === "unread" ? "You're all caught up." : "No pinned conversations."}
+                    </Typography>
+                  </Box>
+                );
+              }
+              return visible.map((c) => {
+                const unread = formatUnread(c.unread_count);
+                const pinned = Boolean(c.is_pinned);
+                return (
+                  <ListItemButton
+                    key={c.id}
+                    selected={c.id === activeId}
+                    onClick={() => openChat(c)}
+                    onContextMenu={(e) => onRowContext(e, c)}
                     sx={{
-                      "& .MuiBadge-badge": {
-                        fontSize: 11,
-                        height: 18,
-                        minWidth: 18,
-                        px: 0.5,
+                      mx: 0.6, my: 0.25,
+                      borderRadius: 2.25,
+                      py: 1.0,
+                      px: 1,
+                      transition: "background-color 120ms ease, transform 120ms ease",
+                      "&:hover": { transform: "translateX(1px)" },
+                      "&.Mui-selected": {
+                        bgcolor: (t) => alpha(t.palette.primary.main, 0.11),
+                        "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.15) },
                       },
                     }}
                   >
-                    <Box
-                      sx={{ position: "relative" }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (c.type === "private" && c.peer?.id) {
-                          onViewUserProfile?.(c.peer.id);
-                        } else if (c.type === "group") {
-                          // open chat info via selecting chat is fine; profile of group = open chat then info
-                          openChat?.(c);
-                        }
-                      }}
-                    >
-                      <Avatar src={convAvatar(c, meId)} sx={{ width: 48, height: 48, cursor: "pointer" }}>
-                        {convTitle(c, meId)[0]?.toUpperCase()}
-                      </Avatar>
-                      {c.type === "group" && (
-                        <Box
-                          sx={{
-                            position: "absolute",
-                            bottom: -2,
-                            right: -2,
-                            width: 18,
-                            height: 18,
-                            borderRadius: "50%",
-                            bgcolor: "background.paper",
-                            border: "1px solid",
-                            borderColor: "divider",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            zIndex: 1,
+                    <ListItemAvatar>
+                      <Badge badgeContent={unread} color="error" max={999} overlap="circular"
+                        sx={{ "& .MuiBadge-badge": { fontSize: 10.5, height: 18, minWidth: 18, px: 0.45 } }}>
+                        <Box sx={{ position: "relative" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (c.type === "private" && c.peer?.id) onViewUserProfile?.(c.peer.id);
+                            else if (c.type === "group") openChat?.(c);
                           }}
-                          title="Group"
                         >
-                          <GroupsIcon sx={{ fontSize: 12, color: "text.secondary" }} />
+                          <Avatar src={convAvatar(c, meId)} sx={{ width: 49, height: 49, cursor: "pointer" }}>
+                            {convTitle(c, meId)[0]?.toUpperCase()}
+                          </Avatar>
+                          {c.type === "group" && (
+                            <Box sx={{ position: "absolute", bottom: -2, right: -2, width: 18, height: 18, borderRadius: "50%",
+                              bgcolor: "background.paper", border: "1px solid", borderColor: "divider",
+                              display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <GroupsIcon sx={{ fontSize: 12, color: "text.secondary" }} />
+                            </Box>
+                          )}
+                          {c.type === "private" && c.peer?.id && onlineUsers?.has(Number(c.peer.id)) && <OnlineDot />}
                         </Box>
-                      )}
-                      {c.type === "private" && c.peer?.id && onlineUsers?.has(Number(c.peer.id)) && (
-                        <OnlineDot />
-                      )}
-                    </Box>
-                  </Badge>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={
-                    <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
-                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
-                        {pinned && (
-                          <PushPinIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />
-                        )}
-                        <Typography noWrap fontWeight={c.unread_count ? 700 : 600} fontSize={14.5}>
-                          {convTitle(c, meId)}
+                      </Badge>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                            {pinned && <PushPinIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />}
+                            <Typography noWrap fontWeight={Number(c.unread_count) > 0 ? 700 : 600} fontSize={14.5}>
+                              {convTitle(c, meId)}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+                            {formatTime(c.last_message_at)}
+                          </Typography>
+                        </Stack>
+                      }
+                      secondary={
+                        <Typography noWrap variant="body2" color="text.secondary" fontSize={13}
+                          sx={c.draft_text ? { fontStyle: "italic", color: "warning.main" } : undefined}
+                        >
+                          {c.draft_text ? `Draft: ${String(c.draft_text).slice(0, 80)}` : formatLastMessagePreview(c.last_message)}
                         </Typography>
-                      </Stack>
-                      <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-                        {formatTime(c.last_message_at)}
-                      </Typography>
-                    </Stack>
-                  }
-                  secondary={
-                    <Typography noWrap variant="body2" color="text.secondary" fontSize={13}
-                      sx={c.draft_text ? { fontStyle: "italic", color: "warning.main" } : undefined}
-                    >
-                      {c.draft_text
-                        ? `Draft: ${String(c.draft_text).slice(0, 80)}`
-                        : formatLastMessagePreview(c.last_message)}
-                    </Typography>
-                  }
-                />
-              </ListItemButton>
-            );
-          })}
-        </List>
+                      }
+                    />
+                  </ListItemButton>
+                );
+              });
+            })()}
+          </List>
+        </Box>
       )}
-
       {/* Chat-row context menu */}
       <ContextMenu ctx={ctx} onClose={() => setCtx(null)} minWidth={220}>
         {ctx && ctx.conv && (
