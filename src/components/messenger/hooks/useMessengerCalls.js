@@ -189,12 +189,11 @@ export default function useMessengerCalls({
     }
   }, [activeIdRef, flash, meId, openChat, resolveConversation]);
 
-  const endServerCall = useCallback(async (config, reason = "ended") => {
+  const endServerCall = useCallback(async (config, reason = "ended", retriesLeft = 3) => {
     const cid = config?.conversation_id;
     const callId = config?.call_id;
     if (!cid) return true;
 
-    let lastError = null;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         await apiRequest({
@@ -203,17 +202,16 @@ export default function useMessengerCalls({
           data: { call_id: callId, reason },
         });
         return true;
-      } catch (e) {
-        lastError = e;
+      } catch {
         if (attempt === 0) {
           await new Promise((resolve) => setTimeout(resolve, 350));
         }
       }
     }
 
-    if (lastError) {
-      endRetryTimerRef.current = setTimeout(async () => {
-        await endServerCall(config, reason);
+    if (retriesLeft > 0) {
+      endRetryTimerRef.current = setTimeout(() => {
+        endServerCall(config, reason, retriesLeft - 1);
       }, 1800);
     }
     return false;
