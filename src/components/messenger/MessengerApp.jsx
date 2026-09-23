@@ -5236,7 +5236,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               <Button
                 size="small"
                 onClick={bulkForwardSelected}
-                disabled={!selectedIds.size}
+                disabled={!selectedIds.size || selectedHasViewOnce}
+                title={selectedHasViewOnce ? "View-once media cannot be forwarded" : "Forward selected messages"}
               >
                 Forward
               </Button>
@@ -5915,6 +5916,14 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const ctxMsg = ctx?.message;
   const ctxMine = ctxMsg && String(ctxMsg.sender?.id) === String(meId);
+  const selectedHasViewOnce = useMemo(
+    () =>
+      Array.from(selectedIds).some((id) =>
+        (messages.find((m) => String(m.id) === String(id))?.attachments || [])
+          .some((att) => att?.is_view_once)
+      ),
+    [messages, selectedIds],
+  );
 
   // Right panel content (rendered inside the centered modal Dialog below)
   const panelIsOpen = Boolean(rightPanel) && rightPanel !== "my-profile";
