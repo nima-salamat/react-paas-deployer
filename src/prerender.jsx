@@ -15,15 +15,6 @@ const PRERENDER_ROUTES = INDEXABLE_PUBLIC_ROUTES.filter(
   (pathname) => pathname !== "/docs" && pathname !== "/signin_or_signup",
 );
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function escapeJsonLd(value) {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }

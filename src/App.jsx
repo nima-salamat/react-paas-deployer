@@ -57,23 +57,6 @@ const allowedThemeModes = new Set([
 const normalizeThemeMode = (value) =>
   allowedThemeModes.has(value) ? value : null;
 
-const getInitialThemeMode = () => "system";
-
-const getSystemTheme = () => {
-  if (
-    typeof window === "undefined" ||
-    !window.matchMedia
-  ) {
-    return "light";
-  }
-
-  return window.matchMedia(
-    "(prefers-color-scheme: dark)"
-  ).matches
-    ? "dark"
-    : "light";
-};
-
 function LegacyServiceRedirect() {
   const { id } = useParams();
   return <Navigate to={`/dashboard/services/${id}`} replace />;
