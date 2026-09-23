@@ -988,6 +988,18 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                       Logout
                     </Button>
                   </>
+                ) : isAuthPage ? (
+                  <Button
+                    fullWidth
+                    component={RouterLink}
+                    to="/"
+                    variant="contained"
+                    startIcon={<HomeOutlinedIcon />}
+                    onClick={closeDrawer}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    Back to site
+                  </Button>
                 ) : (
                   <Button
                     fullWidth
