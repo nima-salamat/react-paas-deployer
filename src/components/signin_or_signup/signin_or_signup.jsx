@@ -404,7 +404,6 @@ export default function SigninOrSignup() {
 
   return (
     <Box
-      component="main"
       sx={{
         minHeight: { xs: "calc(100dvh - 64px)", md: "calc(100dvh - 72px)" },
         width: "100%",
