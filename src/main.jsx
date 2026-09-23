@@ -1,5 +1,5 @@
 import React from "react";
-import { createRoot, hydrateRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import Root from "./Root.jsx";
@@ -12,22 +12,25 @@ if (!rootElement) {
   throw new Error("Root element #root was not found.");
 }
 
-const app = (
+/*
+ * The server may place a boot shell or prerendered HTML inside #root.
+ * The browser owns the root after this point, so remove stale shell nodes
+ * before mounting the interactive React application.
+ */
+Array.from(
+  document.querySelectorAll('div[id="root"]'),
+).forEach((element, index) => {
+  if (index > 0) element.remove();
+});
+
+rootElement
+  .querySelectorAll(".app-loading, #app-boot-shell")
+  .forEach((element) => element.remove());
+
+createRoot(rootElement).render(
   <React.StrictMode>
     <BrowserRouter>
       <Root />
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
-
-const prerendered = Boolean(
-  document.head.querySelector(
-    'meta[name="x-prerendered"][content="true"]',
-  ),
-);
-
-if (prerendered) {
-  hydrateRoot(rootElement, app);
-} else {
-  createRoot(rootElement).render(app);
-}
