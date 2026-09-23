@@ -91,6 +91,7 @@ import useKeyboardLayout from "./hooks/useKeyboardLayout";
 import useMessengerWebSocket from "./hooks/useMessengerWebSocket";
 import useMessengerCalls from "./hooks/useMessengerCalls";
 import MessengerDialogs from "./components/MessengerDialogs";
+import MessengerHome from "./components/MessengerHome";
 
 import CallIcon from "@mui/icons-material/Call";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -112,10 +113,9 @@ import {
   MSG_SESSION_MAX_MSGS,
 } from "./modules/msgCache";
 import { parseCallSystemBody, formatCallSystemLabel, normalizeMessage, normalizeMessages } from "./modules/callSystemMessage";
-import { getSenderGroupFlags } from "./modules/messageGrouping";
 import { readAppearance, writeAppearance, getPalette, normalizeColorThemeId } from "./modules/appearance";
 import { getScrollPrefetchPlan, shouldChainLoadOlder, shouldChainLoadNewer } from "./modules/scrollPrefetch";
-import { MSG_SCROLL_CLASS, MSG_SCROLL_STYLE_TEXT, updateScrollbarGutterVisibility } from "./modules/msgScrollStyles";
+import { MSG_SCROLL_STYLE_TEXT } from "./modules/msgScrollStyles";
 
 export default function MessengerApp({ themeMode = "system", onThemeModeChange }) {
   const theme = useTheme();
@@ -4527,19 +4527,18 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         </Box>
       )}
       {!activeId ? (
-        <Box sx={{
-          flex: 1, display: { xs: "none", md: "flex" },
-          alignItems: "center", justifyContent: "center",
-          flexDirection: "column", gap: 1,
-        }}>
-          <Typography color="text.secondary" variant="h6" fontWeight={500}>Messenger</Typography>
-          <Typography color="text.secondary" variant="body2">Select a chat or search for a user</Typography>
-          <Typography color="text.secondary" variant="caption">
-            Tip: Esc closes a chat · ArrowUp edits your last message · Right-click for more
-          </Typography>
-          <Button startIcon={<HomeOutlinedIcon />} onClick={() => navigate("/")} sx={{ mt: 2 }}>
-            Back to Deployer
-          </Button>
+        <Box sx={{ flex: 1, display: { xs: "none", md: "flex" }, minWidth: 0 }}>
+          <MessengerHome
+            chatCount={conversations.length}
+            onNewMessage={() => {
+              setDrawerOpen(true);
+              requestAnimationFrame(() => {
+                document.querySelector('input[data-messenger-search="true"]')?.focus?.();
+              });
+            }}
+            onCreateGroup={() => setCreateGroupOpen(true)}
+            onNavigateHome={() => navigate("/")}
+          />
         </Box>
       ) : (
         <>
