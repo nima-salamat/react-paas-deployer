@@ -161,6 +161,13 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
       onUploadProgress,
       ...(responseType ? { responseType } : {}),
     });
+
+    try {
+      window.dispatchEvent(new Event("app-network-recovered"));
+    } catch {
+      /* ignore */
+    }
+
     return response;
   } catch (error) {
     const status = error?.response?.status;
@@ -190,6 +197,24 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
         // refreshAccessToken already redirected on hard auth failure
         console.error("Token refresh failed", refreshErr);
         throw refreshErr;
+      }
+    }
+
+    const transientNetworkFailure =
+      !error?.response ||
+      error?.code === "ERR_NETWORK" ||
+      error?.code === "ECONNABORTED" ||
+      [502, 503, 504].includes(status);
+
+    if (transientNetworkFailure) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent("app-network-error", {
+            detail: { status: status || 0, code: error?.code || "" },
+          }),
+        );
+      } catch {
+        /* ignore */
       }
     }
 
