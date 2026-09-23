@@ -105,18 +105,7 @@ export function buildSchema(page, pathname, siteConfig, { docs = null } = {}) {
     },
   ];
 
-  if (pathname === "/") {
-    graph.push({
-      "@type": "SoftwareApplication",
-      "@id": `${siteUrl}/#software`,
-      name: siteName,
-      applicationCategory: "DeveloperApplication",
-      operatingSystem: "Web",
-      url: pageUrl,
-      description: page.description,
-      publisher: { "@id": `${siteUrl}/#organization` },
-    });
-  } else if (docs) {
+  if (docs) {
     graph.push({
       "@type": "TechArticle",
       "@id": `${pageUrl}#article`,

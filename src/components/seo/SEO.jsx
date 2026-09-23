@@ -61,7 +61,6 @@ export default function SEO() {
       <meta name="referrer" content="strict-origin-when-cross-origin" />
       <meta name="theme-color" content="#081325" />
       {!noindex && <link rel="canonical" href={url} />}
-      {!noindex && pathname === "/" && <link rel="amphtml" href={`${siteConfig.siteUrl}/amp/`} />}
       {!noindex && <link rel="alternate" hrefLang="en" href={url} />}
       {!noindex && <link rel="alternate" hrefLang="x-default" href={url} />}
       {page && (

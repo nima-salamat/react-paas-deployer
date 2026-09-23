@@ -95,14 +95,7 @@ function buildHead(page, pathname, noindex = false, docs = null) {
       page && !noindex
         ? `
       <link rel="canonical" href="${escapeHtml(url)}" />
-
-      ${
-        pathname === '/'
-          ? `<link rel="amphtml" href="${escapeHtml(`${SITE_URL}/amp/`)}" />`
-          : ''
-      }
-
-      <link rel="alternate" hreflang="en" href="${escapeHtml(url)}" />
+<link rel="alternate" hreflang="en" href="${escapeHtml(url)}" />
       <link rel="alternate" hreflang="x-default" href="${escapeHtml(url)}" />
     `
         : ''
@@ -1343,50 +1336,23 @@ const server = http.createServer(
       }
 
       /*
-       * AMP
+       * Legacy AMP URL
+       *
+       * AMP is no longer published. Keep existing URLs resolvable and
+       * consolidate any historical indexing signals onto the canonical home
+       * page with a permanent redirect.
        */
       if (
         pathname === '/amp' ||
         pathname === '/amp/'
       ) {
-        const ampPath =
-          path.join(
-            DIST_DIR,
-            'amp',
-            'index.html',
-          );
+        res.writeHead(301, {
+          ...securityHeaders,
+          Location: `/${requestUrl.search}`,
+        });
 
-        if (
-          fs.existsSync(ampPath)
-        ) {
-          const stat =
-            fs.statSync(ampPath);
-
-          res.writeHead(200, {
-            ...securityHeaders,
-
-            'Content-Type':
-              'text/html; charset=utf-8',
-
-            'Cache-Control':
-              'public, max-age=3600',
-
-            'Content-Length':
-              String(stat.size),
-          });
-
-          if (
-            req.method === 'HEAD'
-          ) {
-            res.end();
-          } else {
-            createReadStream(
-              ampPath,
-            ).pipe(res);
-          }
-
-          return;
-        }
+        res.end();
+        return;
       }
 
       /*
