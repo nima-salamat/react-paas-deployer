@@ -196,7 +196,11 @@ export default function TicketDetail() {
   return (
     <Box
       sx={{
-        height: { xs: "calc(100vh - 64px)", md: "calc(100vh - 80px)" },
+        height: {
+          xs: "calc(100dvh - 56px)",
+          sm: "calc(100dvh - 62px)",
+          md: "calc(100dvh - 80px)",
+        },
         maxWidth: 900,
         mx: "auto",
         display: "flex",
