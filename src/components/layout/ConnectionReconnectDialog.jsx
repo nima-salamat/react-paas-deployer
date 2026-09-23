@@ -78,7 +78,10 @@ export default function ConnectionReconnectDialog() {
         target instanceof HTMLLinkElement
       ) {
         const source = target.src || target.href || "";
-        if (source && looksLikeChunkFailure({ message: source })) {
+        const isLocalAsset =
+          source.startsWith(window.location.origin) &&
+          source.includes("/assets/");
+        if (isLocalAsset) {
           setFailure("chunk");
         }
       }
