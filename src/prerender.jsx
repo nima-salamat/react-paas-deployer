@@ -3,6 +3,7 @@ import { renderToString } from "react-dom/server";
 import PrerenderApp from "./PrerenderApp.jsx";
 import {
   INDEXABLE_PUBLIC_ROUTES,
+  PRERENDERABLE_PUBLIC_ROUTES,
   PUBLIC_PAGES,
   buildSchema,
   canonicalUrl,
@@ -11,9 +12,7 @@ import {
 } from "./seo-config.js";
 
 const SITE_CONFIG = getSiteConfig(import.meta.env);
-const PRERENDER_ROUTES = INDEXABLE_PUBLIC_ROUTES.filter(
-  (pathname) => pathname !== "/docs" && pathname !== "/signin_or_signup",
-);
+const PRERENDER_ROUTES = PRERENDERABLE_PUBLIC_ROUTES;
 
 function escapeJsonLd(value) {
   return JSON.stringify(value).replaceAll("<", "\\u003c");

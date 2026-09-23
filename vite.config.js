@@ -4,13 +4,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { vitePrerenderPlugin } from "vite-prerender-plugin";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { PRERENDERABLE_PUBLIC_ROUTES } from "./src/seo-config.js";
 
-const PRERENDER_ROUTES = [
-  "/",
-  "/plans",
-  "/aboutUs",
-];
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [
@@ -18,7 +14,7 @@ export default defineConfig({
     vitePrerenderPlugin({
       renderTarget: "#root",
       prerenderScript: path.resolve(__dirname, "src/prerender.jsx"),
-      additionalPrerenderRoutes: PRERENDER_ROUTES,
+      additionalPrerenderRoutes: PRERENDERABLE_PUBLIC_ROUTES,
       previewMiddlewareEnabled: true,
       previewMiddlewareFallback: "/index.html",
     }),
