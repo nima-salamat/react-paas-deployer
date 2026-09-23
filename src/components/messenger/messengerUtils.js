@@ -103,9 +103,39 @@ export function myRole(c, meId) {
 }
 
 export async function copyText(t) {
+  const text = t == null ? "" : String(t);
+
   try {
-    await navigator.clipboard.writeText(t || "");
-    return true;
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall through to the legacy DOM path.
+  }
+
+  if (typeof document === "undefined") return false;
+
+  try {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.setAttribute("aria-hidden", "true");
+    area.style.position = "fixed";
+    area.style.inset = "0 auto auto 0";
+    area.style.width = "1px";
+    area.style.height = "1px";
+    area.style.padding = "0";
+    area.style.border = "0";
+    area.style.opacity = "0";
+    area.style.pointerEvents = "none";
+    document.body.appendChild(area);
+    area.focus({ preventScroll: true });
+    area.select();
+    area.setSelectionRange(0, area.value.length);
+    const copied = document.execCommand("copy");
+    area.remove();
+    return copied;
   } catch {
     return false;
   }
