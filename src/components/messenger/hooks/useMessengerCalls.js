@@ -419,6 +419,7 @@ export default function useMessengerCalls({
 
         if (
           data.status === "ringing"
+          && data.participant_state !== "left"
           && String(data.initiator?.id) !== String(meId)
           && !callConfigRef.current
         ) {
@@ -456,6 +457,7 @@ export default function useMessengerCalls({
           });
           const data = unwrapData(res);
           if (!data?.active || data.status !== "ringing") continue;
+          if (data.participant_state === "left") continue;
           if (String(data.initiator?.id) === String(meId)) continue;
           if (surfaceIncoming(data, c.id)) return;
         } catch {
