@@ -494,7 +494,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
               aria-label="Open sidebar"
               onClick={() => setDrawerOpen(true)}
               sx={{
-                display: { xs: "inline-flex", md: "none" },
+                display: { xs: "inline-flex", lg: "none" },
                 borderRadius: 2,
                 border: "1px solid",
                 borderColor: alpha(theme.palette.text.primary, 0.08),
@@ -580,10 +580,10 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
             alignItems="center"
             spacing={0.25}
             sx={{
-              display: { xs: "none", md: "flex" },
+              display: { xs: "none", lg: "flex" },
               minWidth: 0,
               flex: 1,
-              mx: 1.5,
+              mx: 1,
               overflowX: "auto",
               scrollbarWidth: "none",
               "&::-webkit-scrollbar": { display: "none" },
