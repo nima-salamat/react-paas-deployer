@@ -27,8 +27,7 @@ import {
   Box, Typography, IconButton, CircularProgress, Menu, MenuItem, ListItemIcon,
   Stack, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
-  ListItemText, Divider, Fade, Chip, Popover, Tooltip, useMediaQuery, LinearProgress,
-  Snackbar, Paper,
+  ListItemText, Divider, Fade, Popover, useMediaQuery, LinearProgress, Paper,
 } from "@mui/material";
 import { useTheme, ThemeProvider, createTheme } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
@@ -52,14 +51,14 @@ import CloseIcon from "@mui/icons-material/Close";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 import apiRequest, { refreshAccessToken } from "../customHooks/apiRequest.jsx";
-import { MSG_API, WS_URL, unwrapData, unwrapList, authHeaders } from "./api";
+import { MSG_API, unwrapData, unwrapList, authHeaders } from "./api";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
   copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE, LOAD_OLDER_SIZE,
   downloadAttachmentToCache, getCachedAttachment, getIsMobileDevice,
 } from "./messengerUtils";
 import Sidebar from "./components/Sidebar";
-import MessageBubble, { MessageContextMenuItems } from "./components/MessageBubble";
+import { MessageContextMenuItems } from "./components/MessageBubble";
 import MessageTimeline from "./components/MessageTimeline";
 import MessageComposer from "./components/MessageComposer";
 import ImageCropDialog from "./components/ImageCropDialog";
@@ -95,8 +94,6 @@ import MessengerHome from "./components/MessengerHome";
 import ChatHeader from "./components/ChatHeader";
 
 import CallIcon from "@mui/icons-material/Call";
-import VideocamIcon from "@mui/icons-material/Videocam";
-import CallEndIcon from "@mui/icons-material/CallEnd";
 import SearchIcon from "@mui/icons-material/Search";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
