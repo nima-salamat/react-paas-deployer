@@ -1358,7 +1358,11 @@ export default function ServiceDetail() {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
+        minHeight: {
+          xs: "calc(100dvh - 56px)",
+          sm: "calc(100dvh - 62px)",
+          md: "calc(100dvh - 62px)",
+        },
         bgcolor: "background.default",
         pb: { xs: 9, md: 2 },
       }}
