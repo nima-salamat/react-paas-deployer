@@ -57,26 +57,13 @@ import {
   copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE, LOAD_OLDER_SIZE,
   downloadAttachmentToCache, getCachedAttachment, getIsMobileDevice,
 } from "./messengerUtils";
-import Sidebar from "./components/Sidebar";
-import { MessageContextMenuItems } from "./components/MessageBubble";
-import MessageTimeline from "./components/MessageTimeline";
-import MessageComposer from "./components/MessageComposer";
-import ImageCropDialog from "./components/ImageCropDialog";
-import ReadReceiptsDialog from "./components/ReadReceiptsDialog";
-import RightPanel from "./components/RightPanel";
-import MessengerProfileEditor from "./MessengerProfileEditor";
-import ContextMenu from "./components/ContextMenu";
-import AudioPlayerBar from "./components/AudioPlayerBar";
-import MediaGalleryDialog from "./components/MediaGalleryDialog";
-import ChatMediaLibraryDialog from "./components/ChatMediaLibraryDialog";
-import VideoEditDialog from "./components/VideoEditDialog";
-import PinnedMessageBar from "./components/PinnedMessageBar";
-import JitsiCallModal from "./components/JitsiCallModal";
-import IncomingCallBanner from "./components/IncomingCallBanner";
-import AddToContactsBanner from "./components/AddToContactsBanner";
-import GroupDescriptionBanner from "./components/GroupDescriptionBanner";
-import MessageSearchDialog from "./components/MessageSearchDialog";
-import PreviewTextBody from "./components/PreviewTextBody";
+import { Sidebar, MessengerHome, ChatHeader } from "./features/inbox";
+import { MessageTimeline, MessageContextMenuItems } from "./features/messages";
+import { MessageComposer } from "./features/composer";
+import { ImageCropDialog, ReadReceiptsDialog, MessengerDialogs, MessageSearchDialog, PinnedMessageBar, AddToContactsBanner, GroupDescriptionBanner, ContextMenu } from "./features/dialogs";
+import { AudioPlayerBar, MediaGalleryDialog, ChatMediaLibraryDialog, VideoEditDialog, PreviewTextBody } from "./features/media";
+import { MessengerProfileEditor } from "./features/profile";
+import { JitsiCallModal, IncomingCallBanner, useMessengerCalls, useMessengerWebSocket } from "./features/calls";
 import { attachMessengerOriginal, messengerOriginalOf, attachMessengerImageEdits, messengerImageEditsOf, attachMessengerVideoEdits, messengerVideoEditsOf, finalizeMessengerFiles, guessLangFromName } from "./modules/fileHelpers";
 import { mergeConversations } from "./modules/mergeConversations";
 import {
@@ -87,11 +74,7 @@ import {
 } from "./modules/composerDrafts";
 import { isGroupDescDismissed, persistGroupDescDismiss } from "./modules/groupDescDismiss";
 import useKeyboardLayout from "./hooks/useKeyboardLayout";
-import useMessengerWebSocket from "./hooks/useMessengerWebSocket";
-import useMessengerCalls from "./hooks/useMessengerCalls";
-import MessengerDialogs from "./components/MessengerDialogs";
-import MessengerHome from "./components/MessengerHome";
-import ChatHeader from "./components/ChatHeader";
+
 
 import CallIcon from "@mui/icons-material/Call";
 import SearchIcon from "@mui/icons-material/Search";
