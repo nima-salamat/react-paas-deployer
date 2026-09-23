@@ -215,6 +215,7 @@ export default function Sidebar({
               setSearchQ(e.target.value);
             }
           }}
+          inputProps={{ "data-messenger-search": "true" }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
