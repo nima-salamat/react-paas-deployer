@@ -818,11 +818,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   };
 
   /* -------------------- calls (helpers defined later, after openChat) -------------------- */
-  // Note: startCall / startCallWithUser are declared *after* openChat to
-  // avoid a temporal-dead-zone reference (openChat is a `const` defined
-  // further down). They are referenced by the chat header call buttons
-  // and by ProfileView, which only run after the component has mounted,
-  // so the late definition is safe.
+  // Call actions are provided by useMessengerCalls after openChat exists.
 
   /* -------------------- panel navigation -------------------- */
 
@@ -1713,7 +1709,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     activeCallInfo,
     callMode,
     setCallMode,
-    setActiveCallInfo,
     startCall,
     startCallWithUser,
     joinCall,
