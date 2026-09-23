@@ -70,16 +70,32 @@ for (const route of ROUTES) {
     fail(`${route.path}: canonical URL does not match ${route.url}.`);
   }
 
-  if (!html.includes(`<title>${route.title}</title>`)) {
-    fail(`${route.path}: title does not match the route registry.`);
+  const escapedTitle = route.title.replaceAll(
+    "&",
+    "&amp;",
+  );
+
+  if (
+    !html.includes(
+      `<title>${escapedTitle}</title>`,
+    )
+  ) {
+    fail(
+      `${route.path}: title does not match the route registry.`,
+    );
   }
 
   if (!/<h1\b[^>]*>/i.test(html)) {
     fail(`${route.path}: prerendered HTML contains no H1.`);
   }
 
-  if (/rel=["']amphtml["']/i.test(html) || /\/amp\/?["']/i.test(html)) {
-    fail(`${route.path}: stale AMP references remain in prerendered HTML.`);
+  if (
+    /rel=["']amphtml["']/i.test(html) ||
+    html.includes("/amp/")
+  ) {
+    fail(
+      `${route.path}: stale AMP references remain in prerendered HTML.`,
+    );
   }
 
   if (!/name=["']robots["'][^>]*content=["']index, follow/i.test(html)) {
