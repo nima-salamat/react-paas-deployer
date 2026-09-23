@@ -1109,6 +1109,17 @@ function serveStatic(req, res, pathname) {
       path.basename(filePath),
     );
 
+  /*
+   * HTML is always rendered through renderDocument() below.
+   * The build may contain prerendered React markup, but serving that file
+   * directly causes an unstyled React page to flash before the client bundle
+   * takes over. renderDocument replaces the root with the inline loading shell
+   * while preserving the SEO metadata/noscript response.
+   */
+  if (getContentType(filePath) === 'text/html; charset=utf-8') {
+    return false;
+  }
+
   if (getContentType(filePath) === 'text/html; charset=utf-8') {
     let html;
 
@@ -1608,7 +1619,9 @@ const server = http.createServer(
       }
 
       /*
-       * Real assets/files from dist/.
+       * Real non-HTML assets/files from dist/.
+       * HTML routes are handled by renderDocument() so the initial paint is
+       * always the loading shell instead of prerendered React markup.
        */
       if (
         serveStatic(
