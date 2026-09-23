@@ -453,7 +453,7 @@ export default function Sidebar({
                         Open
                       </Button>
                     ) : pending ? (
-                      <Button size="small" disabled startIcon={<HourglassEmptyIcon fontSize="small"}>Pending</Button>
+                      <Button size="small" disabled startIcon={<HourglassEmptyIcon fontSize="small" />}>Pending</Button>
                     ) : (
                       <Button size="small" variant={requiresApproval ? "outlined" : "contained"}
                         onClick={(e) => { e.stopPropagation(); onJoinPublicGroup(g); }}>
