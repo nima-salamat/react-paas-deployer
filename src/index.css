@@ -721,15 +721,15 @@
 @keyframes cursor-pulse { 50% { opacity: .45; } }
 
 @media (pointer: fine) and (hover: hover) {
-  html,
-  html *,
-  body {
+  html.custom-cursor-enabled,
+  html.custom-cursor-enabled *,
+  html.custom-cursor-enabled body {
     cursor: none !important;
   }
 
-  input,
-  textarea,
-  [contenteditable="true"] {
+  html.custom-cursor-enabled input,
+  html.custom-cursor-enabled textarea,
+  html.custom-cursor-enabled [contenteditable="true"] {
     cursor: none !important;
   }
 }
