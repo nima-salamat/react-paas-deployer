@@ -745,6 +745,10 @@ export default function Home() {
     navigate(loggedIn ? "/dashboard/services" : "/signin_or_signup");
   }, [navigate, loggedIn]);
 
+  const goDocs = useCallback(() => {
+    navigate("/docs");
+  }, [navigate]);
+
   return (
     <Box
       component="main"
@@ -899,8 +903,7 @@ export default function Home() {
                   {loggedIn ? "Open dashboard" : "Start deploying"}
                 </Button>
                 <Button
-                  component={RouterLink}
-                  to="/docs"
+                  onClick={goDocs}
                   size="large"
                   variant="outlined"
                   endIcon={<ArrowDownwardRoundedIcon />}
