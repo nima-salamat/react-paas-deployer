@@ -2182,7 +2182,7 @@ function MessageComposer({
         );
       })()}
 
-      {hasTextSelection && !editingMsg && (
+      {hasTextSelection && (
         <Box
           role="toolbar"
           aria-label="Text formatting"
