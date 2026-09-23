@@ -75,6 +75,11 @@ export default function CustomCursor() {
     const root = rootRef.current;
     if (!root) return undefined;
 
+    // Only hide the native cursor after the custom cursor is actually
+    // initialized. This leaves the system cursor available if JS fails,
+    // the effect is delayed, or the custom cursor cannot initialize.
+    document.documentElement.classList.add("custom-cursor-enabled");
+
     // Real mice report pointerType "mouse". Emulated mouse events produced by
     // taps on touch-screen laptops / hybrid devices are filtered out here too,
     // so the cursor can never be moved or stuck by touch input.
@@ -189,6 +194,7 @@ export default function CustomCursor() {
       document.documentElement.removeEventListener("mouseleave", handleDocumentLeave);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       finePointer.removeEventListener?.("change", handlePointerPreferenceChange);
+      document.documentElement.classList.remove("custom-cursor-enabled");
       cancelAnimationFrame(frameRef.current);
     };
   }, []);
