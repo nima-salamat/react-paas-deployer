@@ -68,7 +68,7 @@ Django API  →  Celery  →  Docker
 
 ## Requirements
 
-- Node.js 18+ (20+ recommended)  
+- Node.js 20.19+  
 - A running [django-paas-deployer](https://github.com/nima-salamat/django-paas-deployer) API  
 
 ---
