@@ -62,8 +62,8 @@ import SendIcon from "@mui/icons-material/Send";
 const MINI_W = 320;
 const MINI_H = 200;
 const MEDIA_KEY = "messenger.mediaDevices";
-const ALONE_TIMEOUT_MS = 45000;
-const BOOT_FALLBACK_MS = 8000;
+const DEFAULT_RING_TIMEOUT_MS = 30000;
+const CONFERENCE_JOIN_TIMEOUT_MS = 20000;
 
 /* ── Platform detection (deterministic, cached) ────────────────────── */
 function detectPlatform() {
@@ -164,25 +164,61 @@ function loadJitsiDeployConfig(domain) {
 
 function loadLibJitsi(domain) {
   return new Promise((resolve, reject) => {
-    if (typeof window === "undefined") { reject(new Error("No window")); return; }
-    if (window.JitsiMeetJS) { resolve(window.JitsiMeetJS); return; }
-    // Prefer the SAME server's lib so protocol matches Prosody/Jicofo versions.
-    const urls = [
-      `https://${domain}/libs/lib-jitsi-meet.min.js`,
-      `https://${domain}/lib-jitsi-meet.min.js`,
-      "https://cdn.jsdelivr.net/npm/lib-jitsi-meet-dist@latest/lib-jitsi-meet.min.js",
-    ];
-    let i = 0;
-    const next = () => {
-      if (i >= urls.length) { reject(new Error("Could not load media engine")); return; }
-      const s = document.createElement("script");
-      s.src = urls[i++];
-      s.async = true;
-      s.onload = () => { if (window.JitsiMeetJS) resolve(window.JitsiMeetJS); else next(); };
-      s.onerror = () => next();
-      document.body.appendChild(s);
-    };
-    next();
+    if (typeof window === "undefined") {
+      reject(new Error("No window"));
+      return;
+    }
+
+    const key = String(domain || "").toLowerCase();
+    const cache = window.__pdJitsiLibraries || (window.__pdJitsiLibraries = {});
+    const pending = window.__pdJitsiLibraryPromises || (window.__pdJitsiLibraryPromises = {});
+
+    if (cache[key]) {
+      resolve(cache[key]);
+      return;
+    }
+    if (pending[key]) {
+      pending[key].then(resolve, reject);
+      return;
+    }
+
+    pending[key] = new Promise((resolveInner, rejectInner) => {
+      let i = 0;
+      const urls = [
+        `https://${domain}/libs/lib-jitsi-meet.min.js`,
+        `https://${domain}/lib-jitsi-meet.min.js`,
+      ];
+
+      const next = () => {
+        if (i >= urls.length) {
+          rejectInner(new Error("Could not load the media engine from the configured call server"));
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = urls[i++];
+        script.async = true;
+        script.onload = () => {
+          if (!window.JitsiMeetJS) {
+            next();
+            return;
+          }
+          cache[key] = window.JitsiMeetJS;
+          resolveInner(window.JitsiMeetJS);
+        };
+        script.onerror = () => {
+          try { script.remove(); } catch { /* */ }
+          next();
+        };
+        (document.body || document.head).appendChild(script);
+      };
+
+      next();
+    });
+
+    pending[key].then(
+      (value) => { delete pending[key]; resolve(value); },
+      (err) => { delete pending[key]; reject(err); },
+    );
   });
 }
 
@@ -898,6 +934,7 @@ export default function JitsiCallModal({
   const onCloseRef = useRef(onClose);
   const dragRef = useRef({ active: false, ox: 0, oy: 0 });
   const startingRef = useRef(false);
+  const disposedRef = useRef(false);
   const audioCtxRef = useRef(null);
   const analyserRef = useRef(null);
   const rafRef = useRef(null);
@@ -1112,8 +1149,16 @@ export default function JitsiCallModal({
   useEffect(() => {
     if (!callConfig || !roomKey) return undefined;
     let disposed = false;
+    disposedRef.current = false;
+    let joinTimeoutId = null;
+    let deviceChangeHandler = null;
 
     const cleanup = async () => {
+      if (joinTimeoutId) clearTimeout(joinTimeoutId);
+      if (deviceChangeHandler) {
+        try { navigator.mediaDevices?.removeEventListener?.("devicechange", deviceChangeHandler); } catch { /* */ }
+        deviceChangeHandler = null;
+      }
       stopMicMeter();
       try {
         for (const t of localTracksRef.current) {
@@ -1200,6 +1245,18 @@ export default function JitsiCallModal({
           websocket: wsUrl,
         });
         connRef.current = connection;
+
+        const connectionEvents = JitsiMeetJS.events?.connection || {};
+        if (connectionEvents.CONNECTION_INTERRUPTED) {
+          connection.addEventListener(connectionEvents.CONNECTION_INTERRUPTED, () => {
+            if (!disposed) flash("Connection interrupted — reconnecting…");
+          });
+        }
+        if (connectionEvents.CONNECTION_RESTORED) {
+          connection.addEventListener(connectionEvents.CONNECTION_RESTORED, () => {
+            if (!disposed) flash("Connection restored");
+          });
+        }
 
         await new Promise((resolve, reject) => {
           const onOk = () => {
@@ -1424,6 +1481,13 @@ export default function JitsiCallModal({
           } catch { /* */ }
         };
 
+        let resolveConferenceJoined;
+        let rejectConferenceJoined;
+        const conferenceJoined = new Promise((resolve, reject) => {
+          resolveConferenceJoined = resolve;
+          rejectConferenceJoined = reject;
+        });
+
         const onJoined = () => {
           if (disposed || published) return;
           published = true;
@@ -1432,12 +1496,15 @@ export default function JitsiCallModal({
           publishLocalTracks();
           // Peer may already be in the room (callee joined first)
           syncExistingParticipants();
+          resolveConferenceJoined();
         };
         room.on(JitsiMeetJS.events.conference.CONFERENCE_JOINED, onJoined);
 
         room.on(JitsiMeetJS.events.conference.CONFERENCE_FAILED, (err) => {
           console.error("[call] CONFERENCE_FAILED", err);
-          if (!disposed) setError(String(err || "Conference failed"));
+          const failure = err instanceof Error ? err : new Error(String(err || "Conference failed"));
+          rejectConferenceJoined(failure);
+          if (!disposed) setError(failure.message);
         });
 
         try {
@@ -1488,22 +1555,23 @@ export default function JitsiCallModal({
             });
           } catch { /* */ }
         };
-        navigator.mediaDevices.addEventListener?.("devicechange", onDeviceChange);
+        deviceChangeHandler = onDeviceChange;
+        navigator.mediaDevices?.addEventListener?.("devicechange", deviceChangeHandler);
 
         room.join();
-        // Fallback: if CONFERENCE_JOINED is slow/missed, still try publish + stop spinner
-        setTimeout(() => {
-          if (disposed) return;
-          setLoading(false);
-          if (!published) {
-            published = true;
-            publishLocalTracks();
-          }
-        }, BOOT_FALLBACK_MS);
+        joinTimeoutId = setTimeout(() => {
+          rejectConferenceJoined(new Error("The call server did not join the conference in time"));
+        }, CONFERENCE_JOIN_TIMEOUT_MS);
+        await conferenceJoined;
+        if (joinTimeoutId) {
+          clearTimeout(joinTimeoutId);
+          joinTimeoutId = null;
+        }
       } catch (e) {
         if (!disposed) {
           setError(e?.message || "Could not start call");
           setLoading(false);
+          try { await cleanup(); } catch { /* */ }
         }
       } finally {
         startingRef.current = false;
@@ -1514,6 +1582,7 @@ export default function JitsiCallModal({
 
     return () => {
       disposed = true;
+      disposedRef.current = true;
       startingRef.current = false;
       cleanup();
     };
@@ -1551,21 +1620,50 @@ export default function JitsiCallModal({
   }, [hasPeer]);
 
   // Auto hangup:
-  //  1) Nobody ever joined → after ALONE_TIMEOUT_MS (ringing timeout)
-  //  2) Someone was here and everyone left → end quickly and announce
+  //  1) A ringing call must not outlive the server's authoritative 30s window.
+  //  2) After a real participant has joined, allow a short disconnect grace period.
   useEffect(() => {
-    if (loading || error) return undefined;
-    if (hasPeer) return undefined;
-    const grace = hadPeerRef.current ? 2500 : ALONE_TIMEOUT_MS;
-    const t = setTimeout(() => {
-      if (hadPeerRef.current) {
+    if (loading || error || hasPeer) return undefined;
+
+    const isRinging = String(callConfig?.call_status || "") === "ringing";
+    if (!isRinging && hadPeerRef.current) {
+      const t = setTimeout(() => {
         flash("Call ended — no one left in the call");
-      }
-      hangup();
-    }, grace);
+        hangup();
+      }, 2500);
+      return () => clearTimeout(t);
+    }
+
+    const configuredSeconds = Number(
+      callConfig?.ring_remaining
+      ?? callConfig?.ring_timeout
+      ?? (DEFAULT_RING_TIMEOUT_MS / 1000)
+    );
+    const configuredMs = Number.isFinite(configuredSeconds)
+      ? Math.max(1000, configuredSeconds * 1000)
+      : DEFAULT_RING_TIMEOUT_MS;
+    const startedAtMs = callConfig?.started_at
+      ? new Date(callConfig.started_at).getTime()
+      : NaN;
+    const remainingMs = Number.isFinite(startedAtMs)
+      ? Math.max(1000, startedAtMs + configuredMs - Date.now() + 1000)
+      : configuredMs + 1000;
+
+    const t = setTimeout(() => {
+      if (!disposedRef.current) hangup();
+    }, isRinging ? remainingMs : Math.max(2500, remainingMs));
+
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error, hasPeer]);
+  }, [
+    loading,
+    error,
+    hasPeer,
+    callConfig?.call_status,
+    callConfig?.ring_remaining,
+    callConfig?.ring_timeout,
+    callConfig?.started_at,
+  ]);
 
   /* ── Action handlers (every action is precondition-checked) ──────── */
 
