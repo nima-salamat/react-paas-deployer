@@ -14,6 +14,38 @@ const REFRESH_URLS = [
   `${API_HOST}/auth/api/login/token/refresh/`,
 ];
 
+function notifyNetworkError(error) {
+  const status = error?.response?.status;
+  const transient =
+    !error?.response ||
+    error?.code === "ERR_NETWORK" ||
+    error?.code === "ECONNABORTED" ||
+    [502, 503, 504].includes(status);
+
+  if (!transient) return;
+
+  try {
+    window.dispatchEvent(
+      new CustomEvent("app-network-error", {
+        detail: {
+          status: status || 0,
+          code: error?.code || "",
+        },
+      }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function notifyNetworkRecovered() {
+  try {
+    window.dispatchEvent(new Event("app-network-recovered"));
+  } catch {
+    /* ignore */
+  }
+}
+
 function isAccessTokenExpired(token, leewayMs = 5000) {
   if (!token) return true;
   try {
@@ -108,6 +140,7 @@ function refreshAccessToken() {
       }
 
       localStorage.setItem("access", access);
+      notifyNetworkRecovered();
       // SimpleJWT only returns a new refresh when ROTATE_REFRESH_TOKENS=True
       if (refreshResponse.data.refresh) {
         localStorage.setItem("refresh", refreshResponse.data.refresh);
@@ -121,6 +154,7 @@ function refreshAccessToken() {
 
       return access;
     } catch (err) {
+      notifyNetworkError(err);
       const status = err?.response?.status;
       // Only an explicit auth rejection proves that the refresh credential
       // is invalid. Network/timeout/5xx failures are transient and MUST NOT
@@ -200,24 +234,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
       }
     }
 
-    const transientNetworkFailure =
-      !error?.response ||
-      error?.code === "ERR_NETWORK" ||
-      error?.code === "ECONNABORTED" ||
-      [502, 503, 504].includes(status);
-
-    if (transientNetworkFailure) {
-      try {
-        window.dispatchEvent(
-          new CustomEvent("app-network-error", {
-            detail: { status: status || 0, code: error?.code || "" },
-          }),
-        );
-      } catch {
-        /* ignore */
-      }
-    }
-
+    notifyNetworkError(error);
     throw error;
   }
 };
