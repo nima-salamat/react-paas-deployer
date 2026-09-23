@@ -88,6 +88,7 @@ import {
 import { isGroupDescDismissed, persistGroupDescDismiss } from "./modules/groupDescDismiss";
 import useKeyboardLayout from "./hooks/useKeyboardLayout";
 import useMessengerWebSocket from "./hooks/useMessengerWebSocket";
+import useMessengerCalls from "./hooks/useMessengerCalls";
 import MessengerDialogs from "./components/MessengerDialogs";
 
 import CallIcon from "@mui/icons-material/Call";
@@ -410,21 +411,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   // Read receipts
   const [readersMessage, setReadersMessage] = useState(null);
-  // Jitsi call state
-  const [callConfig, setCallConfig] = useState(null);
-  const callConfigRef = useRef(null);
-  useEffect(() => { callConfigRef.current = callConfig; }, [callConfig]);
-  const [incomingCall, setIncomingCall] = useState(null); // { conversation_id, initiator, media, ... }
-  const [activeCallInfo, setActiveCallInfo] = useState(null); // ongoing/ringing in current chat
-  const [callMode, setCallMode] = useState("inline"); // "full" | "inline" | "mini" — from JitsiCallModal
-  // Telegram-style fixed video-note PiP (not draggable; tied to one conversation)
-  const [videoNotePip, setVideoNotePip] = useState(null); // { key, src, currentTime, conversationId, ... }
-
-  const seenRingIdsRef = useRef(new Set());
-  const incomingCallRef = useRef(null);
-  useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
-  const conversationsRef = useRef([]);
-  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+  // Call lifecycle is isolated in useMessengerCalls.
 
   // Video-note PiP: listen for hand-off from ChatVideo; stop when leaving that chat
   useEffect(() => {
@@ -452,53 +439,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   }, [activeId]);
 
 
-  // When chat changes, check live/ringing call (also covers offline→online within ring window)
-  useEffect(() => {
-    if (!activeId) {
-      setActiveCallInfo(null);
-      return undefined;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await apiRequest({
-          method: "GET",
-          url: `${MSG_API}/conversations/${activeId}/call/active/`,
-        });
-        const data = unwrapData(res);
-        if (cancelled) return;
-        if (data?.active) {
-          setActiveCallInfo({ ...data, conversation_id: data.conversation_id || activeId });
-          if (
-            data.status === "ringing"
-            && String(data.initiator?.id) !== String(meId)
-            && !callConfigRef.current
-          ) {
-            const rid = data.call_id;
-            if (rid && !seenRingIdsRef.current.has(String(rid))) {
-              seenRingIdsRef.current.add(String(rid));
-              const remaining = data.ring_remaining ?? 30;
-              setIncomingCall({
-                conversation_id: data.conversation_id || activeId,
-                call_id: data.call_id,
-                media: data.media,
-                is_video: data.is_video,
-                initiator: data.initiator,
-                ring_timeout: remaining,
-                _receivedAt: Date.now() - (30 - remaining) * 1000,
-                replay: true,
-              });
-            }
-          }
-        } else {
-          setActiveCallInfo(null);
-        }
-      } catch {
-        if (!cancelled) setActiveCallInfo(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [activeId, meId]);
 
   // Profile / contacts / blocks / invites
   const [profileData, setProfileData] = useState(null);
@@ -698,69 +638,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   }, []);
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
-  /**
-   * Cross-chat incoming-call poller.
-   *
-   * When the user is sitting in chat A, they should still be alerted if
-   * someone rings them in chat B. We poll each conversation (except the
-   * active one) every ~12s, looking for ringing sessions we haven't seen
-   * yet. If found, we surface the incoming-call banner so the user can
-   * accept or decline.
-   *
-   * We bail out entirely if the user is already in a call (callConfig set)
-   * or already showing an incoming-call banner.
-   */
-  useEffect(() => {
-    if (callConfig) return undefined;
-    let cancelled = false;
-
-    const checkConversations = async () => {
-      if (cancelled) return;
-      if (incomingCallRef.current) return;
-      const convs = conversationsRef.current || [];
-      const candidates = convs
-        .filter((c) => String(c.id) !== String(activeIdRef.current))
-        .slice(0, 25);
-      for (const c of candidates) {
-        if (cancelled || incomingCallRef.current) return;
-        try {
-          const res = await apiRequest({
-            method: "GET",
-            url: `${MSG_API}/conversations/${c.id}/call/active/`,
-          });
-          if (cancelled) return;
-          const data = unwrapData(res);
-          if (!data?.active) continue;
-          if (data.status !== "ringing") continue;
-          if (String(data.initiator?.id) === String(meId)) continue;
-          const rid = data.call_id;
-          if (!rid || seenRingIdsRef.current.has(String(rid))) continue;
-          seenRingIdsRef.current.add(String(rid));
-          const remaining = data.ring_remaining ?? 30;
-          setIncomingCall({
-            conversation_id: data.conversation_id || c.id,
-            call_id: data.call_id,
-            media: data.media,
-            is_video: data.is_video,
-            initiator: data.initiator,
-            ring_timeout: remaining,
-            _receivedAt: Date.now() - (30 - remaining) * 1000,
-            replay: true,
-          });
-          return;
-        } catch { /* ignore — likely 404 */ }
-      }
-    };
-
-    const initial = setTimeout(checkConversations, 2000);
-    const interval = setInterval(checkConversations, 12000);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(initial);
-      clearInterval(interval);
-    };
-  }, [callConfig, meId]);
 
   // Cancel pending scroll rAF on unmount
   useEffect(() => () => {
@@ -1773,123 +1650,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }, 900);
   }, [isMobile, loadMessages, loadConversationDetail, loadOlder, flushDraftToServer]);
 
-  /* -------------------- calls -------------------- */
-
-  /**
-   * Start a new call in the ACTIVE conversation.
-   * Refuses to start if the user is already in another call (busy).
-   *
-   * Defined here (after openChat) because startCallWithUser depends on
-   * openChat — declaring it earlier would hit a TDZ violation under
-   * strict-mode bundlers (Vite production build).
-   */
-  const startCall = useCallback(async ({ video, audio = true } = {}) => {
-    if (!activeId) return;
-    if (callConfigRef.current) {
-      flash("You're already in a call — end it first");
-      return;
-    }
-    // Compute the active conversation inline — `activeConv` is a derived
-    // value defined further down in the component body, so referencing it
-    // here would hit a TDZ violation in production builds. We replicate the
-    // same derivation locally from already-declared state.
-    const conv = activeDetail || conversations.find((c) => c.id === activeId);
-    try {
-      const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/${activeId}/call/`,
-        data: { video, audio },
-      });
-      const cfg = unwrapData(res);
-      if (cfg?.room) {
-        const isGroup = conv?.type === "group";
-        const peer = !isGroup ? peerUser(conv, meId) : null;
-        setCallConfig({
-          ...cfg,
-          is_initiator: true,
-          is_group: isGroup,
-          conversation_id: activeId,
-          peer_title: isGroup
-            ? (convTitle(conv, meId) || "Group call")
-            : (peer?.username || peer?.display_name || convTitle(conv, meId) || "Call"),
-          peer_avatar: withTokenQuery(
-            isGroup ? convAvatar(conv, meId) : (peer?.avatar || peer?.avatar_url || convAvatar(conv, meId))
-          ) || null,
-        });
-        setActiveCallInfo({
-          call_id: cfg.call_id,
-          status: "ringing",
-          is_video: !!video,
-          initiator: { id: meId, username: "You" },
-          conversation_id: activeId,
-        });
-      }
-    } catch (e) {
-      flash(e?.response?.data?.message || "Could not start call");
-    }
-  }, [activeId, activeDetail, conversations, meId, flash]);
-
-  /**
-   * Start a call with a specific user (used by ProfileView call buttons).
-   * Opens (or reuses) the DM with that user, then starts the call.
-   */
-  const startCallWithUser = useCallback(async (user, opts = {}) => {
-    if (!user?.id) return;
-    if (callConfigRef.current) {
-      flash("You're already in a call — end it first");
-      return;
-    }
-    try {
-      // Ensure a DM exists
-      const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/`,
-        data: { type: "private", user_id: user.id },
-      });
-      const conv = unwrapData(res) || res?.data;
-      const convId = conv?.id;
-      if (!convId) {
-        flash("Could not open conversation");
-        return;
-      }
-      // Open the chat (does nothing if already open)
-      openChat(conv);
-      // Small delay so activeId propagates before we fire the call
-      setTimeout(() => {
-        (async () => {
-          try {
-            const r = await apiRequest({
-              method: "POST",
-              url: `${MSG_API}/conversations/${convId}/call/`,
-              data: { video: !!opts.video, audio: true },
-            });
-            const cfg = unwrapData(r);
-            if (cfg?.room) {
-              setCallConfig({
-                ...cfg,
-                is_initiator: true,
-                is_group: false,
-                conversation_id: convId,
-                peer_title: user.username || user.display_name || "Call",
-                peer_avatar: withTokenQuery(user.avatar || user.avatar_url) || null,
-              });
-              setActiveCallInfo({
-                call_id: cfg.call_id,
-                status: "ringing",
-                is_video: !!opts.video,
-                initiator: { id: meId, username: "You" },
-                conversation_id: convId,
-              });
-            }
-          } catch (e) {
-            flash(e?.response?.data?.message || "Could not start call");
-          }
-        })();
-      }, 250);
-    } catch (e) {
-      flash(e?.response?.data?.message || "Could not start call");
-    }
-  }, [flash, meId, openChat]);
 
   /* bootstrap + hash restore */
   useEffect(() => {
@@ -1947,16 +1707,41 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     setRemoteEmojiPlay({ messageId: String(messageId), key: Date.now() });
   }, []);
 
+  const {
+    callConfig,
+    incomingCall,
+    activeCallInfo,
+    callMode,
+    setCallMode,
+    setActiveCallInfo,
+    startCall,
+    startCallWithUser,
+    joinCall,
+    declineIncomingCall,
+    timeoutIncomingCall,
+    endActiveCall,
+    handleCallEvent,
+    callConversationId,
+    callConv,
+    incomingCallBusy,
+  } = useMessengerCalls({
+    meId,
+    activeId,
+    activeIdRef,
+    activeDetail,
+    conversations,
+    openChat,
+    flash,
+    wsRef,
+  });
   useMessengerWebSocket({
     meId,
     wsRef,
     activeIdRef,
-    callConfigRef,
     panelHistoryRef,
     messagesCacheRef,
     nearBottomRef,
     pendingNewIdsRef,
-    seenRingIdsRef,
     bottomRef,
     loadConversations,
     loadMessages,
@@ -1970,13 +1755,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     setMessages,
     setOnlineUsers,
     setTypingUsers,
-    setIncomingCall,
-    setCallConfig,
-    setActiveCallInfo,
     setNewBelowCount,
     setText: forceComposerText,
     setConversations,
     onRemoteEmojiPlay,
+    onCallEvent: handleCallEvent,
   });
 
 
@@ -4613,16 +4396,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // header, above the audio player) so it never escapes the viewport on
   // window resize. We build it as a stable element here so the chat pane
   // can drop it into the right slot.
-  // Resolve the conversation the active call belongs to — never the currently
-  // open chat if the user navigated away mid-call.
-  const callConversationId = callConfig?.conversation_id || null;
-  const callConv = useMemo(() => {
-    if (!callConversationId) return null;
-    if (String(activeId) === String(callConversationId)) {
-      return activeDetail || activeConv || null;
-    }
-    return conversations.find((c) => String(c.id) === String(callConversationId)) || null;
-  }, [callConversationId, activeId, activeDetail, activeConv, conversations]);
 
   const callMemberDirectory = useMemo(() => {
     const conv = callConv || (String(activeId) === String(callConversationId) ? (activeDetail || activeConv) : null);
@@ -4720,20 +4493,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       loadingMore={String(activeId) === String(callConversationId) ? loadingMore : false}
       hasMoreMessages={String(activeId) === String(callConversationId) ? hasMoreMsgs : false}
       onModeChange={setCallMode}
-      onClose={async () => {
-        const cid = callConfig?.conversation_id || activeId;
-        const callId = callConfig?.call_id;
-        setCallConfig(null);
-        setCallMode("inline");
-        if (cid) {
-          try {
-            await apiRequest({
-              method: "POST",
-              url: `${MSG_API}/conversations/${cid}/call/end/`,
-              data: { call_id: callId, reason: "ended" },
-            });
-          } catch { /* */ }
-        }
+      onClose={() => {
+        void endActiveCall("ended");
       }}
     />
   ) : null;
@@ -5322,31 +5083,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
                   color="success"
                   size="small"
                   sx={{ bgcolor: "success.main", color: "#fff", "&:hover": { bgcolor: "success.dark" } }}
-                  onClick={async () => {
-                    const cid = activeId;
-                    const callId = activeCallInfo.call_id;
-                    try {
-                      const res = await apiRequest({
-                        method: "GET",
-                        url: `${MSG_API}/conversations/${cid}/call/join/` + (callId ? `?call_id=${encodeURIComponent(callId)}` : ""),
-                      });
-                      const cfg = unwrapData(res);
-                      if (cfg?.room) {
-                        setIncomingCall(null);
-                        setCallConfig({
-                          ...cfg,
-                          is_initiator: false,
-                          is_group: activeConv?.type === "group",
-                          conversation_id: cid,
-                          peer_title: activeCallInfo.initiator?.username || convTitle(activeConv, meId) || "Call",
-                          peer_avatar: null,
-                        });
-                        setActiveCallInfo(null);
-                      }
-                    } catch (e) {
-                      flash(e?.response?.data?.message || "Could not join call");
-                    }
-                  }}
+                  onClick={() => { void joinCall(activeCallInfo); }}
                 >
                   <CallIcon fontSize="small" />
                 </IconButton>
@@ -6291,79 +6028,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       {incomingCall && !callConfig && (
         <IncomingCallBanner
           incomingCall={incomingCall}
-          onAccept={async () => {
-            const cid = incomingCall.conversation_id;
-            const callId = incomingCall.call_id;
-            setIncomingCall(null);
-            try {
-              const res = await apiRequest({
-                method: "GET",
-                url: `${MSG_API}/conversations/${cid}/call/join/` + (callId ? `?call_id=${encodeURIComponent(callId)}` : ""),
-              });
-              const cfg = unwrapData(res);
-              if (cfg?.room) {
-                if (incomingCall.media) {
-                  cfg.config = {
-                    ...(cfg.config || {}),
-                    startWithVideoMuted: !incomingCall.media.video,
-                    startWithAudioMuted: !incomingCall.media.audio,
-                  };
-                }
-                const joinConv = conversations.find((c) => String(c.id) === String(cid));
-                const isGroupCall = !!incomingCall.is_group || joinConv?.type === "group";
-                const initiator = incomingCall.initiator || {};
-                // Private call: show the other person's identity, not whichever chat is open
-                const peerTitle = isGroupCall
-                  ? (convTitle(joinConv, meId) || incomingCall.peer_title || "Group call")
-                  : (initiator.username || initiator.display_name || incomingCall.peer_title || "Call");
-                const peerAv = isGroupCall
-                  ? withTokenQuery(convAvatar(joinConv, meId))
-                  : withTokenQuery(initiator.avatar || initiator.avatar_url) || null;
-                setCallConfig({
-                  ...cfg,
-                  is_initiator: false,
-                  is_group: isGroupCall,
-                  conversation_id: cid,
-                  peer_title: peerTitle,
-                  peer_avatar: peerAv,
-                });
-                // Always open the conversation the call belongs to
-                if (String(activeId) !== String(cid)) {
-                  if (joinConv) openChat(joinConv);
-                  else {
-                    // Cold join: still switch active id so chat pane matches the call
-                    openChat({ id: cid, type: isGroupCall ? "group" : "private", peer: initiator });
-                  }
-                }
-              }
-            } catch (e) {
-              flash(e?.response?.data?.message || "Could not join call");
-            }
-          }}
-          onDecline={async () => {
-            const cid = incomingCall.conversation_id;
-            const callId = incomingCall.call_id;
-            setIncomingCall(null);
-            try {
-              await apiRequest({
-                method: "POST",
-                url: `${MSG_API}/conversations/${cid}/call/end/`,
-                data: { call_id: callId, reason: "declined" },
-              });
-            } catch { /* */ }
-          }}
-          onTimeout={async () => {
-            const cid = incomingCall.conversation_id;
-            const callId = incomingCall.call_id;
-            setIncomingCall(null);
-            try {
-              await apiRequest({
-                method: "POST",
-                url: `${MSG_API}/conversations/${cid}/call/end/`,
-                data: { call_id: callId, reason: "no_answer" },
-              });
-            } catch { /* */ }
-          }}
+          onAccept={() => { void joinCall(incomingCall); }}
+          onDecline={() => { void declineIncomingCall(); }}
+          onTimeout={() => { void timeoutIncomingCall(); }}
+          busy={incomingCallBusy}
         />
       )}
 
