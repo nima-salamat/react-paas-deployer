@@ -73,7 +73,7 @@ const themeChoices = [
   { value: "system", label: "System", icon: SettingsBrightnessOutlinedIcon },
 ];
 
-export default function Navbar({ themeMode = "system", onThemeModeChange }) {
+export default function Navbar({ themeMode = "system", onThemeModeChange, isAuthPage = false }) {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -487,13 +487,14 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
             minHeight: { xs: 64, sm: 72 },
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 0.75, sm: 1.25 }, minWidth: 0, flexShrink: 1 }}>
             <IconButton
               edge="start"
               color="inherit"
               aria-label="Open sidebar"
               onClick={() => setDrawerOpen(true)}
               sx={{
+                display: { xs: "inline-flex", md: "none" },
                 borderRadius: 2,
                 border: "1px solid",
                 borderColor: alpha(theme.palette.text.primary, 0.08),
@@ -548,16 +549,77 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
                     minWidth: 0,
                   }}
                 >
-                  <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 900,
+                      lineHeight: 1.05,
+                      fontSize: { xs: "1rem", sm: "1.15rem", md: "1.25rem" },
+                    }}
+                    noWrap
+                  >
                     PassDeployer
                   </Typography>
-                  <Typography variant="caption" color="text.secondary" noWrap>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    noWrap
+                    sx={{ display: { xs: "none", sm: "block" } }}
+                  >
                     Modern control panel
                   </Typography>
                 </Box>
               </Box>
             </Button>
           </Box>
+
+          <Stack
+            component="nav"
+            aria-label="Primary navigation"
+            direction="row"
+            alignItems="center"
+            spacing={0.25}
+            sx={{
+              display: { xs: "none", md: "flex" },
+              minWidth: 0,
+              flex: 1,
+              mx: 1.5,
+              overflowX: "auto",
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
+            {visibleNavItems.map((item) => {
+              const active = isActive(item.path);
+              const Icon = item.icon;
+              return (
+                <Button
+                  key={item.path}
+                  component={RouterLink}
+                  to={item.path}
+                  size="small"
+                  startIcon={<Icon sx={{ fontSize: 18 }} />}
+                  aria-current={active ? "page" : undefined}
+                  sx={{
+                    minHeight: 42,
+                    px: 1.15,
+                    borderRadius: 2,
+                    color: active ? "primary.main" : "text.secondary",
+                    fontWeight: active ? 800 : 650,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    bgcolor: active ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.16 : 0.08) : "transparent",
+                    "&:hover": {
+                      bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.13 : 0.06),
+                      color: "text.primary",
+                    },
+                  }}
+                >
+                  {item.label}
+                </Button>
+              );
+            })}
+          </Stack>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             {!checkingAuth && loggedIn ? (
@@ -597,38 +659,49 @@ export default function Navbar({ themeMode = "system", onThemeModeChange }) {
             ) : !checkingAuth ? (
               <>
                 {/* Mobile View: Icon Only */}
-                <IconButton
-                  onClick={() => handleSignInClick({ fromMenu: false })}
-                  aria-label="Sign in"
-                  sx={{
-                    display: { xs: "flex", sm: "none" },
-                    border: "1px solid",
-                    borderColor: alpha(theme.palette.text.primary, 0.14),
-                    color: "inherit",
-                    bgcolor: alpha(theme.palette.background.paper, 0.16),
-                    borderRadius: 2,
-                  }}
-                >
-                  <LoginOutlinedIcon fontSize="small" />
-                </IconButton>
+                {!isAuthPage && (
+                  <IconButton
+                    onClick={() => handleSignInClick({ fromMenu: false })}
+                    aria-label="Sign in"
+                    sx={{
+                      display: { xs: "flex", sm: "none" },
+                      border: "1px solid",
+                      borderColor: alpha(theme.palette.text.primary, 0.14),
+                      color: "inherit",
+                      bgcolor: alpha(theme.palette.background.paper, 0.16),
+                      borderRadius: 2,
+                    }}
+                  >
+                    <LoginOutlinedIcon fontSize="small" />
+                  </IconButton>
+                )}
 
                 {/* Tablet/Desktop View: Full Text Button */}
-                <Button
-                  variant="outlined"
-                  onClick={() => handleSignInClick({ fromMenu: false })}
-                  startIcon={<LoginOutlinedIcon />}
-                  sx={{
-                    display: { xs: "none", sm: "flex" },
-                    borderColor: alpha(theme.palette.text.primary, 0.14),
-                    color: "inherit",
-                    bgcolor: alpha(theme.palette.background.paper, 0.16),
-                    textTransform: "none",
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Sign in / Sign up
-                </Button>
+                {isAuthPage ? (
+                  <Button
+                    component={RouterLink}
+                    to="/"
+                    variant="outlined"
+                    startIcon={<HomeOutlinedIcon />}
+                    sx={{
+                      minHeight: 42,
+                      px: { xs: 1, sm: 1.5 },
+                      minWidth: { xs: 42, sm: "auto" },
+                      borderColor: alpha(theme.palette.text.primary, 0.14),
+                      color: "inherit",
+                      bgcolor: alpha(theme.palette.background.paper, 0.16),
+                      fontWeight: 700,
+                      whiteSpace: "nowrap",
+                      "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.75 } },
+                    }}
+                  >
+                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                      Back to site
+                    </Box>
+                  </Button>
+                ) : (
+                <Button\n                  variant="outlined"\n                  onClick={() => handleSignInClick({ fromMenu: false })}\n                  startIcon={<LoginOutlinedIcon />}\n                  sx={{\n                    display: { xs: "none", sm: "flex" },\n                    borderColor: alpha(theme.palette.text.primary, 0.14),\n                    color: "inherit",\n                    bgcolor: alpha(theme.palette.background.paper, 0.16),\n                    textTransform: "none",\n                    fontWeight: 700,\n                    whiteSpace: "nowrap",\n                  }}\n                >\n                  Sign in / Sign up\n                </Button>
+                )}
               </>
             ) : null}
           </Box>
