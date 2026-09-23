@@ -63,6 +63,7 @@ export default function IncomingCallBanner({
   onAccept,
   onDecline,
   onTimeout,
+  busy = false,
 }) {
   const ringRef = useRef(null);
   const timeoutRef = useRef(null);
@@ -108,7 +109,7 @@ export default function IncomingCallBanner({
           backdropFilter: "blur(2px)",
           pointerEvents: "auto",
         }}
-        onClick={onDecline}
+        onClick={busy ? undefined : onDecline}
       />
 
       {/* Floating call card */}
@@ -192,7 +193,8 @@ export default function IncomingCallBanner({
         >
           <Stack alignItems="center" spacing={0.75}>
             <IconButton
-              onClick={onDecline}
+              onClick={busy ? undefined : onDecline}
+              disabled={busy}
               sx={{
                 bgcolor: "error.main",
                 color: "#fff",
@@ -209,7 +211,8 @@ export default function IncomingCallBanner({
 
           <Stack alignItems="center" spacing={0.75}>
             <IconButton
-              onClick={onAccept}
+              onClick={busy ? undefined : onAccept}
+              disabled={busy}
               sx={{
                 bgcolor: "success.main",
                 color: "#fff",
@@ -226,7 +229,7 @@ export default function IncomingCallBanner({
             >
               {isVideo ? <VideocamIcon sx={{ fontSize: 28 }} /> : <CallIcon sx={{ fontSize: 28 }} />}
             </IconButton>
-            <Typography variant="caption" color="text.secondary">Accept</Typography>
+            <Typography variant="caption" color="text.secondary">{busy ? "Connecting…" : "Accept"}</Typography>
           </Stack>
         </Stack>
 
