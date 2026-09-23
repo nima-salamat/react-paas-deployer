@@ -15,6 +15,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GroupsIcon from "@mui/icons-material/Groups";
 import { formatCallSystemLabel, parseCallSystemBody } from "../modules/callSystemMessage";
 import PushPinIcon from "@mui/icons-material/PushPin";
@@ -153,6 +154,26 @@ export default function Sidebar({
           <Avatar src={meAvatar || undefined} sx={{ width: 36, height: 36 }} />
         </IconButton>
         <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Messenger</Typography>
+        <IconButton
+          size="small"
+          onClick={() => {
+            setListTab(0);
+            setSearchQ("");
+            requestAnimationFrame(() => {
+              document.querySelector('input[data-messenger-search="true"]')?.focus?.();
+            });
+          }}
+          title="New message"
+          aria-label="New message"
+          sx={{
+            borderRadius: 2,
+            color: "primary.main",
+            bgcolor: (t) => alpha(t.palette.primary.main, 0.08),
+            "&:hover": { bgcolor: (t) => alpha(t.palette.primary.main, 0.14) },
+          }}
+        >
+          <EditOutlinedIcon fontSize="small" />
+        </IconButton>
         <IconButton
           size="small"
           onClick={(e) => setListMenuAnchor(e.currentTarget)}
