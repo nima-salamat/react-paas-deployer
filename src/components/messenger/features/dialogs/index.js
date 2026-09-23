@@ -6,3 +6,4 @@ export { default as PinnedMessageBar } from "../../components/PinnedMessageBar";
 export { default as AddToContactsBanner } from "../../components/AddToContactsBanner";
 export { default as GroupDescriptionBanner } from "../../components/GroupDescriptionBanner";
 export { default as ContextMenu } from "../../components/ContextMenu";
+export * from "../../modules/groupDescDismiss";

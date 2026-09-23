@@ -5,4 +5,5 @@ export * as inbox from "./inbox";
 export * as media from "./media";
 export * as messages from "./messages";
 export * as profile from "./profile";
+export * as settings from "./settings";
 export * as shared from "./shared";
