@@ -427,7 +427,7 @@ export default function Sidebar({
                   />
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     {isMember ? (
-                      <Button size="small" color="primary" startIcon={<HowToRegIcon fontSize="small"} onClick={(e) => { e.stopPropagation(); openChat(g); }}>
+                      <Button size="small" color="primary" startIcon={<HowToRegIcon fontSize="small" />} onClick={(e) => { e.stopPropagation(); openChat(g); }}>
                         Open
                       </Button>
                     ) : pending ? (
