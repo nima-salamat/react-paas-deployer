@@ -57,22 +57,21 @@ import {
   copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE, LOAD_OLDER_SIZE,
   downloadAttachmentToCache, getCachedAttachment, getIsMobileDevice,
 } from "./messengerUtils";
-import { Sidebar, MessengerHome, ChatHeader } from "./features/inbox";
-import { MessageTimeline, MessageContextMenuItems } from "./features/messages";
-import { MessageComposer } from "./features/composer";
-import { ImageCropDialog, ReadReceiptsDialog, MessengerDialogs, MessageSearchDialog, PinnedMessageBar, AddToContactsBanner, GroupDescriptionBanner, ContextMenu } from "./features/dialogs";
-import { AudioPlayerBar, MediaGalleryDialog, ChatMediaLibraryDialog, VideoEditDialog, PreviewTextBody } from "./features/media";
+import { Sidebar, MessengerHome, ChatHeader, mergeConversations } from "./features/inbox";
+import { MessageTimeline, MessageContextMenuItems, slimMessageForCache, readMessengerMsgCache, writeMessengerMsgCache, touchMessengerMsgCache, MSG_SESSION_MAX_MSGS, getScrollPrefetchPlan, shouldChainLoadOlder, shouldChainLoadNewer, MSG_SCROLL_STYLE_TEXT } from "./features/messages";
+import { MessageComposer, writeComposerDraft, readComposerDraft, resolveComposerDraft, draftPayload } from "./features/composer";
+import { ImageCropDialog, ReadReceiptsDialog, MessengerDialogs, MessageSearchDialog, PinnedMessageBar, AddToContactsBanner, GroupDescriptionBanner, isGroupDescDismissed, persistGroupDescDismiss } from "./features/dialogs";
+import { AudioPlayerBar, MediaGalleryDialog, ChatMediaLibraryDialog, VideoEditDialog, PreviewTextBody, attachMessengerOriginal, messengerOriginalOf, attachMessengerImageEdits, messengerImageEditsOf, attachMessengerVideoEdits, messengerVideoEditsOf, finalizeMessengerFiles, guessLangFromName } from "./features/media";
 import { MessengerProfileEditor } from "./features/profile";
-import { JitsiCallModal, IncomingCallBanner, useMessengerCalls, useMessengerWebSocket } from "./features/calls";
-import { attachMessengerOriginal, messengerOriginalOf, attachMessengerImageEdits, messengerImageEditsOf, attachMessengerVideoEdits, messengerVideoEditsOf, finalizeMessengerFiles, guessLangFromName } from "./features/media";
-import { mergeConversations } from "./features/inbox";
+import { JitsiCallModal, IncomingCallBanner, useMessengerCalls, useMessengerWebSocket, parseCallSystemBody, formatCallSystemLabel, normalizeMessage, normalizeMessages } from "./features/calls";
+import { RightPanel, readAppearance, writeAppearance, getPalette, normalizeColorThemeId } from "./features/settings";
+import { ContextMenu } from "./features/shared";
 import {
   writeComposerDraft,
   readComposerDraft,
   resolveComposerDraft,
   draftPayload,
 } from "./features/composer";
-import { isGroupDescDismissed, persistGroupDescDismiss } from "./features/dialogs";
 import useKeyboardLayout from "./hooks/useKeyboardLayout";
 
 
@@ -86,17 +85,6 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
 
 
-import {
-  slimMessageForCache,
-  readMessengerMsgCache,
-  writeMessengerMsgCache,
-  touchMessengerMsgCache,
-  MSG_SESSION_MAX_MSGS,
-} from "./features/messages";
-import { parseCallSystemBody, formatCallSystemLabel, normalizeMessage, normalizeMessages } from "./features/calls";
-import { readAppearance, writeAppearance, getPalette, normalizeColorThemeId } from "./features/settings";
-import { getScrollPrefetchPlan, shouldChainLoadOlder, shouldChainLoadNewer } from "./features/messages";
-import { MSG_SCROLL_STYLE_TEXT } from "./features/messages";
 
 export default function MessengerApp({ themeMode = "system", onThemeModeChange }) {
   const theme = useTheme();
