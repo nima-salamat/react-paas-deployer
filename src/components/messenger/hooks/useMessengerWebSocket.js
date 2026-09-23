@@ -46,6 +46,61 @@ useEffect(() => {
 
   const buildUrl = (tok) => `${WS_URL}?token=${encodeURIComponent(tok)}`;
 
+  const patchReactionLocally = (conversationId, messageId, emoji, action, actorId) => {
+    const cid = String(conversationId);
+    const mid = String(messageId);
+    const actorIsMe = String(actorId) === String(meId);
+
+    const patchMessages = (items) =>
+      (items || []).map((message) => {
+        if (String(message.id) !== mid) return message;
+
+        const current = Array.isArray(message.reactions) ? message.reactions : [];
+        const index = current.findIndex((r) => String(r?.emoji) === String(emoji));
+        const nextReactions = current.map((r) => ({ ...r }));
+
+        if (action === "added") {
+          if (index < 0) {
+            nextReactions.push({ emoji, count: 1, mine: actorIsMe });
+          } else {
+            nextReactions[index] = {
+              ...nextReactions[index],
+              count: Number(nextReactions[index].count || 0) + 1,
+              mine: actorIsMe ? true : !!nextReactions[index].mine,
+            };
+          }
+        } else if (action === "removed" && index >= 0) {
+          const currentCount = Number(nextReactions[index].count || 0);
+          if (currentCount <= 1) {
+            nextReactions.splice(index, 1);
+          } else {
+            nextReactions[index] = {
+              ...nextReactions[index],
+              count: currentCount - 1,
+              mine: actorIsMe ? false : !!nextReactions[index].mine,
+            };
+          }
+        }
+
+        return { ...message, reactions: nextReactions };
+      });
+
+    setMessages((items) => patchMessages(items));
+
+    try {
+      const cached = messagesCacheRef.current.get(cid);
+      if (cached?.messages) {
+        messagesCacheRef.current.set(cid, {
+          ...cached,
+          messages: patchMessages(cached.messages),
+          savedAt: Date.now(),
+        });
+      }
+    } catch {
+      // Cache is an optimization; live state is authoritative.
+    }
+  };
+
   const handleOnMessage = (ev) => {
     let data;
     try { data = JSON.parse(ev.data); } catch { return; }
@@ -190,7 +245,8 @@ useEffect(() => {
           }
         }
         if (data.type === "message.read") {
-          // Peer (or self on another device) marked messages read → update ticks on my messages
+          // Read receipts are local UI state. Re-fetching the entire history here
+          // causes scroll jumps and can undo an in-progress history window.
           const idsRaw = data.message_ids || data.read_ids || data.ids || [];
           const idSet = new Set(
             (Array.isArray(idsRaw) ? idsRaw : [data.message_id || data.last_read_id])
@@ -198,24 +254,42 @@ useEffect(() => {
               .map((x) => String(x))
           );
           const readerId = data.user_id ?? data.reader_id ?? data.read_by;
-          // If server only sends last_read_id, mark all of my earlier msgs as read
           const lastRead = data.last_read_id != null ? Number(data.last_read_id) : null;
-          setMessages((prev) => prev.map((m) => {
+          const patchRead = (items) => (items || []).map((m) => {
             if (String(m.sender?.id) !== String(meId)) return m;
             if (m.read_state === "read") return m;
             if (idSet.has(String(m.id))) return { ...m, read_state: "read" };
             if (lastRead != null && Number(m.id) <= lastRead) return { ...m, read_state: "read" };
-            // Some backends only emit conversation-level read without ids
             if (!idSet.size && lastRead == null && readerId != null && String(readerId) !== String(meId)) {
               return { ...m, read_state: "read" };
             }
             return m;
-          }));
-        }
-        if (data.type !== "message.read") {
-          loadMessages(activeIdRef.current, { silent: true });
-        } else {
-          // Still soft-refresh to stay consistent with server
+          });
+          setMessages(patchRead);
+          try {
+            const cid = String(data.conversation_id);
+            const cached = messagesCacheRef.current.get(cid);
+            if (cached?.messages) {
+              messagesCacheRef.current.set(cid, {
+                ...cached,
+                messages: patchRead(cached.messages),
+                savedAt: Date.now(),
+              });
+            }
+          } catch {
+            // Cache is an optimization.
+          }
+        } else if (data.type === "message.reaction") {
+          patchReactionLocally(
+            data.conversation_id,
+            data.message_id || data.id,
+            data.emoji,
+            data.action,
+            data.user_id ?? data.actor_id,
+          );
+        } else if (data.type === "message.new" || data.type === "message.edited") {
+          // These events can change the message window itself, so retain the
+          // existing background refresh behavior.
           loadMessages(activeIdRef.current, { silent: true });
         }
       }
