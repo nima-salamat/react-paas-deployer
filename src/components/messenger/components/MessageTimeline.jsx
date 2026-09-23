@@ -72,7 +72,7 @@ export default function MessageTimeline(props) {
   const onCancelSchedule = async (msg) => {
     if (!msg?.id) return;
     try {
-      await apiRequest({ method: "POST", url: `${MSG_API}messages/${msg.id}/cancel-schedule/` });
+      await apiRequest({ method: "POST", url: `${MSG_API}/messages/${msg.id}/cancel-schedule/` });
       setMessages((prev) => prev.filter((m) => String(m.id) !== String(msg.id)));
       flash("Scheduled message cancelled");
     } catch (e) {
@@ -80,6 +80,7 @@ export default function MessageTimeline(props) {
     }
   };
 
+  return (
   <Box
     ref={listRef} className={MSG_SCROLL_CLASS} onScroll={onScrollMsgs}
     onMouseMove={(e) => {
@@ -363,4 +364,5 @@ export default function MessageTimeline(props) {
     <div ref={bottomRef} />
 
   </Box>
+  );
 }
