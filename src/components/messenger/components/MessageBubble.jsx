@@ -2506,9 +2506,11 @@ export function MessageContextMenuItems({
       <MenuItem onClick={(e) => onReact(e, ctxMsg)}>
         <ListItemIcon><EmojiEmotionsIcon fontSize="small" /></ListItemIcon> React
       </MenuItem>
-      <MenuItem onClick={() => onForward(ctxMsg)}>
-        <ListItemIcon><ForwardIcon fontSize="small" /></ListItemIcon> Forward
-      </MenuItem>
+      {!ctxAtts.some((att) => att?.is_view_once) && (
+        <MenuItem onClick={() => onForward(ctxMsg)}>
+          <ListItemIcon><ForwardIcon fontSize="small" /></ListItemIcon> Forward
+        </MenuItem>
+      )}
       {onPinMessage && (
         <MenuItem onClick={() => onPinMessage(ctxMsg)}>
           <ListItemIcon>
