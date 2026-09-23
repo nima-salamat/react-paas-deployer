@@ -66,12 +66,6 @@ import { MessengerProfileEditor } from "./features/profile";
 import { JitsiCallModal, IncomingCallBanner, useMessengerCalls, useMessengerWebSocket, parseCallSystemBody, formatCallSystemLabel, normalizeMessage, normalizeMessages } from "./features/calls";
 import { RightPanel, readAppearance, writeAppearance, getPalette, normalizeColorThemeId } from "./features/settings";
 import { ContextMenu } from "./features/shared";
-import {
-  writeComposerDraft,
-  readComposerDraft,
-  resolveComposerDraft,
-  draftPayload,
-} from "./features/composer";
 import useKeyboardLayout from "./hooks/useKeyboardLayout";
 
 
