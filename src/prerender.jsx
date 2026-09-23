@@ -1,4 +1,4 @@
-import { renderToString } from "react-dom/server";
+import { renderToString } from "react-dom/server.edge";
 
 import PrerenderApp from "./PrerenderApp.jsx";
 import {
