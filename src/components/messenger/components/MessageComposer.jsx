@@ -1962,12 +1962,27 @@ function MessageComposer({
       )}
       {files.length > 0 && (
         <Box sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderColor: "divider" }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.25, pt: 0.75, pb: 0.25 }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            justifyContent="space-between"
+            spacing={{ xs: 0.5, sm: 1 }}
+            sx={{ px: 1.25, pt: 0.75, pb: 0.25 }}
+          >
             <Typography variant="caption" color="text.secondary" fontWeight={700}>
               {files.length} {files.length === 1 ? "file" : "files"} selected
             </Typography>
             {files.some((f) => String(f.type || "").startsWith("image/") || String(f.type || "").startsWith("video/")) && (
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75, flexWrap: "wrap" }}>
+              <Stack
+                direction="row"
+                spacing={0.75}
+                alignItems="center"
+                sx={{
+                  mb: { xs: 0.5, sm: 0.75 },
+                  flexWrap: "wrap",
+                  width: { xs: "100%", sm: "auto" },
+                }}
+              >
                 {setMediaSpoiler && (
                   <Chip
                     size="small"
