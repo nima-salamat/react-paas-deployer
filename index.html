@@ -67,7 +67,19 @@
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root">
+    <div
+      class="app-loading"
+      role="status"
+      aria-live="polite"
+      aria-label="Loading PassDeployer…"
+    >
+      <div class="app-loading__inner">
+        <div class="app-loading__spinner" aria-hidden="true"></div>
+        <p class="app-loading__text">Loading PassDeployer…</p>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.jsx"></script>
 </body>
