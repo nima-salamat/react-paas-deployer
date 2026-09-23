@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import apiRequest, { refreshAccessToken } from "../../customHooks/apiRequest.jsx";
 import { MSG_API, WS_URL } from "../api";
 import { writeComposerDraft } from "../modules/composerDrafts";
@@ -34,12 +34,14 @@ export default function useMessengerWebSocket({
   onRemoteEmojiPlay,
   onCallEvent,
 }) {
+  const onCallEventRef = useRef(onCallEvent);
+  onCallEventRef.current = onCallEvent;
+
 useEffect(() => {
   let cancelled = false;
   let pingTimer = null;
   let reconnectTimer = null;
   let refreshing = false;
-  const onCallEventRef = { current: onCallEvent };
 
   const buildUrl = (tok) => `${WS_URL}?token=${encodeURIComponent(tok)}`;
 
@@ -97,8 +99,6 @@ useEffect(() => {
       // Cache is an optimization; live state is authoritative.
     }
   };
-
-  onCallEventRef.current = onCallEvent;
 
   const handleOnMessage = (ev) => {
     let data;
