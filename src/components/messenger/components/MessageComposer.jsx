@@ -2209,6 +2209,7 @@ function MessageComposer({
                 <IconButton
                   size="small"
                   aria-label={item.label}
+                  onPointerDown={(e) => e.preventDefault()}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => applyTextFormat(item.kind)}
                   sx={{ minWidth: 40, minHeight: 40, borderRadius: 1.5 }}
