@@ -1374,7 +1374,14 @@ function MessageComposer({
   const addPickedFiles = (list) => {
     const picked = Array.from(list || []).filter(Boolean);
     if (!picked.length) return;
-    setFiles((prev) => [...prev, ...picked]);
+    setFiles((prev) => {
+      const room = Math.max(0, 10 - prev.length);
+      const accepted = picked.slice(0, room);
+      if (accepted.length < picked.length) {
+        setRecordError("You can attach up to 10 files per message.");
+      }
+      return [...prev, ...accepted];
+    });
     // Open image/video editor for first media file if single image/video
     // (caller can edit via strip). Keep all in list.
   };
