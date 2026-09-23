@@ -700,7 +700,22 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                     </Box>
                   </Button>
                 ) : (
-                <Button\n                  variant="outlined"\n                  onClick={() => handleSignInClick({ fromMenu: false })}\n                  startIcon={<LoginOutlinedIcon />}\n                  sx={{\n                    display: { xs: "none", sm: "flex" },\n                    borderColor: alpha(theme.palette.text.primary, 0.14),\n                    color: "inherit",\n                    bgcolor: alpha(theme.palette.background.paper, 0.16),\n                    textTransform: "none",\n                    fontWeight: 700,\n                    whiteSpace: "nowrap",\n                  }}\n                >\n                  Sign in / Sign up\n                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => handleSignInClick({ fromMenu: false })}
+                  startIcon={<LoginOutlinedIcon />}
+                  sx={{
+                    display: { xs: "none", sm: "flex" },
+                    borderColor: alpha(theme.palette.text.primary, 0.14),
+                    color: "inherit",
+                    bgcolor: alpha(theme.palette.background.paper, 0.16),
+                    textTransform: "none",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Sign in / Sign up
+                </Button>
                 )}
               </>
             ) : null}
