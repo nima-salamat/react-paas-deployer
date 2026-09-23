@@ -32,9 +32,11 @@ export const PUBLIC_PAGES = {
 };
 
 export const NOINDEX_PREFIXES = [
+  "/dashboard",
   "/profile",
   "/services",
-  "/service/",
+  "/service",
+  "/service_detail",
   "/volumes",
   "/networks",
   "/tickets",
@@ -56,9 +58,17 @@ export function isDocsPath(pathname = "/") {
 export function isNoIndex(pathname) {
   const normalized = normalizePathname(pathname);
   return NOINDEX_PREFIXES.some(
-    (prefix) => normalized === prefix || normalized.startsWith(prefix),
+    (prefix) =>
+      normalized === prefix ||
+      normalized.startsWith(`${prefix}/`),
   );
 }
+
+export const INDEXABLE_PUBLIC_ROUTES = Object.freeze(
+  Object.keys(PUBLIC_PAGES).filter(
+    (pathname) => !isNoIndex(pathname),
+  ),
+);
 
 export function getSiteConfig(env = {}) {
   const siteUrl = String(env.VITE_APP_URL || DEFAULT_SITE_URL).replace(/\/+$/, "");
