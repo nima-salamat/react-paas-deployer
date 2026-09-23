@@ -2643,7 +2643,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       await apiRequest({ method: "DELETE", url: `${MSG_API}/contacts/${userId}/` });
       flash("Removed");
       setContacts((prev) => prev.filter((c) => c.contact?.id !== userId));
-    } catch { /* */ }
+    } catch (e) {
+      setError(e?.response?.data?.message || "Remove failed");
+    }
   };
 
   const blockUser = async (userId) => {
@@ -3406,7 +3408,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       loadConversationDetail(activeId);
       flash("Revoked");
-    } catch { /* */ }
+    } catch (e) {
+      setError(e?.response?.data?.message || "Revoke failed");
+    }
   };
 
   const joinByCode = async () => {
