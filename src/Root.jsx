@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { CacheProvider } from "@emotion/react";
 import { createEmotionCache } from "./emotionCache";
 
@@ -7,7 +7,10 @@ import App from "./App.jsx";
 import CustomCursor from "./components/layout/CustomCursor.jsx";
 
 export default function Root({ emotionCache = null }) {
-  const cache = emotionCache || createEmotionCache();
+  const cache = useMemo(
+    () => emotionCache || createEmotionCache(),
+    [emotionCache],
+  );
 
   return (
     <CacheProvider value={cache}>
