@@ -226,6 +226,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
           onUploadProgress,
           ...(responseType ? { responseType } : {}),
         });
+        notifyNetworkRecovered();
         return retryResponse;
       } catch (refreshErr) {
         // refreshAccessToken already redirected on hard auth failure
