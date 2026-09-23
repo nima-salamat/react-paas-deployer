@@ -93,11 +93,19 @@ const Layout = ({
     location.pathname.startsWith("/dashboard/") ||
     location.pathname.startsWith("/service/") ||
     location.pathname.startsWith("/services/");
-  const loggedIn =
-    typeof window !== "undefined" &&
-    Boolean(
-      window.localStorage.getItem("access")
-    );
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    try {
+      setLoggedIn(
+        Boolean(
+          window.localStorage.getItem("access")
+        )
+      );
+    } catch {
+      setLoggedIn(false);
+    }
+  }, []);
 
   return (
     <Box
