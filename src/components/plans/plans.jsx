@@ -738,24 +738,30 @@ export default function PlatformPlans() {
             </Box>
           </Stack>
 
-          <Stack direction="row" spacing={1}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
+          >
             <Button
+              fullWidth={isMobile}
               variant="outlined"
               size="small"
               startIcon={<RefreshIcon />}
               onClick={retryAll}
               disabled={loadingPlatforms || loadingPlans}
-              sx={{ borderRadius: 1 }}
+              sx={{ borderRadius: 1, whiteSpace: "nowrap" }}
             >
               Refresh
             </Button>
             <Button
+              fullWidth={isMobile}
               variant="outlined"
               size="small"
               startIcon={<LaunchIcon />}
               component={RouterLink}
               to="/services"
-              sx={{ borderRadius: 1 }}
+              sx={{ borderRadius: 1, whiteSpace: "nowrap" }}
             >
               Services
             </Button>
