@@ -165,7 +165,13 @@ export default function ServicesToolbar({
               e.preventDefault();
               onSearch();
             }}
-            sx={{ display: "flex", gap: 1, flexGrow: 1, minWidth: 200 }}
+            sx={{
+              display: "flex",
+              gap: 1,
+              flexGrow: 1,
+              width: { xs: "100%", sm: "auto" },
+              minWidth: { xs: 0, sm: 200 },
+            }}
           >
             <TextField
               fullWidth
@@ -182,13 +188,15 @@ export default function ServicesToolbar({
                 borderRadius: 1.5,
                 textTransform: "none",
                 fontWeight: 700,
-                px: 2.5,
+                px: { xs: 1.75, sm: 2.5 },
+                flexShrink: 0,
+                minHeight: 40,
               }}
             >
               Search
             </Button>
           </Box>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" sx={{ width: { xs: "100%", sm: 140 }, minWidth: 0 }}>
             <InputLabel>View</InputLabel>
             <Select
               value={viewMode}
