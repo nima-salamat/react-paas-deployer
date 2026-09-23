@@ -28,11 +28,14 @@ const {
 } = SITE_CONFIG;
 
 const DOCS_CACHE_TTL_MS = 5 * 60 * 1000;
+const PUBLIC_DOC_CACHE_TTL_MS = 15 * 60 * 1000;
 
 let docsSitemapCache = {
   expiresAt: 0,
   items: [],
 };
+
+const publicDocCache = new Map();
 
 function escapeHtml(value) {
   return String(value)
@@ -658,6 +661,82 @@ async function fetchPublicJson(pathname) {
   }
 }
 
+async function fetchPublicJsonWithStatus(pathname) {
+  if (!API_ORIGIN) {
+    return {
+      ok: false,
+      status: 0,
+      transient: true,
+      data: null,
+    };
+  }
+
+  const controller = new AbortController();
+
+  const timer = setTimeout(
+    () => controller.abort(),
+    2500,
+  );
+
+  try {
+    const response = await fetch(
+      `${API_ORIGIN}${pathname}`,
+      {
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      },
+    );
+
+    let data = null;
+
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      transient: false,
+      data,
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      transient: true,
+      data: null,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getCachedPublicDoc(slug) {
+  const entry = publicDocCache.get(slug);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (Date.now() >= entry.expiresAt) {
+    publicDocCache.delete(slug);
+    return null;
+  }
+
+  return entry.data;
+}
+
+function cachePublicDoc(slug, data) {
+  publicDocCache.set(slug, {
+    data,
+    expiresAt: Date.now() + PUBLIC_DOC_CACHE_TTL_MS,
+  });
+}
+
 function docsPageFromRecord(doc) {
   if (!doc?.slug || doc.status === 'draft') {
     return null;
@@ -701,17 +780,51 @@ async function resolvePageMetadata(pathname) {
       };
     }
 
-    const doc = await fetchPublicJson(
+    const apiResult = await fetchPublicJsonWithStatus(
       `/api/docs/public/${encodeURIComponent(
         slug,
       )}/`,
     );
 
-    const page = docsPageFromRecord(doc);
+    if (apiResult.ok) {
+      const page = docsPageFromRecord(apiResult.data);
+
+      if (page) {
+        cachePublicDoc(slug, apiResult.data);
+      }
+
+      return {
+        page,
+        docs: page ? apiResult.data : null,
+        notFound: !page,
+      };
+    }
+
+    if (apiResult.status === 404) {
+      return {
+        page: null,
+        docs: null,
+        notFound: true,
+      };
+    }
+
+    const cached = getCachedPublicDoc(slug);
+
+    if (cached) {
+      const page = docsPageFromRecord(cached);
+
+      return {
+        page,
+        docs: page ? cached : null,
+        notFound: !page,
+        fromCache: true,
+      };
+    }
 
     return {
-      page,
-      docs: page ? doc : null,
+      page: null,
+      docs: null,
+      unavailable: true,
     };
   }
 
@@ -923,11 +1036,7 @@ function getSafeStaticPath(pathname) {
  * Unknown routes are handled by the SEO/SPA rendering path.
  */
 function serveStatic(req, res, pathname) {
-  if (pathname === '/') {
-    return false;
-  }
-
-  const filePath =
+  let filePath =
     getSafeStaticPath(pathname);
 
   if (!filePath) {
@@ -950,6 +1059,38 @@ function serveStatic(req, res, pathname) {
     return false;
   }
 
+  if (stat.isDirectory()) {
+    const indexPath = path.join(
+      filePath,
+      'index.html',
+    );
+
+    const relativeIndex = path.relative(
+      DIST_DIR,
+      indexPath,
+    );
+
+    if (
+      relativeIndex === '..' ||
+      relativeIndex.startsWith(`..\${path.sep}`) ||
+      path.isAbsolute(relativeIndex)
+    ) {
+      return false;
+    }
+
+    try {
+      stat = fs.statSync(indexPath);
+    } catch {
+      return false;
+    }
+
+    if (!stat.isFile()) {
+      return false;
+    }
+
+    filePath = indexPath;
+  }
+
   if (!stat.isFile()) {
     return false;
   }
@@ -968,6 +1109,27 @@ function serveStatic(req, res, pathname) {
       path.basename(filePath),
     );
 
+  if (getContentType(filePath) === 'text/html; charset=utf-8') {
+    let html;
+
+    try {
+      html = fs.readFileSync(
+        filePath,
+        'utf8',
+      );
+    } catch {
+      return false;
+    }
+
+    if (
+      !html.includes(
+        'name="x-prerendered"',
+      )
+    ) {
+      return false;
+    }
+  }
+
   const headers = {
     'X-Content-Type-Options':
       'nosniff',
@@ -984,7 +1146,10 @@ function serveStatic(req, res, pathname) {
     'Cache-Control':
       isHashedAsset
         ? 'public, max-age=31536000, immutable'
-        : 'public, max-age=3600',
+        : getContentType(filePath) ===
+            'text/html; charset=utf-8'
+          ? 'public, max-age=300, must-revalidate'
+          : 'public, max-age=3600',
 
     'Content-Length':
       String(stat.size),
@@ -1462,6 +1627,29 @@ const server = http.createServer(
         await resolvePageMetadata(
           pathname,
         );
+
+      if (resolved.unavailable) {
+        const body =
+          'Service temporarily unavailable. Retry shortly.';
+
+        res.writeHead(503, {
+          ...securityHeaders,
+          'Content-Type':
+            'text/plain; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'Retry-After': '60',
+          'Content-Length':
+            String(Buffer.byteLength(body)),
+        });
+
+        if (req.method === 'HEAD') {
+          res.end();
+        } else {
+          res.end(body);
+        }
+
+        return;
+      }
 
       const knownPublic =
         Boolean(
