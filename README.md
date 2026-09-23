@@ -157,23 +157,28 @@ No license file is published in the repository yet. Add one if you intend to ope
 
 ---
 
-## SEO (server + SPA)
+## SEO architecture
 
-Public marketing routes (`/`, `/plans`, `/aboutUs`) receive:
+SEO is treated as a build/runtime contract rather than a collection of page-level meta tags.
 
-1. **Server-injected `<head>`** – unique title, description, robots, canonical, hreflang, Open Graph, Twitter cards, and JSON-LD from `src/seo-config.js` (same source of truth as the React `SEO` component).
-2. **Neutral loading shell** inside `#root` – a spinner only. Users never see a separate “SEO marketing page”; React’s `createRoot` replaces `#root` as soon as the app boots and the real Home / Plans / About UI is shown.
-3. **`<noscript>` body** – route-specific readable HTML for non-JS agents. This is the only place the long SEO copy lives in the initial HTML; it is not shown when JavaScript is enabled.
-4. **Private routes** (`/services`, `/profile`, `/admin`, `/messenger`, …) get `noindex, nofollow` and are excluded from `sitemap.xml`.
+- `src/seo-config.js` is the route metadata and indexability source of truth.
+- `vite-prerender-plugin` generates real HTML for the indexable public marketing routes at build time.
+- The prerendered HTML contains the actual React page structure, canonical metadata, Open Graph/Twitter metadata, and JSON-LD.
+- `server.js` serves a prerendered route directly when the build produced and marked it; otherwise it falls back to dynamic rendering.
+- Historical `/amp` URLs permanently redirect to the canonical home URL. AMP is no longer published.
+- Private application routes are explicitly `noindex` and are excluded from the XML sitemap.
+- Public documentation pages remain dynamic because their content is managed by the Django API. A successful document response is cached in-process; a transient API failure returns HTTP 503 instead of falsely turning an existing document into a 404.
+- `scripts/seo-audit.mjs` verifies the generated public HTML after every build.
 
-Build and run:
+Build and validate:
 
 ```bash
 npm ci
 npm run build
+npm run seo:check
 npm run start   # node server.js → port 3000
 ```
 
-Production edge: use `nginx-seo.conf.example` so `/`, `/plans`, `/aboutUs`, `/robots.txt`, `/sitemap.xml`, and SPA fallbacks all hit the Node process. Canonical host is controlled at Nginx.
+For production, the edge proxy should canonicalize the public host (HTTPS and the preferred hostname) before requests reach Node. Keep application routing and SEO redirects at the same canonical URL policy.
 
-Do **not** put keyword blocks inside `#root` and hide them with CSS — that is cloaking. The current design keeps the visible UI identical for users and JS-capable crawlers, while still giving non-JS agents useful HTML.
+Do not add hidden keyword blocks or crawler-only content. The prerendered HTML is the same React UI that users receive, followed by normal client-side bootstrapping.
