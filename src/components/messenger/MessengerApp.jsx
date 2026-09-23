@@ -2273,7 +2273,14 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const list = e.dataTransfer?.files;
     if (!list?.length) return;
     const arr = Array.from(list).map((f) => attachMessengerOriginal(f, f));
-    setFiles((prev) => [...prev, ...arr]);
+    setFiles((prev) => {
+      const room = Math.max(0, 10 - prev.length);
+      const accepted = arr.slice(0, room);
+      if (accepted.length < arr.length) {
+        setError("You can attach up to 10 files per message.");
+      }
+      return [...prev, ...accepted];
+    });
   };
 
   const sendOrEdit = async () => {
