@@ -11,12 +11,10 @@ export default function useMessengerWebSocket({
   meId,
   wsRef,
   activeIdRef,
-  callConfigRef,
   panelHistoryRef,
   messagesCacheRef,
   nearBottomRef,
   pendingNewIdsRef,
-  seenRingIdsRef,
   bottomRef,
   loadConversations,
   loadMessages,
@@ -30,19 +28,18 @@ export default function useMessengerWebSocket({
   setMessages,
   setOnlineUsers,
   setTypingUsers,
-  setIncomingCall,
-  setCallConfig,
-  setActiveCallInfo,
   setNewBelowCount,
   setText,
   setConversations,
   onRemoteEmojiPlay,
+  onCallEvent,
 }) {
 useEffect(() => {
   let cancelled = false;
   let pingTimer = null;
   let reconnectTimer = null;
   let refreshing = false;
+  const onCallEventRef = { current: onCallEvent };
 
   const buildUrl = (tok) => `${WS_URL}?token=${encodeURIComponent(tok)}`;
 
@@ -101,6 +98,8 @@ useEffect(() => {
     }
   };
 
+  onCallEventRef.current = onCallEvent;
+
   const handleOnMessage = (ev) => {
     let data;
     try { data = JSON.parse(ev.data); } catch { return; }
@@ -122,74 +121,16 @@ useEffect(() => {
       }
       loadConversations({ silent: true });
     }
-    if (data.type === "call.started") {
-      // Incoming call from another participant
-      if (String(data.initiator?.id) !== String(meId)) {
-        // Already in another call → busy (auto-decline)
-        if (callConfigRef.current) {
-          const cid = data.conversation_id;
-          const callId = data.call_id;
-          (async () => {
-            try {
-              await apiRequest({
-                method: "POST",
-                url: `${MSG_API}/conversations/${cid}/call/end/`,
-                data: { call_id: callId, reason: "busy" },
-              });
-            } catch { /* */ }
-          })();
-          return;
-        }
-        const rid = data.call_id || `${data.conversation_id}:${data.initiator?.id}`;
-        if (seenRingIdsRef.current.has(String(rid))) return;
-        seenRingIdsRef.current.add(String(rid));
-        setIncomingCall({ ...data, _receivedAt: data._receivedAt || Date.now() });
-        // If this is the open chat, show in-chat join bar too
-        if (String(data.conversation_id) === String(activeIdRef.current)) {
-          setActiveCallInfo({
-            call_id: data.call_id,
-            status: "ringing",
-            is_video: !!(data.media?.video || data.is_video),
-            initiator: data.initiator,
-            conversation_id: data.conversation_id,
-          });
-        }
+    if (
+      data.type === "call.started"
+      || data.type === "call.answered"
+      || data.type === "call.ended"
+    ) {
+      try {
+        onCallEventRef.current?.(data);
+      } catch {
+        // Call UI owns its own recovery; one bad handler must not break WS dispatch.
       }
-    }
-    if (data.type === "call.answered") {
-      // Someone else answered — stop our ringing UI if still showing
-      setIncomingCall((prev) =>
-        prev && String(prev.call_id) === String(data.call_id) ? null : prev
-      );
-    }
-    if (data.type === "call.ended") {
-      setIncomingCall((prev) => {
-        if (!prev) return null;
-        if (data.call_id && String(prev.call_id) === String(data.call_id)) return null;
-        if (String(prev.conversation_id) === String(data.conversation_id)) return null;
-        return prev;
-      });
-      // If we are in this call, close modal (remote hangup / timeout)
-      setCallConfig((prev) => {
-        if (!prev) return null;
-        if (data.call_id && prev.call_id && String(prev.call_id) === String(data.call_id)) {
-          return null;
-        }
-        if (String(prev.conversation_id) === String(data.conversation_id)) return null;
-        return prev;
-      });
-      if (data.status === "busy") {
-        try { flash("User is busy on another call"); } catch { /* */ }
-      }
-      if (data.call_id) {
-        seenRingIdsRef.current.delete(String(data.call_id));
-      }
-      setActiveCallInfo((prev) => {
-        if (!prev) return null;
-        if (data.call_id && String(prev.call_id) === String(data.call_id)) return null;
-        if (String(prev.conversation_id) === String(data.conversation_id)) return null;
-        return prev;
-      });
     }
     if (["message.new", "message.edited", "message.reaction", "message.read"].includes(data.type)) {
       if (String(data.conversation_id) === String(activeIdRef.current)) {
