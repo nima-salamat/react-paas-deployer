@@ -200,7 +200,7 @@ export default function MessengerDialogs({
       <ConfirmDialog
         open={Boolean(confirmCleanup)}
         title="Clear messages?"
-        message="This clears all messages in this conversation for you. Other participants will still see their copies. This cannot be undone."
+        message="This permanently removes all messages and attachments from this conversation. Other participants will lose this conversation history too. This cannot be undone."
         confirmLabel="Clear"
         confirmColor="warning"
         onConfirm={cleanupConversation}
