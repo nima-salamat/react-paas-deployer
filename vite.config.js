@@ -9,6 +9,16 @@ import { PRERENDERABLE_PUBLIC_ROUTES } from "./src/seo-config.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      // vite-prerender-plugin executes the browser bundle in Node. Use
+      // Emotion's universal ESM build so its SSR path never assumes document.
+      "@emotion/cache": path.resolve(
+        __dirname,
+        "node_modules/@emotion/cache/dist/emotion-cache.esm.js",
+      ),
+    },
+  },
   plugins: [
     react(),
     vitePrerenderPlugin({
