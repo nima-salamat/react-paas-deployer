@@ -2278,7 +2278,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const sendOrEdit = async () => {
     if (!activeId) return;
-    const body = String(textRef.current || "").trim();
+    const originalBody = String(textRef.current || "");
+    const body = originalBody.trim();
+    const originalFiles = [...files];
+    const originalMediaSpoiler = mediaSpoiler;
+    const originalMediaViewOnce = mediaViewOnce;
     if (editingMsg) {
       if (!body) return;
       try {
@@ -2425,14 +2429,26 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
           if (filesToSend.length) setTimeout(() => setPendingUploads((prev) => prev.filter((u) => u.id !== pendingId)), 600);
         }
       } catch (e) {
-        if (rep) setReplyTo(rep);
         const msg = e?.response?.data?.message || "Send failed";
         setError(msg);
-        // Remove optimistic bubble on failure
+        // Restore the complete pre-send state so transient failures never
+        // destroy text, attachments, media flags, reply context, or schedule.
+        forceComposerText(originalBody);
+        setFiles(filesToSend.length ? filesToSend : originalFiles);
+        setMediaSpoiler(originalMediaSpoiler);
+        setMediaViewOnce(originalMediaViewOnce);
+        setReplyTo(rep);
+        setScheduledFor(scheduledFor);
         if (!filesToSend.length) {
           setMessages((prev) => prev.filter((m) => String(m.id) !== tempMsgId));
         }
-        if (filesToSend.length) setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, status: "failed", error: msg } : u));
+        if (filesToSend.length) {
+          setPendingUploads((prev) =>
+            prev.map((u) =>
+              u.id === pendingId ? { ...u, status: "failed", error: msg } : u
+            )
+          );
+        }
       }
       return;
     }
@@ -2444,6 +2460,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     try { flushDraftToServer(activeId, ""); } catch { /* */ }
     setScheduledFor(null);
     let firstError = null;
+    let firstFailedIndex = -1;
     for (let i = 0; i < filesToSend.length; i += 1) {
       const file = filesToSend[i];
       const pendingId = `upload-${Date.now()}-${i}-${Math.random().toString(36).slice(2)}`;
@@ -2455,6 +2472,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       const form = new FormData();
       if (i === 0) form.append("body", body);
       if (i === 0 && rep) form.append("reply_to", rep.id);
+      if (scheduledFor) form.append("scheduled_for", scheduledFor);
       form.append("files", file);
       if (mediaSpoiler) form.append("is_spoiler", "1");
       if (mediaViewOnce) form.append("is_view_once", "1");
@@ -2472,10 +2490,29 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       } catch (e) {
         const msg = e?.response?.data?.message || `Failed to send ${file.name || "file"}`;
         firstError = firstError || msg;
-        setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, status: "failed", error: msg } : u));
+        if (firstFailedIndex < 0) firstFailedIndex = i;
+        setPendingUploads((prev) =>
+          prev.map((u) =>
+            u.id === pendingId ? { ...u, status: "failed", error: msg } : u
+          )
+        );
       }
     }
-    if (firstError) setError(firstError);
+    if (firstError) {
+      setError(firstError);
+      const remainingFiles = filesToSend.slice(Math.max(0, firstFailedIndex));
+      setFiles(remainingFiles);
+      setMediaSpoiler(originalMediaSpoiler);
+      setMediaViewOnce(originalMediaViewOnce);
+      setScheduledFor(scheduledFor);
+      if (firstFailedIndex === 0) {
+        forceComposerText(originalBody);
+        setReplyTo(rep);
+      } else {
+        forceComposerText("");
+        setReplyTo(null);
+      }
+    }
     await loadMessages(activeId, { silent: true });
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
     loadConversations({ silent: true });
