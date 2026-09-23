@@ -403,7 +403,23 @@ export default function SigninOrSignup() {
   );
 
   return (
-    <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", p: 2, background: bgGradient, position: "relative", overflow: "hidden" }}>
+    <Box
+      component="main"
+      sx={{
+        minHeight: { xs: "calc(100dvh - 64px)", md: "calc(100dvh - 72px)" },
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        p: { xs: 1, sm: 2 },
+        py: { xs: 1.5, sm: 2.5 },
+        background: bgGradient,
+        position: "relative",
+        overflowX: "hidden",
+        overflowY: "auto",
+        boxSizing: "border-box",
+      }}
+    >
       <Backdrop sx={{ color: "#fff", zIndex: (t) => t.zIndex.drawer + 2 }} open={loading}>
         <CircularProgress color="inherit" />
       </Backdrop>
@@ -466,9 +482,28 @@ export default function SigninOrSignup() {
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
             {showMethodToggle && (
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1, mb: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Method</Typography>
-                <ToggleButtonGroup value={method} exclusive onChange={(_, v) => v && setMethod(v)} size="small">
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                alignItems={{ xs: "stretch", sm: "center" }}
+                spacing={{ xs: 0.75, sm: 1 }}
+                sx={{ mt: 1, mb: 1 }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>Method</Typography>
+                <ToggleButtonGroup
+                  value={method}
+                  exclusive
+                  onChange={(_, v) => v && setMethod(v)}
+                  size="small"
+                  fullWidth={isSm}
+                  sx={{
+                    "& .MuiToggleButton-root": {
+                      flex: 1,
+                      minHeight: 42,
+                      px: { xs: 1, sm: 1.5 },
+                      whiteSpace: "nowrap",
+                    },
+                  }}
+                >
                   {settings.allow_email && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> Email</ToggleButton>}
                   {settings.allow_phone && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> Phone</ToggleButton>}
                 </ToggleButtonGroup>
@@ -599,7 +634,22 @@ export default function SigninOrSignup() {
         {step === "password_recovery" && (
           <Box component="form" onSubmit={handlePasswordRecoveryRequest}>
             {showRecoveryMethodToggle && (
-              <ToggleButtonGroup value={method} exclusive onChange={(_, v) => v && setMethod(v)} size="small" sx={{ mb: 2 }}>
+              <ToggleButtonGroup
+                value={method}
+                exclusive
+                onChange={(_, v) => v && setMethod(v)}
+                size="small"
+                fullWidth={isSm}
+                sx={{
+                  mb: 2,
+                  "& .MuiToggleButton-root": {
+                    flex: 1,
+                    minHeight: 42,
+                    px: { xs: 1, sm: 1.5 },
+                    whiteSpace: "nowrap",
+                  },
+                }}
+              >
                 {recoveryEmailOk && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> Email</ToggleButton>}
                 {recoveryPhoneOk && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> Phone</ToggleButton>}
               </ToggleButtonGroup>
