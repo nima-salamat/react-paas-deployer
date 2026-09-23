@@ -62,7 +62,6 @@ export default function ChatHeader(props) {
   } = props;
 
   const title = convTitle(activeConv, meId);
-  const isGroup = activeConv?.type === "group";
 
   return (
   <Stack
@@ -72,12 +71,14 @@ export default function ChatHeader(props) {
     sx={{
       px: msgSearchOpen && isMobile ? 0.35 : 1,
       py: 0.85,
-      bgcolor: "background.paper",
+      bgcolor: (t) => alpha(t.palette.background.paper, 0.94),
+      backdropFilter: "blur(16px)",
       borderBottom: "1px solid",
       borderColor: "divider",
       minHeight: 56,
       position: "relative",
       zIndex: 11,
+      boxShadow: (t) => t.palette.mode === "dark" ? "0 4px 18px rgba(0,0,0,0.10)" : "0 4px 18px rgba(15,23,42,0.04)",
     }}
   >
     {isMobile && !msgSearchOpen && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
@@ -282,7 +283,7 @@ export default function ChatHeader(props) {
         </IconButton>
       </>
     )}
-    <IconButton onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
+    <IconButton aria-label="Chat actions" onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
     <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
       {isMobile && (
         <MenuItem onClick={() => { openMsgSearch(); setHeaderMenu(null); }}>
