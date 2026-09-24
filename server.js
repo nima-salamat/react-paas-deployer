@@ -1138,7 +1138,7 @@ function serveStatic(req, res, pathname) {
       'strict-origin-when-cross-origin',
 
     'Permissions-Policy':
-      'camera=(), microphone=(), geolocation=()',
+      'camera=(self), microphone=(self), display-capture=(self), fullscreen=(self), geolocation=()',
 
     'Content-Type':
       getContentType(filePath),
