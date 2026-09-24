@@ -34,8 +34,8 @@ export function getEmotionStyleTags(cache) {
     .join("");
 }
 
-export function createEmotionCache() {
-  if (typeof document === "undefined") {
+export function createEmotionCache({ forceServer = false } = {}) {
+  if (forceServer || typeof document === "undefined") {
     return createServerCache();
   }
 
