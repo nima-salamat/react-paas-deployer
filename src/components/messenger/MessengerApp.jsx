@@ -5153,7 +5153,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     <Box
       sx={{
         position: "fixed",
-        zIndex: 1300,
+        // Keep the full-screen messenger below the global FloatingNav and MUI modal layers.
+        zIndex: 1200,
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.default",
