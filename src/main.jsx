@@ -34,6 +34,15 @@ const app = (
 rootElement.replaceChildren();
 createRoot(rootElement).render(app);
 
+// Keep the initial document hidden until React has committed and Emotion/MUI
+// styles have had a frame to attach. This prevents a stale/prerendered HTML
+// response from producing a flash of unstyled content.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    document.documentElement.classList.add("app-ready");
+  });
+});
+
 // Remove crawler-only SEO content once the interactive React app owns the page.
 document.getElementById("seo-noscript-fallback")?.remove();
 
