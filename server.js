@@ -11,7 +11,6 @@ import {
   getSiteConfig,
   isNoIndex,
   isDocsPath,
-  PRERENDERABLE_PUBLIC_ROUTES,
 } from './src/seo-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
