@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - fix/frontend-runtime-and-build-20260924
   pull_request:
 
 jobs:
@@ -29,18 +28,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Inspect prerender output
-        run: |
-          echo "HTML files:"
-          find dist -maxdepth 2 -type f -name '*.html' -print | sort
-          echo "Canonical counts:"
-          for file in $(find dist -maxdepth 2 -type f -name '*.html' | sort); do
-            printf '%s: ' "$file"
-            grep -Eio '<link[^>]+rel="canonical"[^>]*>' "$file" | wc -l
-          done
-          echo "Root head:"
-          sed -n '1,120p' dist/index.html
 
       - name: Validate SEO output
         run: npm run seo:check
