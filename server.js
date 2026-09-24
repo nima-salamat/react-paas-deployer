@@ -11,6 +11,7 @@ import {
   getSiteConfig,
   isNoIndex,
   isDocsPath,
+  PRERENDERABLE_PUBLIC_ROUTES,
 } from './src/seo-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -191,10 +192,20 @@ function buildHead(page, pathname, noindex = false, docs = null) {
 }
 
 function loadTemplate() {
-  return fs.readFileSync(
+  const templateCandidates = [
+    path.join(DIST_DIR, '_template.html'),
     path.join(DIST_DIR, 'index.html'),
-    'utf8',
-  );
+  ];
+
+  for (const templatePath of templateCandidates) {
+    try {
+      return fs.readFileSync(templatePath, 'utf8');
+    } catch {
+      // Try the next template candidate.
+    }
+  }
+
+  throw new Error('No built HTML template is available.');
 }
 
 const PUBLIC_SHELLS = {
@@ -1028,6 +1039,86 @@ function getSafeStaticPath(pathname) {
   return absolutePath;
 }
 
+function getPrerenderedRoutePath(pathname) {
+  const normalized =
+    pathname.replace(/\/+$/, '') || '/';
+
+  if (!PRERENDERABLE_PUBLIC_ROUTES.includes(normalized)) {
+    return null;
+  }
+
+  const relativePath =
+    normalized === '/'
+      ? 'index.html'
+      : path.join(
+          normalized.slice(1),
+          'index.html',
+        );
+
+  const filePath = path.resolve(
+    DIST_DIR,
+    relativePath,
+  );
+
+  const relative = path.relative(
+    DIST_DIR,
+    filePath,
+  );
+
+  if (
+    relative === '..' ||
+    relative.startsWith('..' + path.sep) ||
+    path.isAbsolute(relative)
+  ) {
+    return null;
+  }
+
+  return filePath;
+}
+
+function servePrerenderedRoute(req, res, pathname) {
+  const filePath = getPrerenderedRoutePath(pathname);
+  if (!filePath) return false;
+
+  let stat;
+  try {
+    stat = fs.statSync(filePath);
+  } catch {
+    return false;
+  }
+
+  if (!stat.isFile()) return false;
+
+  const headers = {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'public, max-age=300, must-revalidate',
+    'Content-Length': String(stat.size),
+  };
+
+  if (req.method === 'HEAD') {
+    res.writeHead(200, headers);
+    res.end();
+    return true;
+  }
+
+  res.writeHead(200, headers);
+  const stream = createReadStream(filePath);
+  stream.on('error', (error) => {
+    console.error(`Prerendered route error for ${filePath}:`, error);
+    if (!res.headersSent) {
+      res.writeHead(500, {
+        'Content-Type': 'text/plain; charset=utf-8',
+      });
+    }
+    res.end('Internal Server Error');
+  });
+  stream.pipe(res);
+  return true;
+}
+
 /**
  * Serve real files from dist/.
  *
@@ -1596,6 +1687,20 @@ const server = http.createServer(
         });
 
         res.end();
+        return;
+      }
+
+      /*
+       * Exact prerendered public routes. Private/dynamic routes never use the
+       * prerendered homepage document as their HTML shell.
+       */
+      if (
+        servePrerenderedRoute(
+          req,
+          res,
+          pathname,
+        )
+      ) {
         return;
       }
 
