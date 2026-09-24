@@ -143,6 +143,7 @@ export default function ComposeCodeWorkspace({
   const taRef = useRef(null);
   const preRef = useRef(null);
   const syncingRef = useRef(false);
+  const historyRef = useRef(new Map());
 
   // Sync from parent when external text changes (and we're not the source)
   useEffect(() => {
@@ -196,8 +197,34 @@ export default function ComposeCodeWorkspace({
   }, [files, active, emit]);
 
   const setCode = useCallback((nextCode) => {
-    updateActive({ code: nextCode });
-  }, [updateActive]);
+    const next = typeof nextCode === "function" ? nextCode(code) : nextCode;
+    if (next === code) return;
+    recordCodeEdit(active?.id, code);
+    updateActive({ code: next });
+  }, [active?.id, code, updateActive]);
+
+  const getHistory = (fileId) => {
+    if (!fileId) return null;
+    let history = historyRef.current.get(fileId);
+    if (!history) {
+      history = { undo: [], redo: [] };
+      historyRef.current.set(fileId, history);
+    }
+    return history;
+  };
+
+  const recordCodeEdit = (fileId, previousCode) => {
+    const history = getHistory(fileId);
+    if (!history || previousCode === code) return;
+    const sel = getSel();
+    history.undo.push({
+      code: previousCode,
+      start: sel.start,
+      end: sel.end,
+    });
+    if (history.undo.length > 200) history.undo.shift();
+    history.redo = [];
+  };
 
   const getSel = () => {
     const ta = taRef.current;
@@ -405,6 +432,43 @@ export default function ComposeCodeWorkspace({
 
     if (mod && !e.altKey) {
       const k = key.toLowerCase();
+
+      // Explicit editor history. Programmatic edits (indent, duplicate,
+      // comment, paste, etc.) change the controlled value and therefore
+      // cannot rely on the browser's native textarea undo stack.
+      if (k === "z") {
+        e.preventDefault();
+        e.stopPropagation();
+        const history = getHistory(active?.id);
+        if (!history?.undo.length) return;
+        const current = code;
+        const entry = history.undo.pop();
+        history.redo.push({
+          code: current,
+          start: e.currentTarget?.selectionStart ?? current.length,
+          end: e.currentTarget?.selectionEnd ?? current.length,
+        });
+        updateActive({ code: entry.code });
+        setSel(Math.min(entry.start, entry.code.length), Math.min(entry.end, entry.code.length));
+        return;
+      }
+
+      if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const history = getHistory(active?.id);
+        if (!history?.redo.length) return;
+        const current = code;
+        const entry = history.redo.pop();
+        history.undo.push({
+          code: current,
+          start: e.currentTarget?.selectionStart ?? current.length,
+          end: e.currentTarget?.selectionEnd ?? current.length,
+        });
+        updateActive({ code: entry.code });
+        setSel(Math.min(entry.start, entry.code.length), Math.min(entry.end, entry.code.length));
+        return;
+      }
       if (k === "c") {
         e.preventDefault();
         e.stopPropagation();
