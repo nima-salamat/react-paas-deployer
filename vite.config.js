@@ -58,6 +58,7 @@ export default defineConfig({
     },
   },
   build: {
+    sourcemap: true,
     outDir: "dist",
     sourcemap: false,
     cssCodeSplit: true,
