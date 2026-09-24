@@ -63,6 +63,7 @@ const MINI_W = 320;
 const MINI_H = 200;
 const MEDIA_KEY = "messenger.mediaDevices";
 const DEFAULT_RING_TIMEOUT_MS = 30000;
+const ALONE_TIMEOUT_MS = DEFAULT_RING_TIMEOUT_MS;
 const CONFERENCE_JOIN_TIMEOUT_MS = 20000;
 
 /* ── Platform detection (deterministic, cached) ────────────────────── */
