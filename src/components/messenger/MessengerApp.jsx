@@ -2513,9 +2513,23 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   };
 
   const togglePin = async (conv) => {
+    if (!conv?.id) return;
     try {
-      await apiRequest({ method: "POST", url: `${MSG_API}/conversations/${conv.id}/pin/` });
-      loadConversations({ silent: true });
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${conv.id}/pin/`,
+      });
+      const data = unwrapData(res);
+      if (typeof data?.is_pinned === "boolean") {
+        setConversations((prev) =>
+          prev.map((item) =>
+            String(item.id) === String(conv.id)
+              ? { ...item, is_pinned: data.is_pinned }
+              : item,
+          ),
+        );
+      }
+      await loadConversations({ silent: true });
     } catch (e) {
       setError(e?.response?.data?.message || "Pin failed");
     }
