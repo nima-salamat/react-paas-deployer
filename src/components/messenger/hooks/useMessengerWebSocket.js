@@ -33,6 +33,9 @@ export default function useMessengerWebSocket({
   setConversations,
   onRemoteEmojiPlay,
   onCallEvent,
+  markVisibleMessagesRead,
+  profileDataRef,
+  refreshProfileData,
 }) {
   const onCallEventRef = useRef(onCallEvent);
   onCallEventRef.current = onCallEvent;
