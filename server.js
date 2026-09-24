@@ -1361,27 +1361,16 @@ function renderDocument(
   /*
    * Per-path noscript SEO content.
    *
-   * Keep it outside #root: it is a crawler-only fallback, not part of the
-   * interactive application. A JS-enabled browser hides/removes it.
+   * Always remove any template/prerender noscript first. Only indexable
+   * public pages and published docs receive the fallback for their own URL.
+   * It is outside #root and is removed/hidden by the JS client.
    */
-  if (noscriptContent) {
-    const existingNoscriptPattern =
-      /<noscript\b[^>]*>[\s\S]*?<\/noscript>/i;
+  html = html.replace(
+    /<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi,
+    '',
+  );
 
-    if (existingNoscriptPattern.test(html)) {
-      html = html.replace(
-        existingNoscriptPattern,
-        renderedNoscript,
-      );
-    } else {
-      html = html.replace(
-        /<\/body>/i,
-        `${renderedNoscript}</body>`,
-      );
-    }
-  }
-
-  if (renderedNoscript && !/<noscript\b/i.test(html)) {
+  if (renderedNoscript) {
     html = html.replace(
       /<\/body>/i,
       `${renderedNoscript}</body>`,
