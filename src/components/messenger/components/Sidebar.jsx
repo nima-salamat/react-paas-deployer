@@ -15,6 +15,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GroupsIcon from "@mui/icons-material/Groups";
 import { formatCallSystemLabel, parseCallSystemBody } from "../modules/callSystemMessage";
@@ -201,6 +202,10 @@ export default function Sidebar({
           <MenuItem onClick={() => { setListMenuAnchor(null); onOpenJoin?.(); }}>
             <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
             Join invite
+          </MenuItem>
+          <MenuItem onClick={() => { setListMenuAnchor(null); onOpenSettings?.(); }}>
+            <ListItemIcon><SettingsOutlinedIcon fontSize="small" /></ListItemIcon>
+            Settings
           </MenuItem>
           <MenuItem onClick={() => { setListMenuAnchor(null); onNavigateHome?.(); }}>
             <ListItemIcon><HomeOutlinedIcon fontSize="small" /></ListItemIcon>
