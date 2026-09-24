@@ -232,8 +232,6 @@ function Reveal({
 
 /** SVG curtain — only on desktop + when motion is allowed */
 function CurtainPanel({ side, progress, dark, enabled }) {
-  if (!enabled) return null;
-
   const uid = `${side}-${dark ? "d" : "l"}`;
   const tx = useTransform(
     progress,
