@@ -159,7 +159,7 @@ const Layout = ({
   );
 };
 
-export function App() {
+export function App({ prerender = false }) {
   const [themeMode, setThemeMode] = useState("system");
 
   const [systemTheme, setSystemTheme] = useState("light");
@@ -338,7 +338,7 @@ export function App() {
 
         <TicketNotifyProvider>
           <RouteScrollManager />
-          <SEO />
+          <SEO prerender={prerender} />
 
           <Suspense
             fallback={
