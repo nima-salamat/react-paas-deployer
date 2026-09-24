@@ -29,7 +29,7 @@ jobs:
       - name: Benchmark Vite 8 build
         run: |
           rm -rf dist-vite8
-          npm install --no-save --package-lock=false vite@8.3.0 @vitejs/plugin-react@6.1.1 --ignore-scripts
+          npm install --no-save --package-lock=false vite@8.3.0 @vitejs/plugin-react@6.1.1 esbuild --ignore-scripts
           /usr/bin/time -f "VITE8_BUILD_SECONDS=%e" npx --no-install vite build --outDir dist-vite8
 
       - name: Build
