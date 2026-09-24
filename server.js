@@ -1191,6 +1191,50 @@ function serveStatic(req, res, pathname) {
   return true;
 }
 
+function replaceRootContents(html, innerHtml) {
+  const rootOpen = /<div\b[^>]*\bid=["']root["'][^>]*>/i.exec(html);
+  if (!rootOpen) {
+    return { html, replaced: false };
+  }
+
+  const openStart = rootOpen.index;
+  const openEnd = openStart + rootOpen[0].length;
+  const tagPattern = /<\/?div\b[^>]*>/gi;
+
+  tagPattern.lastIndex = openEnd;
+
+  let depth = 1;
+  let closeStart = -1;
+  let closeEnd = -1;
+  let match;
+
+  while ((match = tagPattern.exec(html))) {
+    if (/^<div\b/i.test(match[0])) {
+      depth += 1;
+    } else {
+      depth -= 1;
+    }
+
+    if (depth === 0) {
+      closeStart = match.index;
+      closeEnd = tagPattern.lastIndex;
+      break;
+    }
+  }
+
+  if (closeStart < 0) {
+    return { html, replaced: false };
+  }
+
+  return {
+    html:
+      html.slice(0, openEnd) +
+      innerHtml +
+      html.slice(closeStart),
+    replaced: true,
+  };
+}
+
 function renderDocument(
   pathname,
   statusCode,
@@ -1293,82 +1337,28 @@ function renderDocument(
   }
 
   /*
-   * Replace Vite's #root content with the loading shell:
-   *
-   *   #root
-   *     loading shell
-   *
-   *   noscript
-   *     SEO content
-   *
-   * IMPORTANT: never inject a SECOND #root. A duplicate id means React
-   * mounts into the first root while the second one keeps rendering a
-   * ghost spinner below the app forever.
-   *
-   * The SEO fallback is intentionally outside #root, but it is hidden inline
-   * for JavaScript-enabled browsers so prerender/SPA content cannot leave a
-   * second long SEO section underneath the interactive page before cleanup.
+   * Replace the complete prerendered #root contents with the lightweight
+   * loading shell. The build template can contain nested divs and React SSR
+   * comment markers, so a single non-greedy regex is not reliable.
    */
-  const shellStart = '<!-- APP_SHELL_START -->';
-  const shellEnd = '<!-- APP_SHELL_END -->';
+  const rootReplacement = replaceRootContents(
+    html,
+    loadingShell,
+  );
 
-  const appRootPattern =
-    /<div\b[^>]*\bid=["']root["'][^>]*>\s*<\/div>/i;
-
-  const renderedRoot = `
-    <div id="root">
-      ${loadingShell}
-    </div>
-  `;
-
-  const renderedNoscript = noscriptContent
-    ? `<noscript id="seo-noscript-fallback" style="display:none">${noscriptContent}</noscript>`
-    : '';
-
-
-  if (
-    html.includes(shellStart) &&
-    html.includes(shellEnd)
-  ) {
-    /*
-     * Case 1 — Vite kept the static boot shell between markers:
-     * swap it for the dynamic (per-path) loading shell.
-     */
-    html = html.replace(
-      new RegExp(
-        `${shellStart}[\\s\\S]*?${shellEnd}`,
-      ),
-      `${shellStart}${loadingShell}${shellEnd}`,
-    );
-  } else if (appRootPattern.test(html)) {
-    // Case 2 — empty #root: replace it with the loading shell.
-    html = html.replace(
-      appRootPattern,
-      renderedRoot,
-    );
+  if (rootReplacement.replaced) {
+    html = rootReplacement.html;
   } else if (
-    /<div\b[^>]*\bid=["']root["'][^>]*>/i.test(
-      html,
-    )
-  ) {
-    /*
-     * Case 3 — #root exists but is NOT empty (it already contains the
-     * static boot shell). Replace the content INSIDE the existing root
-     * with the dynamic shell — do not create another root.
-     */
-    html = html.replace(
-      /(<div\b[^>]*\bid=["']root["'][^>]*>)[\s\S]*?(<\/div>\s*(?=<noscript\b|<script\b|<\/body))/i,
-      (match, open, close) =>
-        `${open}${loadingShell}${close}`,
-    );
-  } else if (
+    !/<div\b[^>]*\bid=["']root["'][^>]*>/i.test(html) &&
     /<body\b[^>]*>/i.test(html)
   ) {
-    // Case 4 — no #root at all: append one after <body>.
     html = html.replace(
       /<body\b[^>]*>/i,
       (match) =>
-        `${match}${renderedRoot}`,
+        match +
+        '<div id="root">' +
+        loadingShell +
+        '</div>',
     );
   }
 
