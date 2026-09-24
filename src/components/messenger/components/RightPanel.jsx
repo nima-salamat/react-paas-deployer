@@ -643,7 +643,7 @@ export default function RightPanel({
     return (
       <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ p: 1, borderBottom: "1px solid", borderColor: "divider" }}>
-          {canGoBack || true ? (
+          {canGoBack ? (
             <IconButton size="small" onClick={() => setShowSharedServices(false)}>
               <ArrowBackIcon />
             </IconButton>
