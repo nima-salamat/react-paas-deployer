@@ -67,6 +67,7 @@ export default function MessageTimeline(props) {
     loadUserProfileByUsername,
     pendingUploads,
     bottomRef,
+    typingUsers,
   } = props;
 
   const onCancelSchedule = async (msg) => {
