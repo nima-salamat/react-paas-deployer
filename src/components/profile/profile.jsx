@@ -133,6 +133,7 @@ function isImageFile(file) {
 }
 
 import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
+import { CURSOR_OPTIONS, readCursorPreference, writeCursorPreference } from "../layout/cursorSettings";
 
 // --- DND-Kit Imports ---
 import {
@@ -342,6 +343,7 @@ const Profile = ({ embedded = false }) => {
   const isMobileViewport = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
   const prefersFinePointer = useMediaQuery("(pointer: fine)", { noSsr: true });
   const enableFileDrop = isDesktop && prefersFinePointer;
+  const [cursorPreference, setCursorPreference] = useState(() => readCursorPreference());
 
   // When rendered inside the dashboard shell, chrome is provided by the shell.
   const fromDashboard =
@@ -1254,6 +1256,34 @@ const Profile = ({ embedded = false }) => {
               </Button>
             )}
           </Stack>
+        </Paper>
+
+        <Paper elevation={0} sx={{ ...sectionPaper, mb: 3 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+            <Typography variant="h6" fontWeight={800}>
+              Interface
+            </Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Choose how the mouse cursor is displayed. This preference is stored locally in this browser.
+          </Typography>
+          <FormControl fullWidth size="small">
+            <InputLabel>Cursor</InputLabel>
+            <Select
+              value={cursorPreference}
+              label="Cursor"
+              onChange={(e) => setCursorPreference(writeCursorPreference(e.target.value))}
+            >
+              {CURSOR_OPTIONS.map((option) => (
+                <MenuItem key={option.id} value={option.id}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+            {CURSOR_OPTIONS.find((option) => option.id === cursorPreference)?.description}
+          </Typography>
         </Paper>
 
         {/* Photos List */}
