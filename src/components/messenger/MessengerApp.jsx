@@ -774,10 +774,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     if (role !== "owner" && role !== "admin") return;
     loadConvJoinRequests(activeDetail.id);
   }, [activeDetail?.id, activeDetail?.requires_approval, meId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, []);
+  // The messenger shell is fixed to the viewport, so it does not need to
+  // mutate document.body scrolling. Keeping the global body unlocked prevents
+  // navigation/back-forward transitions from leaving Home or other routes
+  // permanently unscrollable.
   useEffect(() => {
     if (!isMobile) setDrawerOpen(true);
   }, [isMobile]);
