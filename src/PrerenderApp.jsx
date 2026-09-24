@@ -18,7 +18,7 @@ export default function PrerenderApp({ url }) {
 
   return (
     <StaticRouter location={pathname}>
-      <Root />
+      <Root prerender />
     </StaticRouter>
   );
 }
