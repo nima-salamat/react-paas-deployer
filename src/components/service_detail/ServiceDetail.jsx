@@ -912,7 +912,6 @@ export default function ServiceDetail() {
           setError(resp.data?.detail || resp.data?.error || "Rebuild request was not accepted.");
           return;
         }
-      }
 
       // No deploy is selected. Service-level rebuild is the intended fallback.
       await startService({ forceRebuild: true });
