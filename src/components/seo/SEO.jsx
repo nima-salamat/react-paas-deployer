@@ -33,15 +33,21 @@ export default function SEO({ prerender = false }) {
       .then((data) => { if (!cancelled) setDoc(data); })
       .catch(() => { if (!cancelled) setDoc(null); });
     return () => { cancelled = true; };
-  }, [isDocDetail, slug]);
+  }, [isDocDetail, slug, prerender]);
 
   const staticPage = PUBLIC_PAGES[pathname];
-  const page = doc
-    ? {
-        title: `${doc.title} | Documentation | ${siteConfig.siteName}`,
-        description: doc.description || `Learn how to use ${siteConfig.siteName}: ${doc.title}.`,
-      }
-    : staticPage;
+  const page = useMemo(
+    () =>
+      doc
+        ? {
+            title: `${doc.title} | Documentation | ${siteConfig.siteName}`,
+            description:
+              doc.description ||
+              `Learn how to use ${siteConfig.siteName}: ${doc.title}.`,
+          }
+        : staticPage,
+    [doc, staticPage],
+  );
   const noindex = isNoIndex(pathname) || (isDocDetail && !doc);
   const title = page?.title || `${siteConfig.siteName} | Application Deployment Platform`;
   const description = page?.description || "Application deployment and infrastructure management platform.";
