@@ -394,6 +394,7 @@ export default function CreateDeployPanel({
                 {["username", "password", "root_password", "database", "port"].map(
                   (field) => {
                     const editing = Boolean(editingDeployId);
+                    const isPasswordField = field === "password" || field === "root_password";
                     return (
                       <TextField
                         key={field}
