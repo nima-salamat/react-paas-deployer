@@ -1243,11 +1243,17 @@ function renderDocument(
   const loadingShell =
     buildLoadingShell(pathname);
 
+  const normalizedPathname =
+    pathname.replace(/\/+$/, '') || '/';
+
+  const isIndexableRoute =
+    Boolean(PUBLIC_PAGES[normalizedPathname]) &&
+    !isNoIndex(normalizedPathname);
+
   const noscriptContent =
-    buildNoscriptContent(
-      pathname,
-      docs,
-    );
+    (isIndexableRoute || docs)
+      ? buildNoscriptContent(normalizedPathname, docs)
+      : '';
 
   let html = template;
 
@@ -1299,13 +1305,12 @@ function renderDocument(
     <div id="root">
       ${loadingShell}
     </div>
-
-    ${
-      noscriptContent
-        ? `<noscript>${noscriptContent}</noscript>`
-        : ''
-    }
   `;
+
+  const renderedNoscript = noscriptContent
+    ? `<noscript id="seo-noscript-fallback">${noscriptContent}</noscript>`
+    : '';
+
 
   if (
     html.includes(shellStart) &&
@@ -1322,7 +1327,7 @@ function renderDocument(
       `${shellStart}${loadingShell}${shellEnd}`,
     );
   } else if (appRootPattern.test(html)) {
-    // Case 2 — empty #root: replace it with shell + noscript.
+    // Case 2 — empty #root: replace it with the loading shell.
     html = html.replace(
       appRootPattern,
       renderedRoot,
@@ -1354,25 +1359,33 @@ function renderDocument(
   }
 
   /*
-   * Per-path noscript SEO content: replace the static noscript block
-   * from index.html (or add one before </body> when missing).
+   * Per-path noscript SEO content.
+   *
+   * Keep it outside #root: it is a crawler-only fallback, not part of the
+   * interactive application. A JS-enabled browser hides/removes it.
    */
   if (noscriptContent) {
-    if (
-      /<noscript>[\s\S]*?<\/noscript>/i.test(
-        html,
-      )
-    ) {
+    const existingNoscriptPattern =
+      /<noscript\b[^>]*>[\s\S]*?<\/noscript>/i;
+
+    if (existingNoscriptPattern.test(html)) {
       html = html.replace(
-        /<noscript>[\s\S]*?<\/noscript>/i,
-        `<noscript>${noscriptContent}</noscript>`,
+        existingNoscriptPattern,
+        renderedNoscript,
       );
     } else {
       html = html.replace(
         /<\/body>/i,
-        `<noscript>${noscriptContent}</noscript></body>`,
+        `${renderedNoscript}</body>`,
       );
     }
+  }
+
+  if (renderedNoscript && !/<noscript\b/i.test(html)) {
+    html = html.replace(
+      /<\/body>/i,
+      `${renderedNoscript}</body>`,
+    );
   }
 
   return {
