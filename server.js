@@ -1385,6 +1385,10 @@ function renderDocument(
    * IMPORTANT: never inject a SECOND #root. A duplicate id means React
    * mounts into the first root while the second one keeps rendering a
    * ghost spinner below the app forever.
+   *
+   * The SEO fallback is intentionally outside #root, but it is hidden inline
+   * for JavaScript-enabled browsers so prerender/SPA content cannot leave a
+   * second long SEO section underneath the interactive page before cleanup.
    */
   const shellStart = '<!-- APP_SHELL_START -->';
   const shellEnd = '<!-- APP_SHELL_END -->';
@@ -1399,7 +1403,7 @@ function renderDocument(
   `;
 
   const renderedNoscript = noscriptContent
-    ? `<noscript id="seo-noscript-fallback">${noscriptContent}</noscript>`
+    ? `<noscript id="seo-noscript-fallback" style="display:none">${noscriptContent}</noscript>`
     : '';
 
 
