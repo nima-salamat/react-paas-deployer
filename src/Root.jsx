@@ -6,10 +6,10 @@ import { ProfileProvider } from "./components/profile/profileContext.jsx";
 import App from "./App.jsx";
 import CustomCursor from "./components/layout/CustomCursor.jsx";
 
-export default function Root({ emotionCache = null, prerender = false }) {
+export default function Root({ prerender = false }) {
   const cache = useMemo(
-    () => emotionCache || createEmotionCache(),
-    [emotionCache],
+    () => createEmotionCache(),
+    [],
   );
 
   return (
