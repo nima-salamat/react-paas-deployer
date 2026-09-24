@@ -244,7 +244,8 @@ export default function FloatingNav({
     <Box
       sx={{
         position: "fixed",
-        zIndex: 20,
+        // Stay above the full-screen Messenger shell, but below MUI modal/snackbar layers.
+        zIndex: 1250,
         bottom,
         ...containerSx,
         pointerEvents: "none",
