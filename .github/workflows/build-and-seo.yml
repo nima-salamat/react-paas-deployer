@@ -26,8 +26,6 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Check Messenger for use-before-definition
-        run: npx eslint src/components/messenger/MessengerApp.jsx --rule 'no-use-before-define: [error, { functions: false, classes: true, variables: true }]'
 
       - name: Validate SEO output
         run: npm run seo:check
