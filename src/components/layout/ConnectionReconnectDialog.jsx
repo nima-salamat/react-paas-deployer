@@ -65,8 +65,11 @@ export default function ConnectionReconnectDialog() {
   // This dialog is mounted globally from App.jsx, outside MessengerApp's
   // nested ThemeProvider. Mirror the active Messenger palette on /messenger.
   const parentTheme = useTheme();
+  const isMessengerPath = location.pathname === "/messenger"
+    || location.pathname.startsWith("/messenger/");
+
   const messengerTheme = useMemo(() => {
-    if (!isReconnectablePath(location.pathname)) return null;
+    if (!isMessengerPath) return null;
 
     const mode = parentTheme.palette.mode === "dark" ? "dark" : "light";
     const appearance = readAppearance();
@@ -106,7 +109,7 @@ export default function ConnectionReconnectDialog() {
       transitions: parentTheme.transitions,
       zIndex: parentTheme.zIndex,
     });
-  }, [location.pathname, parentTheme]);
+  }, [isMessengerPath, parentTheme]);
 
   useEffect(() => {
     const handleOffline = () => setOffline(true);
