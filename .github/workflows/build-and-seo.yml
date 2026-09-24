@@ -26,6 +26,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Benchmark Vite 8 build
+        run: |
+          rm -rf dist-vite8
+          /usr/bin/time -f "VITE8_BUILD_SECONDS=%e" npx --yes vite@8.3.0 build --outDir dist-vite8
+
       - name: Build
         run: npm run build
 
