@@ -13,7 +13,7 @@ import {
 
 const siteConfig = getSiteConfig(import.meta.env);
 
-export default function SEO() {
+export default function SEO({ prerender = false }) {
   const location = useLocation();
   const pathname = normalizePathname(location.pathname);
   const [doc, setDoc] = useState(null);
@@ -21,7 +21,7 @@ export default function SEO() {
   const slug = isDocDetail ? pathname.slice("/docs/".length).split("/")[0] : "";
 
   useEffect(() => {
-    if (!isDocDetail || !slug) {
+    if (prerender || !isDocDetail || !slug) {
       setDoc(null);
       return undefined;
     }
@@ -53,7 +53,7 @@ export default function SEO() {
 
   // PrerenderApp injects the finalized SEO head explicitly. Rendering Helmet
   // during the Vite prerender pass would serialize the same tags into #root.
-  if (import.meta.env.SSR) return null;
+  if (prerender) return null;
 
   return (
     <Helmet prioritizeSeoTags>
