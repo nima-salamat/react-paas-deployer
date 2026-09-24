@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+    - fix/frontend-runtime-and-build-20260924
   pull_request:
 
 jobs:
