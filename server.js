@@ -1205,7 +1205,6 @@ function replaceRootContents(html, innerHtml) {
 
   let depth = 1;
   let closeStart = -1;
-  let closeEnd = -1;
   let match;
 
   while ((match = tagPattern.exec(html))) {
@@ -1217,7 +1216,6 @@ function replaceRootContents(html, innerHtml) {
 
     if (depth === 0) {
       closeStart = match.index;
-      closeEnd = tagPattern.lastIndex;
       break;
     }
   }
@@ -1308,6 +1306,12 @@ function renderDocument(
     (isIndexableRoute || docs)
       ? buildNoscriptContent(normalizedPathname, docs)
       : '';
+
+  const renderedNoscript = noscriptContent
+    ? '<noscript id="seo-noscript-fallback" style="display:none">' +
+      noscriptContent +
+      '</noscript>'
+    : '';
 
   let html = template;
 
