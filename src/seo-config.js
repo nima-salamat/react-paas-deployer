@@ -70,12 +70,6 @@ export const INDEXABLE_PUBLIC_ROUTES = Object.freeze(
   ),
 );
 
-export const PRERENDERABLE_PUBLIC_ROUTES = Object.freeze(
-  INDEXABLE_PUBLIC_ROUTES.filter(
-    (pathname) => pathname !== "/docs",
-  ),
-);
-
 export function getSiteConfig(env = {}) {
   const siteUrl = String(env.VITE_APP_URL || DEFAULT_SITE_URL).replace(/\/+$/, "");
   const siteName = env.VITE_APP_NAME || DEFAULT_SITE_NAME;
