@@ -62,5 +62,9 @@ export default defineConfig({
     sourcemap: false,
     cssCodeSplit: true,
     minify: "esbuild",
+    modulePreload: {
+      resolveDependencies: (_filename, deps) =>
+        deps.filter((dep) => !/(?:^|\/)prerender-[^/]+\.js$/.test(dep)),
+    },
   },
 });
