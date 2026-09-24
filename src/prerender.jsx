@@ -19,7 +19,7 @@ function escapeJsonLd(value) {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
 
-function buildHead(page, pathname) {
+function buildHead(page, pathname, emotionStyles = "") {
   const url = canonicalUrl(pathname, SITE_CONFIG.siteUrl);
   const schema = buildSchema(page, pathname, SITE_CONFIG);
 
@@ -264,6 +264,6 @@ export async function prerender({ url }) {
   return {
     html,
     links: new Set(PRERENDER_ROUTES),
-    head: buildHead(page, pathname),
+    head: buildHead(page, pathname, emotionStyles),
   };
 }
