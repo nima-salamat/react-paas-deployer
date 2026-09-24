@@ -469,22 +469,6 @@ export default function ComposeCodeWorkspace({
         setSel(Math.min(entry.start, entry.code.length), Math.min(entry.end, entry.code.length));
         return;
       }
-
-        e.preventDefault();
-        e.stopPropagation();
-        const history = getHistory(active?.id);
-        if (!history?.redo.length) return;
-        const current = code;
-        const entry = history.redo.pop();
-        history.undo.push({
-          code: current,
-          start: e.currentTarget?.selectionStart ?? current.length,
-          end: e.currentTarget?.selectionEnd ?? current.length,
-        });
-        updateActive({ code: entry.code });
-        setSel(Math.min(entry.start, entry.code.length), Math.min(entry.end, entry.code.length));
-        return;
-      }
       if (k === "c") {
         e.preventDefault();
         e.stopPropagation();
