@@ -559,6 +559,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // can read the latest values without re-binding every render.
   const panelHistoryRef = useRef([]);
   const profileDataRef = useRef(null);
+  // These handlers are declared later in this large orchestrator. Keep stable
+  // indirections here so the WebSocket hook never evaluates a TDZ'd const.
+  const markVisibleMessagesReadRef = useRef(() => {});
+  const refreshProfileDataRef = useRef(() => {});
   useEffect(() => { panelHistoryRef.current = panelHistory; }, [panelHistory]);
   useEffect(() => { profileDataRef.current = profileData; }, [profileData]);
 
@@ -1725,9 +1729,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     setConversations,
     onRemoteEmojiPlay,
     onCallEvent: handleCallEvent,
-    markVisibleMessagesRead,
+    markVisibleMessagesRead: (...args) => markVisibleMessagesReadRef.current(...args),
     profileDataRef,
-    refreshProfileData,
+    refreshProfileData: (...args) => refreshProfileDataRef.current(...args),
   });
 
 
@@ -3097,6 +3101,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     } catch { /* */ }
   };
 
+  refreshProfileDataRef.current = refreshProfileData;
+
   // Ref mirror for the public-group search query (used inside WS callbacks
   // to refresh search results after a join/cancel without needing to lift
   // the search input state to the parent).
@@ -3521,7 +3527,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     seenFlushTimerRef.current = setTimeout(() => flushSeenReceipts(cid), 250);
   }, [flushSeenReceipts]);
 
-  const dismissScrollDownButton = () => {
+  markVisibleMessagesReadRef.current = markVisibleMessagesRead;
+
+  const dismissScrollDownButton = () =>;
     // Hide during programmatic smooth-scroll. Re-armed only by a real user
     // gesture (wheel / touch / pointer), never by the programmatic scroll events.
     scrollDownDismissedRef.current = true;
