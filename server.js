@@ -1695,20 +1695,6 @@ const server = http.createServer(
       }
 
       /*
-       * Exact prerendered public routes. Private/dynamic routes never use the
-       * prerendered homepage document as their HTML shell.
-       */
-      if (
-        servePrerenderedRoute(
-          req,
-          res,
-          pathname,
-        )
-      ) {
-        return;
-      }
-
-      /*
        * Real non-HTML assets/files from dist/.
        * HTML routes are handled by renderDocument() so the initial paint is
        * always the loading shell instead of prerendered React markup.
