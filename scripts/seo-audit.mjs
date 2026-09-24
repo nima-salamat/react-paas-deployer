@@ -66,6 +66,10 @@ for (const route of ROUTES) {
     fail(`${route.path}: missing prerender marker.`);
   }
 
+  if (!/<style\b[^>]*data-emotion=["']pd\s+/i.test(html)) {
+    fail(`${route.path}: prerendered HTML is missing critical Emotion CSS.`);
+  }
+
   if (!html.includes(`<link rel="canonical" href="${route.url}"`)) {
     fail(`${route.path}: canonical URL does not match ${route.url}.`);
   }
