@@ -255,7 +255,7 @@ export async function prerender({ url }) {
     };
   }
 
-  const emotionCache = createEmotionCache();
+  const emotionCache = createEmotionCache({ forceServer: true });
   const html = renderToString(
     <PrerenderApp url={url} emotionCache={emotionCache} />,
   );
