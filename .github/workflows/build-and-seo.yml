@@ -29,5 +29,8 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Server shell smoke test
+        run: node scripts/server-smoke.mjs
+
       - name: Validate SEO output
         run: npm run seo:check
