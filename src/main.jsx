@@ -23,9 +23,11 @@ Array.from(
   if (index > 0) element.remove();
 });
 
-rootElement
-  .querySelectorAll(".app-loading, #app-boot-shell")
-  .forEach((element) => element.remove());
+// The production server may serve a prerendered document shell. The browser
+// client owns #root completely, so discard every leftover child before mount.
+// This also prevents SEO/prerender markup from remaining visible when a route
+// crashes during its first React render.
+rootElement.replaceChildren();
 
 createRoot(rootElement).render(
   <React.StrictMode>
