@@ -52,8 +52,8 @@ export default function SEO() {
   const schema = useMemo(() => buildSchema(page, pathname, siteConfig, { docs: doc }), [page, pathname, doc]);
 
   // PrerenderApp injects the finalized SEO head explicitly. Rendering Helmet
-  // during React SSR would serialize the same tags into #root as well.
-  if (typeof document === "undefined") return null;
+  // during the Vite prerender pass would serialize the same tags into #root.
+  if (import.meta.env.SSR) return null;
 
   return (
     <Helmet prioritizeSeoTags>
