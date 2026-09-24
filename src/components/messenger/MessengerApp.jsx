@@ -4850,6 +4850,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             loadUserProfileByUsername={loadUserProfileByUsername}
             pendingUploads={pendingUploads}
             bottomRef={bottomRef}
+            typingUsers={typingUsers}
           />
 
           {/* Channel mode: if only_admins_send is on and the current user is not
