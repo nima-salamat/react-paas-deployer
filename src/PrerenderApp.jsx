@@ -7,7 +7,7 @@ import {
   normalizePathname,
 } from "./seo-config.js";
 
-export default function PrerenderApp({ url, emotionCache = null }) {
+export default function PrerenderApp({ url }) {
   const pathname = normalizePathname(
     new URL(url, "http://prerender.local").pathname,
   );
@@ -18,7 +18,7 @@ export default function PrerenderApp({ url, emotionCache = null }) {
 
   return (
     <StaticRouter location={pathname}>
-      <Root prerender emotionCache={emotionCache} />
+      <Root prerender />
     </StaticRouter>
   );
 }
