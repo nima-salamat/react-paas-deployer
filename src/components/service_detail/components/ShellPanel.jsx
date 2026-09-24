@@ -838,10 +838,11 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     const editorCommand = cmd.match(/^(?:nano|vi|vim)\s+(.+)$/i);
     if (editorCommand) {
       appendHistory({ type: "command", text: cmd, cwd: currentCwd });
+      let editorPath = null;
       try {
         const editorArg = parseSingleEditorArgument(editorCommand[1]);
         if (!editorArg || /^(?:-|--)/.test(editorArg)) throw new Error("Use a single file path with the built-in editor.");
-        const editorPath = editorArg.startsWith("/") ? editorArg : joinPath(currentCwd, editorArg);
+        editorPath = editorArg.startsWith("/") ? editorArg : joinPath(currentCwd, editorArg);
         await (async () => {
           const response = await apiRequest({ method: "POST", url: `${apiRoot}/file/`, data: { token: session.token, action: "read", path: editorPath } });
           const data = response?.data || {};
