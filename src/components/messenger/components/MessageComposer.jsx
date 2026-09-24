@@ -26,6 +26,7 @@ import DescriptionIcon from "@mui/icons-material/Description";
 import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
 import CodeIcon from "@mui/icons-material/Code";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import SelectAllIcon from "@mui/icons-material/SelectAll";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -1522,6 +1523,15 @@ function MessageComposer({
     });
   };
 
+  const selectAllComposerText = () => {
+    const ta = getComposerTextarea();
+    if (!ta || typeof ta.select !== "function") return;
+    ta.focus();
+    ta.select();
+    rememberSelection(ta);
+    setFmtMenu(null);
+  };
+
   const onTextContextMenu = (e) => {
     // Mobile browsers own long-press text selection. Do not cancel their native
     // selection/context actions; formatting is exposed through the selection
@@ -2651,6 +2661,15 @@ function MessageComposer({
         disableRestoreFocus
         slotProps={{ paper: { sx: { minWidth: 180 } } }}
       >
+        <MenuItem
+          onClick={() => {
+            selectAllComposerText();
+          }}
+        >
+          <ListItemIcon><SelectAllIcon fontSize="small" /></ListItemIcon>
+          Select all
+          <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+A</Typography>
+        </MenuItem>
         <MenuItem onClick={() => applyTextFormat("spoiler")}>
           <ListItemIcon><VisibilityOffIcon fontSize="small" /></ListItemIcon>
           Spoiler
