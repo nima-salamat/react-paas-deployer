@@ -54,6 +54,11 @@ async function waitForServer(url) {
 
 try {
   const response = await waitForServer(`http://127.0.0.1:${port}/`);
+  const permissionsPolicy = response.headers.get("permissions-policy") || "";
+  if (!permissionsPolicy.includes("camera=(self)") || !permissionsPolicy.includes("microphone=(self)")) {
+    throw new Error("Permissions-Policy does not allow browser media access for calls.");
+  }
+
   const html = await response.text();
   const root = extractRoot(html);
 
