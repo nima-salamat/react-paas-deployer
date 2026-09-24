@@ -15,6 +15,8 @@ import {
   Typography,
 } from "@mui/material";
 import { useLocation } from "react-router-dom";
+import { useTheme, ThemeProvider, createTheme } from "@mui/material/styles";
+import { getPalette, normalizeColorThemeId, readAppearance } from "../messenger/modules/appearance";
 
 const RECONNECTABLE_PREFIXES = ["/dashboard", "/messenger"];
 
@@ -59,6 +61,52 @@ export default function ConnectionReconnectDialog() {
   );
   const [failure, setFailure] = useState(null);
   const [retrying, setRetrying] = useState(false);
+
+  // This dialog is mounted globally from App.jsx, outside MessengerApp's
+  // nested ThemeProvider. Mirror the active Messenger palette on /messenger.
+  const parentTheme = useTheme();
+  const messengerTheme = useMemo(() => {
+    if (!isReconnectablePath(location.pathname)) return null;
+
+    const mode = parentTheme.palette.mode === "dark" ? "dark" : "light";
+    const appearance = readAppearance();
+    const colorId = normalizeColorThemeId(appearance?.colorTheme);
+    const pal = getPalette(colorId, mode);
+    const isDark = mode === "dark";
+
+    return createTheme({
+      palette: {
+        mode,
+        primary: {
+          main: pal.primary,
+          dark: isDark ? pal.primarySoft : pal.primaryHover,
+          light: isDark ? pal.primaryHover : pal.primarySoft,
+          contrastText: "#ffffff",
+        },
+        secondary: parentTheme.palette.secondary,
+        success: { main: pal.success },
+        warning: { main: pal.warning },
+        error: { main: pal.danger },
+        background: {
+          default: pal.background,
+          paper: pal.surface,
+        },
+        text: {
+          primary: pal.text,
+          secondary: pal.textSecondary,
+          disabled: pal.textMuted,
+        },
+        divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)",
+        action: parentTheme.palette.action,
+      },
+      shape: parentTheme.shape,
+      typography: parentTheme.typography,
+      breakpoints: parentTheme.breakpoints,
+      spacing: parentTheme.spacing,
+      transitions: parentTheme.transitions,
+      zIndex: parentTheme.zIndex,
+    });
+  }, [location.pathname, parentTheme]);
 
   useEffect(() => {
     const handleOffline = () => setOffline(true);
@@ -151,7 +199,7 @@ export default function ConnectionReconnectDialog() {
     window.location.reload();
   }, []);
 
-  return (
+  const dialog = (
     <Dialog
       open={open}
       fullWidth
@@ -219,4 +267,8 @@ export default function ConnectionReconnectDialog() {
       </DialogActions>
     </Dialog>
   );
+
+  return messengerTheme
+    ? <ThemeProvider theme={messengerTheme}>{dialog}</ThemeProvider>
+    : dialog;
 }
