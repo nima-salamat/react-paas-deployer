@@ -38,6 +38,10 @@ jobs:
             printf '%s: ' "$file"
             grep -Eio '<link[^>]+rel="canonical"[^>]*>' "$file" | wc -l
           done
+          echo "Title tags:"
+          grep -Eio '<title[^>]*>' dist/index.html || true
+          echo "Title tag count:"
+          grep -Eio '<title[^>]*>' dist/index.html | wc -l
           echo "Root head:"
           sed -n '1,120p' dist/index.html
 
