@@ -60,6 +60,78 @@ import { format, parseISO } from "date-fns";
 import { useLocation, useNavigate } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 import { useProfiles, resolveProfileImageUrl } from "./profileContext";
+const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
+
+const EDITOR_SIZE_DESKTOP = 360;
+const EDITOR_SIZE_MOBILE = 280;
+
+const COLOR_CHOICES = [
+  { value: 0, label: "Default" },
+  { value: 1, label: "Red" },
+  { value: 2, label: "Blue" },
+  { value: 3, label: "Green" },
+  { value: 4, label: "Yellow" },
+  { value: 5, label: "Purple" },
+  { value: 6, label: "Orange" },
+  { value: 7, label: "Pink" },
+  { value: 8, label: "Teal" },
+  { value: 9, label: "Indigo" },
+  { value: 10, label: "Gray" },
+  { value: 11, label: "Black" },
+  { value: 12, label: "White" },
+];
+
+const THEME_CHOICES = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
+const PRESET_EMOJIS = [
+  "😀", "😂", "😍", "😎", "🤩", "👑",
+  "💡", "🔥", "❤️", "⭐", "🚀", "🍕",
+  "🎉", "🏆", "💎", "✨", "🎵", "💬",
+];
+
+function getProfileId(profile) {
+  if (!profile) return null;
+  return profile.id ?? profile.pk ?? profile.uuid ?? profile.user_id ?? null;
+}
+
+function friendlyErr(err, fallback = "Something went wrong.") {
+  const data = err?.response?.data;
+  if (!data) return err?.message || fallback;
+  if (typeof data === "string") return data;
+  if (typeof data.message === "string") return data.message.replace(/^(error|success)::/, "");
+  if (data.errors) {
+    if (typeof data.errors === "string") return data.errors;
+    try {
+      const parts = Object.entries(data.errors).flatMap(([k, v]) =>
+        Array.isArray(v) ? v.map((x) => `${k}: ${x}`) : [`${k}: ${v}`]
+      );
+      if (parts.length) return parts.join(" · ");
+    } catch {
+      /* ignore malformed error payloads */
+    }
+  }
+  if (data.detail) return String(data.detail);
+  return fallback;
+}
+
+function revokeUrl(url) {
+  if (typeof url !== "string" || !url.startsWith("blob:")) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    /* ignore */
+  }
+}
+
+function isImageFile(file) {
+  if (!file) return false;
+  if (file.type?.startsWith("image/")) return true;
+  return /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(file.name || "");
+}
+
 import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
 
 // --- DND-Kit Imports ---
