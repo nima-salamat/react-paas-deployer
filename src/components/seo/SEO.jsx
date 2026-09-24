@@ -13,7 +13,7 @@ import {
 
 const siteConfig = getSiteConfig(import.meta.env);
 
-export default function SEO() {
+export default function SEO({ prerender = false }) {
   const location = useLocation();
   const pathname = normalizePathname(location.pathname);
   const [doc, setDoc] = useState(null);
@@ -21,7 +21,7 @@ export default function SEO() {
   const slug = isDocDetail ? pathname.slice("/docs/".length).split("/")[0] : "";
 
   useEffect(() => {
-    if (!isDocDetail || !slug) {
+    if (prerender || !isDocDetail || !slug) {
       setDoc(null);
       return undefined;
     }
@@ -33,15 +33,21 @@ export default function SEO() {
       .then((data) => { if (!cancelled) setDoc(data); })
       .catch(() => { if (!cancelled) setDoc(null); });
     return () => { cancelled = true; };
-  }, [isDocDetail, slug]);
+  }, [isDocDetail, slug, prerender]);
 
   const staticPage = PUBLIC_PAGES[pathname];
-  const page = doc
-    ? {
-        title: `${doc.title} | Documentation | ${siteConfig.siteName}`,
-        description: doc.description || `Learn how to use ${siteConfig.siteName}: ${doc.title}.`,
-      }
-    : staticPage;
+  const page = useMemo(
+    () =>
+      doc
+        ? {
+            title: `${doc.title} | Documentation | ${siteConfig.siteName}`,
+            description:
+              doc.description ||
+              `Learn how to use ${siteConfig.siteName}: ${doc.title}.`,
+          }
+        : staticPage,
+    [doc, staticPage],
+  );
   const noindex = isNoIndex(pathname) || (isDocDetail && !doc);
   const title = page?.title || `${siteConfig.siteName} | Application Deployment Platform`;
   const description = page?.description || "Application deployment and infrastructure management platform.";
@@ -50,6 +56,10 @@ export default function SEO() {
     ? "noindex, nofollow, noarchive"
     : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1";
   const schema = useMemo(() => buildSchema(page, pathname, siteConfig, { docs: doc }), [page, pathname, doc]);
+
+  // PrerenderApp injects the finalized SEO head explicitly. Rendering Helmet
+  // during the Vite prerender pass would serialize the same tags into #root.
+  if (prerender) return null;
 
   return (
     <Helmet prioritizeSeoTags>

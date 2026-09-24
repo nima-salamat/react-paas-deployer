@@ -232,8 +232,6 @@ function Reveal({
 
 /** SVG curtain — only on desktop + when motion is allowed */
 function CurtainPanel({ side, progress, dark, enabled }) {
-  if (!enabled) return null;
-
   const uid = `${side}-${dark ? "d" : "l"}`;
   const tx = useTransform(
     progress,
@@ -242,6 +240,7 @@ function CurtainPanel({ side, progress, dark, enabled }) {
       ? ["0%", "0%", "-102%", "-102%", "0%", "0%"]
       : ["0%", "0%", "102%", "102%", "0%", "0%"]
   );
+  if (!enabled) return null;
   const c0 = dark ? (side === "left" ? "#070f1c" : "#120a1c") : side === "left" ? "#e8eef8" : "#efe8f8";
   const c1 = dark ? (side === "left" ? "#0f1c32" : "#1c1430") : side === "left" ? "#d0dceb" : "#ddd0f0";
   const fold = dark ? "#7dd3fc" : "#3b82f6";

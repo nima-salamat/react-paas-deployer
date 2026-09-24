@@ -1,7 +1,5 @@
 import React, {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -61,31 +59,9 @@ import ReactAvatarEditor from "react-avatar-editor";
 import { format, parseISO } from "date-fns";
 import { useLocation, useNavigate } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
-import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
-
-// --- DND-Kit Imports ---
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  rectSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-
+import { useProfiles, resolveProfileImageUrl } from "./profileContext";
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
 
-/** Size of the crop canvas inside the editor (px) */
-//** Base size of the crop canvas inside the editor (px). On mobile we shrink to fit viewport. */
 const EDITOR_SIZE_DESKTOP = 360;
 const EDITOR_SIZE_MOBILE = 280;
 
@@ -116,66 +92,9 @@ const PRESET_EMOJIS = [
   "🎉", "🏆", "💎", "✨", "🎵", "💬",
 ];
 
-// ─── helpers ───────────────────────────────────────────────────────────────
-
-function hasAccessToken() {
-  try {
-    return Boolean(window.localStorage.getItem("access"));
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Build a displayable absolute URL for a profile photo.
- * Backend returns relative /media/images/... URLs protected by JWT.
- * <img> cannot send Authorization headers, so we append ?token=<access>.
- */
-export function resolveProfileImageUrl(profile) {
-  if (!profile) return null;
-  const candidates = [
-    profile.image_url,
-    profile.imageUrl,
-    profile.avatar_url,
-    profile.avatar,
-    typeof profile.image === "string" ? profile.image : null,
-    profile.image?.url,
-  ];
-  for (const c of candidates) {
-    if (typeof c === "string" && c.trim()) {
-      let url = c.trim();
-      // Resolve relative URLs against the API host first
-      if (url.startsWith("/")) {
-        const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
-        url = `${host}${url}`;
-      } else if (!/^https?:\/\//i.test(url) && import.meta.env.VITE_API_BASE) {
-        const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/$/, "");
-        url = `${host}/${url}`;
-      }
-
-      // Any /media/ path is JWT-protected (images, messenger, tickets)
-      if (/\/media\//i.test(url) || /\/api\/messenger\/attachments\//i.test(url)) {
-        const token = localStorage.getItem("access");
-        if (token) {
-          try {
-            const u = new URL(url);
-            u.searchParams.set("token", token);
-            return u.toString();
-          } catch {
-            const sep = url.includes("?") ? "&" : "?";
-            return `${url}${sep}token=${encodeURIComponent(token)}`;
-          }
-        }
-      }
-      return url;
-    }
-  }
-  return null;
-}
-
 function getProfileId(profile) {
   if (!profile) return null;
-  return profile.id ?? profile.pk ?? profile.uuid ?? null;
+  return profile.id ?? profile.pk ?? profile.uuid ?? profile.user_id ?? null;
 }
 
 function friendlyErr(err, fallback = "Something went wrong.") {
@@ -191,7 +110,7 @@ function friendlyErr(err, fallback = "Something went wrong.") {
       );
       if (parts.length) return parts.join(" · ");
     } catch {
-      /* ignore */
+      /* ignore malformed error payloads */
     }
   }
   if (data.detail) return String(data.detail);
@@ -199,128 +118,40 @@ function friendlyErr(err, fallback = "Something went wrong.") {
 }
 
 function revokeUrl(url) {
-  if (url && typeof url === "string" && url.startsWith("blob:")) {
-    try {
-      URL.revokeObjectURL(url);
-    } catch {
-      /* ignore */
-    }
+  if (typeof url !== "string" || !url.startsWith("blob:")) return;
+  try {
+    URL.revokeObjectURL(url);
+  } catch {
+    /* ignore */
   }
 }
 
 function isImageFile(file) {
   if (!file) return false;
-  if (file.type && file.type.startsWith("image/")) return true;
-  // fallback for some OS that omit MIME
+  if (file.type?.startsWith("image/")) return true;
   return /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(file.name || "");
 }
 
-// ─── Context ───────────────────────────────────────────────────────────────
+import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
 
-const ProfileContext = createContext(null);
-
-export const ProfileProvider = ({ children }) => {
-  const [profiles, setProfiles] = useState([]);
-  const [loadingProfiles, setLoadingProfiles] = useState(false);
-  const [profileError, setProfileError] = useState("");
-  const inFlightRef = useRef(null);
-
-  const fetchProfiles = useCallback(async () => {
-    if (!hasAccessToken()) {
-      setProfiles([]);
-      setLoadingProfiles(false);
-      setProfileError("");
-      return [];
-    }
-
-    if (inFlightRef.current) return inFlightRef.current;
-
-    setLoadingProfiles(true);
-    setProfileError("");
-
-    const req = (async () => {
-      try {
-        const response = await apiRequest({
-          url: `${API_BASE}profile/list/`,
-          method: "GET",
-        });
-        const raw = response?.data;
-        const list = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.results)
-          ? raw.results
-          : Array.isArray(raw?.profiles)
-          ? raw.profiles
-          : [];
-        const normalized = list.map((p) => ({
-          ...p,
-          id: getProfileId(p),
-          image_url: resolveProfileImageUrl(p),
-        }));
-        normalized.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        setProfiles(normalized);
-        return normalized;
-      } catch (err) {
-        if (err?.response?.status === 401 || err?.response?.status === 403) {
-          setProfiles([]);
-          setProfileError("");
-          return [];
-        }
-        setProfileError(friendlyErr(err, "Failed to fetch profiles"));
-        return [];
-      } finally {
-        setLoadingProfiles(false);
-        inFlightRef.current = null;
-      }
-    })();
-
-    inFlightRef.current = req;
-    return req;
-  }, []);
-
-  useEffect(() => {
-    fetchProfiles();
-
-    const onAuth = () => fetchProfiles();
-    window.addEventListener("auth-changed", onAuth);
-    window.addEventListener("storage", onAuth);
-    return () => {
-      window.removeEventListener("auth-changed", onAuth);
-      window.removeEventListener("storage", onAuth);
-    };
-  }, [fetchProfiles]);
-
-  const value = useMemo(
-    () => ({
-      profiles,
-      setProfiles,
-      fetchProfiles,
-      loadingProfiles,
-      profileError,
-      primaryImageUrl: profiles[0] ? resolveProfileImageUrl(profiles[0]) : null,
-    }),
-    [profiles, fetchProfiles, loadingProfiles, profileError]
-  );
-
-  return (
-    <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>
-  );
-};
-
-export const useProfiles = () => {
-  const ctx = useContext(ProfileContext);
-  if (!ctx) {
-    return {
-      profiles: [],
-      setProfiles: () => {},
-      fetchProfiles: async () => [],
-      loadingProfiles: false,
-      profileError: "",
-      primaryImageUrl: null,
-    };
-  }
-  return ctx;
-};
+// --- DND-Kit Imports ---
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ─── Sortable Photo — whole card is draggable; click still opens preview ───
 

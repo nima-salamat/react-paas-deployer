@@ -876,7 +876,6 @@ export default function ServiceDetail() {
 
     try {
       if (deployId) {
-        try {
           // ---------------------------------------------------------------
           // Build the rebuild URL. For DB platforms, append ?force_reinit=true
           // when the operator armed the "Force re-initialize" checkbox in
@@ -910,12 +909,11 @@ export default function ServiceDetail() {
             setTimeout(() => { if (mountedRef.current) { fetchService(true); checkServiceRunning(true); } }, 4000);
             return;
           }
-        } catch (rebuildErr) { }
-      }
-      // Fallback: start_service does NOT support force_reinit (it's a
-      // deploy-level option, not a service-level one), so we ignore
-      // forceReinit here on purpose. The operator should select a deploy
-      // first if they want force_reinit semantics.
+          setError(resp.data?.detail || resp.data?.error || "Rebuild request was not accepted.");
+          return;
+        }
+
+      // No deploy is selected. Service-level rebuild is the intended fallback.
       await startService({ forceRebuild: true });
     } catch (err) {
       setError(err.response?.data?.detail || (err.response ? JSON.stringify(err.response.data) : "Error rebuilding service"));

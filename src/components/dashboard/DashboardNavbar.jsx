@@ -23,7 +23,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
-import { useProfiles, resolveProfileImageUrl } from "../profile/profile.jsx";
+import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 
 const resolveName = (profile) =>
   profile?.display_name ||

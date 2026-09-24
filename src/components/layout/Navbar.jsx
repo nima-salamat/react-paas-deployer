@@ -51,7 +51,7 @@ import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightnessOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 
-import { useProfiles, resolveProfileImageUrl } from "../profile/profile.jsx";
+import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_ICON = "/icon.svg";

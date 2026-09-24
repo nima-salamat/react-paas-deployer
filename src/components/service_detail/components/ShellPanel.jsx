@@ -838,17 +838,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     const editorCommand = cmd.match(/^(?:nano|vi|vim)\s+(.+)$/i);
     if (editorCommand) {
       appendHistory({ type: "command", text: cmd, cwd: currentCwd });
+      let editorPath = null;
       try {
         const editorArg = parseSingleEditorArgument(editorCommand[1]);
         if (!editorArg || /^(?:-|--)/.test(editorArg)) throw new Error("Use a single file path with the built-in editor.");
-        const path = editorArg.startsWith("/") ? editorArg : joinPath(currentCwd, editorArg);
+        editorPath = editorArg.startsWith("/") ? editorArg : joinPath(currentCwd, editorArg);
         await (async () => {
-          const response = await apiRequest({ method: "POST", url: `${apiRoot}/file/`, data: { token: session.token, action: "read", path } });
+          const response = await apiRequest({ method: "POST", url: `${apiRoot}/file/`, data: { token: session.token, action: "read", path: editorPath } });
           const data = response?.data || {};
           if (data.result !== "success") throw new Error(data.detail || "Unable to read file.");
-          setActiveTab(`file:${path}`);
-          setTabs((prev) => prev.some((tab) => tab.id === `file:${path}`) ? prev : [...prev, { id: `file:${path}`, type: "file", title: path.split("/").pop() || path, path }]);
-          setOpenFiles((prev) => ({ ...prev, [path]: { content: String(data.content || ""), dirty: false, writable: data.writable !== false, readOnlyReason: data.read_only_reason || "This file is read-only." } }));
+          setActiveTab(`file:${editorPath}`);
+          setTabs((prev) => prev.some((tab) => tab.id === `file:${editorPath}`) ? prev : [...prev, { id: `file:${editorPath}`, type: "file", title: editorPath.split("/").pop() || editorPath, path: editorPath }]);
+          setOpenFiles((prev) => ({ ...prev, [editorPath]: { content: String(data.content || ""), dirty: false, writable: data.writable !== false, readOnlyReason: data.read_only_reason || "This file is read-only." } }));
         })();
       } catch (err) {
         handleError(err?.response?.data?.detail || err?.message || "Unable to open file.");
@@ -862,7 +863,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       setCommand("");
       setCompletionOpen(false);
       focusTerminal();
-      appendHistory({ type: "system", text: `Opened ${path}`, cwd: currentCwd });
+      appendHistory({ type: "system", text: `Opened ${editorPath}`, cwd: currentCwd });
       return true;
     }
 

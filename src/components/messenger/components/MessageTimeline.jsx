@@ -5,6 +5,7 @@ import {
 import MessageBubble from "./MessageBubble";
 import { MSG_SCROLL_CLASS, updateScrollbarGutterVisibility } from "../modules/msgScrollStyles";
 import { getSenderGroupFlags } from "../modules/messageGrouping";
+import { copyText } from "../messengerUtils";
 
 /**
  * MessageTimeline owns the chat history viewport: pagination affordance,
@@ -257,7 +258,6 @@ export default function MessageTimeline(props) {
           onCopyText={async (msg) => {
             await copyText(typeof msg?.body === "string" ? msg.body : "");
             flash("Copied");
-            setCtx(null);
           }}
           onLoadUserProfile={loadUserProfile}
           onJumpToMessage={onJumpToMessage}
@@ -274,7 +274,7 @@ export default function MessageTimeline(props) {
     );})}
 
     {pendingUploads
-      .filter((u) => String(u.conversationId) === String(activeId))
+      .filter((u) => String(u.conversationId) === String(activeIdRef.current))
       .map((u) => (
         <Box key={u.id} sx={{ display: "flex", justifyContent: "flex-end", mb: 0.8, px: 0.5 }}>
           <Box sx={{
