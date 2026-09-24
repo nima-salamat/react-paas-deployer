@@ -1,3 +1,6 @@
+import { renderToString } from "react-dom/server.edge";
+import PrerenderApp from "./PrerenderApp.jsx";
+
 import {
   INDEXABLE_PUBLIC_ROUTES,
   PRERENDERABLE_PUBLIC_ROUTES,
@@ -246,64 +249,13 @@ export async function prerender({ url }) {
     };
   }
 
-  // vite-prerender-plugin provides a browser-like document while evaluating
-  // the prerender hook. Emotion detects that at module initialization and
-  // otherwise disables its SSR style output. Temporarily expose a genuine
-  // server environment before importing the React tree so Emotion renders its
-  // critical style tags into the prerendered markup.
-  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, "document");
-  const previousDocument = globalThis.document;
-  const hadWindow = Object.prototype.hasOwnProperty.call(globalThis, "window");
-  const previousWindow = globalThis.window;
+  const html = renderToString(
+    <PrerenderApp url={url} />,
+  );
 
-  try {
-    try {
-      delete globalThis.document;
-    } catch {
-      globalThis.document = undefined;
-    }
-    try {
-      delete globalThis.window;
-    } catch {
-      globalThis.window = undefined;
-    }
-
-    const [{ renderToString }, { default: PrerenderApp }, { createEmotionCache }] =
-      await Promise.all([
-        import("react-dom/server.edge"),
-        import("./PrerenderApp.jsx"),
-        import("./emotionCache.js"),
-      ]);
-
-    const emotionCache = createEmotionCache({ forceServer: true });
-    const html = renderToString(
-      <PrerenderApp url={url} emotionCache={emotionCache} />,
-    );
-
-    return {
-      html,
-      links: new Set(PRERENDER_ROUTES),
-      head: buildHead(page, pathname),
-    };
-  } finally {
-    if (hadDocument) {
-      globalThis.document = previousDocument;
-    } else {
-      try {
-        delete globalThis.document;
-      } catch {
-        globalThis.document = undefined;
-      }
-    }
-
-    if (hadWindow) {
-      globalThis.window = previousWindow;
-    } else {
-      try {
-        delete globalThis.window;
-      } catch {
-        globalThis.window = undefined;
-      }
-    }
-  }
+  return {
+    html,
+    links: new Set(PRERENDER_ROUTES),
+    head: buildHead(page, pathname),
+  };
 }
