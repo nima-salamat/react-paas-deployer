@@ -26,6 +26,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Upload debug dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: messenger-tdz-dist
+          path: dist/
+          if-no-files-found: error
+
       - name: Check Messenger for use-before-definition
         run: npx eslint src/components/messenger/MessengerApp.jsx --rule 'no-use-before-define: [error, { functions: false, classes: true, variables: true }]'
 
