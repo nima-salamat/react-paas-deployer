@@ -8,6 +8,10 @@
   <meta name="author" content="PassDeployer" />
   <meta name="application-name" content="PassDeployer" />
 
+  <script>
+    document.documentElement.classList.add("js-enabled");
+  </script>
+
   <!-- Inter font (theme's primary typeface). Falls back to system-ui
        gracefully when the CDN is unreachable. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -35,6 +39,7 @@
       .app-loading__text { color: #94a3b8; }
     }
     @media (prefers-reduced-motion: reduce) { .app-loading__spinner { animation-duration: 1.8s; } }
+    .js-enabled #seo-noscript-fallback { display: none !important; }
     .seo-noscript {
       box-sizing: border-box; min-height: 100vh; padding: clamp(48px, 8vw, 96px) 20px;
       background: #f7f9fc; color: #0f172a;
