@@ -29,6 +29,9 @@ Array.from(
 // crashes during its first React render.
 rootElement.replaceChildren();
 
+// Remove crawler-only SEO content once the interactive React app owns the page.
+document.getElementById("seo-noscript-fallback")?.remove();
+
 createRoot(rootElement).render(
   <React.StrictMode>
     <BrowserRouter>
