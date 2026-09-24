@@ -537,11 +537,11 @@ function ScreenShareViewer({ participant, isLocal }) {
     setPan(p);
   };
 
-  const zoomBy = (delta) => {
+  const zoomBy = useCallback((delta) => {
     const next = Math.min(4, Math.max(1, +(zoomRef.current + delta).toFixed(2)));
     const p = next <= 1 ? { x: 0, y: 0 } : panRef.current;
     applyTransform(next, p);
-  };
+  }, []);
 
   // Wheel zoom
   useEffect(() => {
@@ -553,7 +553,7 @@ function ScreenShareViewer({ participant, isLocal }) {
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [zoomBy]);
 
   useEffect(() => {
     const onFs = () => {
@@ -1144,7 +1144,7 @@ export default function JitsiCallModal({
       };
       tick();
     } catch { /* */ }
-  }, [stopMicMeter, speakingId]);
+  }, [stopMicMeter]);
 
   /* ── Boot conference ──────────────────────────────────────────────── */
   useEffect(() => {
