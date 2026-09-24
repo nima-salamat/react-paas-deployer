@@ -436,6 +436,23 @@ export default function ComposeCodeWorkspace({
       // Explicit editor history. Programmatic edits (indent, duplicate,
       // comment, paste, etc.) change the controlled value and therefore
       // cannot rely on the browser's native textarea undo stack.
+      if (k === "y" || (k === "z" && e.shiftKey)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const history = getHistory(active?.id);
+        if (!history?.redo.length) return;
+        const current = code;
+        const entry = history.redo.pop();
+        history.undo.push({
+          code: current,
+          start: e.currentTarget?.selectionStart ?? current.length,
+          end: e.currentTarget?.selectionEnd ?? current.length,
+        });
+        updateActive({ code: entry.code });
+        setSel(Math.min(entry.start, entry.code.length), Math.min(entry.end, entry.code.length));
+        return;
+      }
+
       if (k === "z") {
         e.preventDefault();
         e.stopPropagation();
@@ -453,7 +470,6 @@ export default function ComposeCodeWorkspace({
         return;
       }
 
-      if (k === "y" || (k === "z" && e.shiftKey)) {
         e.preventDefault();
         e.stopPropagation();
         const history = getHistory(active?.id);
