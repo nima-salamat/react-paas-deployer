@@ -458,9 +458,11 @@ useEffect(() => {
       reconnectTimer = setTimeout(connect, 3000);
     };
     ws.onerror = () => {
+      if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) return;
       try { ws.close(); } catch { /* */ }
     };
     pingTimer = setInterval(() => {
+      if (ws.readyState !== WebSocket.OPEN) return;
       try { ws.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
     }, 25000);
   };
