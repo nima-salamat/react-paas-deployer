@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { readCursorPreference } from "./cursorSettings";
 import { MouseFollower } from "./mouseFollower";
 
 const POINTER_SELECTOR = [
@@ -58,8 +59,27 @@ function resolveCursorState(target) {
 
 export default function CustomCursor() {
   const rootRef = useRef(null);
+  const [enabled, setEnabled] = useState(() => readCursorPreference() === "custom");
 
   useEffect(() => {
+    const syncPreference = (event) => {
+      const next = event?.detail ?? readCursorPreference();
+      setEnabled(next === "custom");
+    };
+    const onStorage = (event) => {
+      if (event.key === "paas-cursor-preference") syncPreference();
+    };
+    window.addEventListener("passdeployer:cursor-preference", syncPreference);
+    window.addEventListener("storage", onStorage);
+    syncPreference();
+    return () => {
+      window.removeEventListener("passdeployer:cursor-preference", syncPreference);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
     const finePointer = window.matchMedia("(pointer: fine) and (hover: hover)");
     if (!finePointer.matches) return undefined;
 
@@ -146,7 +166,7 @@ export default function CustomCursor() {
       document.removeEventListener("visibilitychange", handleVisibility);
       document.documentElement.classList.remove("custom-cursor-enabled");
     };
-  }, []);
+  }, [enabled]);
 
   return (
     <div
