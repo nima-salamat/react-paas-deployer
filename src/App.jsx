@@ -73,6 +73,14 @@ function RouteScrollManager() {
   const navigationType = useNavigationType();
 
   useEffect(() => {
+    // Messenger uses a full-screen fixed shell and temporarily locks the page
+    // body. Always release that lock when navigation lands on a normal route,
+    // including browser Back/Forward navigation.
+    if (!location.pathname.startsWith("/messenger")) {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    }
+
     // Preserve browser history restoration for Back/Forward, but never carry a
     // previous page's scroll position into a new route pushed by the app.
     if (navigationType === "POP" || location.hash) return;
