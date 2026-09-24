@@ -1,4 +1,5 @@
 import { renderToString } from "react-dom/server.edge";
+import { createEmotionCache, getEmotionStyleTags } from "./emotionCache.js";
 
 import PrerenderApp from "./PrerenderApp.jsx";
 import {
@@ -26,6 +27,11 @@ function buildHead(page, pathname) {
     lang: "en",
     title: page.title,
     elements: new Set([
+      {
+        type: "style",
+        props: {},
+        children: emotionStyles,
+      },
       {
         type: "meta",
         props: {
@@ -249,9 +255,11 @@ export async function prerender({ url }) {
     };
   }
 
+  const emotionCache = createEmotionCache();
   const html = renderToString(
-    <PrerenderApp url={url} />,
+    <PrerenderApp url={url} emotionCache={emotionCache} />,
   );
+  const emotionStyles = getEmotionStyleTags(emotionCache);
 
   return {
     html,
