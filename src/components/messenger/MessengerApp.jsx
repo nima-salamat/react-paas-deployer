@@ -1725,6 +1725,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     setConversations,
     onRemoteEmojiPlay,
     onCallEvent: handleCallEvent,
+    markVisibleMessagesRead,
+    profileDataRef,
+    refreshProfileData,
   });
 
 
