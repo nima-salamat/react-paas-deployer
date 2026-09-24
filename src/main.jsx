@@ -1,5 +1,5 @@
 import React from "react";
-import { createRoot, hydrateRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import Root from "./Root.jsx";
@@ -31,21 +31,8 @@ const app = (
   </React.StrictMode>
 );
 
-const isPrerenderedDocument =
-  rootElement.hasChildNodes() &&
-  document.head.querySelector(
-    'meta[name="x-prerendered"][content="true"]',
-  );
-
-// Public prerendered routes already contain the exact page structure.
-// Hydrate them in place so there is no server-HTML -> empty-root -> React flash.
-// Dynamic/private routes keep the normal createRoot path.
-if (isPrerenderedDocument) {
-  hydrateRoot(rootElement, app);
-} else {
-  rootElement.replaceChildren();
-  createRoot(rootElement).render(app);
-}
+rootElement.replaceChildren();
+createRoot(rootElement).render(app);
 
 // Remove crawler-only SEO content once the interactive React app owns the page.
 document.getElementById("seo-noscript-fallback")?.remove();
