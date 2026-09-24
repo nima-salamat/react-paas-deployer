@@ -43,7 +43,12 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
   const [selectedMic, setSelectedMic] = useState("");
   const [selectedSpeaker, setSelectedSpeaker] = useState("");
   const [permissionError, setPermissionError] = useState("");
+  const [permissionState, setPermissionState] = useState({
+    camera: "unknown",
+    microphone: "unknown",
+  });
   const [loadingDevices, setLoadingDevices] = useState(false);
+  const [requestingPermission, setRequestingPermission] = useState(false);
   const [previewStream, setPreviewStream] = useState(null);
   const [testingMic, setTestingMic] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
@@ -64,41 +69,15 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
     } catch { /* */ }
   }, []);
 
-  // ---- Enumerate devices (requires permission to see labels) ----
+  // ---- Enumerate devices ----
   const enumerateDevices = async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setPermissionError("Your browser does not support media device selection.");
+      return;
+    }
+
     setLoadingDevices(true);
-    setPermissionError("");
     try {
-      // Ask for permission first so device labels become visible
-      // (without permission, labels are blank). Request separately so a
-      // missing camera does not block mic labels and vice versa.
-      let permStream = null;
-      try {
-        permStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-      } catch (e) {
-        try {
-          permStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        } catch (e2) {
-          try {
-            permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          } catch (e3) {
-            if (e?.name === "NotAllowedError" || e2?.name === "NotAllowedError") {
-              setPermissionError("Permission denied. Allow camera & microphone access in your browser to see device names.");
-            }
-          }
-        }
-      }
-      // Release the permission stream fully before we open a specific device
-      // for preview — otherwise desktop browsers often keep the first camera
-      // locked and ignore subsequent deviceId switches.
-      if (permStream) {
-        permStream.getTracks().forEach((t) => {
-          try { t.stop(); } catch { /* */ }
-        });
-        permStream = null;
-        // Brief yield so the OS releases the device before enumerate + preview
-        await new Promise((r) => setTimeout(r, 120));
-      }
       const devices = await navigator.mediaDevices.enumerateDevices();
       // Deduplicate by deviceId (some drivers report the same cam twice)
       const uniq = (list) => {
@@ -129,6 +108,13 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
         if (cur && spkrs.some((s) => s.deviceId === cur)) return cur;
         return spkrs[0]?.deviceId || "";
       });
+
+      // Once permission has been granted, browsers expose real device labels.
+      // Use that as a fallback on browsers where Permissions API is unavailable.
+      setPermissionState((prev) => ({
+        camera: cams.some((d) => d.label) ? "granted" : prev.camera,
+        microphone: mics.some((d) => d.label) ? "granted" : prev.microphone,
+      }));
     } catch (e) {
       setPermissionError(e?.message || "Could not list devices");
     } finally {
@@ -137,7 +123,61 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
   };
 
   useEffect(() => {
-    if (open) enumerateDevices();
+    if (!open) return;
+
+    enumerateDevices();
+
+    let disposed = false;
+    const permissionStatuses = [];
+
+    const readPermission = async (name, key) => {
+      try {
+        if (!navigator.permissions?.query) return;
+        const status = await navigator.permissions.query({ name });
+        if (disposed) return;
+
+        setPermissionState((prev) => ({ ...prev, [key]: status.state }));
+
+        const onChange = () => {
+          if (disposed) return;
+          setPermissionState((prev) => ({ ...prev, [key]: status.state }));
+          enumerateDevices();
+        };
+
+        if (typeof status.addEventListener === "function") {
+          status.addEventListener("change", onChange);
+          permissionStatuses.push({ status, onChange });
+        } else {
+          status.onchange = onChange;
+          permissionStatuses.push({ status, onChange, legacy: true });
+        }
+      } catch {
+        // Some browsers do not expose camera/microphone through Permissions API.
+      }
+    };
+
+    readPermission("camera", "camera");
+    readPermission("microphone", "microphone");
+
+    const refresh = () => enumerateDevices();
+    navigator.mediaDevices?.addEventListener?.("devicechange", refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
+    return () => {
+      disposed = true;
+      permissionStatuses.forEach(({ status, onChange, legacy }) => {
+        if (legacy) {
+          status.onchange = null;
+        } else {
+          status.removeEventListener?.("change", onChange);
+        }
+      });
+      navigator.mediaDevices?.removeEventListener?.("devicechange", refresh);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+    // enumerateDevices is intentionally stable for this dialog lifecycle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -265,7 +305,7 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
       stopPreview();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, selectedCamera, selectedMic]);
+  }, [open, selectedCamera, selectedMic, permissionState.camera, permissionState.microphone]);
 
   const stopPreview = () => {
     if (streamRef.current) {
@@ -285,6 +325,70 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
     }
     setMicLevel(0);
     setPreviewStream(null);
+  };
+
+  // ---- Explicit browser permission request ----
+  const requestMediaAccess = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setPermissionError("Your browser does not support camera and microphone access.");
+      return;
+    }
+
+    if (window.isSecureContext === false) {
+      setPermissionError("Camera and microphone access requires a secure HTTPS connection.");
+      return;
+    }
+
+    setRequestingPermission(true);
+    setPermissionError("");
+    stopPreview();
+
+    const result = { camera: "unknown", microphone: "unknown" };
+
+    const requestOne = async (key, constraints) => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream.getTracks().forEach((track) => {
+          try { track.stop(); } catch { /* */ }
+        });
+        result[key] = "granted";
+      } catch (error) {
+        if (error?.name === "NotAllowedError" || error?.name === "SecurityError") {
+          result[key] = "denied";
+        } else if (error?.name === "NotFoundError" || error?.name === "OverconstrainedError") {
+          result[key] = "unknown";
+        } else {
+          result[key] = "unknown";
+        }
+      }
+    };
+
+    try {
+      // Request separately so a missing camera does not prevent the browser
+      // from asking for microphone permission, and vice versa.
+      await requestOne("camera", { video: true, audio: false });
+      await requestOne("microphone", { video: false, audio: true });
+
+      setPermissionState((prev) => ({
+        camera: result.camera === "unknown" ? prev.camera : result.camera,
+        microphone: result.microphone === "unknown" ? prev.microphone : result.microphone,
+      }));
+
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      await enumerateDevices();
+
+      if (result.camera === "denied" && result.microphone === "denied") {
+        setPermissionError(
+          "Permission denied. Allow camera & microphone access in your browser to see device names."
+        );
+      } else if (result.camera === "denied") {
+        setPermissionError("Camera permission denied. Allow camera access in your browser to use camera devices.");
+      } else if (result.microphone === "denied") {
+        setPermissionError("Microphone permission denied. Allow microphone access in your browser to use microphone devices.");
+      }
+    } finally {
+      setRequestingPermission(false);
+    }
   };
 
   const startMicMeter = (stream) => {
@@ -379,10 +483,31 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
 
       <DialogContent dividers>
         {permissionError && (
-          <Paper variant="outlined" sx={{ p: 1.5, mb: 2, bgcolor: alpha("#f44336", 0.08), borderColor: "error.main" }}>
-            <Stack direction="row" spacing={1} alignItems="flex-start">
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              mb: 2,
+              bgcolor: alpha("#f44336", 0.08),
+              borderColor: "error.main",
+            }}
+          >
+            <Stack direction="row" spacing={1.25} alignItems="flex-start">
               <ErrorIcon color="error" fontSize="small" sx={{ mt: 0.25 }} />
-              <Typography variant="body2" color="error.main">{permissionError}</Typography>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" color="error.main" sx={{ mb: 1 }}>
+                  {permissionError}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="contained"
+                  onClick={requestMediaAccess}
+                  disabled={requestingPermission}
+                  sx={{ textTransform: "none", fontWeight: 700 }}
+                >
+                  {requestingPermission ? "Requesting access…" : "Allow camera & microphone"}
+                </Button>
+              </Box>
             </Stack>
           </Paper>
         )}
