@@ -24,6 +24,7 @@ function buildHead(page, pathname) {
 
   return {
     lang: "en",
+    title: page.title,
     elements: new Set([
       {
         type: "meta",
