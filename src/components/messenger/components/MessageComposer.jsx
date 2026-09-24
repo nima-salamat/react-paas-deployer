@@ -790,7 +790,7 @@ function MessageComposer({
     };
     draw();
     if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
-      try { startMediaRecorderOnStream(source, "video"); } catch (e) { setRecordError(e?.message || "Could not start video recording"); }
+      try { startMediaRecorderOnStream(source, "video"); } catch (e) { showRecordError(e?.message || "Could not start video recording"); }
     }
     return () => stopRecordingCanvas();
   }, [recPhase, recKind]);
@@ -1408,7 +1408,7 @@ function MessageComposer({
       const room = Math.max(0, 10 - prev.length);
       const accepted = picked.slice(0, room);
       if (accepted.length < picked.length) {
-        setRecordError("You can attach up to 10 files per message.");
+        showRecordError("You can attach up to 10 files per message.");
       }
       return [...prev, ...accepted];
     });
@@ -1453,7 +1453,7 @@ function MessageComposer({
         });
       }
     } catch (e) {
-      setRecordError(e?.message || "Could not preview file");
+      showRecordError(e?.message || "Could not preview file");
     }
   };
 
