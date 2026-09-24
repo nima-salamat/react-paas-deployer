@@ -375,6 +375,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   // Read receipts
   const [readersMessage, setReadersMessage] = useState(null);
+
+  // Video-note picture-in-picture state. ChatVideo hands off the current
+  // video note through a window event; keep the active item in the shell so
+  // it can continue while the message list is scrolled.
+  const [videoNotePip, setVideoNotePip] = useState(null);
+
   // Call lifecycle is isolated in useMessengerCalls.
 
   // Video-note PiP: listen for hand-off from ChatVideo; stop when leaving that chat
