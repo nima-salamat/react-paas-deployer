@@ -625,6 +625,27 @@ function MessageComposer({
   const [hint, setHint] = useState(""); // "Slide up to lock" / "Release to cancel"
   const [dragUI, setDragUI] = useState({ dx: 0, dy: 0 });
 
+  const RECORD_ERROR_TTL_MS = 5000;
+  const recordErrorTimerRef = useRef(null);
+  const clearRecordError = useCallback(() => {
+    if (recordErrorTimerRef.current) {
+      clearTimeout(recordErrorTimerRef.current);
+      recordErrorTimerRef.current = null;
+    }
+    setRecordError("");
+  }, []);
+  const showRecordError = useCallback((message) => {
+    if (recordErrorTimerRef.current) {
+      clearTimeout(recordErrorTimerRef.current);
+    }
+    const text = String(message || "Recording unavailable");
+    setRecordError(text);
+    recordErrorTimerRef.current = setTimeout(() => {
+      recordErrorTimerRef.current = null;
+      setRecordError("");
+    }, RECORD_ERROR_TTL_MS);
+  }, []);
+
   const mediaRecorderRef = useRef(null);
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
@@ -714,6 +735,7 @@ function MessageComposer({
     stopMicMeter();
     if (timerRef.current) clearInterval(timerRef.current);
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    if (recordErrorTimerRef.current) clearTimeout(recordErrorTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -886,7 +908,7 @@ function MessageComposer({
       setRecordSeconds(0);
 
       if (wasCancel || !blob.size) {
-        if (!wasCancel && !blob.size) setRecordError("Recording was empty");
+        if (!wasCancel && !blob.size) showRecordError("Recording was empty");
         return;
       }
       const ts = Date.now();
@@ -921,7 +943,7 @@ function MessageComposer({
   const flipCamera = async () => {
     if (recKind !== "video" || flippingCam || !streamRef.current) return;
     setFlippingCam(true);
-    setRecordError("");
+    clearRecordError();
     const nextFacing = cameraFacingRef.current === "user" ? "environment" : "user";
     const oldStream = streamRef.current;
     let newVideoStream = null;
@@ -967,14 +989,14 @@ function MessageComposer({
       try { localStorage.setItem("messenger.videoFacing", nextFacing); } catch { /* */ }
     } catch (e) {
       if (newVideoStream) newVideoStream.getTracks().forEach((t) => { try { t.stop(); } catch { /* */ } });
-      setRecordError(e?.message || "Could not switch camera");
+      showRecordError(e?.message || "Could not switch camera");
     } finally {
       setFlippingCam(false);
     }
   };
 
   const beginRecording = useCallback(async (mode) => {
-    setRecordError("");
+    clearRecordError();
     setLocked(false);
     lockedRef.current = false;
     cancelRef.current = false;
@@ -1037,11 +1059,17 @@ function MessageComposer({
         });
       }, 1000);
     } catch (e) {
-      setRecordError(
-        e?.name === "NotAllowedError"
-          ? "Microphone/camera permission denied"
-          : (e?.message || "Recording unavailable")
-      );
+      const name = e?.name;
+      const message = name === "NotAllowedError" || name === "SecurityError"
+        ? "Camera or microphone access is blocked for this site."
+        : name === "NotFoundError"
+          ? "Camera or microphone is not available."
+          : name === "NotReadableError"
+            ? "Camera or microphone is busy or unavailable."
+            : name === "OverconstrainedError"
+              ? "The selected camera or microphone is unavailable. Check Media settings."
+              : (e?.message || "Could not start recording.");
+      showRecordError(message);
       stopAllTracks();
       setRecPhase("idle");
     }
