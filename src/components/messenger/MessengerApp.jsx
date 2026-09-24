@@ -3529,7 +3529,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   markVisibleMessagesReadRef.current = markVisibleMessagesRead;
 
-  const dismissScrollDownButton = () =>;
+  const dismissScrollDownButton = () => {
     // Hide during programmatic smooth-scroll. Re-armed only by a real user
     // gesture (wheel / touch / pointer), never by the programmatic scroll events.
     scrollDownDismissedRef.current = true;
