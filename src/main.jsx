@@ -1,5 +1,5 @@
 import React from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import Root from "./Root.jsx";
@@ -23,19 +23,30 @@ Array.from(
   if (index > 0) element.remove();
 });
 
-// The production server may serve a prerendered document shell. The browser
-// client owns #root completely, so discard every leftover child before mount.
-// This also prevents SEO/prerender markup from remaining visible when a route
-// crashes during its first React render.
-rootElement.replaceChildren();
-
-// Remove crawler-only SEO content once the interactive React app owns the page.
-document.getElementById("seo-noscript-fallback")?.remove();
-
-createRoot(rootElement).render(
+const app = (
   <React.StrictMode>
     <BrowserRouter>
       <Root />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 );
+
+const isPrerenderedDocument =
+  rootElement.hasChildNodes() &&
+  document.head.querySelector(
+    'meta[name="x-prerendered"][content="true"]',
+  );
+
+// Public prerendered routes already contain the exact page structure.
+// Hydrate them in place so there is no server-HTML -> empty-root -> React flash.
+// Dynamic/private routes keep the normal createRoot path.
+if (isPrerenderedDocument) {
+  hydrateRoot(rootElement, app);
+} else {
+  rootElement.replaceChildren();
+  createRoot(rootElement).render(app);
+}
+
+// Remove crawler-only SEO content once the interactive React app owns the page.
+document.getElementById("seo-noscript-fallback")?.remove();
+
