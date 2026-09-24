@@ -24,7 +24,8 @@ import CameraswitchIcon from "@mui/icons-material/Cameraswitch";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import DescriptionIcon from "@mui/icons-material/Description";
 import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
-import CodeIcon from "@mui/icons-material/Code";
+import CodeOutlinedIcon from "@mui/icons-material/CodeOutlined";
+import DataObjectIcon from "@mui/icons-material/DataObject";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import SelectAllIcon from "@mui/icons-material/SelectAll";
 import Menu from "@mui/material/Menu";
@@ -2226,8 +2227,8 @@ function MessageComposer({
           <Stack direction="row" spacing={0.25} sx={{ width: "max-content" }}>
             {[
               { kind: "spoiler", label: "Spoiler", icon: <VisibilityOffIcon fontSize="small" /> },
-              { kind: "code", label: "Inline code", icon: <CodeIcon fontSize="small" /> },
-              { kind: "codeblock", label: "Code block", icon: <CodeIcon fontSize="small" /> },
+              { kind: "code", label: "Inline code", icon: <CodeOutlinedIcon fontSize="small" /> },
+              { kind: "codeblock", label: "Code block", icon: <DataObjectIcon fontSize="small" /> },
               { kind: "quote", label: "Quote", icon: <FormatQuoteIcon fontSize="small" /> },
             ].map((item) => (
               <Tooltip key={item.kind} title={item.label}>
@@ -2676,12 +2677,12 @@ function MessageComposer({
           <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+Shift+S</Typography>
         </MenuItem>
         <MenuItem onClick={() => applyTextFormat("code")}>
-          <ListItemIcon><CodeIcon fontSize="small" /></ListItemIcon>
+          <ListItemIcon><CodeOutlinedIcon fontSize="small" /></ListItemIcon>
           Inline code
           <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+E</Typography>
         </MenuItem>
         <MenuItem onClick={() => applyTextFormat("codeblock")}>
-          <ListItemIcon><CodeIcon fontSize="small" /></ListItemIcon>
+          <ListItemIcon><DataObjectIcon fontSize="small" /></ListItemIcon>
           Code block
           <Typography variant="caption" sx={{ ml: "auto", pl: 2, opacity: 0.55 }}>Ctrl+Shift+E</Typography>
         </MenuItem>
