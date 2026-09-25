@@ -325,7 +325,7 @@ export default function ServiceDetail() {
         const resp = await apiRequest({
           method: "GET",
           url: `${DEPLOY_BASE}name_is_available/`,
-          params: { name, ...(editingDeployId ? { exclude_id: String(editingDeployId) } : {}) },
+          params: { name, service_id: String(id), ...(editingDeployId ? { exclude_id: String(editingDeployId) } : {}) },
         });
         const data = resp?.data ?? resp;
         const ok = data?.result === true || data?.result === "true";
