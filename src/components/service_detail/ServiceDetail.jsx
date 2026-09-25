@@ -721,14 +721,16 @@ export default function ServiceDetail() {
 
     setSubmitting(true);
     try {
-      const nameCheck = await checkDeployNameAvailable(name);
-      if (!nameCheck.ok) { setError(nameCheck.detail || "Name is not available."); setSubmitting(false); return; }
-
+      // Creation is server-allocated: the API automatically suffixes a requested
+      // name when it already exists within this service. Availability is only
+      // enforced client-side for deploy updates, where identity must remain exact.
       if (effectiveIsDb || !zipFile) {
         const payload = { name, service: id, version, config: configPayload };
         const createResp = await apiRequest({ method: "POST", url: `${DEPLOY_BASE}`, data: payload });
         if (createResp.status === 201) {
-          safeSetSnackbar("success", effectiveIsDb ? "DB deploy created." : "Deploy created.");
+          const createdName = createResp.data?.deploy?.name || name;
+          const renamedNotice = createdName !== name ? ` as "${createdName}"` : "";
+          safeSetSnackbar("success", effectiveIsDb ? `DB deploy created${renamedNotice}.` : `Deploy created${renamedNotice}.`);
           await fetchDeploys(1);
           setName(""); setVersion(""); setConfig("");
           setCreateDbFields({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
@@ -745,7 +747,9 @@ export default function ServiceDetail() {
         const resp = await axios.post(`${DEPLOY_BASE}`, fd, { headers });
 
         if (resp.status === 201) {
-          safeSetSnackbar("success", "App deploy created.");
+          const createdName = resp.data?.deploy?.name || name;
+          const renamedNotice = createdName !== name ? ` as "${createdName}"` : "";
+          safeSetSnackbar("success", `App deploy created${renamedNotice}.`);
           await fetchDeploys(1);
           setName(""); setVersion(""); setConfig(""); setZipFile(null);
           if (zipInputRef.current) zipInputRef.current.value = "";
