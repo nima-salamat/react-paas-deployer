@@ -19,6 +19,7 @@ import { useTheme, ThemeProvider, createTheme } from "@mui/material/styles";
 import { getPalette, normalizeColorThemeId, readAppearance } from "../messenger/modules/appearance";
 
 const RECONNECTABLE_PREFIXES = ["/dashboard", "/messenger"];
+const API_HOST = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
 
 function isReconnectablePath(pathname) {
   return RECONNECTABLE_PREFIXES.some(
@@ -51,6 +52,53 @@ function looksLikeChunkFailure(error) {
     text.includes("loading chunk") ||
     text.includes("failed to fetch")
   );
+}
+
+async function probeBackendConnection() {
+  if (
+    typeof window === "undefined" ||
+    typeof fetch !== "function" ||
+    navigator.onLine === false
+  ) {
+    return false;
+  }
+
+  const url = `${API_HOST}/api/users/user/`;
+  const token = localStorage.getItem("access");
+  const controller =
+    typeof AbortController === "function" ? new AbortController() : null;
+  const timeoutId = controller
+    ? window.setTimeout(() => controller.abort(), 5000)
+    : null;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      ...(controller ? { signal: controller.signal } : {}),
+    });
+
+    // 401/403 still prove that the API is reachable. 5xx means the
+    // application/backend path is still unavailable.
+    return response.status < 500;
+  } catch {
+    // A CORS failure can happen even while the API host is reachable.
+    // A no-cors request gives us a network-level reachability fallback.
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        mode: "no-cors",
+        cache: "no-store",
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      return response.type === "opaque" || response.status < 500;
+    } catch {
+      return false;
+    }
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
+  }
 }
 
 export default function ConnectionReconnectDialog() {
@@ -197,9 +245,28 @@ export default function ConnectionReconnectDialog() {
     };
   }, [offline, failure]);
 
-  const reconnect = useCallback(() => {
+  const reconnect = useCallback(async () => {
     setRetrying(true);
-    window.location.reload();
+
+    // Never reload the document here. A hard reload destroys unsaved React
+    // state, drafts and in-progress form edits. WebSocket owners listen for
+    // this event and recreate only their transport connections.
+    try {
+      window.dispatchEvent(new Event("app-reconnect-requested"));
+    } catch {
+      /* ignore */
+    }
+
+    const recovered = await probeBackendConnection();
+    if (recovered) {
+      try {
+        window.dispatchEvent(new Event("app-network-recovered"));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    setRetrying(false);
   }, []);
 
   const dialog = (
