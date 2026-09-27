@@ -165,6 +165,7 @@ export function TicketNotifyProvider({ children }) {
     // additional reconnect attempts (prevents a thundering herd of WS connects
     // each using the same expired token).
     let refreshing = false;
+    let reconnectImmediately = false;
 
     const connect = async () => {
       let token = localStorage.getItem("access");
@@ -245,6 +246,15 @@ export function TicketNotifyProvider({ children }) {
         clearInterval(pingTimer);
         console.warn("[tickets-ws] closed", ev.code, ev.reason || "");
         if (closed) return;
+
+        if (reconnectImmediately) {
+          reconnectImmediately = false;
+          if (localStorage.getItem("access")) {
+            timer = setTimeout(connect, 50);
+          }
+          return;
+        }
+
         // 4401 = our backend's "auth failed" close code (see consumers.py).
         // Treat it as "token expired" — try to refresh, then reconnect.
         // If refresh fails, refreshAccessToken() will redirect to login.
@@ -334,7 +344,19 @@ export function TicketNotifyProvider({ children }) {
       clearTimeout(timer);
       clearInterval(pingTimer);
       reconnectRef.current = 0;
-      try { wsRef.current?.close(4000, "client reconnect"); } catch { /* */ }
+      reconnectImmediately = true;
+
+      const socket = wsRef.current;
+      if (!socket || socket.readyState === WebSocket.CLOSED) {
+        reconnectImmediately = false;
+        timer = setTimeout(connect, 0);
+        return;
+      }
+
+      try { socket.close(4000, "client reconnect"); } catch {
+        reconnectImmediately = false;
+        timer = setTimeout(connect, 0);
+      }
     };
     window.addEventListener("app-reconnect-requested", onReconnectRequested);
 
