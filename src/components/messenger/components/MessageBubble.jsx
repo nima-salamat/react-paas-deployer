@@ -2088,6 +2088,16 @@ function MessageBubble({
           pl: isIrc ? 0.25 : undefined,
           pr: isIrc ? 0.5 : undefined,
           border: isIrc ? "none" : undefined,
+          transition: isIrc ? "background-color 140ms ease" : undefined,
+          "&:hover": isIrc
+            ? {
+                bgcolor: (t) =>
+                  alpha(
+                    t.palette.primary.main,
+                    t.palette.mode === "dark" ? 0.055 : 0.035
+                  ),
+              }
+            : undefined,
         }}
       >
         {/* Overlap avatar — top-left (others) / top-right (mine) */}
@@ -2421,14 +2431,17 @@ function MessageBubble({
         <Stack
           direction="row"
           alignItems="center"
-          justifyContent={isIrcInlineLayout ? "initial" : "flex-end"}
+          justifyContent="flex-end"
           spacing={0.4}
           mt={isIrcInlineLayout ? 0 : 0.35}
           sx={isIrcInlineLayout ? {
-            display: "inline-flex",
+            display: "flex",
+            float: "right",
             verticalAlign: "baseline",
-            ml: 0.8,
+            ml: 1,
             whiteSpace: "nowrap",
+            position: "relative",
+            zIndex: 1,
           } : undefined}
         >
           <IconButton className="msg-actions" size="small"
