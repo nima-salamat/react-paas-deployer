@@ -47,6 +47,7 @@ import FolderOpenRoundedIcon from "@mui/icons-material/FolderOpenRounded";
 import FolderRoundedIcon from "@mui/icons-material/FolderRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import UnfoldLessRoundedIcon from "@mui/icons-material/UnfoldLessRounded";
 import UnfoldMoreRoundedIcon from "@mui/icons-material/UnfoldMoreRounded";
@@ -793,6 +794,11 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
     setMobileOpen(false);
   };
 
+  const goDocs = () => {
+    navigate("/docs");
+    setMobileOpen(false);
+  };
+
   // ── Theme control ──────────────────────────────────────────────
   const isDark = muiTheme.palette.mode === "dark";
   const currentThemeChoice =
@@ -971,9 +977,7 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
         spacing={1.25}
         sx={{
           height: HEADER_HEIGHT,
-          px: { xs: 1.5, sm: 2.5 },
-          maxWidth: 1440,
-          mx: "auto",
+          px: { xs: 1, sm: 2, md: 2.5 },
           width: "100%",
         }}
       >
@@ -987,9 +991,9 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
 
         <Tooltip title="Back to home">
           <ButtonBase
-            onClick={goHome}
+            onClick={goDocs}
             focusRipple
-            aria-label="Back to PassDeployer home"
+            aria-label="Open PassDeployer documentation"
             sx={{
               borderRadius: 2,
               px: 1,
@@ -1049,10 +1053,13 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
             onClick={(event) => setThemeMenuAnchor(event.currentTarget)}
             aria-label="Change theme"
             sx={{
+              width: { xs: 36, sm: 38 },
+              height: { xs: 36, sm: 38 },
               border: "1px solid",
               borderColor: "divider",
+              color: "text.secondary",
               bgcolor: "action.hover",
-              "&:hover": { bgcolor: "action.selected" },
+              "&:hover": { bgcolor: "action.selected", color: "text.primary" },
             }}
           >
             {currentThemeChoice?.icon ? (
@@ -1062,6 +1069,25 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
             ) : (
               <DarkModeRoundedIcon fontSize="small" />
             )}
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title="Home">
+          <IconButton
+            size="small"
+            onClick={goHome}
+            aria-label="Home"
+            sx={{
+              width: { xs: 36, sm: 38 },
+              height: { xs: 36, sm: 38 },
+              border: "1px solid",
+              borderColor: "divider",
+              color: "text.secondary",
+              bgcolor: "action.hover",
+              "&:hover": { bgcolor: "action.selected", color: "text.primary" },
+            }}
+          >
+            <HomeOutlinedIcon sx={{ fontSize: { xs: 19, sm: 20 } }} />
           </IconButton>
         </Tooltip>
 
