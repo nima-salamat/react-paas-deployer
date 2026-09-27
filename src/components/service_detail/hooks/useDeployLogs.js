@@ -161,6 +161,11 @@ export default function useDeployLogs({
         setConnected(true);
         setReconnecting(false);
         setError(null);
+        try {
+          window.dispatchEvent(new Event("app-network-recovered"));
+        } catch {
+          /* ignore */
+        }
       };
 
       socket.onmessage = (event) => {
@@ -433,6 +438,21 @@ export default function useDeployLogs({
     wsReconnectAttemptRef.current = 0;
     connectWs(deployId);
   }, [connectWs, deployId]);
+
+  useEffect(() => {
+    if (!enabled || !deployId) return undefined;
+
+    const onReconnectRequested = () => {
+      // Rebuild only the deployment log transport. The existing history,
+      // filters and scroll state stay in memory.
+      retryConnection();
+    };
+
+    window.addEventListener("app-reconnect-requested", onReconnectRequested);
+    return () => {
+      window.removeEventListener("app-reconnect-requested", onReconnectRequested);
+    };
+  }, [enabled, deployId, retryConnection]);
 
   return {
     entries,
