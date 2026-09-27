@@ -989,7 +989,7 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
           <MenuRoundedIcon />
         </IconButton>
 
-        <Tooltip title="Back to home">
+        <Tooltip title="Documentation">
           <ButtonBase
             onClick={goDocs}
             focusRipple
