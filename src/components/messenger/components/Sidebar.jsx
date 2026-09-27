@@ -626,7 +626,7 @@ export default function Sidebar({
                   : chatFilter === "pinned" ? Boolean(c.is_pinned)
                     : true
               ));
-              if (!visible.length && !loadingConvs) {
+              if (!visible.length && !loadingConvs && !conversationLoadError) {
                 return (
                   <Box sx={{ px: 2, py: 5, textAlign: "center" }}>
                     <Typography variant="body2" color="text.secondary">
