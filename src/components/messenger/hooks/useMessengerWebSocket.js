@@ -433,6 +433,12 @@ useEffect(() => {
       try {
         ws.send(JSON.stringify({ type: "presence.update", online: true }));
       } catch { /* */ }
+
+      // A transport reconnect is enough to recover the connection dialog;
+      // do not reload the application document.
+      try {
+        window.dispatchEvent(new Event("app-network-recovered"));
+      } catch { /* */ }
     };
     ws.onmessage = handleOnMessage;
     ws.onclose = (ev) => {
@@ -472,6 +478,26 @@ useEffect(() => {
 
   connect();
 
+  // Manual reconnect requests rebuild only the WebSocket transport.
+  const onReconnectRequested = () => {
+    clearTimeout(reconnectTimer);
+    clearInterval(pingTimer);
+
+    const socket = wsRef.current;
+    if (!socket || socket.readyState === WebSocket.CLOSED) {
+      reconnectTimer = setTimeout(connect, 0);
+      return;
+    }
+
+    try {
+      socket.close(4000, "client reconnect");
+    } catch {
+      reconnectTimer = setTimeout(connect, 0);
+    }
+  };
+
+  window.addEventListener("app-reconnect-requested", onReconnectRequested);
+
   // Listen for auth changes (login / logout / token refresh) so we reconnect
   // immediately after the user logs in.
   const onAuth = () => {
@@ -487,6 +513,7 @@ useEffect(() => {
     cancelled = true;
     clearInterval(pingTimer);
     clearTimeout(reconnectTimer);
+    window.removeEventListener("app-reconnect-requested", onReconnectRequested);
     window.removeEventListener("auth-changed", onAuth);
     window.removeEventListener("storage", onAuth);
     try { wsRef.current?.close(); } catch { /* */ }
