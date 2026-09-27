@@ -263,7 +263,7 @@ export default function ProfileView({
           }}
         >
           <List disablePadding>
-            {!isContact && !isBlocked && (
+            {!isSelf && !isContact && !isBlocked && (
               <ListItemButtonRow
                 icon={<PersonAddIcon color="primary" />}
                 title="Add to contacts"
@@ -288,7 +288,7 @@ export default function ProfileView({
               />
             )}
             <Divider />
-            {isBlocked ? (
+            {!isSelf && (isBlocked ? (
               <ListItemButtonRow
                 icon={<BlockIcon color="success" />}
                 title="Unblock user"
@@ -302,7 +302,7 @@ export default function ProfileView({
                 destructive
                 onClick={() => onBlock?.(profileData.id)}
               />
-            )}
+            ))}
           </List>
         </Paper>
 
