@@ -240,7 +240,7 @@ function Tree({ nodes, selectedId, depth = 0, expanded, onToggle, onDocClick, ge
                       component={RouterLink}
                       to={getDocHref(doc)}
                       selected={isActive}
-                      onClick={onDocClick}
+                      onClick={() => onDocClick(doc)}
                       sx={{
                         borderRadius: 1.5,
                         mb: 0.25,
