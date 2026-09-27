@@ -2432,12 +2432,22 @@ function MessageBubble({
           } : undefined}
         >
           <IconButton className="msg-actions" size="small"
-            sx={{ p: 0.2, opacity: { xs: 0.65, md: 0 }, color: mine ? "rgba(255,255,255,0.75)" : "text.secondary" }}
+            sx={{
+              p: 0.2,
+              display: isIrcInlineLayout ? "none" : undefined,
+              opacity: { xs: 0.65, md: 0 },
+              color: mine ? "rgba(255,255,255,0.75)" : "text.secondary",
+            }}
             onClick={(e) => onReactAnchor(e, m)}>
             <EmojiEmotionsIcon sx={{ fontSize: 15 }} />
           </IconButton>
           <IconButton className="msg-actions" size="small"
-            sx={{ p: 0.2, opacity: { xs: 0.65, md: 0 }, color: mine ? "rgba(255,255,255,0.75)" : "text.secondary" }}
+            sx={{
+              p: 0.2,
+              display: isIrcInlineLayout ? "none" : undefined,
+              opacity: { xs: 0.65, md: 0 },
+              color: mine ? "rgba(255,255,255,0.75)" : "text.secondary",
+            }}
             onClick={() => onReply(m)}>
             <ReplyIcon sx={{ fontSize: 15 }} />
           </IconButton>
