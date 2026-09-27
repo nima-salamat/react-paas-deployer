@@ -779,11 +779,18 @@ async function resolvePageMetadata(pathname) {
     isDocsPath(normalized) &&
     normalized !== '/docs'
   ) {
-    const slug = normalized
+    const docPath = normalized
       .slice('/docs/'.length)
-      .split('/')[0];
+      .split('/')
+      .filter(Boolean);
 
-    if (!slug || slug.includes('..')) {
+    const slug = docPath[docPath.length - 1] || '';
+
+    if (
+      !slug ||
+      slug.includes('..') ||
+      docPath.some((segment) => segment.includes('..'))
+    ) {
       return {
         page: null,
         docs: null,
@@ -875,28 +882,57 @@ async function buildSitemapItems() {
       lastmod: null,
     }));
 
-  const docs = await fetchPublicJson(
-    '/api/docs/',
+  const treePayload = await fetchPublicJson(
+    '/api/docs/tree/',
   );
 
-  if (Array.isArray(docs)) {
-    for (const doc of docs) {
-      if (
-        !doc?.slug ||
-        doc.status === 'draft'
-      ) {
-        continue;
+  const pushDoc = (doc, categorySlugs = []) => {
+    if (!doc?.slug || doc.status === 'draft') {
+      return;
+    }
+
+    const segments = [...categorySlugs, doc.slug]
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment));
+
+    items.push({
+      pathname: `/docs/${segments.join('/')}`,
+      changefreq: 'monthly',
+      priority: '0.7',
+      lastmod:
+        doc.updated_at ||
+        doc.published_at ||
+        null,
+    });
+  };
+
+  const walkCategories = (nodes, parentSlugs = []) => {
+    for (const node of Array.isArray(nodes) ? nodes : []) {
+      const slugs = node?.slug
+        ? [...parentSlugs, node.slug]
+        : parentSlugs;
+
+      for (const doc of Array.isArray(node?.documents) ? node.documents : []) {
+        pushDoc(doc, slugs);
       }
 
-      items.push({
-        pathname: `/docs/${doc.slug}`,
-        changefreq: 'monthly',
-        priority: '0.7',
-        lastmod:
-          doc.updated_at ||
-          doc.published_at ||
-          null,
-      });
+      walkCategories(node?.children, slugs);
+    }
+  };
+
+  if (treePayload && typeof treePayload === 'object') {
+    walkCategories(treePayload.categories);
+
+    for (const doc of Array.isArray(treePayload.uncategorized)
+      ? treePayload.uncategorized
+      : []) {
+      pushDoc(doc);
+    }
+  } else {
+    // Graceful fallback for older/unavailable tree endpoints.
+    const docs = await fetchPublicJson('/api/docs/');
+    if (Array.isArray(docs)) {
+      docs.forEach((doc) => pushDoc(doc));
     }
   }
 
