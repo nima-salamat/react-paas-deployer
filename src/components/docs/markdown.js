@@ -500,7 +500,10 @@ export function renderMarkdown(markdown = "", options = {}) {
       flushQuote();
       const rows = [line, lines[i + 1]];
       i += 2;
-      while (i < lines.length && /^\|.*\|\s*$/.test(lines[i])) {
+      // GFM also permits body rows without outer pipes (e.g. "a | b").
+      // Once a valid header/separator pair is found, continue collecting
+      // pipe-containing rows until the next non-table block.
+      while (i < lines.length && /\|/.test(lines[i]) && lines[i].trim()) {
         rows.push(lines[i]);
         i += 1;
       }
