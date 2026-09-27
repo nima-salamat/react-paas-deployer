@@ -63,6 +63,8 @@ export default function IncomingCallBanner({
   onAccept,
   onDecline,
   onTimeout,
+  onDismiss,
+  visible = true,
   busy = false,
 }) {
   const ringRef = useRef(null);
@@ -98,6 +100,8 @@ export default function IncomingCallBanner({
   const isVideo = !!(incomingCall.media?.video || incomingCall.is_video);
   const name = incomingCall.initiator?.username || "Incoming call";
   const initial = (name || "C")[0]?.toUpperCase();
+
+  if (!visible) return <Box sx={{ display: "none" }} aria-hidden="true" />;
 
   return (
     <>
@@ -176,6 +180,30 @@ export default function IncomingCallBanner({
             {isVideo ? <VideocamIcon sx={{ fontSize: 16 }} /> : <CallIcon sx={{ fontSize: 16 }} />}
           </Box>
         </Box>
+
+        <IconButton
+          aria-label="Hide incoming call"
+          title="Hide"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!busy) onDismiss?.();
+          }}
+          disabled={busy}
+          sx={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            width: 34,
+            height: 34,
+            color: "text.secondary",
+            bgcolor: (theme) => alpha(theme.palette.text.primary, 0.05),
+            "&:hover": {
+              bgcolor: (theme) => alpha(theme.palette.text.primary, 0.1),
+            },
+          }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
 
         <Typography variant="h6" fontWeight={700} noWrap sx={{ maxWidth: "100%" }}>
           {name}
