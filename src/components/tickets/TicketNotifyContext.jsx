@@ -228,6 +228,10 @@ export function TicketNotifyProvider({ children }) {
         setConnected(true);
         console.info("[tickets-ws] connected");
         try { socket.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
+
+        try {
+          window.dispatchEvent(new Event("app-network-recovered"));
+        } catch { /* */ }
         clearInterval(pingTimer);
         pingTimer = setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
@@ -324,6 +328,16 @@ export function TicketNotifyProvider({ children }) {
 
     connect();
 
+    // Reconnect only the notification transport. Keeping this in the provider
+    // means the current route, local state and unsaved UI remain untouched.
+    const onReconnectRequested = () => {
+      clearTimeout(timer);
+      clearInterval(pingTimer);
+      reconnectRef.current = 0;
+      try { wsRef.current?.close(4000, "client reconnect"); } catch { /* */ }
+    };
+    window.addEventListener("app-reconnect-requested", onReconnectRequested);
+
     const onAuth = () => {
       clearTimeout(timer);
       clearInterval(pingTimer);
@@ -338,6 +352,7 @@ export function TicketNotifyProvider({ children }) {
       closed = true;
       clearTimeout(timer);
       clearInterval(pingTimer);
+      window.removeEventListener("app-reconnect-requested", onReconnectRequested);
       window.removeEventListener("auth-changed", onAuth);
       window.removeEventListener("storage", onAuth);
       try { wsRef.current?.close(); } catch { /* */ }
