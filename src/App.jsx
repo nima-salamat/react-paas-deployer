@@ -448,6 +448,14 @@ export function App({ prerender = false }) {
               }
             />
             <Route
+              path="/docs/:categorySlug/:slug"
+              element={
+                <DocsHome
+                  onThemeModeChange={handleThemeModeChange}
+                />
+              }
+            />
+            <Route
               path="/docs/:slug"
               element={
                 <DocsHome
