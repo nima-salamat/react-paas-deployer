@@ -43,6 +43,122 @@ export default function DocsStyles() {
           wordBreak: "break-word",
         },
 
+        /* ── Element presentation presets ───────────────────────── */
+        ".docs-markdown-preview .doc-style-scope": {
+          margin: "1em 0",
+        },
+        ".docs-markdown-preview .doc-style-subtle": {
+          opacity: 0.92,
+        },
+        ".docs-markdown-preview .doc-style-soft": {
+          padding: "12px 14px",
+          border: "1px solid " + border,
+          borderRadius: 10,
+          background: surface,
+        },
+        ".docs-markdown-preview .doc-style-elevated": {
+          padding: "14px 16px",
+          border: "1px solid " + border,
+          borderRadius: 10,
+          background: surfaceRaised,
+          boxShadow: glow,
+        },
+        ".docs-markdown-preview .doc-style-outline": {
+          padding: "12px 14px",
+          border: "1px solid " + border,
+          borderRadius: 10,
+          background: "transparent",
+        },
+        ".docs-markdown-preview .doc-style-flat": {
+          border: "none !important",
+          boxShadow: "none !important",
+          background: "transparent !important",
+        },
+        ".docs-markdown-preview .doc-style-compact": {
+          padding: "8px 10px",
+          marginTop: "0.65em",
+          marginBottom: "0.65em",
+          lineHeight: 1.55,
+        },
+        ".docs-markdown-preview .doc-style-spacious": {
+          padding: "20px 22px",
+          marginTop: "1.4em",
+          marginBottom: "1.4em",
+        },
+        ".docs-markdown-preview .doc-style-accent": {
+          padding: "12px 14px",
+          borderLeft: "3px solid " + accent,
+          background: alpha(accent, isDark ? 0.1 : 0.055),
+          borderRadius: 8,
+        },
+        ".docs-markdown-preview .doc-style-muted": {
+          color: textSec,
+          opacity: 0.82,
+        },
+        ".docs-markdown-preview .doc-style-hero": {
+          padding: "20px 22px",
+          borderRadius: 12,
+          background: "linear-gradient(145deg, " + alpha(accent, isDark ? 0.16 : 0.08) + ", transparent)",
+          border: "1px solid " + alpha(accent, isDark ? 0.28 : 0.18),
+        },
+        ".docs-markdown-preview .doc-style-align-left": { textAlign: "left" },
+        ".docs-markdown-preview .doc-style-align-center": { textAlign: "center" },
+        ".docs-markdown-preview .doc-style-align-right": { textAlign: "right" },
+        ".docs-markdown-preview .doc-style-align-justify": { textAlign: "justify" },
+        ".docs-markdown-preview .doc-style-width-narrow": { maxWidth: 560 },
+        ".docs-markdown-preview .doc-style-width-normal": { maxWidth: "100%" },
+        ".docs-markdown-preview .doc-style-width-wide": { maxWidth: 980 },
+        ".docs-markdown-preview .doc-style-width-full": { maxWidth: "none", width: "100%" },
+        ".docs-markdown-preview .doc-style-spacing-none": {
+          marginTop: 0,
+          marginBottom: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+        },
+        ".docs-markdown-preview .doc-style-spacing-compact": {
+          marginTop: "0.45em",
+          marginBottom: "0.45em",
+          gap: "6px",
+        },
+        ".docs-markdown-preview .doc-style-spacing-normal": {
+          marginTop: "1em",
+          marginBottom: "1em",
+        },
+        ".docs-markdown-preview .doc-style-spacing-loose": {
+          marginTop: "1.7em",
+          marginBottom: "1.7em",
+          gap: "18px",
+        },
+        ".docs-markdown-preview .doc-style-radius-none": { borderRadius: 0 },
+        ".docs-markdown-preview .doc-style-radius-sm": { borderRadius: 6 },
+        ".docs-markdown-preview .doc-style-radius-md": { borderRadius: 10 },
+        ".docs-markdown-preview .doc-style-radius-lg": { borderRadius: 16 },
+        ".docs-markdown-preview .doc-style-border-none": {
+          border: "none !important",
+        },
+        ".docs-markdown-preview .doc-style-border-subtle": {
+          border: "1px solid " + border,
+        },
+        ".docs-markdown-preview .doc-style-border-accent": {
+          border: "1px solid " + alpha(accent, isDark ? 0.4 : 0.25),
+        },
+        ".docs-markdown-preview .doc-style-border-strong": {
+          border: "1px solid " + alpha(theme.palette.text.primary, isDark ? 0.3 : 0.18),
+        },
+        ".docs-markdown-preview .doc-style-shadow-none": { boxShadow: "none !important" },
+        ".docs-markdown-preview .doc-style-shadow-soft": {
+          boxShadow: edgeLight,
+        },
+        ".docs-markdown-preview .doc-style-shadow-strong": {
+          boxShadow: glow,
+        },
+        ".docs-markdown-preview .doc-style-tone-neutral": { color: text },
+        ".docs-markdown-preview .doc-style-tone-primary": { color: accent },
+        ".docs-markdown-preview .doc-style-tone-success": { color: theme.palette.success.main },
+        ".docs-markdown-preview .doc-style-tone-warning": { color: theme.palette.warning.main },
+        ".docs-markdown-preview .doc-style-tone-danger": { color: theme.palette.error.main },
+        ".docs-markdown-preview .doc-user-centered": { textAlign: "center" },
+
         /* ── Typography ───────────────────────────────────────── */
         ".docs-markdown-preview h1, .docs-article h1": {
           fontSize: "clamp(1.85rem, 2.6vw, 2.35rem)",
