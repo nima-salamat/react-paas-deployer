@@ -1048,36 +1048,6 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
           </IconButton>
         </Tooltip>
 
-        <Menu
-          anchorEl={themeMenuAnchor}
-          open={Boolean(themeMenuAnchor)}
-          onClose={() => setThemeMenuAnchor(null)}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-          slotProps={{ paper: { sx: { minWidth: 160, borderRadius: 1.75 } } }}
-        >
-          {THEME_CHOICES.map((choice) => {
-            const ChoiceIcon = choice.icon;
-            const selectedChoice = choice.value === themeMode;
-            return (
-              <MenuItem
-                key={choice.value}
-                selected={selectedChoice}
-                onClick={() => handleThemeMenuChange(choice.value)}
-              >
-                <ListItemIcon>
-                  <ChoiceIcon
-                    fontSize="small"
-                    color={selectedChoice ? "primary" : undefined}
-                  />
-                </ListItemIcon>
-                <Typography fontWeight={selectedChoice ? 800 : 500}>
-                  {choice.label}
-                </Typography>
-              </MenuItem>
-            );
-          })}
-        </Menu>
       </Stack>
 
       {/* Reading progress line */}
