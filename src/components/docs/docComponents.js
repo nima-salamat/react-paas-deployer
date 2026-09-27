@@ -126,9 +126,9 @@ function splitSections(bodyLines, matcher) {
   return sections;
 }
 
-const matchEqualsSections = (line) => line.match(/^===\s+(.+)$/);
+const matchEqualsSections = (line) => line.match(/^\s*===\s+(.+)$/);
 const matchTabSections = (line) => (
-  line.match(/^(?:===|---)\s+(.+)$/)
+  line.match(/^\s*(?:===|---)\s+(.+)$/)
 );
 
 function parseAttrs(headerRest = "") {
@@ -492,7 +492,7 @@ export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
     let j = 0;
     while (j < body.length) {
       const line = body[j];
-      const sec = line.match(/^===\s+(.+)$/);
+      const sec = line.match(/^\s*===\s+(.+)$/);
       if (sec) {
         const title = sec[1].trim();
         j += 1;
@@ -508,7 +508,7 @@ export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
           j += 1; // close fence
           sections.push({ title, lang, code: codeLines.join("\n") });
         } else {
-          while (j < body.length && !/^===\s+/.test(body[j]) && !/^```/.test(body[j].trim())) {
+          while (j < body.length && !/^\s*===\s+/.test(body[j]) && !/^```/.test(body[j].trim())) {
             codeLines.push(body[j]);
             j += 1;
           }
