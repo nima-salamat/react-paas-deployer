@@ -117,10 +117,22 @@ function wireTabs(root) {
       const btn = event.target.closest(".doc-tab");
       if (!btn || !group.contains(btn)) return;
       const target = btn.getAttribute("data-tab-target");
-      group.querySelectorAll(".doc-tab").forEach((t) => t.classList.toggle("is-active", t === btn));
-      group.querySelectorAll(".doc-tab-panel").forEach((p) => {
-        p.classList.toggle("is-active", p.id === target);
+      group.querySelectorAll(".doc-tab").forEach((t) => {
+        const active = t === btn;
+        t.classList.toggle("is-active", active);
+        t.setAttribute("aria-selected", active ? "true" : "false");
+        t.setAttribute("tabindex", active ? "0" : "-1");
       });
+      group.querySelectorAll(".doc-tab-panel").forEach((p) => {
+        const active = p.id === target;
+        p.classList.toggle("is-active", active);
+        p.hidden = !active;
+      });
+      try {
+        btn.focus({ preventScroll: true });
+      } catch {
+        btn.focus();
+      }
     };
     group.addEventListener("click", handler);
     return () => group.removeEventListener("click", handler);
