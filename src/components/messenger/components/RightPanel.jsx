@@ -43,6 +43,8 @@ import ProfileView from "./ProfileView";
 import ContextMenu from "./ContextMenu";
 import OnlineDot from "./OnlineDot";
 import { CURSOR_OPTIONS, readCursorPreference, writeCursorPreference } from "../../layout/cursorSettings";
+import { useTheme } from "@mui/material/styles";
+import { getPalette } from "../modules/appearance";
 
 /**
  * Right panel — settings menu / contacts / blocked / info / profile / join-requests.
@@ -96,6 +98,8 @@ export default function RightPanel({
   onUploadGroupAvatar, onClearGroupAvatar,
   onCancelJoinRequest, onActOnJoinRequest,
 }) {
+  const messengerTheme = useTheme();
+
   // All hooks MUST be declared before any conditional `return` — otherwise
   // the hook count varies between renders of different `kind` panels and
   // React throws "Invalid hook call" (#300) when the user switches panels.
@@ -366,30 +370,75 @@ export default function RightPanel({
             >
               {themes.map((t) => {
                 const selected = (colorThemeId || "default") === t.id;
+                const previewPalette = getPalette(t.id, messengerTheme.palette.mode);
                 return (
                   <Box
                     key={t.id}
                     onClick={() => onColorThemeChange?.(t.id)}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selected}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onColorThemeChange?.(t.id);
+                      }
+                    }}
                     sx={{
                       cursor: "pointer",
                       borderRadius: 2,
                       border: "2px solid",
-                      borderColor: selected ? "primary.main" : "divider",
-                      bgcolor: selected ? (th) => alpha(th.palette.primary.main, 0.08) : "background.default",
-                      px: 1.25,
+                      borderColor: selected ? previewPalette.primary : "divider",
+                      bgcolor: selected
+                        ? alpha(previewPalette.primary, messengerTheme.palette.mode === "dark" ? 0.16 : 0.09)
+                        : "background.default",
+                      px: 1.1,
                       py: 1,
-                      transition: "border-color 120ms, background-color 120ms",
+                      transition: "border-color 120ms, background-color 120ms, transform 120ms",
                       "&:hover": {
-                        borderColor: selected ? "primary.main" : "text.disabled",
+                        borderColor: previewPalette.primary,
+                        transform: "translateY(-1px)",
+                      },
+                      "&:focus-visible": {
+                        outline: "2px solid " + alpha(previewPalette.primary, 0.35),
+                        outlineOffset: 2,
                       },
                     }}
                   >
-                    <Typography sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
-                      {t.emoji} {t.label}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
-                      {t.tagline}
-                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 1.5,
+                          flexShrink: 0,
+                          background: "linear-gradient(135deg, " + previewPalette.primary + ", " + previewPalette.primaryHover + ")",
+                          boxShadow: selected
+                            ? "0 4px 12px " + alpha(previewPalette.primary, 0.3)
+                            : "none",
+                          display: "grid",
+                          placeItems: "center",
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "50%",
+                            bgcolor: previewPalette.surface,
+                            opacity: 0.9,
+                          }}
+                        />
+                      </Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
+                          {t.emoji} {t.label}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
+                          {t.tagline}
+                        </Typography>
+                      </Box>
+                    </Stack>
                   </Box>
                 );
               })}

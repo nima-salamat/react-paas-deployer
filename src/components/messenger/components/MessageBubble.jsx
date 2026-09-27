@@ -1843,6 +1843,15 @@ function MessageBubble({
     ? emojiOnlyCount(bodyStr)
     : null;
   const isBigEmoji = emojiCount != null && emojiCount >= 1 && emojiCount <= 3;
+  const isIrcInlineLayout =
+    isIrc
+    && !hasAttachments
+    && !m.reply_to_preview
+    && !m.forwarded_from_user
+    && !isBigEmoji
+    && !bodySegments.some(
+      (seg) => seg.type === "codeblock" || seg.type === "quote"
+    );
   const emojiFontSize = emojiCount === 1 ? 72 : emojiCount === 2 ? 56 : emojiCount === 3 ? 44 : 14.5;
   const isSingleEmoji = emojiCount === 1;
   let singleEmojiChar = "";
@@ -2044,7 +2053,11 @@ function MessageBubble({
         sx={{
           maxWidth: isCircularVideoMsg
             ? 320
-            : (bodySegments.some((s) => s.type === "codeblock") ? { xs: "96%", sm: "85%" } : { xs: "82%", sm: "70%" }),
+            : (isIrc
+              ? { xs: "96%", sm: "88%" }
+              : (bodySegments.some((s) => s.type === "codeblock")
+                ? { xs: "96%", sm: "85%" }
+                : { xs: "82%", sm: "70%" })),
           minWidth: 0,
           position: "relative",
           // visible for big-emoji Lottie overlay / overlap avatar; hidden otherwise to clip
@@ -2106,13 +2119,16 @@ function MessageBubble({
           <Typography
             variant="caption"
             fontWeight={700}
+            component={isIrcInlineLayout ? "span" : "div"}
             sx={{
               color: isIrc
                 ? (mine ? "primary.main" : "primary.light")
                 : "primary.light",
               cursor: "pointer",
-              display: "block",
+              display: isIrcInlineLayout ? "inline" : "block",
+              mr: isIrcInlineLayout ? 0.8 : 0,
               mb: isIrc ? 0.15 : 0,
+              whiteSpace: isIrcInlineLayout ? "nowrap" : undefined,
             }}
             onClick={() => m.sender?.id && onLoadUserProfile(m.sender.id)}
           >
@@ -2280,9 +2296,10 @@ function MessageBubble({
           </Box>
         ) : bodyStr ? (
           <Typography
-            component="div"
+            component={isIrcInlineLayout ? "span" : "div"}
             dir="auto"
             sx={{
+              display: isIrcInlineLayout ? "inline" : undefined,
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
               fontSize: isBigEmoji ? emojiFontSize : 14.5,
@@ -2401,7 +2418,19 @@ function MessageBubble({
             })}
           </Stack>
         )}
-        <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.4} mt={0.35}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent={isIrcInlineLayout ? "initial" : "flex-end"}
+          spacing={0.4}
+          mt={isIrcInlineLayout ? 0 : 0.35}
+          sx={isIrcInlineLayout ? {
+            display: "inline-flex",
+            verticalAlign: "baseline",
+            ml: 0.8,
+            whiteSpace: "nowrap",
+          } : undefined}
+        >
           <IconButton className="msg-actions" size="small"
             sx={{ p: 0.2, opacity: { xs: 0.65, md: 0 }, color: mine ? "rgba(255,255,255,0.75)" : "text.secondary" }}
             onClick={(e) => onReactAnchor(e, m)}>

@@ -57,7 +57,7 @@ import {
   copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE, LOAD_OLDER_SIZE,
   downloadAttachmentToCache, getCachedAttachment, getIsMobileDevice,
 } from "./messengerUtils";
-import { Sidebar, MessengerHome, ChatHeader, mergeConversations } from "./features/inbox";
+import { Sidebar, MessengerHome, ChatHeader, mergeConversations, sortConversations } from "./features/inbox";
 import { MessageTimeline, MessageContextMenuItems, slimMessageForCache, readMessengerMsgCache, writeMessengerMsgCache, touchMessengerMsgCache, MSG_SESSION_MAX_MSGS, getScrollPrefetchPlan, shouldChainLoadOlder, shouldChainLoadNewer, MSG_SCROLL_STYLE_TEXT } from "./features/messages";
 import { MessageComposer, writeComposerDraft, readComposerDraft, resolveComposerDraft, draftPayload } from "./features/composer";
 import { ImageCropDialog, ReadReceiptsDialog, MessengerDialogs, MessageSearchDialog, PinnedMessageBar, AddToContactsBanner, GroupDescriptionBanner, readDismissedGroupDesc, isGroupDescDismissed, persistGroupDescDismiss } from "./features/dialogs";
@@ -227,6 +227,13 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const colorId = normalizeColorThemeId(appearance?.colorTheme);
     const pal = getPalette(colorId, mode);
     const isDark = mode === "dark";
+
+    const actionHover = alpha(pal.primary, isDark ? 0.12 : 0.075);
+    const actionSelected = alpha(pal.primary, isDark ? 0.2 : 0.12);
+    const actionFocus = alpha(pal.primary, isDark ? 0.24 : 0.16);
+    const paperSurface = isDark ? pal.surface : alpha(pal.primary, 0.028);
+    const elevatedSurface = isDark ? pal.surfaceElevated : alpha(pal.primary, 0.055);
+
     return createTheme({
       palette: {
         mode,
@@ -236,21 +243,37 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
           light: isDark ? pal.primaryHover : pal.primarySoft,
           contrastText: "#ffffff",
         },
-        secondary: parentTheme.palette.secondary,
+        secondary: {
+          main: pal.primaryHover,
+          dark: pal.primary,
+          light: pal.primaryHover,
+          contrastText: "#ffffff",
+        },
         success: { main: pal.success },
         warning: { main: pal.warning },
         error: { main: pal.danger },
         background: {
           default: pal.background,
-          paper: pal.surface,
+          paper: paperSurface,
         },
         text: {
           primary: pal.text,
           secondary: pal.textSecondary,
           disabled: pal.textMuted,
         },
-        divider: isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)",
-        action: parentTheme.palette.action,
+        divider: isDark ? alpha(pal.primary, 0.18) : alpha(pal.primary, 0.13),
+        action: {
+          active: pal.primary,
+          hover: actionHover,
+          hoverOpacity: isDark ? 0.12 : 0.075,
+          selected: actionSelected,
+          selectedOpacity: isDark ? 0.2 : 0.12,
+          focus: actionFocus,
+          focusOpacity: isDark ? 0.24 : 0.16,
+          activatedOpacity: isDark ? 0.24 : 0.16,
+          disabled: pal.textMuted,
+          disabledBackground: alpha(pal.primary, isDark ? 0.04 : 0.025),
+        },
       },
       shape: parentTheme.shape,
       typography: parentTheme.typography,
@@ -258,14 +281,98 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       spacing: parentTheme.spacing,
       transitions: parentTheme.transitions,
       zIndex: parentTheme.zIndex,
+      components: {
+        MuiPaper: {
+          styleOverrides: {
+            root: {
+              backgroundImage: "none",
+              backgroundColor: elevatedSurface,
+              borderColor: pal.border,
+            },
+          },
+        },
+        MuiListItemButton: {
+          styleOverrides: {
+            root: {
+              "&:hover": { backgroundColor: actionHover },
+              "&.Mui-selected": { backgroundColor: actionSelected },
+              "&.Mui-selected:hover": {
+                backgroundColor: alpha(pal.primary, isDark ? 0.26 : 0.16),
+              },
+            },
+          },
+        },
+        MuiOutlinedInput: {
+          styleOverrides: {
+            root: {
+              backgroundColor: alpha(pal.primary, isDark ? 0.045 : 0.03),
+              "& fieldset": {
+                borderColor: alpha(pal.primary, isDark ? 0.2 : 0.16),
+              },
+              "&:hover fieldset": {
+                borderColor: alpha(pal.primary, 0.38),
+              },
+              "&.Mui-focused fieldset": {
+                borderColor: pal.primary,
+                borderWidth: 1.5,
+              },
+            },
+          },
+        },
+        MuiIconButton: {
+          styleOverrides: {
+            root: {
+              "&:hover": { backgroundColor: actionHover },
+              "&.Mui-focusVisible": {
+                outline: "2px solid " + alpha(pal.primary, 0.34),
+                outlineOffset: 2,
+              },
+            },
+          },
+        },
+        MuiToggleButton: {
+          styleOverrides: {
+            root: {
+              borderColor: alpha(pal.primary, isDark ? 0.22 : 0.16),
+              "&:hover": { backgroundColor: actionHover },
+              "&.Mui-selected": {
+                color: pal.primary,
+                backgroundColor: actionSelected,
+                borderColor: alpha(pal.primary, 0.38),
+              },
+              "&.Mui-selected:hover": {
+                backgroundColor: alpha(pal.primary, isDark ? 0.27 : 0.18),
+              },
+            },
+          },
+        },
+        MuiTab: {
+          styleOverrides: {
+            root: {
+              color: pal.textSecondary,
+              "&.Mui-selected": { color: pal.primary },
+            },
+          },
+        },
+        MuiChip: {
+          styleOverrides: {
+            root: {
+              borderColor: alpha(pal.primary, isDark ? 0.24 : 0.18),
+            },
+          },
+        },
+      },
       customColors: {
-        surfaceElevated: pal.surfaceElevated,
+        surface: pal.surface,
+        surfaceElevated: elevatedSurface,
         surfaceHover: pal.surfaceHover,
         border: pal.border,
         borderStrong: pal.borderStrong,
         textMuted: pal.textMuted,
         primarySoft: pal.primarySoft,
         bubbleMine: pal.bubbleMine || pal.primary,
+        accentSurface: alpha(pal.primary, isDark ? 0.18 : 0.09),
+        accentSurfaceStrong: alpha(pal.primary, isDark ? 0.26 : 0.15),
         colorThemeId: colorId,
       },
     });
@@ -2522,10 +2629,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       const data = unwrapData(res);
       if (typeof data?.is_pinned === "boolean") {
         setConversations((prev) =>
-          prev.map((item) =>
-            String(item.id) === String(conv.id)
-              ? { ...item, is_pinned: data.is_pinned }
-              : item,
+          sortConversations(
+            prev.map((item) =>
+              String(item.id) === String(conv.id)
+                ? { ...item, is_pinned: data.is_pinned }
+                : item,
+            ),
           ),
         );
       }
@@ -5129,6 +5238,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     <Sidebar
       meId={meId} conversations={conversations} loadingConvs={loadingConvs}
       activeId={activeId} openChat={openChat}
+      isMobile={isMobile}
       searchQ={searchQ} setSearchQ={setSearchQ}
       searchResults={searchResults} searching={searching}
       onViewUserProfile={loadUserProfile}
@@ -5184,6 +5294,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.default",
+        backgroundImage: "radial-gradient(circle at 0% 0%, " + alpha(messengerTheme.palette.primary.main, 0.08) + ", transparent 30%), radial-gradient(circle at 100% 100%, " + alpha(messengerTheme.palette.secondary.main, 0.05) + ", transparent 28%)",
         // On mobile, bind to visualViewport so the header stays on screen when
         // the soft keyboard opens (instead of staying glued to the layout viewport).
         top: isMobileDevice ? kbLayout.top : 0,

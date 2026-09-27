@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Stack, Typography, IconButton, TextField, InputAdornment, Avatar,
@@ -91,6 +91,7 @@ export default function Sidebar({
   // navigate used for Services shortcut
   meId, conversations, loadingConvs,
   activeId, openChat,
+  isMobile = false,
   searchQ, setSearchQ, searchResults, searching,
   onViewUserProfile, startDm, addContact,
   listTab, setListTab, publicGroups, searchPublicGroups,
@@ -109,6 +110,75 @@ export default function Sidebar({
   const [listMenuAnchor, setListMenuAnchor] = useState(null);
   const [publicSearchQ, setPublicSearchQ] = useState("");
   const [chatFilter, setChatFilter] = useState("all");
+  const swipeStartRef = useRef(null);
+
+  const clearPublicSearch = () => {
+    setPublicSearchQ("");
+    searchPublicGroups("");
+  };
+
+  const handleListTabChange = (nextTab) => {
+    setListTab(nextTab);
+    if (nextTab === 1) {
+      setSearchQ("");
+      clearPublicSearch();
+    } else {
+      clearPublicSearch();
+    }
+  };
+
+  const handleSwipeStart = (event) => {
+    if (!isMobile || event.touches.length !== 1) return;
+
+    const target = event.target;
+    if (
+      target?.closest?.(
+        "input, textarea, button, [role='button'], [data-swipe-ignore='true']"
+      )
+    ) {
+      swipeStartRef.current = null;
+      return;
+    }
+
+    const touch = event.touches[0];
+    swipeStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+    };
+  };
+
+  const handleSwipeMove = (event) => {
+    if (!swipeStartRef.current || event.touches.length !== 1) return;
+
+    const touch = event.touches[0];
+    const dx = touch.clientX - swipeStartRef.current.x;
+    const dy = touch.clientY - swipeStartRef.current.y;
+
+    // Once it clearly becomes a vertical scroll, abandon horizontal navigation.
+    if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx) * 0.8) {
+      swipeStartRef.current = null;
+    }
+  };
+
+  const handleSwipeEnd = (event) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!isMobile || !start || event.changedTouches.length !== 1) return;
+
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    const horizontal =
+      Math.abs(dx) >= 64 && Math.abs(dx) > Math.abs(dy) * 1.25;
+
+    if (!horizontal) return;
+
+    if (dx < 0 && listTab === 0) {
+      handleListTabChange(1);
+    } else if (dx > 0 && listTab === 1) {
+      handleListTabChange(0);
+    }
+  };
 
   const onRowContext = (e, conv) => {
     e.preventDefault();
@@ -139,7 +209,17 @@ export default function Sidebar({
 
   return (
     <Box
-      sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "background.paper" }}
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "background.paper",
+        touchAction: isMobile ? "pan-y" : undefined,
+      }}
+      onTouchStartCapture={handleSwipeStart}
+      onTouchMoveCapture={handleSwipeMove}
+      onTouchEndCapture={handleSwipeEnd}
+      onTouchCancel={() => { swipeStartRef.current = null; }}
       onContextMenu={(e) => {
         // Only suppress the browser menu when no child has its own handler
         if (e.target === e.currentTarget) e.preventDefault();
@@ -282,18 +362,7 @@ export default function Sidebar({
 
       <Tabs
         value={listTab}
-        onChange={(_, v) => {
-          setListTab(v);
-          // Clear the other mode's query so the shared search bar stays relevant
-          if (v === 1) {
-            setSearchQ("");
-            setPublicSearchQ("");
-            searchPublicGroups("");
-          } else {
-            setPublicSearchQ("");
-            searchPublicGroups("");
-          }
-        }}
+        onChange={(_, v) => handleListTabChange(v)}
         variant="fullWidth"
         sx={{ minHeight: 36, "& .MuiTab-root": { minHeight: 36, py: 0.5, fontSize: 13 } }}
       >

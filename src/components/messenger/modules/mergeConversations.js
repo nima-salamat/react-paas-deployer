@@ -4,25 +4,52 @@
  */
 import { readComposerDraft } from "./composerDrafts";
 
+function conversationTimestamp(conv) {
+  const value = conv?.last_message_at || conv?.created_at;
+  const timestamp = value ? Date.parse(value) : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+/**
+ * Keep chat-list order deterministic:
+ * pinned first, then newest activity, preserving input order for exact ties.
+ */
+export function sortConversations(items) {
+  return (items || [])
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const aPinned = Boolean(a.item?.is_pinned);
+      const bPinned = Boolean(b.item?.is_pinned);
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+      const activityDiff =
+        conversationTimestamp(b.item) - conversationTimestamp(a.item);
+      return activityDiff || (a.index - b.index);
+    })
+    .map(({ item }) => item);
+}
+
 export function mergeConversations(prev, next) {
   if (!prev?.length) {
-    // First load: still hydrate drafts from localStorage
-    return (next || []).map((c) => {
-      if (!c || c.id == null) return c;
-      const local = readComposerDraft(c.id);
-      if (!local.trim()) return c;
-      // Prefer non-empty local over empty/missing server draft
-      if (!(c.draft_text || "").trim()) return { ...c, draft_text: local };
-      return c;
-    });
+    return sortConversations(
+      (next || []).map((c) => {
+        if (!c || c.id == null) return c;
+        const local = readComposerDraft(c.id);
+        if (!local.trim()) return c;
+        // Prefer non-empty local over empty/missing server draft
+        if (!(c.draft_text || "").trim()) return { ...c, draft_text: local };
+        return c;
+      })
+    );
   }
   if (!next?.length) return [];
+
+  // Reconcile server payload with the same client-side ordering rule.
+  const orderedNext = sortConversations(next);
   const prevMap = new Map(prev.map((c) => [String(c.id), c]));
-  let changed = prev.length !== next.length;
-  const merged = next.map((c) => {
+  const merged = orderedNext.map((c) => {
     const old = prevMap.get(String(c.id));
     if (!old) {
-      changed = true;
       const local = readComposerDraft(c.id);
       if (local.trim() && !(c.draft_text || "").trim()) {
         return { ...c, draft_text: local };
@@ -42,7 +69,6 @@ export function mergeConversations(prev, next) {
       && (old.is_pinned === c.is_pinned)
       && (old.draft_text || "") === (c.draft_text || "");
     if (same) return old;
-    changed = true;
     // Resolve draft: never clobber non-empty local (React state or localStorage)
     // with an empty server field. Prefer localStorage if state is also empty.
     const serverDraft = typeof c.draft_text === "string" ? c.draft_text : "";
@@ -57,5 +83,10 @@ export function mergeConversations(prev, next) {
     }
     return { ...old, ...c, draft_text };
   });
-  return changed ? merged : prev;
+  const orderedMerged = sortConversations(merged);
+  const sameOrder =
+    orderedMerged.length === prev.length &&
+    orderedMerged.every((item, index) => item === prev[index]);
+
+  return sameOrder ? prev : orderedMerged;
 }
