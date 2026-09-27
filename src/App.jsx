@@ -128,6 +128,9 @@ const Layout = ({
     location.pathname.startsWith("/service/") ||
     location.pathname.startsWith("/services/");
   const isAuthPage = location.pathname === "/signin_or_signup";
+  const isAdminSpace =
+    location.pathname === "/admin" ||
+    location.pathname.startsWith("/admin/");
   const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -154,7 +157,7 @@ const Layout = ({
         color: "text.primary",
       }}
     >
-      {!isDashboardSpace && (
+      {!isDashboardSpace && !isAdminSpace && (
         <Navbar
           themeMode={themeMode}
           onThemeModeChange={onThemeModeChange}
@@ -173,9 +176,9 @@ const Layout = ({
         <Outlet />
       </Box>
 
-      {!isDashboardSpace && !isAuthPage && <Footer />}
+      {!isDashboardSpace && !isAdminSpace && !isAuthPage && <Footer />}
 
-      {!isDashboardSpace && !isAuthPage && (
+      {!isDashboardSpace && !isAdminSpace && !isAuthPage && (
         <FloatingNav
           loggedIn={loggedIn}
         />
@@ -491,7 +494,7 @@ export function App({ prerender = false }) {
 
             <Route
               path="/admin/*"
-              element={<AdminDashboard />}
+              element={<AdminDashboard themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}
             />
 
             <Route path="*" element={<NotFound />} />
