@@ -776,6 +776,7 @@ export default function DocsStyles() {
         ".docs-markdown-preview .doc-tab.is-active": { color: accent, borderBottomColor: accent },
         ".docs-markdown-preview .doc-tab-panel": { display: "none", padding: "14px 16px" },
         ".docs-markdown-preview .doc-tab-panel.is-active": { display: "block" },
+        ".docs-markdown-preview .doc-tab-panel[hidden]": { display: "none !important" },
         ".docs-markdown-preview .doc-details, .docs-markdown-preview .doc-spoiler": { margin: "1.1em 0", borderRadius: 2, border: `1px solid ${border}`, boxShadow: edgeLight, background: surface },
         ".docs-markdown-preview .doc-details-summary, .docs-markdown-preview .doc-spoiler-summary": { padding: "10px 14px", fontWeight: 700, cursor: "pointer", listStyle: "none" },
         ".docs-markdown-preview .doc-details-body, .docs-markdown-preview .doc-spoiler-body": { padding: "0 14px 14px", borderTop: `1px solid ${border}` },
