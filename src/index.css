@@ -76,11 +76,16 @@
 .docs-markdown-preview li { margin: .45rem 0; padding-left: .2rem; }
 .docs-markdown-preview li::marker { font-weight: 750; }
 .docs-markdown-preview blockquote { margin: 1.5rem 0; padding: .95rem 1.2rem; border-left: 4px solid currentColor; border-radius: 0 14px 14px 0; background: color-mix(in srgb, currentColor 5%, transparent); }
-.docs-markdown-preview table { width: 100%; border-collapse: separate; border-spacing: 0; margin: 1.5rem 0; overflow: hidden; border: 1px solid color-mix(in srgb, currentColor 12%, transparent); border-radius: 14px; }
+.docs-markdown-preview .doc-table-wrap { overflow-x: auto; margin: 1.5rem 0; }
+.docs-markdown-preview table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid color-mix(in srgb, currentColor 12%, transparent); border-radius: 14px; background: color-mix(in srgb, currentColor 2%, transparent); }
 .docs-markdown-preview th, .docs-markdown-preview td { padding: .8rem .9rem; border-right: 1px solid color-mix(in srgb, currentColor 10%, transparent); border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent); text-align: left; }
 .docs-markdown-preview th { background: color-mix(in srgb, currentColor 6%, transparent); font-weight: 800; }
 .docs-markdown-preview tr:last-child td { border-bottom: 0; }
 .docs-markdown-preview th:last-child, .docs-markdown-preview td:last-child { border-right: 0; }
+.docs-markdown-preview thead tr:first-child th:first-child { border-top-left-radius: 13px; }
+.docs-markdown-preview thead tr:first-child th:last-child { border-top-right-radius: 13px; }
+.docs-markdown-preview tbody tr:last-child td:first-child { border-bottom-left-radius: 13px; }
+.docs-markdown-preview tbody tr:last-child td:last-child { border-bottom-right-radius: 13px; }
 .docs-markdown-preview img { max-width: 100%; height: auto; }
 .docs-markdown-preview :not(pre) > code { display: inline-block; padding: .12em .42em; border-radius: 7px; background: color-mix(in srgb, currentColor 8%, transparent); font: 0.92em/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .docs-markdown-preview .doc-code { position: relative; margin: 1.45rem 0 1.7rem; border: 1px solid rgba(148,163,184,.20); border-radius: 16px; overflow: hidden; background: #0b1020; box-shadow: 0 18px 45px rgba(2,8,23,.16); }
