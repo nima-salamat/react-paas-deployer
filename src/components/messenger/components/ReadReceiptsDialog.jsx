@@ -21,8 +21,9 @@ import { formatTime, withTokenQuery } from "../messengerUtils";
  * Props:
  *  - message: object | null  (the message)
  *  - onClose: () => void
+ *  - onOpenProfile: (userId) => void
  */
-export default function ReadReceiptsDialog({ message, onClose }) {
+export default function ReadReceiptsDialog({ message, onClose, onOpenProfile }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [tab, setTab] = useState(0);
@@ -97,19 +98,32 @@ export default function ReadReceiptsDialog({ message, onClose }) {
                 Nobody has read this message yet.
               </Typography>
             )}
-            {readList.map((r, i) => (
-              <ListItem key={`${r.user?.id ?? i}`}>
-                <ListItemAvatar>
-                  <Avatar src={withTokenQuery(r.user?.avatar) || undefined} sx={{ width: 36, height: 36 }}>
-                    {r.user?.username?.[0]?.toUpperCase()}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={r.user?.username || "User"}
-                  secondary={r.seen_at ? formatTime(r.seen_at) : ""}
-                />
-              </ListItem>
-            ))}
+            {readList.map((r, i) => {
+              const userId = r.user?.id;
+              return (
+                <ListItem key={String(r.user?.id ?? i)} disablePadding>
+                  <ListItemButton
+                    disabled={!userId || !onOpenProfile}
+                    onClick={() => {
+                      if (!userId || !onOpenProfile) return;
+                      onClose?.();
+                      onOpenProfile(userId);
+                    }}
+                    sx={{ px: 2, py: 0.7 }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar src={withTokenQuery(r.user?.avatar) || undefined} sx={{ width: 36, height: 36 }}>
+                        {r.user?.username?.[0]?.toUpperCase()}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={r.user?.username || "User"}
+                      secondary={r.seen_at ? formatTime(r.seen_at) : ""}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              );
+            })}
           </List>
         ) : (
           <List dense disablePadding>
@@ -118,16 +132,29 @@ export default function ReadReceiptsDialog({ message, onClose }) {
                 Everyone has read this message.
               </Typography>
             )}
-            {unreadList.map((r, i) => (
-              <ListItem key={`${r.user?.id ?? i}`}>
-                <ListItemAvatar>
-                  <Avatar src={withTokenQuery(r.user?.avatar) || undefined} sx={{ width: 36, height: 36 }}>
-                    {r.user?.username?.[0]?.toUpperCase()}
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText primary={r.user?.username || "User"} />
-              </ListItem>
-            ))}
+            {unreadList.map((r, i) => {
+              const userId = r.user?.id;
+              return (
+                <ListItem key={String(r.user?.id ?? i)} disablePadding>
+                  <ListItemButton
+                    disabled={!userId || !onOpenProfile}
+                    onClick={() => {
+                      if (!userId || !onOpenProfile) return;
+                      onClose?.();
+                      onOpenProfile(userId);
+                    }}
+                    sx={{ px: 2, py: 0.7 }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar src={withTokenQuery(r.user?.avatar) || undefined} sx={{ width: 36, height: 36 }}>
+                        {r.user?.username?.[0]?.toUpperCase()}
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText primary={r.user?.username || "User"} />
+                  </ListItemButton>
+                </ListItem>
+              );
+            })}
           </List>
         )}
       </DialogContent>
