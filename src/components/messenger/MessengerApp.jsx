@@ -930,7 +930,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       const data = unwrapData(res);
       const next = data?.results || [];
-      if (!silent) setConversationLoadError(false);
+      setConversationLoadError(false);
       // Merge by id: keep previous object reference when payload is unchanged so
       // Sidebar Avatars do not remount / re-download on every silent refresh.
       setConversations((prev) => mergeConversations(prev, next));
