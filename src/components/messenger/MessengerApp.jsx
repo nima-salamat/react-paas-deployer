@@ -61,7 +61,7 @@ import { Sidebar, MessengerHome, ChatHeader, mergeConversations, sortConversatio
 import { MessageTimeline, MessageContextMenuItems, slimMessageForCache, readMessengerMsgCache, writeMessengerMsgCache, touchMessengerMsgCache, MSG_SESSION_MAX_MSGS, getScrollPrefetchPlan, shouldChainLoadOlder, shouldChainLoadNewer, MSG_SCROLL_STYLE_TEXT } from "./features/messages";
 import { MessageComposer, writeComposerDraft, readComposerDraft, resolveComposerDraft, draftPayload } from "./features/composer";
 import { ImageCropDialog, ReadReceiptsDialog, MessengerDialogs, MessageSearchDialog, PinnedMessageBar, AddToContactsBanner, GroupDescriptionBanner, readDismissedGroupDesc, isGroupDescDismissed, persistGroupDescDismiss } from "./features/dialogs";
-import { AudioPlayerBar, MediaGalleryDialog, ChatMediaLibraryDialog, VideoEditDialog, PreviewTextBody, attachMessengerOriginal, messengerOriginalOf, attachMessengerImageEdits, messengerImageEditsOf, attachMessengerVideoEdits, messengerVideoEditsOf, finalizeMessengerFiles, guessLangFromName } from "./features/media";
+import { AudioPlayerBar, MediaGalleryDialog, ChatMediaLibraryDialog, VideoEditDialog, AudioEditDialog, PreviewTextBody, attachMessengerOriginal, messengerOriginalOf, attachMessengerImageEdits, messengerImageEditsOf, attachMessengerVideoEdits, messengerVideoEditsOf, finalizeMessengerFiles, guessLangFromName } from "./features/media";
 import { MessengerProfileEditor } from "./features/profile";
 import { JitsiCallModal, IncomingCallBanner, useMessengerCalls, useMessengerWebSocket, parseCallSystemBody, formatCallSystemLabel, normalizeMessage, normalizeMessages } from "./features/calls";
 import { RightPanel, readAppearance, writeAppearance, getPalette, normalizeColorThemeId } from "./features/settings";
@@ -117,6 +117,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [nextBefore, setNextBefore] = useState(null);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [conversationLoadError, setConversationLoadError] = useState(false);
+  const [websocketConnected, setWebsocketConnected] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
@@ -478,6 +479,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // Video edit dialog (trim + crop before sending)
   const [videoEditFile, setVideoEditFile] = useState(null);
   const [videoInitialEdits, setVideoInitialEdits] = useState(null);
+  const [audioEditFile, setAudioEditFile] = useState(null);
+  const [audioEditIndex, setAudioEditIndex] = useState(null);
+  const [audioInitialEdits, setAudioInitialEdits] = useState(null);
 
   // "Join this public group?" confirmation dialog — shown when the user clicks
   // a non-member public group row in the search results (Telegram shows a
@@ -1899,6 +1903,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     markVisibleMessagesRead: (...args) => markVisibleMessagesReadRef.current(...args),
     profileDataRef,
     refreshProfileData: (...args) => refreshProfileDataRef.current(...args),
+    setWebsocketConnected,
   });
 
 
@@ -1911,6 +1916,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       if (galleryState) { setGalleryState(null); return; }
       if (mediaLibraryOpen) { setMediaLibraryOpen(false); return; }
       if (readersMessage) { setReadersMessage(null); return; }
+      if (audioEditFile) { setAudioEditFile(null); setAudioEditIndex(null); setAudioInitialEdits(null); return; }
       if (videoEditFile) { setVideoEditFile(null); return; }
       if (cropFile) { setCropFile(null); return; }
       if (mediaSettingsOpen) { setMediaSettingsOpen(false); return; }
@@ -5357,7 +5363,17 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
                   setVideoEditIndex(index);
                   setVideoInitialEdits(messengerVideoEditsOf(file) || null);
                   setVideoEditFile(messengerOriginalOf(file));
+                } else if (file?.type?.startsWith("audio/")) {
+                  setAudioEditIndex(index);
+                  setAudioInitialEdits(file?._messengerAudioEdits || null);
+                  setAudioEditFile(messengerOriginalOf(file) || file);
                 }
+              }}
+              onEditAudio={(file, index) => {
+                if (!file?.type?.startsWith("audio/") || file?._messengerProcessing) return;
+                setAudioEditIndex(index);
+                setAudioInitialEdits(file?._messengerAudioEdits || null);
+                setAudioEditFile(messengerOriginalOf(file) || file);
               }}
             />
           ))}
@@ -5450,6 +5466,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       meId={meId} conversations={conversations} loadingConvs={loadingConvs}
       conversationLoadError={conversationLoadError}
       onReloadConversations={() => { void loadConversations(); }}
+      websocketConnected={websocketConnected}
       activeId={activeId} openChat={openChat}
       isMobile={isMobile}
       searchQ={searchQ} setSearchQ={setSearchQ}
@@ -5886,6 +5903,32 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
           setVideoEditFile(null);
           setVideoEditIndex(null);
           setVideoInitialEdits(null);
+        }}
+        confirmLabel="Done"
+      />
+
+      {/* Audio editor (trim before sending) */}
+      <AudioEditDialog
+        open={Boolean(audioEditFile)}
+        file={audioEditFile}
+        initialEdits={audioInitialEdits}
+        onClose={() => { setAudioEditFile(null); setAudioEditIndex(null); setAudioInitialEdits(null); }}
+        onConfirm={(editedFile, filename, edits) => {
+          const f = editedFile instanceof File
+            ? editedFile
+            : new File([editedFile], filename || "audio.wav", { type: "audio/wav" });
+          if (edits) f._messengerAudioEdits = edits;
+          setFiles((prev) => {
+            if (audioEditIndex != null && audioEditIndex >= 0 && audioEditIndex < prev.length) {
+              const next = [...prev];
+              next[audioEditIndex] = f;
+              return next;
+            }
+            return [...prev, f];
+          });
+          setAudioEditFile(null);
+          setAudioEditIndex(null);
+          setAudioInitialEdits(null);
         }}
         confirmLabel="Done"
       />
