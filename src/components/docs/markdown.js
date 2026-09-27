@@ -309,9 +309,15 @@ export function renderMarkdown(markdown = "", options = {}) {
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
-    const text = paragraph.join(" ");
+    //  marks an intentional Markdown hard break and  marks a
+    // normal source-line boundary. These private-use sentinels survive
+    // inline escaping, so code spans are not accidentally rewritten.
+    const text = paragraph.join("\uE001");
+    const rendered = inline(text, resolveUrl)
+      .replace(/\uE000\uE001/g, "<br/>")
+      .replace(/\uE001/g, " ");
     // dir=auto so Persian/Arabic and mixed LTR content render correctly
-    out.push(`<p dir="auto">${inline(text, resolveUrl)}</p>`);
+    out.push(`<p dir="auto">${rendered}</p>`);
     paragraph = [];
   };
 
@@ -485,7 +491,10 @@ export function renderMarkdown(markdown = "", options = {}) {
     }
 
     // GFM tables
-    if (/^\|.*\|\s*$/.test(line) && /^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?$/.test(lines[i + 1] || "")) {
+    if (
+      /\|/.test(line)
+      && /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1] || "")
+    ) {
       flushParagraph();
       flushList();
       flushQuote();
@@ -623,7 +632,11 @@ export function renderMarkdown(markdown = "", options = {}) {
       }
     }
 
-    paragraph.push(trimmed);
+    const hasHardBreak = /(?:[ \t]{2,}|\\)$/.test(line);
+    const paragraphLine = trimmed
+      .replace(/\\$/, "")
+      .replace(/[ \t]{2,}$/, "");
+    paragraph.push(paragraphLine + (hasHardBreak ? "\uE000" : ""));
     i += 1;
   }
 
