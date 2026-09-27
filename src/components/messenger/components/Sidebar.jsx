@@ -489,10 +489,12 @@ export default function Sidebar({
                       secondary={u.is_contact ? "Contact · open profile" : "Open profile"}
                     />
                     <Stack direction="row" spacing={0.25}>
-                      <IconButton size="small" title="Message" onClick={(e) => { e.stopPropagation(); startDm(u); }}>
-                        <ChatIcon fontSize="small" />
-                      </IconButton>
-                      {!u.is_contact && (
+                      {String(u.id) !== String(meId) && (
+                        <IconButton size="small" title="Message" onClick={(e) => { e.stopPropagation(); startDm(u); }}>
+                          <ChatIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                      {!u.is_contact && String(u.id) !== String(meId) && (
                         <IconButton size="small" title="Add contact" onClick={(e) => { e.stopPropagation(); addContact(u.id); }}>
                           <PersonAddIcon fontSize="small" />
                         </IconButton>
