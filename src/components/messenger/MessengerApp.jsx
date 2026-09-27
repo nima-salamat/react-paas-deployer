@@ -70,6 +70,7 @@ import useKeyboardLayout from "./hooks/useKeyboardLayout";
 
 
 import CallIcon from "@mui/icons-material/Call";
+import CallEndIcon from "@mui/icons-material/CallEnd";
 import SearchIcon from "@mui/icons-material/Search";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -1810,6 +1811,21 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     flash,
     wsRef,
   });
+
+  // Keep the incoming call alive after the central popup is dismissed.
+  // X only hides the overlay; the call keeps ringing until accepted,
+  // declined, or timed out, so the list and active chat can still control it.
+  const incomingCallKey = incomingCall?.call_id || incomingCall?.conversation_id || null;
+  const [incomingCallPopupDismissedKey, setIncomingCallPopupDismissedKey] = useState(null);
+  useEffect(() => {
+    setIncomingCallPopupDismissedKey(null);
+  }, [incomingCallKey]);
+
+  const incomingCallForActiveChat =
+    Boolean(incomingCall)
+    && String(incomingCall.conversation_id) === String(activeId)
+    && !callConfig;
+
   const [callExitConfirmOpen, setCallExitConfirmOpen] = useState(false);
   const [callExitBusy, setCallExitBusy] = useState(false);
   const pendingMessengerExitRef = useRef(null);
@@ -4947,7 +4963,103 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             />
           )}
 
-            {activeCallInfo && !callConfig && (
+            {incomingCallForActiveChat && (
+              <Paper
+                elevation={0}
+                sx={{
+                  mx: { xs: 1, sm: 1.5 },
+                  mt: 1,
+                  mb: 0.75,
+                  px: { xs: 1.1, sm: 1.5 },
+                  py: 1,
+                  borderRadius: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.25,
+                  bgcolor: (theme) => alpha(
+                    theme.palette.success.main,
+                    theme.palette.mode === "dark" ? 0.14 : 0.08
+                  ),
+                  border: "1px solid",
+                  borderColor: "success.main",
+                  boxShadow: (theme) => theme.palette.mode === "dark"
+                    ? "0 8px 24px rgba(34,197,94,0.10)"
+                    : "0 8px 24px rgba(34,197,94,0.08)",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: "50%",
+                    display: "grid",
+                    placeItems: "center",
+                    flexShrink: 0,
+                    color: "#fff",
+                    bgcolor: "success.main",
+                    animation: "incomingCallBannerPulse 1.4s ease-in-out infinite",
+                    "@keyframes incomingCallBannerPulse": {
+                      "0%, 100%": { boxShadow: "0 0 0 0 rgba(34,197,94,0.35)" },
+                      "50%": { boxShadow: "0 0 0 9px rgba(34,197,94,0)" },
+                    },
+                  }}
+                >
+                  {incomingCall?.media?.video || incomingCall?.is_video
+                    ? <VideocamIcon fontSize="small" />
+                    : <CallIcon fontSize="small" />}
+                </Box>
+
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={800} noWrap>
+                    Incoming {incomingCall?.media?.video || incomingCall?.is_video ? "video" : "voice"} call
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {incomingCall?.initiator?.username || "Someone"} is calling you
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                  <IconButton
+                    size="small"
+                    aria-label="Decline incoming call"
+                    title="Decline"
+                    disabled={incomingCallBusy}
+                    onClick={() => { void declineIncomingCall(); }}
+                    sx={{
+                      width: 34,
+                      height: 34,
+                      bgcolor: "error.main",
+                      color: "#fff",
+                      "&:hover": { bgcolor: "error.dark" },
+                    }}
+                  >
+                    <CallEndIcon sx={{ fontSize: 17 }} />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    aria-label={incomingCall?.media?.video || incomingCall?.is_video
+                      ? "Accept incoming video call"
+                      : "Accept incoming call"}
+                    title={incomingCall?.media?.video || incomingCall?.is_video ? "Accept video call" : "Accept call"}
+                    disabled={incomingCallBusy}
+                    onClick={() => { void joinCall(incomingCall); }}
+                    sx={{
+                      width: 34,
+                      height: 34,
+                      bgcolor: "success.main",
+                      color: "#fff",
+                      "&:hover": { bgcolor: "success.dark" },
+                    }}
+                  >
+                    {incomingCall?.media?.video || incomingCall?.is_video
+                      ? <VideocamIcon sx={{ fontSize: 17 }} />
+                      : <CallIcon sx={{ fontSize: 17 }} />}
+                  </IconButton>
+                </Stack>
+              </Paper>
+            )}
+
+            {activeCallInfo && !callConfig && !incomingCallForActiveChat && (
               <Paper
                 elevation={0}
                 sx={{
@@ -5294,6 +5406,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       listTab={listTab} setListTab={setListTab}
       publicGroups={publicGroups} searchPublicGroups={searchPublicGroups}
       onJoinPublicGroup={joinPublicGroup}
+      incomingCall={incomingCall}
+      incomingCallBusy={incomingCallBusy}
+      onAcceptIncomingCall={() => { void joinCall(incomingCall); }}
+      onDeclineIncomingCall={() => { void declineIncomingCall(); }}
       onConfirmJoinPublicGroup={confirmJoinPublicGroup}
       onTogglePin={togglePin}
       onMarkRead={markChatRead}
@@ -5721,10 +5837,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
           "mini" floating mode if the user wants to keep chatting while in
           a call. */}
 
-      {/* Incoming call banner + ringtone (max 30s) */}
+      {/* Incoming call popup + ringtone. Hiding the popup does not end ringing. */}
       {incomingCall && !callConfig && (
         <IncomingCallBanner
           incomingCall={incomingCall}
+          visible={String(incomingCallKey) !== String(incomingCallPopupDismissedKey)}
+          onDismiss={() => setIncomingCallPopupDismissedKey(String(incomingCallKey))}
           onAccept={() => { void joinCall(incomingCall); }}
           onDecline={() => { void declineIncomingCall(); }}
           onTimeout={() => { void timeoutIncomingCall(); }}
