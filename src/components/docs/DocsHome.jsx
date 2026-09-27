@@ -65,6 +65,12 @@ const HEADER_HEIGHT = { xs: 60, sm: 68 };
 const SIDEBAR_WIDTH = 312;
 const RAIL_WIDTH = 236;
 
+const THEME_CHOICES = [
+  { value: "light", label: "Light", icon: LightModeRoundedIcon },
+  { value: "dark", label: "Dark", icon: DarkModeRoundedIcon },
+  { value: "system", label: "System", icon: SettingsBrightnessRoundedIcon },
+];
+
 /** Public Docs assets are anonymous resources only when their parent document is published. */
 const resolvePublicUrl = (url) => {
   if (!url || url === "#") return url;
