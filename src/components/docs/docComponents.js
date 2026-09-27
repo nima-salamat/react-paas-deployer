@@ -96,9 +96,9 @@ function splitSections(bodyLines, matcher) {
   return sections;
 }
 
-const matchEqualsSections = (line) => line.match(/^===\\s+(.+)$/);
+const matchEqualsSections = (line) => line.match(/^===\s+(.+)$/);
 const matchTabSections = (line) => (
-  line.match(/^(?:===|---)\\s+(.+)$/)
+  line.match(/^(?:===|---)\s+(.+)$/)
 );
 
 function parseAttrs(headerRest = "") {
