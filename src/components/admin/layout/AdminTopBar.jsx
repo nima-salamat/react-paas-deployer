@@ -14,6 +14,7 @@ import MarkChatReadIcon from "@mui/icons-material/MarkChatRead";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import PeopleIcon from "@mui/icons-material/People";
 import { isSessionSuperuser, isSessionStaff, authMediaSrc } from "../adminUtils";
+import ThemeMenuButton from "../../layout/ThemeMenuButton.jsx";
 
 /**
  * AdminTopBar — sticky header.
@@ -35,6 +36,8 @@ export default function AdminTopBar({
   notifications = [],
   onMarkAllRead,
   unreadCount = 0,
+  themeMode = "system",
+  onThemeModeChange,
 }) {
   const [profileMenu, setProfileMenu] = useState(null);
   const [notifAnchor, setNotifAnchor] = useState(null);
@@ -100,6 +103,15 @@ export default function AdminTopBar({
         </Box>
 
         <Box sx={{ flexGrow: 1 }} />
+
+        <ThemeMenuButton
+          themeMode={themeMode}
+          onThemeModeChange={onThemeModeChange}
+          buttonSx={{
+            width: { xs: 36, sm: 38 },
+            height: { xs: 36, sm: 38 },
+          }}
+        />
 
         <Button
           size="small"
