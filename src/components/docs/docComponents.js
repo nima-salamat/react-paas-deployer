@@ -16,37 +16,90 @@ const METHOD_COLORS = {
   options: "options",
 };
 
-/** Collect body until closing ::: */
+/**
+ * Collect a directive body until its matching closing `:::`.
+ *
+ * The old implementation stopped at the first `:::`, which broke nested
+ * components such as a tabs panel containing `:::details`, `:::callout`,
+ * `:::code-group`, etc. Fenced code is tracked so a literal `:::` inside a
+ * code block cannot accidentally close the parent directive.
+ */
 export function collectUntilClose(lines, startIndex) {
   const body = [];
   let i = startIndex;
-  while (i < lines.length && lines[i].trim() !== ":::") {
-    body.push(lines[i]);
+  let depth = 0;
+  let fence = null;
+
+  while (i < lines.length) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+
+    if (fence) {
+      body.push(raw);
+      if (trimmed.startsWith(fence)) {
+        fence = null;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (/^(```|~~~)/.test(trimmed)) {
+      fence = trimmed.slice(0, 3);
+      body.push(raw);
+      i += 1;
+      continue;
+    }
+
+    if (/^:::[a-z]/i.test(trimmed)) {
+      depth += 1;
+      body.push(raw);
+      i += 1;
+      continue;
+    }
+
+    if (trimmed === ":::") {
+      if (depth === 0) {
+        return { body, nextIndex: i + 1 };
+      }
+      depth -= 1;
+      body.push(raw);
+      i += 1;
+      continue;
+    }
+
+    body.push(raw);
     i += 1;
   }
-  return { body, nextIndex: i + 1 };
+
+  // Unterminated directives are rendered as-is instead of silently dropping
+  // the rest of the article.
+  return { body, nextIndex: i };
 }
 
-/** Split body into sections by lines matching `=== Title` or `--- Title` */
-function splitSections(bodyLines, marker = "===") {
+/** Split body into sections by configurable marker syntax. */
+function splitSections(bodyLines, matcher) {
   const sections = [];
   let current = null;
   for (const line of bodyLines) {
-    const m = line.match(new RegExp(`^${marker}\\s+(.+)$`));
+    const m = matcher(line);
     if (m) {
       if (current) sections.push(current);
       current = { title: m[1].trim(), lines: [] };
     } else if (current) {
       current.lines.push(line);
-    } else {
-      // preamble ignored or first section without marker
-      if (!current) current = { title: "Section", lines: [line] };
-      else current.lines.push(line);
+    } else if (line.trim()) {
+      // Allow a small preamble before the first explicit section marker.
+      current = { title: "Section", lines: [line] };
     }
   }
   if (current) sections.push(current);
   return sections;
 }
+
+const matchEqualsSections = (line) => line.match(/^===\\s+(.+)$/);
+const matchTabSections = (line) => (
+  line.match(/^(?:===|---)\\s+(.+)$/)
+);
 
 function parseAttrs(headerRest = "") {
   const attrs = {};
@@ -100,22 +153,45 @@ export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
   // :::tabs
   if (/^:::tabs\s*$/i.test(trimmed)) {
     const { body, nextIndex } = collectUntilClose(lines, i + 1);
-    const sections = splitSections(body, "===");
-    const id = `tabs-${Math.random().toString(36).slice(2, 9)}`;
+    const sections = splitSections(body, matchTabSections);
+    const signature = sections
+      .map((section) => `${section.title}\n${section.lines.join("\n")}`)
+      .join("\n");
+    let hash = 0;
+    for (let index = 0; index < signature.length; index += 1) {
+      hash = ((hash << 5) - hash + signature.charCodeAt(index)) | 0;
+    }
+    const id = `tabs-${Math.abs(hash)}-${sections.length}`;
+
     const tabs = sections
-      .map((s, idx) => {
+      .map((section, idx) => {
         const tid = `${id}-${idx}`;
-        return `<button type="button" class="doc-tab${idx === 0 ? " is-active" : ""}" data-tab-target="${tid}" role="tab">${escapeHtml(s.title)}</button>`;
+        const tabId = `${tid}-tab`;
+        return (
+          `<button type="button" class="doc-tab${idx === 0 ? " is-active" : ""}" ` +
+          `id="${tabId}" data-tab-target="${tid}" role="tab" ` +
+          `aria-controls="${tid}" aria-selected="${idx === 0 ? "true" : "false"}" tabindex="${idx === 0 ? "0" : "-1"}">` +
+          `${escapeHtml(section.title)}</button>`
+        );
       })
       .join("");
+
     const panels = sections
-      .map((s, idx) => {
+      .map((section, idx) => {
         const tid = `${id}-${idx}`;
-        return `<div class="doc-tab-panel${idx === 0 ? " is-active" : ""}" id="${tid}" role="tabpanel">${renderInner(s.lines.join("\n"))}</div>`;
+        const tabId = `${tid}-tab`;
+        return (
+          `<div class="doc-tab-panel${idx === 0 ? " is-active" : ""}" id="${tid}" ` +
+          `role="tabpanel" aria-labelledby="${tabId}"${idx === 0 ? "" : " hidden"}>` +
+          `${renderInner(section.lines.join("\n"))}</div>`
+        );
       })
       .join("");
+
     return {
-      html: `<div class="doc-tabs" data-doc-tabs><div class="doc-tabs-list" role="tablist">${tabs}</div><div class="doc-tabs-panels">${panels}</div></div>`,
+      html:
+        `<div class="doc-tabs" data-doc-tabs><div class="doc-tabs-list" role="tablist">${tabs}</div>` +
+        `<div class="doc-tabs-panels">${panels}</div></div>`,
       nextIndex,
     };
   }
@@ -174,7 +250,7 @@ export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
   // :::cards
   if (/^:::cards\s*$/i.test(trimmed)) {
     const { body, nextIndex } = collectUntilClose(lines, i + 1);
-    const sections = splitSections(body, "===");
+    const sections = splitSections(body, matchEqualsSections);
     const cards = sections
       .map((s) => {
         const firstIndex = s.lines.findIndex((l) => l.trim());
