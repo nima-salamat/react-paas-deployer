@@ -920,6 +920,35 @@ export default function DocsPanel() {
 
   const flatCats = useMemo(() => flattenCats(categories), [categories]);
 
+  const categoryById = useMemo(
+    () => new Map(flatCats.map((category) => [String(category.id), category])),
+    [flatCats]
+  );
+
+  const buildDraftDocsUrl = useCallback(
+    (doc) => {
+      const slugs = [];
+      const seen = new Set();
+      let category = doc?.category
+        ? categoryById.get(String(doc.category))
+        : null;
+
+      while (category && !seen.has(String(category.id))) {
+        seen.add(String(category.id));
+        if (category.slug) slugs.unshift(category.slug);
+        category = category.parent_id
+          ? categoryById.get(String(category.parent_id))
+          : null;
+      }
+
+      if (doc?.slug) slugs.push(doc.slug);
+      return slugs.length
+        ? `/docs/${slugs.map((part) => encodeURIComponent(part)).join("/")}`
+        : "/docs";
+    },
+    [categoryById]
+  );
+
   const generalDocs = useMemo(
     () => (uncategorized.length ? uncategorized : docs.filter((d) => !d.category)),
     [uncategorized, docs]
@@ -1870,7 +1899,7 @@ export default function DocsPanel() {
                     {draft.id && draft.status === "published" && (
                       <Button
                         component="a"
-                        href={`/docs/${draft.slug}`}
+                        href={buildDraftDocsUrl(draft)}
                         target="_blank"
                         rel="noreferrer"
                         startIcon={<OpenInNewRoundedIcon />}
@@ -1924,7 +1953,7 @@ export default function DocsPanel() {
                     helperText={
                       autoSlug && draft.title && !makeSlug(draft.title)
                         ? "No Latin characters in the title — a URL-safe slug is generated on save."
-                        : `URL: /docs/${draft.slug || "your-slug"}`
+                        : `URL: ${buildDraftDocsUrl({ ...draft, slug: draft.slug || "your-slug" })}`
                     }
                     InputProps={{
                       endAdornment: (
