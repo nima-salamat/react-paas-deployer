@@ -12,6 +12,9 @@ import {
   Breadcrumbs,
   Button,
   ButtonBase,
+  ListItemIcon,
+  Menu,
+  MenuItem,
   Chip,
   CircularProgress,
   Collapse,
@@ -48,6 +51,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import UnfoldLessRoundedIcon from "@mui/icons-material/UnfoldLessRounded";
 import UnfoldMoreRoundedIcon from "@mui/icons-material/UnfoldMoreRounded";
 import UpdateRoundedIcon from "@mui/icons-material/UpdateRounded";
+import SettingsBrightnessRoundedIcon from "@mui/icons-material/SettingsBrightnessRounded";
 import apiRequest from "../customHooks/apiRequest";
 import { hostBase, publicDocsAssetSrc } from "../admin/adminUtils";
 import { renderMarkdown } from "./markdown";
@@ -565,7 +569,7 @@ function SidebarContent({
   );
 }
 
-export default function DocsHome({ onThemeModeChange }) {
+export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
   const { "*": docsPath } = useParams();
   const pathSegments = String(docsPath || "")
     .split("/")
@@ -586,6 +590,7 @@ export default function DocsHome({ onThemeModeChange }) {
   const [q, setQ] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState({});
+  const [themeMenuAnchor, setThemeMenuAnchor] = useState(null);
 
   const articleRef = useRef(null);
   const [activeHeading, setActiveHeading] = useState("");
@@ -782,11 +787,21 @@ export default function DocsHome({ onThemeModeChange }) {
     setMobileOpen(false);
   };
 
-  // ── Theme toggle ────────────────────────────────────────────────
+  // ── Theme control ──────────────────────────────────────────────
   const isDark = muiTheme.palette.mode === "dark";
-  const handleToggleTheme = () => {
-    const nextMode = isDark ? "light" : "dark";
-    if (typeof onThemeModeChange === "function") onThemeModeChange(nextMode);
+  const currentThemeChoice =
+    THEME_CHOICES.find((choice) => choice.value === themeMode) ||
+    THEME_CHOICES.find((choice) => choice.value === (isDark ? "dark" : "light"));
+
+  const handleThemeMenuChange = (nextMode) => {
+    if (!nextMode || nextMode === themeMode) {
+      setThemeMenuAnchor(null);
+      return;
+    }
+    if (typeof onThemeModeChange === "function") {
+      onThemeModeChange(nextMode);
+    }
+    setThemeMenuAnchor(null);
   };
 
   // ── Tree expand / collapse helpers ──────────────────────────────
@@ -1023,10 +1038,10 @@ export default function DocsHome({ onThemeModeChange }) {
           </Tooltip>
         )}
 
-        <Tooltip title={isDark ? "Switch to light theme" : "Switch to dark theme"}>
+        <Tooltip title="Change theme">
           <IconButton
-            onClick={handleToggleTheme}
-            aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+            onClick={(event) => setThemeMenuAnchor(event.currentTarget)}
+            aria-label="Change theme"
             sx={{
               border: "1px solid",
               borderColor: "divider",
@@ -1034,13 +1049,46 @@ export default function DocsHome({ onThemeModeChange }) {
               "&:hover": { bgcolor: "action.selected" },
             }}
           >
-            {isDark ? (
+            {currentThemeChoice?.icon ? (
+              React.createElement(currentThemeChoice.icon, { fontSize: "small" })
+            ) : isDark ? (
               <LightModeRoundedIcon fontSize="small" />
             ) : (
               <DarkModeRoundedIcon fontSize="small" />
             )}
           </IconButton>
         </Tooltip>
+
+        <Menu
+          anchorEl={themeMenuAnchor}
+          open={Boolean(themeMenuAnchor)}
+          onClose={() => setThemeMenuAnchor(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          slotProps={{ paper: { sx: { minWidth: 160, borderRadius: 1.75 } } }}
+        >
+          {THEME_CHOICES.map((choice) => {
+            const ChoiceIcon = choice.icon;
+            const selectedChoice = choice.value === themeMode;
+            return (
+              <MenuItem
+                key={choice.value}
+                selected={selectedChoice}
+                onClick={() => handleThemeMenuChange(choice.value)}
+              >
+                <ListItemIcon>
+                  <ChoiceIcon
+                    fontSize="small"
+                    color={selectedChoice ? "primary" : undefined}
+                  />
+                </ListItemIcon>
+                <Typography fontWeight={selectedChoice ? 800 : 500}>
+                  {choice.label}
+                </Typography>
+              </MenuItem>
+            );
+          })}
+        </Menu>
       </Stack>
 
       {/* Reading progress line */}
