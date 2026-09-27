@@ -18,7 +18,13 @@ export default function SEO({ prerender = false }) {
   const pathname = normalizePathname(location.pathname);
   const [doc, setDoc] = useState(null);
   const isDocDetail = isDocsPath(pathname) && pathname !== "/docs";
-  const slug = isDocDetail ? pathname.slice("/docs/".length).split("/")[0] : "";
+  const docPathSegments = isDocDetail
+    ? pathname
+        .slice("/docs/".length)
+        .split("/")
+        .filter(Boolean)
+    : [];
+  const slug = docPathSegments[docPathSegments.length - 1] || "";
 
   useEffect(() => {
     if (prerender || !isDocDetail || !slug) {
