@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { slugifyHeading } from "./markdown";
+import { wireMathPlots } from "./mathPlot";
 import DocsStyles from "./DocsStyles";
 
 function fallbackCopyText(text) {
@@ -224,6 +225,7 @@ export default function MarkdownPreview({ html = "", className = "" }) {
       ...wireCopyButtons(root),
       ...wireInlineCopy(root),
       ...wireTabs(root),
+      ...wireMathPlots(root),
       ...wireFeedback(root),
     ];
 
