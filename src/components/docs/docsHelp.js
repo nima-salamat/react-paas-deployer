@@ -175,7 +175,7 @@ Do not mechanically include every optional component. Use only what improves the
 
 STANDARD MARKDOWN
 - Headings: #, ##, ###, ####, #####, ######
-- Inline: **bold**, *italic*, `code`, ~~strike~~
+- Inline: **bold**, *italic*, \`code\`, ~~strike~~
 - Links: [label](url)
 - Images: ![meaningful alt text](url)
 - Lists: - item, 1. item, task lists - [ ] / - [x]
