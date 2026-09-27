@@ -5937,6 +5937,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       <ReadReceiptsDialog
         message={readersMessage}
         onClose={() => setReadersMessage(null)}
+        onOpenProfile={(userId) => {
+          setReadersMessage(null);
+          void loadUserProfile(userId);
+        }}
       />
 
       {/* Jitsi call modal — now rendered INSIDE chatPane so it sits under
