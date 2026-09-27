@@ -566,7 +566,12 @@ function SidebarContent({
 }
 
 export default function DocsHome({ onThemeModeChange }) {
-  const { categorySlug, slug } = useParams();
+  const { "*": docsPath } = useParams();
+  const pathSegments = String(docsPath || "")
+    .split("/")
+    .map((segment) => decodeURIComponent(segment))
+    .filter(Boolean);
+  const slug = pathSegments[pathSegments.length - 1] || "";
   const navigate = useNavigate();
   const muiTheme = useTheme();
   const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -902,7 +907,7 @@ export default function DocsHome({ onThemeModeChange }) {
     if (canonical !== currentPath) {
       navigate(canonical, { replace: true });
     }
-  }, [selected, tree, getDocHref, navigate, categorySlug, slug]);
+  }, [selected, tree, getDocHref, navigate, slug, docsPath]);
 
   const sidebarProps = {
     tree,
