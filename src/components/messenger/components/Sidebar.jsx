@@ -31,6 +31,7 @@ import BlockIcon from "@mui/icons-material/Block";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import HowToRegIcon from "@mui/icons-material/HowToReg";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   convAvatar, convTitle, formatTime, formatUnread, withTokenQuery,
 } from "../messengerUtils";
@@ -93,6 +94,8 @@ function formatLastMessagePreview(lm) {
 export default function Sidebar({
   // navigate used for Services shortcut
   meId, conversations, loadingConvs,
+  conversationLoadError = false,
+  onReloadConversations,
   activeId, openChat,
   isMobile = false,
   searchQ, setSearchQ, searchResults, searching,
@@ -583,7 +586,36 @@ export default function Sidebar({
           </Stack>
           <List dense sx={{ overflow: "auto", flex: 1, py: 0 }}>
             {loadingConvs && <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress size={22} /></Box>}
-            {!loadingConvs && !conversations.length && (
+            {!loadingConvs && conversationLoadError && !conversations.length && (
+              <Box
+                sx={{
+                  px: 2,
+                  py: 4,
+                  textAlign: "center",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 1.25,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary" fontWeight={600}>
+                  Couldn't load your chats.
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 260 }}>
+                  Check your connection and try loading the chat list again.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<RefreshIcon fontSize="small" />}
+                  onClick={() => onReloadConversations?.()}
+                  sx={{ mt: 0.25, borderRadius: 1.5 }}
+                >
+                  Reload chats
+                </Button>
+              </Box>
+            )}
+            {!loadingConvs && !conversationLoadError && !conversations.length && (
               <Typography variant="body2" color="text.secondary" sx={{ p: 3, textAlign: "center" }}>
                 No chats yet. Search a person above to start a conversation.
               </Typography>
