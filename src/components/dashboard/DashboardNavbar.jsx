@@ -23,6 +23,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import ThemeMenuButton from "../layout/ThemeMenuButton.jsx";
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 
 const resolveName = (profile) =>
@@ -56,6 +57,8 @@ export default function DashboardNavbar({
   profileMode = false,
   onBack = null,
   onMenuClick = null,
+  themeMode = "system",
+  onThemeModeChange,
 }) {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -234,6 +237,11 @@ export default function DashboardNavbar({
           </Stack>
 
           <Stack direction="row" alignItems="center" spacing={{ xs: 0.5, sm: 0.75 }} sx={{ flexShrink: 0 }}>
+            <ThemeMenuButton
+              themeMode={themeMode}
+              onThemeModeChange={onThemeModeChange}
+              buttonSx={navButtonSx}
+            />
             <Tooltip title="Home">
               <IconButton size="small" onClick={() => navigate("/")} sx={navButtonSx} aria-label="Home">
                 <HomeOutlinedIcon sx={{ fontSize: { xs: 19, sm: 20 } }} />
