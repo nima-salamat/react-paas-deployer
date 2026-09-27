@@ -177,10 +177,17 @@ export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
     const sections = splitSections(body, "===");
     const cards = sections
       .map((s) => {
-        const first = s.lines.find((l) => l.trim()) || "";
-        const linkM = first.match(/^\[([^\]]+)\]\(([^)]+)\)/);
+        const firstIndex = s.lines.findIndex((l) => l.trim());
+        const first = firstIndex >= 0 ? s.lines[firstIndex].trim() : "";
+        const linkM = first.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
         const href = linkM ? resolveUrl(linkM[2]) : null;
-        const content = renderInner(s.lines.join("\n"));
+        // A card's first line can be its target link. Do not render that line
+        // again inside the outer <a>, otherwise the browser receives nested
+        // anchors and the card markup becomes invalid.
+        const contentLines = linkM
+          ? s.lines.filter((_, index) => index !== firstIndex)
+          : s.lines;
+        const content = renderInner(contentLines.join("\n"));
         const inner = `<div class="doc-card-title">${escapeHtml(s.title)}</div><div class="doc-card-body">${content}</div>`;
         return href
           ? `<a class="doc-card" href="${escapeHtml(href)}">${inner}</a>`
@@ -757,13 +764,19 @@ export function postProcessHtml(html, plainTextForReading) {
       /<div class="doc-toc-list"><\/div>/g,
       `<div class="doc-toc-list">${tocItems}</div>`
     );
-    const h2 = headings.filter((h) => h.level === 2);
-    const anchorItems = h2
-      .map((h) => `<a href="#${escapeHtml(h.id)}">${escapeHtml(h.text)}</a>`)
-      .join("");
+
     html = html.replace(
-      /<div class="doc-anchors-list"><\/div>/g,
-      `<div class="doc-anchors-list">${anchorItems}</div>`
+      /(<nav class="doc-anchors" data-doc-anchors="([^"]+)"[^>]*>\s*<div class="doc-anchors-title">Jump to<\/div>\s*<div class="doc-anchors-list">)<\/div>(\s*<\/nav>)/g,
+      (_match, prefix, requestedLevel, suffix) => {
+        const level = String(requestedLevel || "h2").toLowerCase();
+        const selected = level === "h3"
+          ? headings.filter((h) => h.level === 3)
+          : headings.filter((h) => h.level === 2);
+        const anchorItems = selected
+          .map((h) => `<a href="#${escapeHtml(h.id)}">${escapeHtml(h.text)}</a>`)
+          .join("");
+        return `${prefix}${anchorItems}</div>${suffix}`;
+      }
     );
   }
   return html;
