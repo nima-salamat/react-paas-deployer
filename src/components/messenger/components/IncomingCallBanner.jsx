@@ -10,6 +10,7 @@ import CallIcon from "@mui/icons-material/Call";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import PersonIcon from "@mui/icons-material/Person";
+import CloseIcon from "@mui/icons-material/Close";
 import { alpha } from "@mui/material/styles";
 
 const DEFAULT_RING_MS = 30000;
