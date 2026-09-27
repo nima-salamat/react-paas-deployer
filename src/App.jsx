@@ -399,7 +399,7 @@ export function App({ prerender = false }) {
                 element={<Home />}
               />
 
-              <Route path="dashboard" element={<Dashboard />}>
+              <Route path="dashboard" element={<Dashboard themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}>
                 <Route index element={<Navigate to="services" replace />} />
                 <Route path="services" element={<Services />} />
                 <Route path="networks" element={<Networks />} />
@@ -452,6 +452,7 @@ export function App({ prerender = false }) {
               path="/docs/*"
               element={
                 <DocsHome
+                  themeMode={themeMode}
                   onThemeModeChange={handleThemeModeChange}
                 />
               }
