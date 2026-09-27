@@ -32,6 +32,7 @@ export const DOCS_HELP_ITEMS = [
   { id: "nav", group: "Structure", label: "Page nav", icon: "⇔", help: "Previous / next page links (slug|Title).", syntax: ":::nav prev=intro|Introduction next=auth|Authentication\n:::", snippet: ":::nav prev=intro|Introduction next=auth|Authentication\n:::\n", aiHint: "Use :::nav only for custom previous/next destinations; normal sequential navigation is provided by the Docs UI." },
   { id: "steps", group: "Structure", label: "Steps", icon: "1", help: "Numbered procedure steps.", syntax: ":::steps\n1. Title\n   Detail\n2. Next\n:::", snippet: ":::steps\n1. Install\n   Run the installer.\n2. Configure\n3. Run\n:::\n", aiHint: "Procedures → :::steps." },
   { id: "tabs", group: "Structure", label: "Tabs", icon: "◫", help: "Tabbed panels. Supports nested documentation components. Prefer === Title; --- Title is also accepted inside :::tabs.", syntax: ":::tabs\n=== JS\n...\n=== Python\n...\n:::", snippet: ":::tabs\n=== JavaScript\n`npm i pkg`\n=== Python\n`pip install pkg`\n:::\n", aiHint: "Same content in multiple variants → :::tabs. Use === panel titles; nested directives are allowed." },
+  { id: "style", group: "Structure", label: "Element styling", icon: "✦", help: "Safe presentation presets and layout options for documentation blocks. Unknown values keep the default renderer style. class= creates a custom CSS hook.", syntax: ":::style style=soft align=center width=wide\nContent\n:::", snippet: ":::style style=hero align=center spacing=compact\n## Highlighted section\nContent styled without changing the default renderer.\n:::\n", aiHint: "Use style= or variant= on directives/fences when a block needs a different presentation. For ordinary Markdown, wrap the content in :::style ... :::. Options: align, width, spacing, radius, border, shadow, tone, class." },
   { id: "details", group: "Structure", label: "Accordion", icon: "▾", help: "Collapsible details/summary.", syntax: ":::details Title\nContent\n:::", snippet: ":::details FAQ\nAnswer here.\n:::\n", aiHint: "Optional deep-dives → :::details." },
   { id: "cards", group: "Structure", label: "Cards", icon: "▦", help: "Feature card grid. Panels with === Title", syntax: ":::cards\n=== Title\nBody\n:::", snippet: ":::cards\n=== Feature A\nDescription\n=== Feature B\nDescription\n:::\n", aiHint: "Feature summaries → :::cards." },
   { id: "compare", group: "Structure", label: "Compare", icon: "▥", help: "Side-by-side columns.", syntax: ":::compare A | B\n=== A\n...\n=== B\n...\n:::", snippet: ":::compare Free | Pro\n=== Free\n- Basic\n=== Pro\n- Advanced\n:::\n", aiHint: "Plans → :::compare." },
@@ -237,6 +238,20 @@ STRUCTURE DIRECTIVES
   :::
   Tabs also accept --- Panel title, but prefer === for clarity.
   Nested directives/components are supported inside tab panels.
+- Styling / presentation
+  - Custom directives support presentation attributes such as style=PRESET or variant=PRESET.
+  - Built-in presets: default, subtle, soft, elevated, outline, flat, compact, spacious, accent, muted, hero.
+  - Layout options: align=left|center|right|justify, width=narrow|normal|wide|full, spacing=none|compact|normal|loose.
+  - Visual options: radius=none|sm|md|lg, border=none|subtle|accent|strong, shadow=none|soft|strong, tone=neutral|primary|success|warning|danger.
+  - class= adds a sanitized custom hook prefixed with doc-user-. It never executes CSS or JavaScript.
+  - Unknown style values are ignored, so the component falls back to its normal default style.
+  - Use :::style to give an explicit presentation scope to ordinary Markdown:
+    :::style style=hero width=wide
+    ## Section
+    Paragraph, list, table, image, or other Markdown.
+    :::
+  - Fenced code and special fences accept the same presentation attributes after the language, for example: fenced code with js style=compact radius=sm.
+  - Do not put arbitrary raw CSS into Markdown; use the documented presets/options or a project CSS rule targeting a doc-user-* hook.
 - :::details Title
   Content
   :::
@@ -392,6 +407,7 @@ AUTHORING RULES
 - Use tabs when multiple variants solve the same task and the reader chooses one.
 - Use code-group when comparing related files.
 - Use a 2D plot when the mathematical relationship itself is easier to understand visually.
+- Use presentation styles only when they improve hierarchy or readability; do not style every block unnecessarily.
 - Keep examples internally consistent with the surrounding explanation.
 - Do not mention undocumented features as if they exist.
 - Do not add navigation, front matter, or metadata solely because this skill document mentions them.
