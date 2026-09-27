@@ -8,7 +8,7 @@ import DashboardSidebar, { SIDEBAR_WIDTH } from "./DashboardSidebar.jsx";
  * Dashboard shell: shared navbar + sidebar. Child routes render in the content area.
  * Service detail is intentionally outside this layout (has its own chrome).
  */
-export default function Dashboard() {
+export default function Dashboard({ themeMode, onThemeModeChange }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
 
@@ -34,7 +34,11 @@ export default function Dashboard() {
         flexDirection: "column",
       }}
     >
-      <DashboardNavbar onMenuClick={() => setMobileOpen(true)} />
+      <DashboardNavbar
+        onMenuClick={() => setMobileOpen(true)}
+        themeMode={themeMode}
+        onThemeModeChange={onThemeModeChange}
+      />
 
       <Box
         sx={{
