@@ -58,6 +58,31 @@ const allowedThemeModes = new Set([
 const normalizeThemeMode = (value) =>
   allowedThemeModes.has(value) ? value : null;
 
+const getInitialThemeMode = () => {
+  if (typeof window === "undefined") return "system";
+
+  try {
+    return normalizeThemeMode(
+      window.localStorage.getItem(THEME_STORAGE_KEY)
+    ) || "system";
+  } catch {
+    return "system";
+  }
+};
+
+const getInitialSystemTheme = () => {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function"
+  ) {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+
+  return "light";
+};
+
 function LegacyServiceRedirect() {
   const { id } = useParams();
   return <Navigate to={`/dashboard/services/${id}`} replace />;
@@ -94,7 +119,7 @@ function RouteScrollManager() {
 
 const Layout = ({
   themeMode,
-  setThemeMode,
+  onThemeModeChange,
 }) => {
   const location = useLocation();
   const isDashboardSpace =
@@ -132,7 +157,7 @@ const Layout = ({
       {!isDashboardSpace && (
         <Navbar
           themeMode={themeMode}
-          onThemeModeChange={setThemeMode}
+          onThemeModeChange={onThemeModeChange}
           isAuthPage={isAuthPage}
         />
       )}
@@ -160,25 +185,10 @@ const Layout = ({
 };
 
 export function App({ prerender = false }) {
-  const [themeMode, setThemeMode] = useState("system");
-
-  const [systemTheme, setSystemTheme] = useState("light");
+  const [themeMode, setThemeMode] = useState(getInitialThemeMode);
+  const [systemTheme, setSystemTheme] = useState(getInitialSystemTheme);
 
   useEffect(() => {
-    try {
-      const stored = normalizeThemeMode(
-        window.localStorage.getItem(
-          THEME_STORAGE_KEY
-        )
-      );
-
-      if (stored) {
-        setThemeMode(stored);
-      }
-    } catch {
-      // Ignore localStorage errors.
-    }
-
     if (
       typeof window !== "undefined" &&
       window.matchMedia
@@ -225,6 +235,19 @@ export function App({ prerender = false }) {
 
     return undefined;
   }, []);
+
+  const handleThemeModeChange = (nextMode) => {
+    const normalized = normalizeThemeMode(nextMode);
+    if (!normalized || normalized === themeMode) return;
+
+    setThemeMode(normalized);
+
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, normalized);
+    } catch {
+      // Ignore localStorage errors.
+    }
+  };
 
   const resolvedMode =
     themeMode === "system"
@@ -365,8 +388,8 @@ export function App({ prerender = false }) {
               element={
                 <Layout
                   themeMode={themeMode}
-                  setThemeMode={
-                    setThemeMode
+                  onThemeModeChange={
+                    handleThemeModeChange
                   }
                 />
               }
@@ -416,8 +439,22 @@ export function App({ prerender = false }) {
             </Route>
 
             {/* Documentation workspace — intentionally outside the public site layout */}
-            <Route path="/docs" element={<DocsHome />} />
-            <Route path="/docs/:slug" element={<DocsHome />} />
+            <Route
+              path="/docs"
+              element={
+                <DocsHome
+                  onThemeModeChange={handleThemeModeChange}
+                />
+              }
+            />
+            <Route
+              path="/docs/:slug"
+              element={
+                <DocsHome
+                  onThemeModeChange={handleThemeModeChange}
+                />
+              }
+            />
 
             {/* Messenger */}
 
@@ -427,7 +464,7 @@ export function App({ prerender = false }) {
                 <MessengerApp
                   themeMode={themeMode}
                   onThemeModeChange={
-                    setThemeMode
+                    handleThemeModeChange
                   }
                 />
               }
