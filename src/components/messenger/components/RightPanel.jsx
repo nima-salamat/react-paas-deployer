@@ -218,44 +218,6 @@ export default function RightPanel({
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
             </ListItemButton>
-            <Box sx={{ px: 2, py: 1.25 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14.5, mb: 0.75 }}>
-                Theme
-              </Typography>
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                fullWidth
-                value={themeMode}
-                onChange={(_, next) => {
-                  if (!next || next === themeMode) return;
-                  if (typeof onThemeModeChange === "function") onThemeModeChange(next);
-                }}
-                aria-label="Theme mode"
-                sx={{
-                  "& .MuiToggleButton-root": {
-                    textTransform: "none",
-                    fontWeight: 600,
-                    fontSize: 12.5,
-                    py: 0.75,
-                    gap: 0.5,
-                  },
-                }}
-              >
-                <ToggleButton value="light" aria-label="Light">
-                  <LightModeOutlinedIcon sx={{ fontSize: 18 }} />
-                  Light
-                </ToggleButton>
-                <ToggleButton value="dark" aria-label="Dark">
-                  <DarkModeOutlinedIcon sx={{ fontSize: 18 }} />
-                  Dark
-                </ToggleButton>
-                <ToggleButton value="system" aria-label="System">
-                  <SettingsBrightnessOutlinedIcon sx={{ fontSize: 18 }} />
-                  System
-                </ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
             <ListItemButton onClick={onOpenAppearance} sx={itemSx}>
               <ListItemIcon><PaletteOutlinedIcon fontSize="small" /></ListItemIcon>
               <ListItemText
