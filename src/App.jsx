@@ -443,6 +443,7 @@ export function App({ prerender = false }) {
               path="/docs"
               element={
                 <DocsHome
+                  themeMode={themeMode}
                   onThemeModeChange={handleThemeModeChange}
                 />
               }
