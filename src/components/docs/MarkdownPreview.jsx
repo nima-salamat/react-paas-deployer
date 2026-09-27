@@ -113,17 +113,31 @@ function wireInlineCopy(root) {
 function wireTabs(root) {
   const groups = Array.from(root.querySelectorAll("[data-doc-tabs]"));
   return groups.map((group) => {
+    // Only operate on this group's own tab list/panels. Using a broad
+    // descendant selector here also catches nested tabs and lets a parent
+    // tab group accidentally hide or activate a child's panels.
+    const tabList = Array.from(group.children).find((child) =>
+      child.classList.contains("doc-tabs-list")
+    );
+    const panelList = Array.from(group.children).find((child) =>
+      child.classList.contains("doc-tabs-panels")
+    );
+    if (!tabList || !panelList) return () => {};
+
+    const tabs = Array.from(tabList.querySelectorAll(":scope > .doc-tab"));
+    const panels = Array.from(panelList.querySelectorAll(":scope > .doc-tab-panel"));
+
     const handler = (event) => {
       const btn = event.target.closest(".doc-tab");
-      if (!btn || !group.contains(btn)) return;
+      if (!btn || !tabList.contains(btn) || !tabs.includes(btn)) return;
       const target = btn.getAttribute("data-tab-target");
-      group.querySelectorAll(".doc-tab").forEach((t) => {
+      tabs.forEach((t) => {
         const active = t === btn;
         t.classList.toggle("is-active", active);
         t.setAttribute("aria-selected", active ? "true" : "false");
         t.setAttribute("tabindex", active ? "0" : "-1");
       });
-      group.querySelectorAll(".doc-tab-panel").forEach((p) => {
+      panels.forEach((p) => {
         const active = p.id === target;
         p.classList.toggle("is-active", active);
         p.hidden = !active;
