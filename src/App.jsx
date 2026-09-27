@@ -477,9 +477,7 @@ export function App({ prerender = false }) {
               element={
                 <MessengerApp
                   themeMode={themeMode}
-                  onThemeModeChange={
-                    setThemeMode
-                  }
+                  onThemeModeChange={handleThemeModeChange}
                 />
               }
             />
@@ -488,7 +486,7 @@ export function App({ prerender = false }) {
 
             <Route
               path="/admin"
-              element={<AdminDashboard />}
+              element={<AdminDashboard themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}
             />
 
             <Route
