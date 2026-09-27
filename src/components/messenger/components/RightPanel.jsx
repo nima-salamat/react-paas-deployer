@@ -672,6 +672,7 @@ export default function RightPanel({
           onUnblock={onUnblock}
           onVoiceCall={onVoiceCall}
           onVideoCall={onVideoCall}
+          isSelf={String(profileData?.id) === String(meId)}
         />
       </Box>
     );
