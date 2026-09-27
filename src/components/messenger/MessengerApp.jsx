@@ -2042,8 +2042,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
       exitConfirmRef.current = false;
       setExitHint(false);
-      stopAllMedia();
-      navigate(-1);
+      requestMessengerExit(() => {
+        stopAllMedia();
+        navigate(-1);
+      });
     };
 
     window.addEventListener("popstate", onPopState);
@@ -2056,8 +2058,16 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     readersMessage, videoEditFile, cropFile, mediaSettingsOpen, stopAllMedia, navigate,
     msgSearchOpen, dayJumpOpen, ctx, reactAnchor, confirmDelete, confirmBlock, confirmLeave,
     confirmCleanup, joinConfirm, forwardOpen, joinOpen, addMemberOpen, createGroupOpen,
-    selectionMode, editingMsg, replyTo,
+    selectionMode, editingMsg, replyTo, requestMessengerExit,
   ]);
+
+  useEffect(() => {
+    if (!callConfig && callExitConfirmOpen) {
+      pendingMessengerExitRef.current = null;
+      setCallExitConfirmOpen(false);
+      setCallExitBusy(false);
+    }
+  }, [callConfig, callExitConfirmOpen]);
 
   // Stop media when Messenger unmounts
   useEffect(() => {
@@ -4678,7 +4688,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               });
             }}
             onCreateGroup={() => setCreateGroupOpen(true)}
-            onNavigateHome={() => navigate("/")}
+            onNavigateHome={() => requestMessengerExit(() => navigate("/"))}
           />
         </Box>
       ) : (
@@ -5295,7 +5305,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       onOpenJoin={() => setJoinOpen(true)}
       onOpenSettings={() => pushPanel("settings")}
       onOpenMyRequests={() => { loadMyJoinRequests(); pushPanel("my-requests"); }}
-      onNavigateHome={() => navigate("/")}
+      onNavigateHome={() => requestMessengerExit(() => navigate("/"))}
       onlineUsers={onlineUsers}
       audioPlayer={audioPlayer}
       onAudioPlayerChange={setAudioPlayer}
@@ -5431,6 +5441,38 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
           to paint (fixed escapes). No second instance. */}
 
       </Box>{/* end main flex row under player */}
+
+      {/* Confirm leaving Messenger while an active call is running */}
+      <Dialog
+        open={callExitConfirmOpen}
+        onClose={callExitBusy ? undefined : cancelMessengerExit}
+        fullWidth
+        maxWidth="xs"
+        disableEscapeKeyDown={callExitBusy}
+        PaperProps={{ sx: { borderRadius: 2, overflow: "hidden" } }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          You are currently in a call
+        </DialogTitle>
+        <DialogContent sx={{ pt: 0 }}>
+          <Typography color="text.secondary">
+            Do you want to leave Messenger? The current call will be ended.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={cancelMessengerExit} disabled={callExitBusy}>
+            Stay
+          </Button>
+          <Button
+            onClick={confirmMessengerExit}
+            variant="contained"
+            color="error"
+            disabled={callExitBusy}
+          >
+            {callExitBusy ? "Ending call…" : "Leave & End Call"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Centered settings / panel modal (with back-button navigation) */}
       <Dialog
