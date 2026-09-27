@@ -242,6 +242,15 @@ export function expandCustomInline(html) {
  * renderInner(md) renders nested markdown.
  */
 export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
+  // :::style / :::styled — apply a presentation preset to arbitrary Markdown.
+  if (/^:::(?:style|styled)\b/i.test(trimmed)) {
+    const { body, nextIndex } = collectUntilClose(lines, i + 1);
+    return {
+      html: `<div class="doc-style-scope">${renderInner(body.join("\n"))}</div>`,
+      nextIndex,
+    };
+  }
+
   // :::plot / :::math-plot
   if (/^:::(?:plot|math-plot)\\s*$/i.test(trimmed)) {
     const { body, nextIndex } = collectUntilClose(lines, i + 1);
