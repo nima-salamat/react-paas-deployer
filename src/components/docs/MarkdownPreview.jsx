@@ -157,6 +157,10 @@ function wireTabs(root) {
         const active = panel === targetPanel;
         panel.classList.toggle("is-active", active);
         panel.hidden = !active;
+        // Also set the inline display state. Documentation CSS is intentionally
+        // broad and can contain nested styles; the inline value makes the
+        // visibility switch deterministic in both public docs and the editor.
+        panel.style.display = active ? "block" : "none";
       });
 
       if (focus) {
