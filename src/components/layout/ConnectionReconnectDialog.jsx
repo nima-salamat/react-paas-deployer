@@ -65,18 +65,29 @@ async function probeBackendConnection() {
 
   const url = `${API_HOST}/api/users/user/`;
   const token = localStorage.getItem("access");
-  const controller =
-    typeof AbortController === "function" ? new AbortController() : null;
-  const timeoutId = controller
-    ? window.setTimeout(() => controller.abort(), 5000)
-    : null;
+
+  const fetchProbe = async (options = {}) => {
+    const controller =
+      typeof AbortController === "function" ? new AbortController() : null;
+    const timeoutId = controller
+      ? window.setTimeout(() => controller.abort(), 5000)
+      : null;
+
+    try {
+      return await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+        ...options,
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }
+  };
 
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      cache: "no-store",
+    const response = await fetchProbe({
       headers: token ? { Authorization: `Bearer ${token}` } : {},
-      ...(controller ? { signal: controller.signal } : {}),
     });
 
     // 401/403 still prove that the API is reachable. 5xx means the
@@ -84,20 +95,16 @@ async function probeBackendConnection() {
     return response.status < 500;
   } catch {
     // A CORS failure can happen even while the API host is reachable.
-    // A no-cors request gives us a network-level reachability fallback.
+    // Use a fresh controller for the network-level fallback so a timeout
+    // from the first probe cannot poison the second attempt.
     try {
-      const response = await fetch(url, {
-        method: "GET",
+      const response = await fetchProbe({
         mode: "no-cors",
-        cache: "no-store",
-        ...(controller ? { signal: controller.signal } : {}),
       });
       return response.type === "opaque" || response.status < 500;
     } catch {
       return false;
     }
-  } finally {
-    if (timeoutId) window.clearTimeout(timeoutId);
   }
 }
 
