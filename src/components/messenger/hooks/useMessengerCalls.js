@@ -234,6 +234,13 @@ export default function useMessengerCalls({
 
   const startCall = useCallback(async ({ video = false, audio = true } = {}) => {
     if (!activeId) return;
+    const activeConversation =
+      activeDetail || conversationsRef.current.find((c) => String(c.id) === String(activeId));
+    const activePeer = activeConversation?.type === "private" ? peerUser(activeConversation, meId) : null;
+    if (activePeer?.id != null && meId != null && String(activePeer.id) === String(meId)) {
+      flash("You can't call yourself.");
+      return;
+    }
     if (callConfigRef.current || incomingCallRef.current) {
       flash("You're already handling a call");
       return;
@@ -281,6 +288,10 @@ export default function useMessengerCalls({
 
   const startCallWithUser = useCallback(async (user, opts = {}) => {
     if (!user?.id) return;
+    if (meId != null && String(user.id) === String(meId)) {
+      flash("You can't call yourself.");
+      return;
+    }
     if (callConfigRef.current || incomingCallRef.current) {
       flash("You're already handling a call");
       return;
