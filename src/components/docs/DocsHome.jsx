@@ -103,6 +103,25 @@ function isTypingTarget(target) {
   );
 }
 
+function findDocCategorySlugs(nodes, docId, trail = []) {
+  for (const node of nodes || []) {
+    const nextTrail = node.slug ? [...trail, node.slug] : trail;
+    if ((node.documents || []).some((doc) => String(doc.id) === String(docId))) {
+      return nextTrail;
+    }
+    const nested = findDocCategorySlugs(node.children || [], docId, nextTrail);
+    if (nested) return nested;
+  }
+  return [];
+}
+
+function buildDocHref(tree, doc) {
+  const categorySlugs = findDocCategorySlugs(tree, doc?.id);
+  const segments = [...categorySlugs, doc?.slug].filter(Boolean);
+  if (!segments.length) return "/docs";
+  return `/docs/${segments.map((part) => encodeURIComponent(part)).join("/")}`;
+}
+
 function formatReadingTime(content) {
   const words = String(content || "")
     .trim()
@@ -143,7 +162,7 @@ function BrandMark({ size = 36, sx = {} }) {
   );
 }
 
-function Tree({ nodes, selectedId, depth = 0, expanded, onToggle, onDocClick }) {
+function Tree({ nodes, selectedId, depth = 0, expanded, onToggle, onDocClick, getDocHref }) {
   if (!nodes?.length) return null;
 
   return (
@@ -219,7 +238,7 @@ function Tree({ nodes, selectedId, depth = 0, expanded, onToggle, onDocClick }) 
                       key={doc.id}
                       data-doc-id={doc.id}
                       component={RouterLink}
-                      to={`/docs/${doc.slug}`}
+                      to={getDocHref(doc)}
                       selected={isActive}
                       onClick={onDocClick}
                       sx={{
@@ -273,6 +292,7 @@ function Tree({ nodes, selectedId, depth = 0, expanded, onToggle, onDocClick }) 
                   expanded={expanded}
                   onToggle={onToggle}
                   onDocClick={onDocClick}
+                  getDocHref={getDocHref}
                 />
               </Box>
             </Collapse>
@@ -299,6 +319,7 @@ function SidebarContent({
   onGoHome,
   searchRef,
   containerRef,
+  getDocHref,
 }) {
   const activeId = selected?.id;
 
@@ -448,6 +469,7 @@ function SidebarContent({
               expanded={expanded}
               onToggle={onToggle}
               onDocClick={onOpenDoc}
+              getDocHref={getDocHref}
             />
             {allDocs
               .filter((doc) => !doc.category)
@@ -458,7 +480,7 @@ function SidebarContent({
                     key={doc.id}
                     data-doc-id={doc.id}
                     component={RouterLink}
-                    to={`/docs/${doc.slug}`}
+                    to={getDocHref(doc)}
                     selected={isActive}
                     onClick={onOpenDoc}
                     sx={{
@@ -544,7 +566,7 @@ function SidebarContent({
 }
 
 export default function DocsHome({ onThemeModeChange }) {
-  const { slug } = useParams();
+  const { categorySlug, slug } = useParams();
   const navigate = useNavigate();
   const muiTheme = useTheme();
   const prefersReducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -742,8 +764,10 @@ export default function DocsHome({ onThemeModeChange }) {
     return () => clearTimeout(timer);
   }, [mobileOpen]);
 
+  const getDocHref = useCallback((doc) => buildDocHref(tree, doc), [tree]);
+
   const chooseSearch = (doc) => {
-    navigate(`/docs/${doc.slug}`);
+    navigate(getDocHref(doc));
     setMobileOpen(false);
     setQ("");
   };
@@ -871,6 +895,15 @@ export default function DocsHome({ onThemeModeChange }) {
 
   const loading = treeLoading || (Boolean(slug) && docLoading && !selected);
 
+  useEffect(() => {
+    if (!selected || !tree.length) return;
+    const canonical = getDocHref(selected);
+    const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+    if (canonical !== currentPath) {
+      navigate(canonical, { replace: true });
+    }
+  }, [selected, tree, getDocHref, navigate, categorySlug, slug]);
+
   const sidebarProps = {
     tree,
     allDocs,
@@ -886,6 +919,7 @@ export default function DocsHome({ onThemeModeChange }) {
     onOpenDoc: chooseSearch,
     onGoHome: goHome,
     searchRef: desktopSearchRef,
+    getDocHref,
   };
 
   const headerBar = (
@@ -1192,7 +1226,7 @@ export default function DocsHome({ onThemeModeChange }) {
                         <Paper
                           key={doc.id}
                           component={RouterLink}
-                          to={`/docs/${doc.slug}`}
+                    to={getDocHref(doc)}
                           variant="outlined"
                           sx={{
                             p: 2.5,
@@ -1330,7 +1364,7 @@ export default function DocsHome({ onThemeModeChange }) {
                     {prevDoc ? (
                       <Paper
                         component={RouterLink}
-                        to={`/docs/${prevDoc.slug}`}
+                        to={getDocHref(prevDoc)}
                         variant="outlined"
                         sx={{
                           flex: 1,
@@ -1358,7 +1392,7 @@ export default function DocsHome({ onThemeModeChange }) {
                     {nextDoc && (
                       <Paper
                         component={RouterLink}
-                        to={`/docs/${nextDoc.slug}`}
+                        to={getDocHref(nextDoc)}
                         variant="outlined"
                         sx={{
                           flex: 1,
