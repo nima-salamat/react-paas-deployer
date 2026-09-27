@@ -150,6 +150,23 @@ export function expandCustomInline(html) {
  * renderInner(md) renders nested markdown.
  */
 export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
+  // :::plot / :::math-plot
+  if (/^:::(?:plot|math-plot)\\s*$/i.test(trimmed)) {
+    const { body, nextIndex } = collectUntilClose(lines, i + 1);
+    const raw = body.join("\\n");
+    return {
+      html:
+        '<div class="doc-math-plot" data-math-plot>' +
+        '<div class="doc-math-plot-header"><span class="doc-math-plot-heading">2D function plot</span></div>' +
+        '<pre class="doc-math-plot-source">' +
+        escapeHtml(raw) +
+        '</pre>' +
+        '<div class="doc-math-plot-render"></div>' +
+        '</div>',
+      nextIndex,
+    };
+  }
+
   // :::tabs
   if (/^:::tabs\s*$/i.test(trimmed)) {
     const { body, nextIndex } = collectUntilClose(lines, i + 1);
@@ -811,6 +828,17 @@ export function renderSpecialFence(langLower, raw, highlightCode) {
   }
   if (langLower === "math") {
     return `<div class="doc-math-block" data-math="${escapeHtml(raw)}"><code>${escapeHtml(raw)}</code></div>`;
+  }
+  if (langLower === "plot" || langLower === "math-plot") {
+    return (
+      '<div class="doc-math-plot" data-math-plot>' +
+      '<div class="doc-math-plot-header"><span class="doc-math-plot-heading">2D function plot</span></div>' +
+      '<pre class="doc-math-plot-source">' +
+      escapeHtml(raw) +
+      '</pre>' +
+      '<div class="doc-math-plot-render"></div>' +
+      '</div>'
+    );
   }
   return null;
 }
