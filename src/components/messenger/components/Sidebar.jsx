@@ -96,6 +96,7 @@ export default function Sidebar({
   meId, conversations, loadingConvs,
   conversationLoadError = false,
   onReloadConversations,
+  websocketConnected = false,
   activeId, openChat,
   isMobile = false,
   searchQ, setSearchQ, searchResults, searching,
@@ -244,7 +245,24 @@ export default function Sidebar({
         >
           <Avatar src={meAvatar || undefined} sx={{ width: 36, height: 36 }} />
         </IconButton>
-        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Messenger</Typography>
+        <Stack direction="row" spacing={0.7} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="subtitle1" fontWeight={700}>Messenger</Typography>
+          <Box
+            component="span"
+            aria-label={websocketConnected ? "Messenger connected" : "Messenger disconnected"}
+            title={websocketConnected ? "Connected" : "Disconnected"}
+            sx={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              flexShrink: 0,
+              bgcolor: websocketConnected ? "success.main" : "transparent",
+              border: "1.5px solid",
+              borderColor: websocketConnected ? "success.main" : "text.secondary",
+              boxShadow: websocketConnected ? "0 0 0 2px rgba(76, 175, 80, 0.10)" : "none",
+            }}
+          />
+        </Stack>
         <IconButton
           size="small"
           onClick={() => {
