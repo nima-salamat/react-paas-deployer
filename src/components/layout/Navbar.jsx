@@ -52,6 +52,7 @@ import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightnessOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
+import ThemeMenuButton from "./ThemeMenuButton.jsx";
 
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 
@@ -86,7 +87,6 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [userImage, setUserImage] = useState(null);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-  const [themeMenuAnchor, setThemeMenuAnchor] = useState(null);
 
   const firstItemRef = useRef(null);
   const authCheckStartedRef = useRef(false);
@@ -432,19 +432,6 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
     if (typeof onThemeModeChange === "function") onThemeModeChange(nextMode);
   };
 
-  const handleCompactThemeChange = (nextMode) => {
-    if (!nextMode || nextMode === themeMode) {
-      setThemeMenuAnchor(null);
-      return;
-    }
-    if (typeof onThemeModeChange === "function") onThemeModeChange(nextMode);
-    setThemeMenuAnchor(null);
-  };
-
-  const CurrentThemeIcon =
-    themeChoices.find((choice) => choice.value === themeMode)?.icon
-    || SettingsBrightnessOutlinedIcon;
-
   const drawerWidth = { xs: "88vw", sm: 360, md: 396 };
   const avatarSrc = userImage || DEFAULT_ICON;
   
@@ -638,54 +625,31 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
           </Stack>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <IconButton
-              onClick={(e) => setThemeMenuAnchor(e.currentTarget)}
-              aria-label="Change theme"
-              title={themeMode === "dark" ? "Dark theme" : themeMode === "light" ? "Light theme" : "System theme"}
-              sx={{
+            <ThemeMenuButton
+              themeMode={themeMode}
+              onThemeModeChange={onThemeModeChange}
+              tooltip={
+                themeMode === "dark"
+                  ? "Dark theme"
+                  : themeMode === "light"
+                    ? "Light theme"
+                    : "System theme"
+              }
+              buttonSx={{
                 display: { xs: "none", lg: "inline-flex" },
                 width: 40,
                 height: 40,
-                border: "1px solid",
                 borderColor: alpha(theme.palette.text.primary, 0.08),
                 bgcolor: alpha(theme.palette.background.paper, 0.2),
-                color: "text.secondary",
                 "&:hover": {
-                  bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.14 : 0.07),
+                  bgcolor: alpha(
+                    theme.palette.primary.main,
+                    theme.palette.mode === "dark" ? 0.14 : 0.07
+                  ),
                   color: "primary.main",
                 },
               }}
-            >
-              <CurrentThemeIcon fontSize="small" />
-            </IconButton>
-            <Menu
-              anchorEl={themeMenuAnchor}
-              open={Boolean(themeMenuAnchor)}
-              onClose={() => setThemeMenuAnchor(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-              transformOrigin={{ vertical: "top", horizontal: "right" }}
-              slotProps={{ paper: { sx: { minWidth: 160, borderRadius: 1.75 } } }}
-            >
-              {themeChoices.map((choice) => {
-                const ChoiceIcon = choice.icon;
-                const selected = choice.value === themeMode;
-                return (
-                  <MenuItem
-                    key={choice.value}
-                    selected={selected}
-                    onClick={() => handleCompactThemeChange(choice.value)}
-                  >
-                    <ListItemIcon>
-                      <ChoiceIcon fontSize="small" color={selected ? "primary" : undefined} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={choice.label}
-                      primaryTypographyProps={{ fontWeight: selected ? 800 : 500 }}
-                    />
-                  </MenuItem>
-                );
-              })}
-            </Menu>
+            />
 
             {!checkingAuth && loggedIn ? (
               <>
