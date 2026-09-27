@@ -560,7 +560,7 @@ function MessageComposer({
 
   text, setText, textVersion = 0, files, setFiles,
   replyTo, editingMsg, onCancelReplyOrEdit,
-  onSend, onPickImage, onPickVideo, onEditAttachment, inputRef, onKeyDown,
+  onSend, onPickImage, onPickVideo, onEditAttachment, onEditAudio, inputRef, onKeyDown,
   sendFilesTogether = true, setSendFilesTogether,
   mediaSpoiler = false, setMediaSpoiler,
   mediaViewOnce = false, setMediaViewOnce,
@@ -912,18 +912,34 @@ function MessageComposer({
         return;
       }
       const ts = Date.now();
-      const finish = (finalBlob, finalType) => {
-        const filename = mode === "video" ? `video_message_${ts}.webm` : `voice_${ts}.webm`;
-        const file = new File([finalBlob], filename, { type: finalType || recordedType });
-        flushSync(() => setFiles((prev) => [...prev, file]));
-        try { onSend?.(); } catch { /* */ }
-      };
+      const filename = mode === "video" ? `video_message_${ts}.webm` : `voice_${ts}.webm`;
+      const attachmentId = `recorded-${mode}-${ts}-${Math.random().toString(36).slice(2, 8)}`;
+      const rawFile = new File([blob], filename, { type: recordedType });
+      rawFile._messengerAttachmentId = attachmentId;
+
+      // Put the recorded file into the attachment strip immediately. Video-note
+      // square/canvas processing continues in the background instead of blocking
+      // the user from seeing or editing the new attachment.
+      if (mode === "video") rawFile._messengerProcessing = true;
+      flushSync(() => setFiles((prev) => [...prev, rawFile]));
+
       if (mode === "video") {
         cropVideoMessageToSquare(blob)
-          .then((cropped) => finish(cropped, cropped.type || recordedType))
-          .catch(() => finish(blob, recordedType));
-      } else {
-        finish(blob, recordedType);
+          .then((cropped) => {
+            const finalFile = new File([cropped], filename, { type: cropped.type || recordedType });
+            finalFile._messengerAttachmentId = attachmentId;
+            setFiles((prev) => prev.map((item) => (
+              item?._messengerAttachmentId === attachmentId ? finalFile : item
+            )));
+          })
+          .catch(() => {
+            setFiles((prev) => prev.map((item) => {
+              if (item?._messengerAttachmentId !== attachmentId) return item;
+              const fallback = new File([blob], filename, { type: recordedType });
+              fallback._messengerAttachmentId = attachmentId;
+              return fallback;
+            }));
+          });
       }
     };
     mediaRecorderRef.current = mr;
@@ -1606,7 +1622,9 @@ function MessageComposer({
     return `${m}:${r.toString().padStart(2, "0")}`;
   };
 
-  const canSend = Boolean(localText.trim() || files.length || editingMsg);
+  const hasPendingMedia = files.some((file) => Boolean(file?._messengerProcessing));
+  const hasComposeContent = Boolean(localText.trim() || files.length || editingMsg);
+  const canSend = hasComposeContent && !hasPendingMedia;
   const primaryMode = mediaMode; // "voice" | "video"
 
   /* ---------- locked / holding recording UI ---------- */
@@ -2084,9 +2102,11 @@ function MessageComposer({
               const url = thumbUrl(f);
               const isImg = f.type?.startsWith("image/");
               const isVid = f.type?.startsWith("video/");
+              const isAudio = f.type?.startsWith("audio/");
               const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || "");
               const isTxt = f.type === "text/plain" || /\.(txt|md|csv|log)$/i.test(f.name || "");
-              const canPreview = isImg || isVid || isPdf || isTxt;
+              const isProcessing = Boolean(f?._messengerProcessing);
+              const canPreview = (isImg || isVid || isAudio || isPdf || isTxt) && !isProcessing;
               return (
                 <Box
                   key={`${f.name}-${f.size}-${i}`}
@@ -2100,7 +2120,9 @@ function MessageComposer({
                 >
                   <Box
                     onClick={() => {
+                      if (isProcessing) return;
                       if ((isImg || isVid) && onEditAttachment) onEditAttachment(f, i);
+                      else if (isAudio && onEditAudio) onEditAudio(f, i);
                       else if (isPdf || isTxt) openFilePreview(f);
                     }}
                     sx={{
@@ -2113,6 +2135,27 @@ function MessageComposer({
                       cursor: canPreview ? "pointer" : "default",
                     }}
                   >
+                    {isProcessing && (
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 0.5,
+                          bgcolor: "rgba(0,0,0,0.48)",
+                          color: "#fff",
+                          zIndex: 1,
+                        }}
+                      >
+                        <CircularProgress size={24} color="inherit" />
+                        <Typography variant="caption" sx={{ fontSize: 9, fontWeight: 700 }}>
+                          Preparing…
+                        </Typography>
+                      </Box>
+                    )}
                     {url ? (
                       isVid ? (
                         <Box
@@ -2568,8 +2611,9 @@ function MessageComposer({
             </IconButton>
           </Tooltip>
         )}
-        {/* When there is something to send → Send. Otherwise Telegram-style media buttons. */}
-        {canSend ? (
+        {/* Keep Send visible while a recorded attachment is being prepared,
+            but disable it until every attachment is ready. */}
+        {hasComposeContent ? (
           <Box sx={{ position: "relative", display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
             {/* Tiny schedule badge in the corner between text input & Send — no layout height */}
             {scheduledFor && !editingMsg && (
@@ -2596,8 +2640,11 @@ function MessageComposer({
             )}
             <IconButton
               color="primary"
+              disabled={hasPendingMedia}
               title={
-                isMobile && !editingMsg
+                hasPendingMedia
+                  ? "Preparing attachment…"
+                  : isMobile && !editingMsg
                   ? (scheduledFor
                     ? `Scheduled: ${new Date(scheduledFor).toLocaleString()} · hold to change`
                     : "Tap to send · hold to schedule")
