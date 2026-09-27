@@ -31,7 +31,7 @@ export const DOCS_HELP_ITEMS = [
   { id: "meta", group: "Structure", label: "Meta bar", icon: "i", help: "Author, updated date, tags.", syntax: ":::meta author=Team updated=2026-08-31 tags=api,guide\n:::", snippet: ":::meta author=Team updated=2026-08-31 tags=api,guide\n:::\n", aiHint: "Add meta when useful." },
   { id: "nav", group: "Structure", label: "Page nav", icon: "⇔", help: "Previous / next page links (slug|Title).", syntax: ":::nav prev=intro|Introduction next=auth|Authentication\n:::", snippet: ":::nav prev=intro|Introduction next=auth|Authentication\n:::\n", aiHint: "End sequential guides with nav." },
   { id: "steps", group: "Structure", label: "Steps", icon: "1", help: "Numbered procedure steps.", syntax: ":::steps\n1. Title\n   Detail\n2. Next\n:::", snippet: ":::steps\n1. Install\n   Run the installer.\n2. Configure\n3. Run\n:::\n", aiHint: "Procedures → :::steps." },
-  { id: "tabs", group: "Structure", label: "Tabs", icon: "◫", help: "Tabbed panels. Each panel starts with === Title", syntax: ":::tabs\n=== JS\n...\n=== Python\n...\n:::", snippet: ":::tabs\n=== JavaScript\n`npm i pkg`\n=== Python\n`pip install pkg`\n:::\n", aiHint: "Same idea in multiple languages → :::tabs." },
+  { id: "tabs", group: "Structure", label: "Tabs", icon: "◫", help: "Tabbed panels. Supports nested documentation components. Prefer === Title; --- Title is also accepted inside :::tabs.", syntax: ":::tabs\n=== JS\n...\n=== Python\n...\n:::", snippet: ":::tabs\n=== JavaScript\n`npm i pkg`\n=== Python\n`pip install pkg`\n:::\n", aiHint: "Same content in multiple variants → :::tabs. Use === panel titles; nested directives are allowed." },
   { id: "details", group: "Structure", label: "Accordion", icon: "▾", help: "Collapsible details/summary.", syntax: ":::details Title\nContent\n:::", snippet: ":::details FAQ\nAnswer here.\n:::\n", aiHint: "Optional deep-dives → :::details." },
   { id: "cards", group: "Structure", label: "Cards", icon: "▦", help: "Feature card grid. Panels with === Title", syntax: ":::cards\n=== Title\nBody\n:::", snippet: ":::cards\n=== Feature A\nDescription\n=== Feature B\nDescription\n:::\n", aiHint: "Feature summaries → :::cards." },
   { id: "compare", group: "Structure", label: "Compare", icon: "▥", help: "Side-by-side columns.", syntax: ":::compare A | B\n=== A\n...\n=== B\n...\n:::", snippet: ":::compare Free | Pro\n=== Free\n- Basic\n=== Pro\n- Advanced\n:::\n", aiHint: "Plans → :::compare." },
@@ -52,6 +52,7 @@ export const DOCS_HELP_ITEMS = [
   { id: "html-block", group: "Code", label: ":::html block", icon: "<>", help: "Same as live HTML using a directive block.", syntax: ":::html\n<div>…</div>\n:::", snippet: ":::html\n<div style=\"padding:8px\">Inline HTML block</div>\n:::\n", aiHint: "Alternate to ```html-render." },
   { id: "mermaid", group: "Code", label: "Mermaid", icon: "⬡", help: "Diagrams via Mermaid (loaded in preview).", syntax: "```mermaid\nflowchart LR\n  A-->B\n```", snippet: "```mermaid\nflowchart LR\n  Client --> API --> DB\n```\n", aiHint: "Architecture → mermaid fence." },
   { id: "math", group: "Code", label: "Math", icon: "∑", help: "Math fence (rendered as preformatted math block).", syntax: "```math\nE = mc^2\n```", snippet: "```math\nE = mc^2\n```\n", aiHint: "Formulas → ```math." },
+  { id: "math-plot", group: "Math & Charts", label: "2D Function Plot", icon: "∿", help: "Client-rendered interactive 2D graph for safe mathematical functions. Supports multiple curves, x/y ranges, grid, title, hover coordinates, and zoom controls.", syntax: "```plot\nx = -10..10\ny = -5..15\ntitle = Quadratic\ny = x^2\ny = sin(x)\n```", snippet: "```plot\nx = -10..10\ny = -5..15\ntitle = Quadratic and sine\ny = x^2\ny = sin(x)\n```\n", aiHint: "Use ```plot for a 2D function chart. One expression per y = line; x/y ranges use a..b. Supported functions include sin, cos, tan, sqrt, abs, log, ln, exp, min, max, pow and constants pi/e/tau. Also available as :::plot ... ::: or ```math-plot." },
 
   // —— API / reference ——
   { id: "api", group: "API", label: "API endpoint", icon: "API", help: "Method + path badge.", syntax: ":::api GET /v1/users\nDescription\n:::", snippet: ":::api GET /v1/users\nReturns a paginated list of users.\n:::\n", aiHint: "Each endpoint :::api METHOD /path." },
@@ -91,62 +92,321 @@ export const DOCS_HELP_ITEMS = [
   { id: "i18n", group: "Content", label: "i18n note", icon: "文", help: "Other-language edition note.", syntax: ":::i18n fa\n:::", snippet: ":::i18n Persian\n:::\n", aiHint: "Other locales → :::i18n." },
 ];
 
-export const AI_WRITER_GUIDE = `You are writing developer documentation for a Docs-as-Code system.
+export const AI_WRITER_GUIDE = `You are using a documentation-writing SKILL for PassDeployer's Docs-as-Code system.
 
-OUTPUT RULES
-- Output ONLY Markdown this renderer understands (no React components).
-- Prefer: title, meta, reading-time, short intro, TOC, then ## sections.
-- Use the blocks below when they improve clarity. Do not invent new block names.
-- Match the user's language (Persian or English).
-- Close every ::: block with a line containing only :::
-- For tabs/cards/compare/code-group, start each panel with: === Panel title
+THIS IS AN INSTRUCTION LAYER, NOT THE TOPIC
+- This text describes how to use the documentation system and how to write output for it.
+- Do NOT turn this guide itself into an article unless the user explicitly asks for an article about this guide.
+- The user's notes/topic that appear after the final USER CONTENT marker are the subject to write about.
+- Use this skill silently to transform those notes into a polished documentation page.
+
+PRIMARY JOB
+- Produce a complete documentation article from the user's notes.
+- Return the actual article, not an explanation of how to write it.
+- Match the user's language unless the user explicitly requests another language.
+- Preserve technical facts from the supplied notes; do not invent APIs, commands, URLs, limits, or product behaviour.
+- Improve structure, clarity, examples, headings, tables, callouts, and diagrams when useful.
+
+OUTPUT CONTRACT
+- Output ONLY Markdown understood by the PassDeployer Docs renderer.
+- Do not output React, JSX, HTML applications, YAML front matter, JSON, or a commentary around the Markdown.
+- When the user asks for an .md file, output the raw Markdown file content directly. Do NOT wrap the entire file in a \`\`\`markdown fence.
+- Do not add a "Subject", "slug", "category", or other import metadata block at the top of an imported Markdown file unless the user explicitly asks for metadata.
+- The first non-empty line of an imported .md file becomes the article title. It may be either:
+  # Article title
+  or:
+  Article title
+  The importer consumes that first title line, so do not repeat it immediately as body content.
+- If the user gives rough notes rather than Markdown, convert them into the final page yourself.
+- Close every :::directive block with a line containing only :::.
+- Do not invent directive names or syntax.
+
+DOCUMENT URL / INFORMATION ARCHITECTURE
+- Public documentation lives under /docs.
+- An uncategorized article with slug x is normally addressed as:
+  /docs/x
+- An article with category slug y and article slug x is addressed as:
+  /docs/y/x
+- For nested categories, include every category slug in order:
+  /docs/parent-category/child-category/x
+- Category names and category slugs are different things. Use the actual slug supplied by the user/admin when constructing URLs; never silently invent a category slug.
+- Category assignment is managed by the Docs admin tree, not by Markdown front matter.
+- The Markdown file itself normally needs only its title and body.
+- When linking to another documentation page whose category path and slug are known, use the corresponding /docs/... URL.
+- Do not add category-path text to a page just to explain its URL unless the user asks for it.
+
+SLUG RULES
+- The admin has automatic slug generation.
+- By default the slug is derived from the title: lower-case, accents normalized, non-alphanumeric runs collapsed into a single dash, and leading/trailing dashes removed.
+- In normal use, do not hard-code a slug into the Markdown file; let the admin generate it from the title.
+- If the user explicitly provides a slug, preserve that exact intended slug and use it in links.
+- The admin also has an Auto Slug option and a manual slug field.
+- A manually edited slug is normalized to lower case, whitespace becomes dashes, invalid characters are removed, and repeated dashes are collapsed.
+- The import pipeline does NOT use YAML front matter to set the slug.
+
+IMPORTING A MARKDOWN FILE
+- A Markdown file can be imported directly into the Admin Docs editor.
+- The first non-empty line becomes the title; if it is an ATX heading, the heading markers are stripped.
+- The title line is removed from the body after import so it is not rendered twice.
+- If the file has no usable first line, the filename becomes the title.
+- Therefore, when preparing an importable .md file, put the intended article title on the first non-empty line.
+- Do not put YAML front matter before the title.
+- The Admin editor can then choose the category, adjust the slug, order, description, and publish state.
+
+PAGE NAVIGATION AND ORDER
+- The Docs UI already provides Previous / Next navigation at the bottom of articles using the article ordering in the Admin tree.
+- Do NOT add a :::nav block just to create ordinary sequential navigation.
+- Use :::nav only when the user specifically needs custom previous/next destinations that differ from the automatic article order.
+- Do not add "Next page", "Previous page", "Read the next article", or equivalent manual navigation text at the end of a normal page.
+- Use :::related when a page benefits from explicitly related links.
+- Do not duplicate navigation that the UI already provides.
+
+PAGE STRUCTURE
+A strong default page structure is:
+1. Title
+2. Short introduction / scope
+3. Optional :::meta
+4. Optional :::reading-time
+5. Optional :::toc
+6. ## / ### sections
+7. Examples / procedures / references as needed
+8. Optional :::related or :::feedback at the end
+Do not mechanically include every optional component. Use only what improves the page.
 
 STANDARD MARKDOWN
-- # ## ### headings, **bold** *italic* \`code\`, [label](url), ![alt](url)
-- Lists: - item, 1. item, - [ ] todo, - [x] done
-- Tables (GFM), > blockquote, --- horizontal rule
-- Definition list: Term on one line, next line ": definition"
+- Headings: #, ##, ###, ####, #####, ######
+- Inline: **bold**, *italic*, `code`, ~~strike~~
+- Links: [label](url)
+- Images: ![meaningful alt text](url)
+- Lists: - item, 1. item, task lists - [ ] / - [x]
+- Blockquotes: > text
+- Horizontal rule: ---
+- GFM tables:
+  | A | B |
+  | --- | --- |
+  | 1 | 2 |
+- Definition lists:
+  Term
+  : definition
+- Prefer descriptive links and meaningful alt text.
 
-GITHUB ALERTS (also render as callouts)
-- [!NOTE] [!TIP] [!IMPORTANT] [!WARNING] [!CAUTION]
-- Or blockquote form:
+GITHUB ALERTS
+- [!NOTE] neutral context
+- [!TIP] useful guidance
+- [!IMPORTANT] important constraints
+- [!WARNING] caution
+- [!CAUTION] destructive/high-risk warning
+- Quote form also works:
   > [!WARNING]
-  > message
+  > Be careful
+- Use alerts when they clarify risk or importance; do not overuse them.
 
 INLINE EXTENSIONS
-- [[kbd:Ctrl+K]] [[badge:success Label]] [[copy:value]] [[term:OAuth]]
-- ::audio[Title](url)  ::video[Title](url)
+- [[kbd:Ctrl+K]]
+- [[badge:success Stable]]
+- [[badge:warning Beta]]
+- [[badge:danger Deprecated]]
+- [[copy:value]]
+- [[term:OAuth]]
+- ::audio[Title](url)
+- ::video[Title](url)
 
-STRUCTURE
-- :::toc  :::anchors h2  :::breadcrumb A > B  :::reading-time
-- :::meta author=X updated=YYYY-MM-DD tags=a,b
-- :::nav prev=slug|Title next=slug|Title
-- :::steps (1. 2. 3.)  :::tabs  :::details Title  :::cards  :::compare L | R  :::timeline
+STRUCTURE DIRECTIVES
+- :::toc
+  :::
+- :::anchors h2
+  :::
+- :::breadcrumb Home > API > Auth
+  :::
+- :::reading-time
+  :::
+- :::meta author=Team updated=YYYY-MM-DD tags=api,guide
+  :::
+- :::steps
+  1. First
+     Details
+  2. Second
+  :::
+- :::tabs
+  === JavaScript
+  ...
+  === Python
+  ...
+  :::
+  Tabs also accept --- Panel title, but prefer === for clarity.
+  Nested directives/components are supported inside tab panels.
+- :::details Title
+  Content
+  :::
+- :::cards
+  === Feature A
+  Description
+  === Feature B
+  Description
+  :::
+- :::compare Free | Pro
+  === Free
+  ...
+  === Pro
+  ...
+  :::
+- :::timeline
+  2026-01-01 — Launch
+  Notes
+  :::
 
-CODE
-- \`\`\`js \`\`\`terminal \`\`\`output \`\`\`diff \`\`\`mermaid \`\`\`math \`\`\`html-render
-- :::html ... :::   :::code-group with === filename panels
+CODE / DIAGRAMS
+- Normal code fences:
+  \`\`\`js
+  code
+  \`\`\`
+- Supported special fences include:
+  terminal, console, shell-session, output, diff, mermaid, math, plot, math-plot.
+- \`\`\`math is a preformatted math block; it is not a graph.
+- \`\`\`mermaid renders a Mermaid diagram.
+- \`\`\`plot and \`\`\`math-plot render a 2D mathematical function graph.
+- :::html ... ::: and html-render fences are available for safe presentation HTML; scripts and dangerous HTML are stripped.
+- :::code-group
+  === index.js
+  \`\`\`js
+  export default 1
+  \`\`\`
+  === index.ts
+  \`\`\`ts
+  export default 1
+  \`\`\`
+  :::
+
+2D MATHEMATICAL FUNCTION PLOTS
+- Use a \`\`\`plot fence for actual 2D function charts.
+- Example:
+  \`\`\`plot
+  x = -10..10
+  y = -5..15
+  title = Quadratic and sine
+  y = x^2
+  y = sin(x)
+  \`\`\`
+- x = a..b controls the x-axis range.
+- y = a..b controls the y-axis range.
+- height = N controls chart height and is clamped to a safe range.
+- grid = false hides the grid; grid defaults to true.
+- title = ... adds a chart title.
+- Each remaining expression is one curve. Preferred syntax is y = expression.
+- A bare expression is also accepted, for example: x^2
+- Use explicit multiplication when clarity matters: 2*x, not a prose phrase.
+- Supported operators: +, -, *, /, ^, parentheses.
+- Supported constants include pi, e, tau.
+- Supported functions include sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, sqrt, cbrt, abs, exp, log, ln, log10, floor, ceil, round, sign, min, max, pow, sec, csc, cot.
+- Implicit multiplication such as 2x and 2(x+1) is accepted.
+- The renderer uses a restricted mathematical parser; do not put JavaScript, arbitrary function calls, or executable code in a plot expression.
+- Plots are rendered in both the public Docs page and the Admin editor live preview.
+- Hovering a graph shows x/y coordinates; zoom controls are available on the graph.
+- Use a plot only when a graph communicates something better than prose or a simple table.
+- For simple equations with no graph, use \`\`\`math instead.
 
 API / REFERENCE
 - :::api METHOD /path
-- :::env   KEY · required · default · description
-- :::props name · type · default · description
-- :::tree  :::matrix (✓/✗ table)
+  Description
+  :::
+- :::env
+  KEY · required · default · description
+  :::
+- :::props
+  name · type · default · description
+  :::
+- :::tree
+  src/
+    components/
+  :::
+- :::matrix
+  | Feature | Free | Pro |
+  | --- | --- | --- |
+  | API | ✓ | ✓ |
+  :::
 
-CALLOUTS
-- :::note :::tip :::warning :::danger
-- :::deprecated since=x use=y  :::security critical
-- :::best-practice :::example :::anti-example :::draft
-- :::changelog 1.0.0 2026-01-01
+CALLOUT DIRECTIVES
+- :::note ... :::
+- :::tip ... :::
+- :::warning ... :::
+- :::danger ... :::
+- :::deprecated since=2.0 use=newApi ... :::
+- :::security critical ... :::
+- :::best-practice ... :::
+- :::example ... :::
+- :::anti-example ... :::
+- :::draft ... :::
+- :::changelog 1.2.0 2026-08-01
+  - item
+  :::
 
-MEDIA / WIDGETS
-- :::figure  :::download /url Label  :::embed youtube ID  :::qr URL
-- :::spoiler Title  :::related  :::feedback  :::author @name
-- :::progress 70  :::date YYYY-MM-DD  :::i18n lang
+MEDIA
+- :::figure
+  ![Alt](url)
+  Caption
+  :::
+- :::download /files/spec.pdf API Spec PDF
+  :::
+- :::embed youtube VIDEO_ID
+  :::
+- :::embed vimeo VIDEO_ID
+  :::
+- :::qr https://example.com
+  :::
+- ::audio[Title](url)
+- ::video[Title](url)
 
-USER CONTENT (rewrite into polished docs using the options above):
+CONTENT DIRECTIVES
+- :::spoiler Answer
+  Content
+  :::
+- :::related
+  [Auth](/docs/auth) — tokens
+  [API](/docs/api) — endpoints
+  :::
+- :::feedback
+  :::
+- :::author @team
+  Bio
+  :::
+- :::progress 70
+  Roadmap complete
+  :::
+- :::date YYYY-MM-DD
+  :::
+- :::i18n lang
+  :::
+- :::draft
+  Work in progress
+  :::
+
+AUTHORING RULES
+- Prefer clear section hierarchy; do not skip from ## to #### without a reason.
+- Use short paragraphs and concrete examples.
+- Use code fences with the correct language whenever showing code.
+- Use tables for structured comparisons, not for ordinary prose.
+- Use callouts for important constraints rather than shouting in prose.
+- Use steps for procedures with a clear sequence.
+- Use tabs when multiple variants solve the same task and the reader chooses one.
+- Use code-group when comparing related files.
+- Use a 2D plot when the mathematical relationship itself is easier to understand visually.
+- Keep examples internally consistent with the surrounding explanation.
+- Do not mention undocumented features as if they exist.
+- Do not add navigation, front matter, or metadata solely because this skill document mentions them.
+- Do not output the skill instructions themselves as the article.
+
+FINAL CHECK BEFORE OUTPUT
+- Is the first non-empty line the intended title?
+- Is the result actual article content rather than an explanation of this skill?
+- Is every ::: block closed?
+- Are all internal /docs links consistent with category + slug when that information is known?
+- Did you avoid unnecessary :::nav because the UI already handles previous/next?
+- Did you avoid YAML front matter so the .md importer can read the title correctly?
+- If a graph is needed, is it written using the supported plot syntax?
+- Is the entire response valid Markdown for direct import?
+
+USER CONTENT / TOPIC TO WRITE ABOUT
 `;
-
 export function buildItemCopyText(item) {
   return [
     "# " + item.label,
