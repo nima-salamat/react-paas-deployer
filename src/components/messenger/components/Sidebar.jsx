@@ -18,6 +18,9 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GroupsIcon from "@mui/icons-material/Groups";
+import CallIcon from "@mui/icons-material/Call";
+import CallEndIcon from "@mui/icons-material/CallEnd";
+import VideocamIcon from "@mui/icons-material/Videocam";
 import { formatCallSystemLabel, parseCallSystemBody } from "../modules/callSystemMessage";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
@@ -100,6 +103,10 @@ export default function Sidebar({
   onOpenCreateGroup, onOpenJoin, onOpenSettings, onNavigateHome,
   onOpenMyRequests,
   onlineUsers,
+  incomingCall = null,
+  incomingCallBusy = false,
+  onAcceptIncomingCall,
+  onDeclineIncomingCall,
   audioPlayer, onAudioPlayerChange, onAudioStateChange, onGoToAudioTrack,
   showAudioPlayer = false,
   meAvatar = null,
@@ -599,6 +606,10 @@ export default function Sidebar({
               return visible.map((c) => {
                 const unread = formatUnread(c.unread_count);
                 const pinned = Boolean(c.is_pinned);
+                const isIncomingRinging =
+                  Boolean(incomingCall)
+                  && String(incomingCall.conversation_id) === String(c.id);
+                const incomingIsVideo = Boolean(incomingCall?.media?.video || incomingCall?.is_video);
                 return (
                   <ListItemButton
                     key={c.id}
@@ -610,7 +621,12 @@ export default function Sidebar({
                       borderRadius: 2.25,
                       py: 1.0,
                       px: 1,
-                      transition: "background-color 120ms ease, transform 120ms ease",
+                      border: "1px solid",
+                      borderColor: isIncomingRinging ? "success.main" : "transparent",
+                      bgcolor: isIncomingRinging
+                        ? (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.12 : 0.07)
+                        : undefined,
+                      transition: "background-color 120ms ease, transform 120ms ease, border-color 120ms ease",
                       "&:hover": { transform: "translateX(1px)" },
                       "&.Mui-selected": {
                         bgcolor: (t) => alpha(t.palette.primary.main, 0.11),
@@ -664,6 +680,56 @@ export default function Sidebar({
                         </Typography>
                       }
                     />
+                    {isIncomingRinging && (
+                      <Stack
+                        direction="row"
+                        spacing={0.35}
+                        alignItems="center"
+                        sx={{ flexShrink: 0, ml: 0.5 }}
+                        data-swipe-ignore="true"
+                      >
+                        <IconButton
+                          size="small"
+                          aria-label={incomingIsVideo ? "Accept incoming video call" : "Accept incoming call"}
+                          title={incomingIsVideo ? "Accept video call" : "Accept call"}
+                          disabled={incomingCallBusy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAcceptIncomingCall?.();
+                          }}
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            bgcolor: "success.main",
+                            color: "#fff",
+                            "&:hover": { bgcolor: "success.dark" },
+                            "&.Mui-disabled": { color: "#fff", bgcolor: "success.main", opacity: 0.55 },
+                          }}
+                        >
+                          {incomingIsVideo ? <VideocamIcon sx={{ fontSize: 16 }} /> : <CallIcon sx={{ fontSize: 16 }} />}
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          aria-label="Decline incoming call"
+                          title="Decline"
+                          disabled={incomingCallBusy}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeclineIncomingCall?.();
+                          }}
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            bgcolor: "error.main",
+                            color: "#fff",
+                            "&:hover": { bgcolor: "error.dark" },
+                            "&.Mui-disabled": { color: "#fff", bgcolor: "error.main", opacity: 0.55 },
+                          }}
+                        >
+                          <CallEndIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Stack>
+                    )}
                   </ListItemButton>
                 );
               });
