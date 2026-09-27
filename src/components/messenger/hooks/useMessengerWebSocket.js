@@ -36,6 +36,7 @@ export default function useMessengerWebSocket({
   markVisibleMessagesRead,
   profileDataRef,
   refreshProfileData,
+  setWebsocketConnected,
 }) {
   const onCallEventRef = useRef(onCallEvent);
   onCallEventRef.current = onCallEvent;
@@ -46,6 +47,16 @@ useEffect(() => {
   let reconnectTimer = null;
   let refreshing = false;
   let reconnectImmediately = false;
+
+  const markDisconnected = () => {
+    try { setWebsocketConnected?.(false); } catch { /* */ }
+  };
+
+  const markConnected = () => {
+    try { setWebsocketConnected?.(true); } catch { /* */ }
+  };
+
+  markDisconnected();
 
   const buildUrl = (tok) => `${WS_URL}?token=${encodeURIComponent(tok)}`;
 
@@ -430,6 +441,7 @@ useEffect(() => {
     const ws = new WebSocket(buildUrl(token));
     wsRef.current = ws;
     ws.onopen = () => {
+      markConnected();
       // Announce online presence so peers can see us (and we receive updates)
       try {
         ws.send(JSON.stringify({ type: "presence.update", online: true }));
@@ -443,6 +455,7 @@ useEffect(() => {
     };
     ws.onmessage = handleOnMessage;
     ws.onclose = (ev) => {
+      markDisconnected();
       clearInterval(pingTimer);
       if (cancelled) return;
 
@@ -477,6 +490,7 @@ useEffect(() => {
       reconnectTimer = setTimeout(connect, 3000);
     };
     ws.onerror = () => {
+      markDisconnected();
       if (ws.readyState === WebSocket.CLOSING || ws.readyState === WebSocket.CLOSED) return;
       try { ws.close(); } catch { /* */ }
     };
