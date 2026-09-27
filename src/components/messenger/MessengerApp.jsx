@@ -1810,7 +1810,45 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     flash,
     wsRef,
   });
-  useMessengerWebSocket({
+  const [callExitConfirmOpen, setCallExitConfirmOpen] = useState(false);
+  const [callExitBusy, setCallExitBusy] = useState(false);
+  const pendingMessengerExitRef = useRef(null);
+
+  const requestMessengerExit = useCallback((action) => {
+    if (callConfig) {
+      pendingMessengerExitRef.current = action;
+      setCallExitConfirmOpen(true);
+      return false;
+    }
+    action?.();
+    return true;
+  }, [callConfig]);
+
+  const cancelMessengerExit = useCallback(() => {
+    pendingMessengerExitRef.current = null;
+    setCallExitConfirmOpen(false);
+    setCallExitBusy(false);
+  }, []);
+
+  const confirmMessengerExit = useCallback(async () => {
+    if (callExitBusy) return;
+    const action = pendingMessengerExitRef.current;
+    pendingMessengerExitRef.current = null;
+    setCallExitBusy(true);
+
+    try {
+      await endActiveCall("ended");
+      setCallExitConfirmOpen(false);
+      setCallExitBusy(false);
+      action?.();
+    } catch (e) {
+      setCallExitBusy(false);
+      pendingMessengerExitRef.current = action;
+      setError(e?.response?.data?.message || e?.message || "Could not end the call");
+    }
+  }, [callExitBusy, endActiveCall]);
+
+    useMessengerWebSocket({
     meId,
     wsRef,
     activeIdRef,
