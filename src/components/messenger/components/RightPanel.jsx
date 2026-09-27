@@ -770,9 +770,11 @@ export default function RightPanel({
         <MenuItem onClick={() => { tUser?.id && onViewProfile(tUser.id); setMemberCtx(null); closeMemberMenu(); }}>
           <ListItemIcon><AccountCircleIcon fontSize="small" /></ListItemIcon> View profile
         </MenuItem>
-        <MenuItem onClick={() => { tUser?.id && onStartDm(tUser); setMemberCtx(null); closeMemberMenu(); }}>
-          <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Message
-        </MenuItem>
+        {!isMe && (
+          <MenuItem onClick={() => { tUser?.id && onStartDm(tUser); setMemberCtx(null); closeMemberMenu(); }}>
+            <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Message
+          </MenuItem>
+        )}
         {!isMe && isOwner && tRole !== "owner" && (
           <MenuItem onClick={() => { onChangeMemberRole(activeConv.id, tUser.id, tRole === "admin" ? "member" : "admin"); setMemberCtx(null); closeMemberMenu(); }}>
             <ListItemIcon><ShieldIcon fontSize="small" /></ListItemIcon>
