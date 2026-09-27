@@ -45,6 +45,7 @@ useEffect(() => {
   let pingTimer = null;
   let reconnectTimer = null;
   let refreshing = false;
+  let reconnectImmediately = false;
 
   const buildUrl = (tok) => `${WS_URL}?token=${encodeURIComponent(tok)}`;
 
@@ -444,6 +445,15 @@ useEffect(() => {
     ws.onclose = (ev) => {
       clearInterval(pingTimer);
       if (cancelled) return;
+
+      if (reconnectImmediately) {
+        reconnectImmediately = false;
+        if (localStorage.getItem("access")) {
+          reconnectTimer = setTimeout(connect, 50);
+        }
+        return;
+      }
+
       // 4401 = our backend's "auth failed" close code (see consumers.py).
       // Try to refresh the token and reconnect once.
       if (ev.code === 4401) {
@@ -482,9 +492,11 @@ useEffect(() => {
   const onReconnectRequested = () => {
     clearTimeout(reconnectTimer);
     clearInterval(pingTimer);
+    reconnectImmediately = true;
 
     const socket = wsRef.current;
     if (!socket || socket.readyState === WebSocket.CLOSED) {
+      reconnectImmediately = false;
       reconnectTimer = setTimeout(connect, 0);
       return;
     }
@@ -492,6 +504,7 @@ useEffect(() => {
     try {
       socket.close(4000, "client reconnect");
     } catch {
+      reconnectImmediately = false;
       reconnectTimer = setTimeout(connect, 0);
     }
   };
