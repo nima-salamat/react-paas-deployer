@@ -48,6 +48,7 @@ export default function ProfileView({
   onOpenChatInfo,
   onVoiceCall,
   onVideoCall,
+  isSelf = false,
 }) {
   const [galleryIndex, setGalleryIndex] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -186,11 +187,22 @@ export default function ProfileView({
           <Divider />
 
           {/* Primary actions */}
-          <Stack direction="row" spacing={0.8} sx={{ p: 1.25 }}>
-            <ActionButton icon={<MessageIcon />} label="Message" onClick={() => onMessage?.(profileData)} />
-            <ActionButton icon={<PhoneIcon />} label="Call" onClick={() => onVoiceCall?.(profileData)} />
-            <ActionButton icon={<VideocamIcon />} label="Video" onClick={() => onVideoCall?.(profileData)} />
-          </Stack>
+          {isSelf ? (
+            <Box sx={{ px: 2, py: 1.5, bgcolor: "action.hover", textAlign: "center" }}>
+              <Typography variant="body2" fontWeight={700}>
+                This is your profile
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                You can't message or call yourself.
+              </Typography>
+            </Box>
+          ) : (
+            <Stack direction="row" spacing={0.8} sx={{ p: 1.25 }}>
+              <ActionButton icon={<MessageIcon />} label="Message" onClick={() => onMessage?.(profileData)} />
+              <ActionButton icon={<PhoneIcon />} label="Call" onClick={() => onVoiceCall?.(profileData)} />
+              <ActionButton icon={<VideocamIcon />} label="Video" onClick={() => onVideoCall?.(profileData)} />
+            </Stack>
+          )}
         </Paper>
 
         {/* About / profile information */}
