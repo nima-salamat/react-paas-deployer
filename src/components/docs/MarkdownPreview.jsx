@@ -113,44 +113,104 @@ function wireInlineCopy(root) {
 
 function wireTabs(root) {
   const groups = Array.from(root.querySelectorAll("[data-doc-tabs]"));
+
   return groups.map((group) => {
-    // Only operate on this group's own tab list/panels. Using a broad
-    // descendant selector here also catches nested tabs and lets a parent
-    // tab group accidentally hide or activate a child's panels.
     const tabList = Array.from(group.children).find((child) =>
       child.classList.contains("doc-tabs-list")
     );
     const panelList = Array.from(group.children).find((child) =>
       child.classList.contains("doc-tabs-panels")
     );
+
     if (!tabList || !panelList) return () => {};
 
-    const tabs = Array.from(tabList.querySelectorAll(":scope > .doc-tab"));
-    const panels = Array.from(panelList.querySelectorAll(":scope > .doc-tab-panel"));
+    // Use direct children rather than :scope selectors. This keeps tab
+    // isolation reliable even when a tab contains nested custom components
+    // that render their own tabs.
+    const tabs = Array.from(tabList.children).filter((node) =>
+      node.classList.contains("doc-tab")
+    );
+    const panels = Array.from(panelList.children).filter((node) =>
+      node.classList.contains("doc-tab-panel")
+    );
 
-    const handler = (event) => {
-      const btn = event.target.closest(".doc-tab");
-      if (!btn || !tabList.contains(btn) || !tabs.includes(btn)) return;
+    if (!tabs.length || !panels.length) return () => {};
+
+    const activate = (btn, { focus = false } = {}) => {
+      if (!tabs.includes(btn)) return;
+
       const target = btn.getAttribute("data-tab-target");
-      tabs.forEach((t) => {
-        const active = t === btn;
-        t.classList.toggle("is-active", active);
-        t.setAttribute("aria-selected", active ? "true" : "false");
-        t.setAttribute("tabindex", active ? "0" : "-1");
+      const targetPanel = panels.find((panel) => panel.id === target);
+
+      // Ignore stale/invalid tab targets instead of leaving the group in a
+      // half-switched state.
+      if (!targetPanel) return;
+
+      tabs.forEach((tab) => {
+        const active = tab === btn;
+        tab.classList.toggle("is-active", active);
+        tab.setAttribute("aria-selected", active ? "true" : "false");
+        tab.setAttribute("tabindex", active ? "0" : "-1");
       });
-      panels.forEach((p) => {
-        const active = p.id === target;
-        p.classList.toggle("is-active", active);
-        p.hidden = !active;
+
+      panels.forEach((panel) => {
+        const active = panel === targetPanel;
+        panel.classList.toggle("is-active", active);
+        panel.hidden = !active;
       });
-      try {
-        btn.focus({ preventScroll: true });
-      } catch {
-        btn.focus();
+
+      if (focus) {
+        try {
+          btn.focus({ preventScroll: true });
+        } catch {
+          btn.focus();
+        }
       }
     };
-    group.addEventListener("click", handler);
-    return () => group.removeEventListener("click", handler);
+
+    const handlers = tabs.map((button, index) => {
+      const onClick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        activate(button);
+      };
+
+      const onKeyDown = (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+          return;
+        }
+
+        event.preventDefault();
+
+        let nextIndex = index;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % tabs.length;
+        if (event.key === "ArrowLeft") nextIndex = (index - 1 + tabs.length) % tabs.length;
+        if (event.key === "Home") nextIndex = 0;
+        if (event.key === "End") nextIndex = tabs.length - 1;
+
+        activate(tabs[nextIndex], { focus: true });
+      };
+
+      button.addEventListener("click", onClick);
+      button.addEventListener("keydown", onKeyDown);
+
+      return () => {
+        button.removeEventListener("click", onClick);
+        button.removeEventListener("keydown", onKeyDown);
+      };
+    });
+
+    // Normalize the initial server-rendered state. This also repairs cases
+    // where a previous render left multiple panels marked active.
+    const initialTab =
+      tabs.find((tab) => tab.classList.contains("is-active")) ||
+      tabs.find((tab) => tab.getAttribute("aria-selected") === "true") ||
+      tabs[0];
+    activate(initialTab);
+
+    return () => {
+      handlers.forEach((cleanup) => cleanup());
+    };
   });
 }
 
