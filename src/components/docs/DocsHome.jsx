@@ -555,6 +555,7 @@ export default function DocsHome({ onThemeModeChange }) {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [docLoading, setDocLoading] = useState(false);
+  const docRequestIdRef = useRef(0);
   const [q, setQ] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState({});
@@ -600,21 +601,36 @@ export default function DocsHome({ onThemeModeChange }) {
 
   const loadDoc = useCallback(
     async (targetSlug, cache) => {
+      const requestId = ++docRequestIdRef.current;
       if (!targetSlug) {
         setSelected(null);
+        setDocLoading(false);
         return;
       }
+
       setDocLoading(true);
       try {
         const detail = await apiRequest({
           url: `${hostBase()}/api/docs/public/${encodeURIComponent(targetSlug)}/`,
         });
+        // A user can click between articles faster than the network responds.
+        // Only the latest request may update the selected document.
+        if (requestId !== docRequestIdRef.current) return;
+        setError("");
         setSelected(detail?.data || null);
-      } catch {
+      } catch (err) {
+        if (requestId !== docRequestIdRef.current) return;
         const wanted = (cache || []).find((d) => d.slug === targetSlug) || null;
         setSelected(wanted);
+        if (!wanted) {
+          setError(
+            err?.response?.data?.detail || "Documentation page could not be loaded."
+          );
+        }
       } finally {
-        setDocLoading(false);
+        if (requestId === docRequestIdRef.current) {
+          setDocLoading(false);
+        }
       }
     },
     []
