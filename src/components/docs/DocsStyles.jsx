@@ -307,32 +307,57 @@ export default function DocsStyles() {
         ".docs-markdown-preview .doc-table-wrap, .docs-article .doc-table-wrap": {
           margin: "1.25em 0 1.5em",
           overflowX: "auto",
-          borderRadius: 2,
-          border: `1px solid ${border}`,
-          boxShadow: edgeLight,
-          background: surfaceRaised,
+          WebkitOverflowScrolling: "touch",
+          overscrollBehaviorX: "contain",
+          border: "none",
+          borderRadius: 0,
+          boxShadow: "none",
+          background: "transparent",
         },
         ".docs-markdown-preview table, .docs-article table": {
           width: "100%",
-          borderCollapse: "collapse",
+          borderCollapse: "separate",
+          borderSpacing: 0,
           fontSize: "0.94rem",
+          overflow: "hidden",
+          borderRadius: 14,
+          border: `1px solid ${border}`,
+          background: surfaceRaised,
+          boxShadow: edgeLight,
         },
         ".docs-markdown-preview th, .docs-article th": {
           textAlign: "left",
           fontWeight: 750,
           padding: "10px 14px",
           background: isDark ? "rgba(148,163,184,0.08)" : "rgba(15,23,42,0.04)",
+          borderRight: `1px solid ${border}`,
           borderBottom: `1px solid ${border}`,
           color: text,
         },
         ".docs-markdown-preview td, .docs-article td": {
           padding: "10px 14px",
+          borderRight: `1px solid ${border}`,
           borderBottom: `1px solid ${border}`,
           color: textSec,
           verticalAlign: "top",
         },
+        ".docs-markdown-preview th:last-child, .docs-article th:last-child, .docs-markdown-preview td:last-child, .docs-article td:last-child": {
+          borderRight: "none",
+        },
         ".docs-markdown-preview tr:last-child td, .docs-article tr:last-child td": {
           borderBottom: "none",
+        },
+        ".docs-markdown-preview thead tr:first-child th:first-child, .docs-article thead tr:first-child th:first-child": {
+          borderTopLeftRadius: 13,
+        },
+        ".docs-markdown-preview thead tr:first-child th:last-child, .docs-article thead tr:first-child th:last-child": {
+          borderTopRightRadius: 13,
+        },
+        ".docs-markdown-preview tbody tr:last-child td:first-child, .docs-article tbody tr:last-child td:first-child": {
+          borderBottomLeftRadius: 13,
+        },
+        ".docs-markdown-preview tbody tr:last-child td:last-child, .docs-article tbody tr:last-child td:last-child": {
+          borderBottomRightRadius: 13,
         },
 
         /* ── Callouts ─────────────────────────────────────────── */
