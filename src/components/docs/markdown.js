@@ -7,6 +7,7 @@ import {
   renderSpecialFence,
   postProcessHtml,
   tryDefinitionList,
+  decorateDocHtml,
 } from "./docComponents";
 
 export { escapeHtml, slugifyHeading };
@@ -401,34 +402,40 @@ export function renderMarkdown(markdown = "", options = {}) {
       if (isLiveHtml) {
         const safeHtml = sanitizeLiveHtml(raw);
         out.push(
-          `<div class="doc-html">` +
-            `<div class="doc-html-head"><span>Live HTML</span></div>` +
-            `<div class="doc-html-body">${safeHtml}</div>` +
-          `</div>`
+          decorateDocHtml(
+            `<div class="doc-html">` +
+              `<div class="doc-html-head"><span>Live HTML</span></div>` +
+              `<div class="doc-html-body">${safeHtml}</div>` +
+            `</div>`,
+            langRaw
+          )
         );
       } else if (isSpecialFence(langLower)) {
         const special = renderSpecialFence(langLower, raw, highlightCode);
-        if (special) out.push(special);
+        if (special) out.push(decorateDocHtml(special, langRaw));
       } else {
         const { highlighted, detectedLang } = highlightCode(raw, lang);
         const lineCount = Math.max(1, raw ? raw.split("\n").length : 1);
         const languageLabel = `<span class="doc-code-lang">${escapeHtml(lang || detectedLang || "text")}</span>`;
         out.push(
-          `<div class="doc-code" data-lang="${escapeHtml(detectedLang || "text")}">` +
-            `<div class="doc-code-head">` +
-            `<span class="doc-code-meta">${languageLabel}<span class="doc-code-lines">${lineCount} lines</span></span>` +
-            `<button type="button" class="doc-copy-btn" aria-label="Copy code" title="Copy code">` +
-              `<span class="doc-copy-icon" aria-hidden="true">` +
-                `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">` +
-                  `<rect x="9" y="9" width="11" height="11" rx="2"></rect>` +
-                  `<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>` +
-                `</svg>` +
-              `</span>` +
-              `<span class="doc-copy-label">Copy</span>` +
-            `</button>` +
-            `</div>` +
-            `<pre><code class="hljs language-${escapeHtml(detectedLang || "text")}">${highlighted}</code></pre>` +
-          `</div>`
+          decorateDocHtml(
+            `<div class="doc-code" data-lang="${escapeHtml(detectedLang || "text")}">` +
+              `<div class="doc-code-head">` +
+              `<span class="doc-code-meta">${languageLabel}<span class="doc-code-lines">${lineCount} lines</span></span>` +
+              `<button type="button" class="doc-copy-btn" aria-label="Copy code" title="Copy code">` +
+                `<span class="doc-copy-icon" aria-hidden="true">` +
+                  `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">` +
+                    `<rect x="9" y="9" width="11" height="11" rx="2"></rect>` +
+                    `<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>` +
+                  `</svg>` +
+                `</span>` +
+                `<span class="doc-copy-label">Copy</span>` +
+              `</button>` +
+              `</div>` +
+              `<pre><code class="hljs language-${escapeHtml(detectedLang || "text")}">${highlighted}</code></pre>` +
+            `</div>`,
+            langRaw
+          )
         );
       }
       i += 1;
@@ -465,7 +472,10 @@ export function renderMarkdown(markdown = "", options = {}) {
         flushParagraph();
         flushList();
         flushQuote();
-        out.push(dir.html);
+        out.push({
+          html: decorateDocHtml(dir.html, trimmed),
+          nextIndex: dir.nextIndex,
+        }.html);
         i = dir.nextIndex;
         continue;
       }
