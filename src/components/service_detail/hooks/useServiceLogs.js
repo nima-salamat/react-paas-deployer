@@ -219,6 +219,11 @@ export default function useServiceLogs({ serviceId, enabled }) {
       setReconnecting(false);
       setError(null);
       reconnectAttempt.current = 0;
+      try {
+        window.dispatchEvent(new Event("app-network-recovered"));
+      } catch {
+        /* noop */
+      }
     };
     socket.onmessage = (evt) => {
       if (pausedRef.current) return;
@@ -321,11 +326,27 @@ export default function useServiceLogs({ serviceId, enabled }) {
   );
 
   const retryConnection = useCallback(() => {
+    shouldReconnect.current = true;
     setError(null);
     setReconnecting(true);
     reconnectAttempt.current = 0;
     connectWs();
   }, [connectWs]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+
+    const onReconnectRequested = () => {
+      // connectWs() already closes the previous socket before opening the new
+      // one. This avoids a hard reload and preserves the current log/history UI.
+      retryConnection();
+    };
+
+    window.addEventListener("app-reconnect-requested", onReconnectRequested);
+    return () => {
+      window.removeEventListener("app-reconnect-requested", onReconnectRequested);
+    };
+  }, [enabled, retryConnection]);
 
   return {
     entries,
