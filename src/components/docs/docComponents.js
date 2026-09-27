@@ -76,12 +76,41 @@ export function collectUntilClose(lines, startIndex) {
   return { body, nextIndex: i };
 }
 
-/** Split body into sections by configurable marker syntax. */
+/** Split body into sections while ignoring nested directives and fenced code. */
 function splitSections(bodyLines, matcher) {
   const sections = [];
   let current = null;
+  let depth = 0;
+  let fence = null;
+
   for (const line of bodyLines) {
-    const m = matcher(line);
+    const trimmed = line.trim();
+
+    if (fence) {
+      if (current) current.lines.push(line);
+      if (trimmed.startsWith(fence)) fence = null;
+      continue;
+    }
+
+    if (/^(?:```|~~~)/.test(trimmed)) {
+      if (current) current.lines.push(line);
+      fence = trimmed.slice(0, 3);
+      continue;
+    }
+
+    if (/^:::[a-z]/i.test(trimmed)) {
+      depth += 1;
+      if (current) current.lines.push(line);
+      continue;
+    }
+
+    if (trimmed === ":::") {
+      if (current) current.lines.push(line);
+      if (depth > 0) depth -= 1;
+      continue;
+    }
+
+    const m = depth === 0 ? matcher(line) : null;
     if (m) {
       if (current) sections.push(current);
       current = { title: m[1].trim(), lines: [] };
@@ -92,6 +121,7 @@ function splitSections(bodyLines, matcher) {
       current = { title: "Section", lines: [line] };
     }
   }
+
   if (current) sections.push(current);
   return sections;
 }
