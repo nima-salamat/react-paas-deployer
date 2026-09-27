@@ -116,6 +116,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const nextAfterRef = useRef(null);
   const [nextBefore, setNextBefore] = useState(null);
   const [loadingConvs, setLoadingConvs] = useState(true);
+  const [conversationLoadError, setConversationLoadError] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const loadingMoreRef = useRef(false);
@@ -146,6 +147,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [newBelowCount, setNewBelowCount] = useState(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [scrollDownOpacity, setScrollDownOpacity] = useState(0);
+  const [scrollDownBottomOffset, setScrollDownBottomOffset] = useState(86);
   const scrollDownFadeTimerRef = useRef(null);
   const scrollDownDismissedRef = useRef(false);
   const userScrollIntentRef = useRef(false);
@@ -644,6 +646,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // Refs
   const bottomRef = useRef(null);
   const listRef = useRef(null);
+  const bottomBarRef = useRef(null);
   const wsRef = useRef(null);
   const inputRef = useRef(null);
   const searchTimer = useRef(null);
@@ -927,6 +930,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       const data = unwrapData(res);
       const next = data?.results || [];
+      if (!silent) setConversationLoadError(false);
       // Merge by id: keep previous object reference when payload is unchanged so
       // Sidebar Avatars do not remount / re-download on every silent refresh.
       setConversations((prev) => mergeConversations(prev, next));
@@ -945,6 +949,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       return next;
     } catch (e) {
+      if (!silent) setConversationLoadError(true);
       setError(e?.response?.data?.message || "Failed to load chats");
       return [];
     } finally {
@@ -4665,6 +4670,45 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const callIsMini = Boolean(callConfig && callMode === "mini");
   const callIsExpanded = Boolean(callConfig && callMode !== "mini");
 
+  // Keep the ↓ control above the complete bottom composer/search dock.
+  // Reply/edit bars and other flow content increase this dock's measured height,
+  // so the button moves upward automatically without covering those controls.
+  useLayoutEffect(() => {
+    const baseOffset = isMobile ? 78 : 86;
+    const dock = bottomBarRef.current;
+
+    if (!dock) {
+      setScrollDownBottomOffset((prev) => (prev === baseOffset ? prev : baseOffset));
+      return undefined;
+    }
+
+    let raf = null;
+    const measure = () => {
+      raf = null;
+      const height = Math.ceil(dock.getBoundingClientRect().height || 0);
+      const next = Math.max(baseOffset, height + 12);
+      setScrollDownBottomOffset((prev) => (prev === next ? prev : next));
+    };
+
+    measure();
+
+    const resizeObserver = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(() => {
+          if (raf != null) cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(measure);
+        })
+      : null;
+
+    resizeObserver?.observe(dock);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      if (raf != null) cancelAnimationFrame(raf);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [isMobile, activeId, callIsExpanded]);
+
   const chatPane = (
     <Box
       sx={{
@@ -5153,7 +5197,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               When a call is active (inline), the composer is hidden because
               the call surface takes over the chat pane. When the call is
               minimised to the thin bar, the composer stays available. */}
-          {callIsExpanded ? null : (
+          <Box ref={bottomBarRef} sx={{ flexShrink: 0 }}>
+            {callIsExpanded ? null : (
             isMobile && msgSearchOpen ? (
               /* Mobile: search bar replaces the composer at the bottom */
               <Stack
@@ -5312,6 +5357,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               }}
             />
           ))}
+          </Box>
 
           {showScrollDown && (
             <Box
@@ -5327,7 +5373,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               sx={{
                 position: "absolute",
                 right: { xs: 12, sm: 16 },
-                bottom: { xs: 78, sm: 86 },
+                bottom: scrollDownBottomOffset,
                 zIndex: 12,
                 pointerEvents: "auto",
                 opacity: scrollDownOpacity,
@@ -5398,6 +5444,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const sidebarEl = (
     <Sidebar
       meId={meId} conversations={conversations} loadingConvs={loadingConvs}
+      conversationLoadError={conversationLoadError}
+      onReloadConversations={() => { void loadConversations(); }}
       activeId={activeId} openChat={openChat}
       isMobile={isMobile}
       searchQ={searchQ} setSearchQ={setSearchQ}
