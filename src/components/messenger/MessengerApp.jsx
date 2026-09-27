@@ -2143,6 +2143,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   // startDm is only called when the user explicitly picks "Message" — NOT on search-result click
   const startDm = async (user) => {
+    if (!user?.id || String(user.id) === String(meId)) {
+      if (user?.id && String(user.id) === String(meId)) flash("You can't message yourself.");
+      return;
+    }
     try {
       const res = await apiRequest({
         method: "POST", url: `${MSG_API}/conversations/`,
@@ -5735,8 +5739,20 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             onBlockUser={(uid) => setConfirmBlock({ user: { id: uid } })}
             onMessage={(u) => startDm(u)}
             onViewProfile={(uid) => loadUserProfile(uid)}
-            onVoiceCall={(u) => startCallWithUser(u, { video: false })}
-            onVideoCall={(u) => startCallWithUser(u, { video: true })}
+            onVoiceCall={(u) => {
+              if (String(u?.id) === String(meId)) {
+                flash("You can't call yourself.");
+                return;
+              }
+              startCallWithUser(u, { video: false });
+            }}
+            onVideoCall={(u) => {
+              if (String(u?.id) === String(meId)) {
+                flash("You can't call yourself.");
+                return;
+              }
+              startCallWithUser(u, { video: true });
+            }}
             onDeleteChat={() => setConfirmDelete({ type: "chat", conv: activeConv })}
             onDeleteGroup={() => setConfirmDelete({ type: "group", conv: activeConv })}
             onCleanupChat={() => setConfirmCleanup({ conv: activeConv })}
