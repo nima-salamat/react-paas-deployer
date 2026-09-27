@@ -543,7 +543,7 @@ export function tryRenderDirective(trimmed, lines, i, renderInner, resolveUrl) {
   if (/^:::compare\b/i.test(trimmed)) {
     const labels = trimmed.replace(/^:::compare\s*/i, "").split("|").map((x) => x.trim()).filter(Boolean);
     const { body, nextIndex } = collectUntilClose(lines, i + 1);
-    const sections = splitSections(body, "===");
+    const sections = splitSections(body, matchEqualsSections);
     const cols = sections.map((s, idx) => {
       const label = labels[idx] || s.title;
       return `<div class="doc-compare-col"><div class="doc-compare-label">${escapeHtml(label)}</div><div class="doc-compare-body">${renderInner(s.lines.join("\n"))}</div></div>`;
