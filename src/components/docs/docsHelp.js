@@ -29,7 +29,7 @@ export const DOCS_HELP_ITEMS = [
   { id: "breadcrumb", group: "Structure", label: "Breadcrumb", icon: "›", help: "Hierarchical path.", syntax: ":::breadcrumb Home > API > Auth\n:::", snippet: ":::breadcrumb Home > API > Auth\n:::\n", aiHint: "Deep pages → breadcrumb at top." },
   { id: "reading-time", group: "Structure", label: "Reading time", icon: "⏱", help: "Estimated reading time from word count.", syntax: ":::reading-time\n:::", snippet: ":::reading-time\n:::\n", aiHint: "Under the title." },
   { id: "meta", group: "Structure", label: "Meta bar", icon: "i", help: "Author, updated date, tags.", syntax: ":::meta author=Team updated=2026-08-31 tags=api,guide\n:::", snippet: ":::meta author=Team updated=2026-08-31 tags=api,guide\n:::\n", aiHint: "Add meta when useful." },
-  { id: "nav", group: "Structure", label: "Page nav", icon: "⇔", help: "Previous / next page links (slug|Title).", syntax: ":::nav prev=intro|Introduction next=auth|Authentication\n:::", snippet: ":::nav prev=intro|Introduction next=auth|Authentication\n:::\n", aiHint: "End sequential guides with nav." },
+  { id: "nav", group: "Structure", label: "Page nav", icon: "⇔", help: "Previous / next page links (slug|Title).", syntax: ":::nav prev=intro|Introduction next=auth|Authentication\n:::", snippet: ":::nav prev=intro|Introduction next=auth|Authentication\n:::\n", aiHint: "Use :::nav only for custom previous/next destinations; normal sequential navigation is provided by the Docs UI." },
   { id: "steps", group: "Structure", label: "Steps", icon: "1", help: "Numbered procedure steps.", syntax: ":::steps\n1. Title\n   Detail\n2. Next\n:::", snippet: ":::steps\n1. Install\n   Run the installer.\n2. Configure\n3. Run\n:::\n", aiHint: "Procedures → :::steps." },
   { id: "tabs", group: "Structure", label: "Tabs", icon: "◫", help: "Tabbed panels. Supports nested documentation components. Prefer === Title; --- Title is also accepted inside :::tabs.", syntax: ":::tabs\n=== JS\n...\n=== Python\n...\n:::", snippet: ":::tabs\n=== JavaScript\n`npm i pkg`\n=== Python\n`pip install pkg`\n:::\n", aiHint: "Same content in multiple variants → :::tabs. Use === panel titles; nested directives are allowed." },
   { id: "details", group: "Structure", label: "Accordion", icon: "▾", help: "Collapsible details/summary.", syntax: ":::details Title\nContent\n:::", snippet: ":::details FAQ\nAnswer here.\n:::\n", aiHint: "Optional deep-dives → :::details." },
@@ -120,6 +120,8 @@ OUTPUT CONTRACT
 - If the user gives rough notes rather than Markdown, convert them into the final page yourself.
 - Close every :::directive block with a line containing only :::.
 - Do not invent directive names or syntax.
+- All directive property/option names must remain English ASCII identifiers exactly as documented. Never translate property names into the article language. Examples include: author, updated, tags, prev, next, since, use, critical, height, grid, and title.
+- Option values may be user-facing content when the syntax allows it, but the property name itself must remain the documented English identifier.
 
 DOCUMENT URL / INFORMATION ARCHITECTURE
 - Public documentation lives under /docs.
