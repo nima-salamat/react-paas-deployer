@@ -12,9 +12,6 @@ import {
   Breadcrumbs,
   Button,
   ButtonBase,
-  ListItemIcon,
-  Menu,
-  MenuItem,
   Chip,
   CircularProgress,
   Collapse,
@@ -38,8 +35,6 @@ import { motion, useMotionValueEvent, useScroll, useTransform } from "framer-mot
 import ArticleRoundedIcon from "@mui/icons-material/ArticleRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
-import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import ClearRoundedIcon from "@mui/icons-material/ClearRounded";
 import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -52,7 +47,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import UnfoldLessRoundedIcon from "@mui/icons-material/UnfoldLessRounded";
 import UnfoldMoreRoundedIcon from "@mui/icons-material/UnfoldMoreRounded";
 import UpdateRoundedIcon from "@mui/icons-material/UpdateRounded";
-import SettingsBrightnessRoundedIcon from "@mui/icons-material/SettingsBrightnessRounded";
+import ThemeMenuButton from "../layout/ThemeMenuButton.jsx";
 import apiRequest from "../customHooks/apiRequest";
 import { hostBase, publicDocsAssetSrc } from "../admin/adminUtils";
 import { renderMarkdown } from "./markdown";
@@ -65,12 +60,6 @@ const BRAND_NAME = "PassDeployer";
 const HEADER_HEIGHT = { xs: 60, sm: 68 };
 const SIDEBAR_WIDTH = 312;
 const RAIL_WIDTH = 236;
-
-const THEME_CHOICES = [
-  { value: "light", label: "Light", icon: LightModeRoundedIcon },
-  { value: "dark", label: "Dark", icon: DarkModeRoundedIcon },
-  { value: "system", label: "System", icon: SettingsBrightnessRoundedIcon },
-];
 
 /** Public Docs assets are anonymous resources only when their parent document is published. */
 const resolvePublicUrl = (url) => {
@@ -597,7 +586,6 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
   const [q, setQ] = useState("");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expanded, setExpanded] = useState({});
-  const [themeMenuAnchor, setThemeMenuAnchor] = useState(null);
 
   const articleRef = useRef(null);
   const [activeHeading, setActiveHeading] = useState("");
@@ -800,22 +788,6 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
   };
 
   // ── Theme control ──────────────────────────────────────────────
-  const isDark = muiTheme.palette.mode === "dark";
-  const currentThemeChoice =
-    THEME_CHOICES.find((choice) => choice.value === themeMode) ||
-    THEME_CHOICES.find((choice) => choice.value === (isDark ? "dark" : "light"));
-
-  const handleThemeMenuChange = (nextMode) => {
-    if (!nextMode || nextMode === themeMode) {
-      setThemeMenuAnchor(null);
-      return;
-    }
-    if (typeof onThemeModeChange === "function") {
-      onThemeModeChange(nextMode);
-    }
-    setThemeMenuAnchor(null);
-  };
-
   // ── Tree expand / collapse helpers ──────────────────────────────
   const handleToggle = (nodeId) =>
     setExpanded((v) => ({ ...v, [nodeId]: v[nodeId] === false }));
@@ -1048,29 +1020,14 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
           </Tooltip>
         )}
 
-        <Tooltip title="Change theme">
-          <IconButton
-            onClick={(event) => setThemeMenuAnchor(event.currentTarget)}
-            aria-label="Change theme"
-            sx={{
-              width: { xs: 36, sm: 38 },
-              height: { xs: 36, sm: 38 },
-              border: "1px solid",
-              borderColor: "divider",
-              color: "text.secondary",
-              bgcolor: "action.hover",
-              "&:hover": { bgcolor: "action.selected", color: "text.primary" },
-            }}
-          >
-            {currentThemeChoice?.icon ? (
-              React.createElement(currentThemeChoice.icon, { fontSize: "small" })
-            ) : isDark ? (
-              <LightModeRoundedIcon fontSize="small" />
-            ) : (
-              <DarkModeRoundedIcon fontSize="small" />
-            )}
-          </IconButton>
-        </Tooltip>
+<ThemeMenuButton
+          themeMode={themeMode}
+          onThemeModeChange={onThemeModeChange}
+          buttonSx={{
+            width: { xs: 36, sm: 38 },
+            height: { xs: 36, sm: 38 },
+          }}
+        />
 
         <Tooltip title="Home">
           <IconButton
