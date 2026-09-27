@@ -63,7 +63,7 @@ const SHORTCUT_MAP = {
   "[": "__collapse__",
 };
 
-function AdminDashboardInner() {
+function AdminDashboardInner({ themeMode, onThemeModeChange }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || "overview";
@@ -346,6 +346,8 @@ function AdminDashboardInner() {
           notifications={notifications}
           unreadCount={unreadCount}
           onMarkAllRead={markAllRead}
+          themeMode={themeMode}
+          onThemeModeChange={onThemeModeChange}
         />
 
         <Box
@@ -461,10 +463,10 @@ function AdminDashboardInner() {
   );
 }
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ themeMode, onThemeModeChange }) {
   return (
     <ToastProvider>
-      <AdminDashboardInner />
+      <AdminDashboardInner themeMode={themeMode} onThemeModeChange={onThemeModeChange} />
     </ToastProvider>
   );
 }
