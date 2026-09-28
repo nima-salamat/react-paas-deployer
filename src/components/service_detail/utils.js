@@ -278,6 +278,14 @@ export function normalizeLogEntry(raw, fallbackText, extra = {}) {
     text = JSON.stringify(text, null, 2);
   }
   text = String(text ?? "").replace(/\r$/, "");
+
+  // Defensive guard for the historical Swarm/dock-py generator-string bug.
+  // The backend now consumes Service.logs() iterators correctly, but old
+  // retained rows must never be rendered as if they were application output.
+  if (/^<generator object .*_multiplexed_response_stream_helper at 0x[0-9a-f]+>$/i.test(text.trim())) {
+    return null;
+  }
+
   if (!text.trim() && !raw.stage) return null;
 
   if (!level) level = inferLogLevel(text);
