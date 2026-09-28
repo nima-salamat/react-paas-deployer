@@ -201,21 +201,24 @@ export default function GlobalServiceControls({
     return theme.palette.primary.main;
   };
 
+  const lifecycleStatus = String(service?.status || "").toLowerCase();
   const statusLabel =
-    serviceRunning === true
+    ["queued", "deploying", "stopping"].includes(lifecycleStatus)
+      ? lifecycleStatus === "stopping"
+        ? "Stopping"
+        : lifecycleStatus
+      : serviceRunning === true
       ? "Running"
-      : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
-      ? String(service.status)
       : serviceRunning === false
       ? "Stopped"
       : service?.status || "Unknown";
 
   const statusColor =
-    serviceRunning === true ||
-    ["running", "success"].includes(String(service?.status || ""))
-      ? "success"
-      : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
+    ["queued", "deploying", "stopping"].includes(lifecycleStatus)
       ? "warning"
+      : serviceRunning === true ||
+        ["running", "success"].includes(lifecycleStatus)
+      ? "success"
       : "default";
 
   const canOpen = Boolean(service?.service_host || service?.service_name) && !selectedIsDb;
