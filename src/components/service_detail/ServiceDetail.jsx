@@ -472,16 +472,30 @@ export default function ServiceDetail() {
         const resp = await apiRequest({ method: "POST", url: `${SERVICE_ACTION_ROOT}service_status/`, data: { service_id: id } });
         if (resp.status === 200 && resp.data) {
           const running = Boolean(resp.data.running);
-          const cpu = normalizePercent(resp.data.cpu);
-          const ram = normalizePercent(resp.data.ram);
+          const cpu = resp.data.cpu == null ? null : normalizePercent(resp.data.cpu);
+          const ram = resp.data.ram == null ? null : normalizePercent(resp.data.ram);
           setServiceRunning((prev) => (prev === running ? prev : running));
-          setServiceCpu((prev) => (typeof prev === "number" && Math.round(prev * 100) / 100 === Math.round(cpu * 100) / 100 ? prev : cpu));
-          setServiceRam((prev) => (typeof prev === "number" && Math.round(prev * 100) / 100 === Math.round(ram * 100) / 100 ? prev : ram));
+          setServiceCpu((prev) => (
+            prev === cpu
+              ? prev
+              : cpu
+          ));
+          setServiceRam((prev) => (
+            prev === ram
+              ? prev
+              : ram
+          ));
         } else if (!silent) {
-          setServiceRunning(false); setServiceCpu(0); setServiceRam(0);
+          setServiceRunning(false);
+          setServiceCpu(null);
+          setServiceRam(null);
         }
       } catch (err) {
-        if (!silent) { setServiceRunning(false); setServiceCpu(0); setServiceRam(0); }
+        if (!silent) {
+          setServiceRunning(false);
+          setServiceCpu(null);
+          setServiceRam(null);
+        }
       } finally {
         if (!silent) setServiceStatusLoadingManual(false);
       }
