@@ -53,6 +53,7 @@ import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import ThemeMenuButton from "./ThemeMenuButton.jsx";
 
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
+import AccountMenu from "./AccountMenu.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_ICON = "/icon.svg";
@@ -84,8 +85,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
   const [isStaff, setIsStaff] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [userImage, setUserImage] = useState(null);
-  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-
+ 
   const firstItemRef = useRef(null);
   const authCheckStartedRef = useRef(false);
   const profileRequestRef = useRef(null);
@@ -357,28 +357,6 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
 
     loadProfilesIfNeeded({ force: true, viewedProfileId });
   }, [location.pathname, loggedIn]);
-
-  const handleLogoutConfirm = () => {
-    window.localStorage.removeItem("access");
-    window.localStorage.removeItem("refresh");
-
-    profilesLoadedRef.current = false;
-    currentProfileIdRef.current = null;
-    previousViewedProfileIdRef.current = null;
-    profileRequestRef.current = null;
-
-    setLoggedIn(false);
-      setIsStaff(false);
-    setUserImage(null);
-    setCheckingAuth(false);
-    setLogoutDialogOpen(false);
-
-    try {
-      window.dispatchEvent(new Event("auth-changed"));
-    } catch {}
-
-    navigate("/signin_or_signup");
-  };
 
   const handleSignInClick = async ({ fromMenu = false } = {}) => {
     if (checkingAuth) return;
@@ -652,38 +630,13 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
             {!checkingAuth && loggedIn ? (
               <>
               <TicketNotifyBell />
-              <IconButton
-                onClick={() => {
-                  try {
-                    sessionStorage.removeItem("profileFromDashboard");
-                    sessionStorage.removeItem("profileReturnTo");
-                  } catch {
-                    // Ignore storage errors.
-                  }
-                  navigate("/profile");
-                }}
-                aria-label="Open profile"
-                sx={{
-                  p: 0.25,
-                  border: "1px solid",
-                  borderColor: alpha(theme.palette.text.primary, 0.08),
-                }}
-              >
-                <Avatar
-                  src={userImage || DEFAULT_ICON}
-                  alt="User"
-                  sx={{ width: 38, height: 38 }}
-                  imgProps={{
-                    onError: (e) => {
-                      if (e.currentTarget.src !== DEFAULT_ICON) {
-                        e.currentTarget.src = DEFAULT_ICON;
-                      }
-                    },
-                  }}
-                />
-              </IconButton>
-              </>
-            ) : !checkingAuth ? (
+              <AccountMenu
+                profilePath="/profile"
+                avatar={userImage || undefined}
+                size={38}
+                tooltip="Account"
+                ariaLabel="Account menu"
+              />         ) : !checkingAuth ? (
               <>
                 {/* Mobile View: Icon Only */}
                 {!isAuthPage && (
@@ -1009,7 +962,14 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                       startIcon={<LogoutOutlinedIcon />}
                       onClick={() => {
                         closeDrawer();
-                        setLogoutDialogOpen(true);
+                        try {
+                          window.localStorage.removeItem("access");
+                          window.localStorage.removeItem("refresh");
+                          window.dispatchEvent(new Event("auth-changed"));
+                        } catch {
+                          /* ignore browser storage errors */
+                        }
+                        navigate("/signin_or_signup", { replace: true });
                       }}
                     >
                       Logout
@@ -1124,25 +1084,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
         </Box>
       </Drawer>
 
-      <Dialog
-        open={logoutDialogOpen}
-        onClose={() => setLogoutDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Confirm logout</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to log out?
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setLogoutDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleLogoutConfirm} color="error" variant="contained" autoFocus>
-            Logout
-          </Button>
-        </DialogActions>
-      </Dialog>
+
     </>
   );
 }
