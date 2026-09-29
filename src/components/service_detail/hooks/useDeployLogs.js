@@ -4,6 +4,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import apiRequest from "../../customHooks/apiRequest";
+import { clearAuthAndRedirect } from "../../customHooks/apiRequest";
+import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import {
   API_BASE,
   DEPLOY_BASE,
@@ -72,6 +74,7 @@ export default function useDeployLogs({
   const pollLockRef = useRef(false);
   const loadingOlderRef = useRef(false);
   const wsRef = useRef(null);
+  const wsPingTimerRef = useRef(null);
   const wsReconnectTimerRef = useRef(null);
   const wsReconnectAttemptRef = useRef(0);
   const wsShouldReconnectRef = useRef(true);
@@ -92,6 +95,8 @@ export default function useDeployLogs({
   const stopWs = useCallback(() => {
     wsShouldReconnectRef.current = false;
     wsReconnectAttemptRef.current = 0;
+    clearInterval(wsPingTimerRef.current);
+    wsPingTimerRef.current = null;
     if (wsReconnectTimerRef.current) {
       clearTimeout(wsReconnectTimerRef.current);
       wsReconnectTimerRef.current = null;
@@ -134,6 +139,11 @@ export default function useDeployLogs({
         setConnected(false);
         return;
       }
+      if (!isSessionBoundToken(token)) {
+        clearAuthAndRedirect();
+        setConnected(false);
+        return;
+      }
 
       let backendUrl;
       try {
@@ -166,6 +176,12 @@ export default function useDeployLogs({
         } catch {
           /* ignore */
         }
+        clearInterval(wsPingTimerRef.current);
+        wsPingTimerRef.current = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            try { socket.send(JSON.stringify({ type: "ping" })); } catch { /* ignore */ }
+          }
+        }, 20000);
       };
 
       socket.onmessage = (event) => {
@@ -195,8 +211,14 @@ export default function useDeployLogs({
       };
 
       socket.onclose = (evt) => {
+        clearInterval(wsPingTimerRef.current);
+        wsPingTimerRef.current = null;
         if (!mountedRef.current) return;
         setConnected(false);
+        if (evt.code === 4401) {
+          clearAuthAndRedirect();
+          return;
+        }
         if (!wsShouldReconnectRef.current || evt.wasClean) return;
         if (deployIdRef.current !== String(id)) return;
         setReconnecting(true);
