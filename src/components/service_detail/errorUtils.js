@@ -50,6 +50,14 @@ export function getApiErrorMessage(error, fallback = "Something went wrong.") {
   if (typeof source === "string" && source.trim()) return source.trim();
 
   if (isObject(source)) {
+    const fieldSource = source.errors;
+    const fields = flattenValue(fieldSource);
+    if (fields.length) {
+      return fields
+        .map(({ key, message }) => (key ? `${key}: ${message}` : message))
+        .join(" · ");
+    }
+
     const direct =
       source.detail ??
       source.message ??
@@ -58,10 +66,9 @@ export function getApiErrorMessage(error, fallback = "Something went wrong.") {
 
     if (direct) return String(direct);
 
-    const fieldSource = source.errors ?? source.error;
-    const fields = flattenValue(fieldSource);
-    if (fields.length) {
-      return fields
+    const genericErrors = flattenValue(source.error);
+    if (genericErrors.length) {
+      return genericErrors
         .map(({ key, message }) => (key ? `${key}: ${message}` : message))
         .join(" · ");
     }
