@@ -464,15 +464,19 @@ export default function ServiceDetail() {
     try {
       const resp = await apiRequest({ method: "GET", url: NETWORK_API_ROOT, params: { page_size: 100 } });
       setAvailableNetworks(Array.isArray(resp.data) ? resp.data : resp.data.results || []);
-    } catch (err) {}
-  }, []);
+    } catch (err) {
+      setError(err, "Could not load available networks.");
+    }
+  }, [setError]);
 
   const fetchAvailableVolumes = useCallback(async () => {
     try {
       const resp = await apiRequest({ method: "GET", url: VOLUME_API_ROOT, params: { unused: true, page_size: 100 } });
       setAvailableVolumes(Array.isArray(resp.data) ? resp.data : resp.data.results || []);
-    } catch (err) {}
-  }, []);
+    } catch (err) {
+      setError(err, "Could not load available volumes.");
+    }
+  }, [setError]);
 
   const fetchPlans = useCallback(async () => {
     setPlansLoading(true);
@@ -483,10 +487,11 @@ export default function ServiceDetail() {
       setAvailablePlans(list);
     } catch (err) {
       setAvailablePlans([]);
+      setError(err, "Could not load available plans.");
     } finally {
       if (mountedRef.current) setPlansLoading(false);
     }
-  }, []);
+  }, [setError]);
 
   const fetchAttachedVolumes = useCallback(async () => {
     if (!id) return;
@@ -494,8 +499,10 @@ export default function ServiceDetail() {
       const resp = await apiRequest({ method: "GET", url: VOLUME_API_ROOT, params: { service: id, page_size: 100 } });
       const next = Array.isArray(resp.data) ? resp.data : resp.data.results || [];
       setAttachedVolumes((prev) => (Array.isArray(prev) && JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
-    } catch (err) {}
-  }, [id]);
+    } catch (err) {
+      setError(err, "Could not load the service volumes.");
+    }
+  }, [id, setError]);
 
   const normalizePercent = useCallback((raw) => {
     let n = typeof raw === "number" ? raw : Number(raw);
@@ -550,10 +557,30 @@ export default function ServiceDetail() {
     [id, serviceStatusLoadingManual, normalizePercent]
   );
 
-  const selectedDeployId = service?.selected_deploy ? String(service.selected_deploy.id ?? service.selected_deploy) : "";
+  const activeRevisionId = service?.active_revision
+    ? String(service.active_revision.id ?? service.active_revision)
+    : "";
+
+  const selectedDeployId = useMemo(() => {
+    if (activeRevisionId) {
+      const activeDeploy = deploys.find((d) =>
+        String(d.revision?.id ?? d.revision ?? "") === activeRevisionId
+      );
+      if (activeDeploy) {
+        return String(activeDeploy.id ?? activeDeploy.pk ?? "");
+      }
+    }
+
+    return service?.selected_deploy
+      ? String(service.selected_deploy.id ?? service.selected_deploy)
+      : "";
+  }, [activeRevisionId, deploys, service?.selected_deploy]);
+
   const selectedDeploy = useMemo(() => {
     if (!selectedDeployId) return null;
-    return deploys.find((d) => String(d.id ?? d.pk ?? "") === selectedDeployId) || null;
+    return deploys.find(
+      (d) => String(d.id ?? d.pk ?? "") === selectedDeployId
+    ) || null;
   }, [deploys, selectedDeployId]);
 
   const selectedPlatform = useMemo(() => (selectedDeploy ? getDeployPlatform(selectedDeploy) : ""), [selectedDeploy]);
@@ -1077,7 +1104,7 @@ export default function ServiceDetail() {
       safeSetSnackbar("success", "Network attached successfully.");
       setSettingsSuccess("Network attached successfully.");
       await fetchService(); await fetchAvailableNetworks();
-    } catch (err) { setError(err.response?.data?.detail || err.response?.data?.error || "Unable to attach network."); }
+    } catch (err) { setError(err, "Unable to attach network."); }
     finally { if (mountedRef.current) setNetworkActionLoading(false); }
   };
 
@@ -1089,7 +1116,7 @@ export default function ServiceDetail() {
       setSelectedNetworkId("");
       safeSetSnackbar("success", "Network detached successfully.");
       await fetchService(); await fetchAvailableNetworks();
-    } catch (err) { setError(err.response?.data?.detail || err.response?.data?.error || "Unable to detach network."); }
+    } catch (err) { setError(err, "Unable to detach network."); }
     finally { if (mountedRef.current) setNetworkActionLoading(false); }
   };
 
@@ -1103,7 +1130,7 @@ export default function ServiceDetail() {
       safeSetSnackbar("success", "Volume attached successfully.");
       setSettingsSuccess("Volume attached successfully.");
       await fetchAttachedVolumes(); await fetchAvailableVolumes();
-    } catch (err) { setError(err.response?.data?.detail || err.response?.data?.error || "Unable to attach volume."); }
+    } catch (err) { setError(err, "Unable to attach volume."); }
     finally { if (mountedRef.current) setVolumeActionLoading(false); }
   };
 
@@ -1114,7 +1141,7 @@ export default function ServiceDetail() {
       await apiRequest({ method: "PATCH", url: `${VOLUME_API_ROOT}${volumeId}/`, data: { service: null } });
       safeSetSnackbar("success", "Volume detached successfully.");
       await fetchAttachedVolumes(); await fetchAvailableVolumes();
-    } catch (err) { setError(err.response?.data?.detail || err.response?.data?.error || "Unable to detach volume."); }
+    } catch (err) { setError(err, "Unable to detach volume."); }
     finally { if (mountedRef.current) setVolumeActionLoading(false); }
   };
 
@@ -1132,8 +1159,7 @@ export default function ServiceDetail() {
       setSettingsSuccess("Network created successfully.");
       await fetchAvailableNetworks();
     } catch (err) {
-      const msg = err.response?.data?.detail || err.response?.data?.error || err.response?.data?.errors || "Unable to create network.";
-      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      setError(err, "Unable to create network.");
       throw err;
     } finally {
       if (mountedRef.current) setNetworkActionLoading(false);
@@ -1163,13 +1189,7 @@ export default function ServiceDetail() {
       await fetchAvailableVolumes();
       await fetchService(true); // refresh storage quota on service
     } catch (err) {
-      const msg =
-        err.response?.data?.errors?.size_mb ||
-        err.response?.data?.detail ||
-        err.response?.data?.error ||
-        err.response?.data?.errors ||
-        "Unable to create volume.";
-      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      setError(err, "Unable to create volume.");
       throw err;
     } finally {
       if (mountedRef.current) setVolumeActionLoading(false);
@@ -1193,11 +1213,7 @@ export default function ServiceDetail() {
       await fetchService?.(true);
       await checkServiceRunning?.(true);
     } catch (err) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        "Failed to remove container/image.";
-      setError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      setError(err, "Failed to remove container/image.");
       throw err;
     } finally {
       if (mountedRef.current) setVolumeActionLoading(false);
@@ -1221,12 +1237,7 @@ export default function ServiceDetail() {
       await fetchAvailableVolumes();
       await fetchService?.(true);
     } catch (err) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.response?.data?.detail ||
-        err?.response?.data?.errors ||
-        "Unable to update volume.";
-      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      setError(err, "Unable to update volume.");
       throw err;
     } finally {
       if (mountedRef.current) setVolumeActionLoading(false);
@@ -1245,12 +1256,7 @@ export default function ServiceDetail() {
       await fetchAvailableVolumes();
       await fetchService(true);
     } catch (err) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.response?.data?.detail ||
-        err?.response?.data?.errors ||
-        "Unable to delete volume.";
-      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
+      setError(err, "Unable to delete volume.");
       throw err;
     } finally {
       if (mountedRef.current) setVolumeActionLoading(false);
