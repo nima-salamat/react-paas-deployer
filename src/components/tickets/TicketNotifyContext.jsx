@@ -10,7 +10,8 @@ import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOu
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
 import { API_HOST } from "./api";
-import { refreshAccessToken } from "../customHooks/apiRequest.jsx";
+import { clearAuthAndRedirect, refreshAccessToken } from "../customHooks/apiRequest.jsx";
+import { isSessionBoundToken } from "../customHooks/authSession.js";
 
 const Ctx = createContext(null);
 const MUTE_KEY = "tickets_notify_muted";
