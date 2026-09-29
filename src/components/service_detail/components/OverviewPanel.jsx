@@ -9,6 +9,8 @@ import {
 } from "@mui/icons-material";
 import { formatDate, parseDeployConfig, isDbPlatform, buildConnectionString, buildConnectionHints } from "../utils";
 import { DEPLOY_BASE } from "../constants";
+import apiRequest from "../../customHooks/apiRequest";
+import { getApiErrorMessage } from "../errorUtils";
 import DnsIcon from "@mui/icons-material/Dns";
 import SpeedIcon from "@mui/icons-material/Speed";
 import HubIcon from "@mui/icons-material/Hub";
@@ -254,16 +256,17 @@ function DatabaseCredentialsCard({ selectedDeploy, serviceName, serviceHost }) {
     setLoading(true);
     setError(null);
     try {
-      const access = localStorage.getItem("access");
-      const headers = access ? { Authorization: `Bearer ${access}` } : {};
-      const resp = await fetch(`${DEPLOY_BASE}${deployId}/reveal_db_credentials/`, { headers });
-      const data = await resp.json();
-      if (!resp.ok || data.result === "error") {
-        throw new Error(data.detail || `HTTP ${resp.status}`);
+      const resp = await apiRequest({
+        method: "GET",
+        url: `${DEPLOY_BASE}${deployId}/reveal_db_credentials/`,
+      });
+      const data = resp?.data || {};
+      if (data.result === "error") {
+        throw data;
       }
       setCreds(data.config);
     } catch (e) {
-      setError(e.message || "Failed to load credentials.");
+      setError(getApiErrorMessage(e, "Failed to load database credentials."));
     } finally {
       setLoading(false);
     }
