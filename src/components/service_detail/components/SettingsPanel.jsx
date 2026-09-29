@@ -1227,12 +1227,7 @@ export default function SettingsPanel({
         setMountOverrides((prev) => ({ ...prev, [vid]: true }));
       } catch (err) {
         console.error(err);
-        window.alert(
-          err?.response?.data?.error ||
-            err?.response?.data?.detail ||
-            err?.message ||
-            "Attach failed"
-        );
+        setVolumeActionError(getApiErrorMessage(err, "Could not attach the volume."));
         throw err;
       }
     },
