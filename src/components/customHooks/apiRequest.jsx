@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearStoredAuth, isAuthRoute, isSessionBoundToken } from "./authSession.js";
 
 /**
  * Build refresh URL consistently with the rest of the app.
@@ -76,8 +77,7 @@ let refreshPromise = null;
 
 function clearAuthAndRedirect() {
   try {
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
+    clearStoredAuth(localStorage);
     window.dispatchEvent(new Event("auth-changed"));
     window.dispatchEvent(new Event("auth"));
   } catch {
@@ -85,7 +85,7 @@ function clearAuthAndRedirect() {
   }
   // Avoid redirect loop if already on auth page
   const path = window.location?.pathname || "";
-  if (!path.includes("signin") && !path.includes("signup") && !path.includes("login")) {
+  if (!isAuthRoute(path)) {
     window.location.href = "/signin_or_signup";
   }
 }
