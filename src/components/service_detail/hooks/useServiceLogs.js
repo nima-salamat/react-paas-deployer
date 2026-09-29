@@ -2,9 +2,10 @@
  * Single source of truth for runtime service logs (persistent history + WS).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import axios from "axios";
 import { API_BASE, SERVICE_BASE, LOG_BUFFER_MAX, LOG_PAGE_SIZE } from "../constants";
 import { normalizeLogEntry } from "../utils";
+import apiRequest from "../../customHooks/apiRequest";
+import { getApiErrorMessage } from "../errorUtils";
 import { clearAuthAndRedirect } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 
@@ -77,11 +78,6 @@ export default function useServiceLogs({ serviceId, enabled }) {
     pausedRef.current = paused;
   }, [paused]);
 
-  const authHeaders = useCallback(() => {
-    const token = localStorage.getItem("access");
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, []);
-
   const logsUrl = useCallback(
     (extra = "") => {
       const base = String(SERVICE_BASE || "").replace(/\/+$/, "");
@@ -117,9 +113,10 @@ export default function useServiceLogs({ serviceId, enabled }) {
         const qq = q !== undefined ? q : historyQ;
         if (qq) params.q = qq;
         if (level && level !== "all") params.level = level;
-        const resp = await axios.get(logsUrl(), {
+        const resp = await apiRequest({
+          method: "GET",
+          url: logsUrl(),
           params,
-          headers: authHeaders(),
         });
         if (!mountedRef.current) return;
         const data = resp?.data || {};
@@ -155,7 +152,7 @@ export default function useServiceLogs({ serviceId, enabled }) {
         }
       } catch (err) {
         if (!mountedRef.current) return;
-        const detail = err?.response?.data?.detail || err?.message || "Failed to load logs";
+        const detail = getApiErrorMessage(err, "Failed to load service logs.");
         if (err?.response?.status === 409) {
           setGap(detail || "Historical gap detected.");
         } else {
@@ -170,7 +167,7 @@ export default function useServiceLogs({ serviceId, enabled }) {
         }
       }
     },
-    [authHeaders, historyQ, level, logsUrl, serviceId]
+    [historyQ, level, logsUrl, serviceId]
   );
 
   useEffect(() => {
@@ -324,9 +321,10 @@ export default function useServiceLogs({ serviceId, enabled }) {
         const params = { format: fmt, limit: 5000 };
         if (searchMode === "server" && historyQ) params.q = historyQ;
         if (level && level !== "all") params.level = level;
-        const resp = await axios.get(logsUrl("export/"), {
+        const resp = await apiRequest({
+          method: "GET",
+          url: logsUrl("export/"),
           params,
-          headers: authHeaders(),
           responseType: "blob",
         });
         const blob = resp.data instanceof Blob ? resp.data : new Blob([resp.data || ""]);
@@ -337,13 +335,13 @@ export default function useServiceLogs({ serviceId, enabled }) {
         URL.revokeObjectURL(a.href);
       } catch (err) {
         if (mountedRef.current) {
-          setError(err?.response?.data?.detail || err?.message || "Export failed");
+          setError(getApiErrorMessage(err, "Could not export service logs."));
         }
       } finally {
         if (mountedRef.current) setExporting(false);
       }
     },
-    [authHeaders, historyQ, level, logsUrl, searchMode, serviceId]
+    [historyQ, level, logsUrl, searchMode, serviceId]
   );
 
   const retryConnection = useCallback(() => {
