@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   clearStoredAuth,
   decodeJwtPayload,
+  getSessionBoundAccessToken,
   isAuthRoute,
   isSessionBoundToken,
 } from "../src/components/customHooks/authSession.js";
@@ -49,6 +50,26 @@ test("session-bound helper preserves JWT payload semantics", () => {
     sid: "abc",
     exp: 123,
   });
+});
+
+
+test("stored access helper clears and rejects a sessionless token", () => {
+  const values = new Map([
+    ["access", fakeJwt({ user_id: 1 })],
+    ["refresh", "legacy-refresh"],
+  ]);
+  const storage = {
+    getItem(key) {
+      return values.get(key) || null;
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+  };
+
+  assert.equal(getSessionBoundAccessToken(storage), null);
+  assert.equal(values.has("access"), false);
+  assert.equal(values.has("refresh"), false);
 });
 
 test("logout storage helper clears both credentials", () => {
@@ -147,4 +168,29 @@ test("shared session API exposes self and admin session operations", () => {
   ]) {
     assert.match(source, new RegExp(`export (?:async )?function ${symbol}`));
   }
+});
+
+test("source uses session-bound helper: app login state", () => {
+  const source = read("src/App.jsx");
+  for (const pattern of ["getSessionBoundAccessToken"]) assert.match(source, new RegExp(pattern));
+});
+
+test("source uses session-bound helper: floating navigation auth state", () => {
+  const source = read("src/components/layout/FloatingNav.jsx");
+  for (const pattern of ["getSessionBoundAccessToken"]) assert.match(source, new RegExp(pattern));
+});
+
+test("source uses session-bound helper: profile provider auth state", () => {
+  const source = read("src/components/profile/profileContext.jsx");
+  for (const pattern of ["getSessionBoundAccessToken"]) assert.match(source, new RegExp(pattern));
+});
+
+test("source uses session-bound helper: messenger local identity", () => {
+  const source = read("src/components/messenger/messengerUtils.js");
+  for (const pattern of ["getSessionBoundAccessToken"]) assert.match(source, new RegExp(pattern));
+});
+
+test("source uses session-bound helper: ticket notification identity", () => {
+  const source = read("src/components/tickets/TicketNotifyContext.jsx");
+  for (const pattern of ["getSessionBoundAccessToken"]) assert.match(source, new RegExp(pattern));
 });
