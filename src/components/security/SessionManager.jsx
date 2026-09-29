@@ -206,6 +206,10 @@ export default function SessionManager({ title = "Devices & sessions", compact =
 
   const handleRevoke = async (session) => {
     const isCurrent = Boolean(session?.current);
+    if (!hasSessionContext) {
+      setActionError("Sign in again with a session-bound login before using session management.");
+      return;
+    }
     if (
       !isCurrent &&
       !management.can_revoke_others
@@ -244,15 +248,14 @@ export default function SessionManager({ title = "Devices & sessions", compact =
   };
 
   const handleLogoutAll = async () => {
+    if (!hasSessionContext) {
+      setActionError("Sign in again with a session-bound login before using session management.");
+      return;
+    }
     if (!canLogoutAll) {
       setActionError(
         `You can sign out all sessions after your current session has been active for ${formatDuration(remainingSeconds)}.`
       );
-      return;
-    }
-
-    if (!hasSessionContext) {
-      setActionError("Sign in again with a session-bound login before using session management.");
       return;
     }
 
