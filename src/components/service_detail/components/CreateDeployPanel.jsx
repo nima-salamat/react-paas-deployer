@@ -23,8 +23,9 @@ import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
 import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import SearchIcon from "@mui/icons-material/Search";
-import axios from "axios";
 import ConfigBuilder from "./ConfigBuilder";
+import apiRequest from "../../customHooks/apiRequest";
+import { getApiErrorMessage } from "../errorUtils";
 
 export default function CreateDeployPanel({
   formState,
@@ -142,16 +143,18 @@ export default function CreateDeployPanel({
       // Plan resources → backend suggests worker_count from CPU/RAM.
       if (planCpu != null && planCpu !== "") fd.append("max_cpu", String(planCpu));
       if (planRam != null && planRam !== "") fd.append("max_ram", String(planRam));
-      const access = localStorage.getItem("access");
-      const headers = access ? { Authorization: `Bearer ${access}` } : {};
-      const resp = await axios.post(`${DEPLOY_BASE}inspect_zip/`, fd, { headers });
+      const resp = await apiRequest({
+        method: "POST",
+        url: `${DEPLOY_BASE}inspect_zip/`,
+        data: fd,
+      });
       if (resp.data?.result === "success") {
         setInspectResult(resp.data);
       } else {
-        setInspectError(resp.data?.detail || "Inspection failed.");
+        setInspectError(getApiErrorMessage(resp.data, "Inspection failed."));
       }
     } catch (e) {
-      setInspectError(e?.response?.data?.detail || e?.message || "Inspection failed.");
+      setInspectError(getApiErrorMessage(e, "Inspection failed."));
     } finally {
       setInspecting(false);
     }
