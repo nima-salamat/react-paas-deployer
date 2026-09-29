@@ -3,8 +3,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import apiRequest from "../../customHooks/apiRequest";
-import { clearAuthAndRedirect } from "../../customHooks/apiRequest";
+import apiRequest, { clearAuthAndRedirect } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import {
   API_BASE,
