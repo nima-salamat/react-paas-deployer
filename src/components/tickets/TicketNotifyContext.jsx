@@ -176,6 +176,10 @@ export function TicketNotifyProvider({ children }) {
         setConnected(false);
         return;
       }
+      if (!isSessionBoundToken(token)) {
+        clearAuthAndRedirect();
+        return;
+      }
 
       // Check token expiry BEFORE opening the socket. If the token is already
       // expired (or about to be), refresh it first so the WS connect succeeds.
