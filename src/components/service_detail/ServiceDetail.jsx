@@ -383,9 +383,16 @@ export default function ServiceDetail() {
         });
       } else if (plan) {
         try {
-          const p = await apiRequest({ method: "GET", url: `${PLANS_BASE}?id=${String(plan)}` });
+          const p = await apiRequest({
+            method: "GET",
+            url: `${PLANS_BASE}?id=${String(plan)}`,
+          });
           if (mountedRef.current) setPlanDetail(p.data);
-        } catch {}
+        } catch (err) {
+          if (mountedRef.current) {
+            setError(err, "Could not load the service plan.");
+          }
+        }
       }
 
       const net = resp.data?.network;
@@ -396,9 +403,16 @@ export default function ServiceDetail() {
         });
       } else if (net) {
         try {
-          const n = await apiRequest({ method: "GET", url: `${NETWORK_API_ROOT}${String(net)}/` });
+          const n = await apiRequest({
+            method: "GET",
+            url: `${NETWORK_API_ROOT}${String(net)}/`,
+          });
           if (mountedRef.current) setNetworkDetail(n.data);
-        } catch {}
+        } catch (err) {
+          if (mountedRef.current) {
+            setError(err, "Could not load the service network.");
+          }
+        }
       }
     } catch (err) {
       if (!silent) setError(err, "Failed to load service information.");
@@ -1292,68 +1306,17 @@ export default function ServiceDetail() {
       safeSetSnackbar("success", "Volume download started.");
     } catch (err) {
       const status = err?.response?.status;
-      let msg = "Unable to download volume.";
-      if (err?.response?.data instanceof Blob) {
-        try {
-          const t = await err.response.data.text();
-          const j = JSON.parse(t);
-          msg = j.detail || j.error || msg;
-        } catch { /* ignore */ }
-      } else {
-        msg = err?.response?.data?.detail || err?.response?.data?.error || msg;
-      }
-      if (status === 404) msg = msg || "Docker volume not found. Rebuild the service first.";
-      safeSetSnackbar("error", typeof msg === "string" ? msg : "Download failed.");
-    }
-  }, [safeSetSnackbar]);
-
-    const handleApplyPlan = async (planId, applyImmediately = false) => {
-    if (!planId || !id) return;
-    setPlanActionLoading(true);
-    setError(null);
-    setSettingsSuccess(null);
-    try {
-      const resp = await apiRequest({
-        method: "POST",
-        url: `${PLANS_BASE}plans/${planId}/apply/`,
-        data: {
-          target_type: "service",
-          target_id: id,
-          applyImmediately: Boolean(applyImmediately),
-        },
-      });
-      const detail = resp.data?.detail || "Plan applied.";
-      safeSetSnackbar("success", detail);
-      setSettingsSuccess(detail);
-
-      // Instant UI feedback: mark the applied plan as current and clear selection
-      const applied = (availablePlans || []).find(
-        (p) => String(p.id ?? p.pk ?? "") === String(planId)
-      );
-      if (applied) {
-        setPlanDetail(applied);
-        setService((prev) =>
-          prev
-            ? {
-                ...prev,
-                plan: typeof prev.plan === "object" && prev.plan
-                  ? { ...prev.plan, ...applied }
-                  : applied,
-              }
-            : prev
+      if (mountedRef.current) {
+        safeSetSnackbar(
+          "error",
+          getApiErrorMessage(
+            err,
+            status === 404
+              ? "The Docker volume files were not found. Rebuild the service if the volume has not been provisioned yet."
+              : "Could not download the volume."
+          )
         );
       }
-      setSelectedPlanId("");
-
-      await fetchService(true);
-      await fetchPlans();
-    } catch (err) {
-      const msg =
-        err.response?.data?.detail ||
-        err.response?.data?.error ||
-        err.response?.data?.result ||
-        "Unable to apply plan.";
-      setError(typeof msg === "object" ? JSON.stringify(msg) : msg);
     } finally {
       if (mountedRef.current) setPlanActionLoading(false);
     }
