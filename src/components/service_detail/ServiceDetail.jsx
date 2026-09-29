@@ -353,7 +353,10 @@ export default function ServiceDetail() {
         const ok = data?.result === true || data?.result === "true";
         return { ok, detail: data?.detail || (ok ? "The name is free." : "That name has already been taken.") };
       } catch (err) {
-        return { ok: false, detail: err?.response?.data?.detail || "Could not verify name availability." };
+        return {
+          ok: false,
+          detail: getApiErrorMessage(err, "Could not verify name availability."),
+        };
       }
     },
     [editingDeployId, editOriginalName]
@@ -527,6 +530,7 @@ export default function ServiceDetail() {
         });
 
         if (resp.status === 200 && resp.data) {
+          if (!silent) setServiceStatusError(null);
           const running = Boolean(resp.data.running);
           const cpu = resp.data.cpu == null ? null : normalizePercent(resp.data.cpu);
           const ram = resp.data.ram == null ? null : normalizePercent(resp.data.ram);
@@ -923,7 +927,7 @@ export default function ServiceDetail() {
       if (resp.data?.result === "success") { safeSetSnackbar("success", resp.data.detail || "Deploy selected."); await fetchService(true); await fetchDeploys(pageInfo.page); }
       else safeSetSnackbar("error", resp.data?.detail || "Select failed.");
     } catch (err) {
-      safeSetSnackbar("error", String(err?.response?.data?.detail || err?.response?.data?.error || "Failed to select deploy."));
+      setError(err, "Failed to select the deployment.");
     } finally {
       setActionState((s) => ({ ...s, [deployId]: { ...(s[deployId] || {}), selecting: false } }));
     }
@@ -939,7 +943,7 @@ export default function ServiceDetail() {
       if (resp.data?.result === "success") { safeSetSnackbar("success", resp.data.detail || "Deploy unselected."); await fetchService(true); await fetchDeploys(pageInfo.page); }
       else safeSetSnackbar("error", resp.data?.detail || "Unselect failed.");
     } catch (err) {
-      safeSetSnackbar("error", String(err?.response?.data?.detail || err?.response?.data?.error || "Failed to unselect deploy."));
+      setError(err, "Failed to unselect the deployment.");
     } finally {
       setActionState((s) => ({ ...s, [deployId]: { ...(s[deployId] || {}), selecting: false } }));
     }
