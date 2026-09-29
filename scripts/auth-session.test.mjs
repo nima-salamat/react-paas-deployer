@@ -194,3 +194,17 @@ test("source uses session-bound helper: ticket notification identity", () => {
   const source = read("src/components/tickets/TicketNotifyContext.jsx");
   for (const pattern of ["getSessionBoundAccessToken"]) assert.match(source, new RegExp(pattern));
 });
+
+test("home and dashboard account triggers share the same account menu", () => {
+  const navbar = read("src/components/layout/Navbar.jsx");
+  const dashboardNavbar = read("src/components/dashboard/DashboardNavbar.jsx");
+  const accountMenu = read("src/components/layout/AccountMenu.jsx");
+
+  assert.match(navbar, /import AccountMenu from "\.\/AccountMenu\.jsx"/);
+  assert.match(dashboardNavbar, /import AccountMenu from "\.\.\/layout\/AccountMenu\.jsx"/);
+  assert.match(navbar, /<AccountMenu[\s\S]*profilePath="\/profile"/);
+  assert.match(dashboardNavbar, /<AccountMenu[\s\S]*profilePath="\/dashboard\/profile"/);
+  assert.match(accountMenu, /Profile/);
+  assert.match(accountMenu, /Sign out/);
+  assert.match(accountMenu, /Confirm logout/);
+});
