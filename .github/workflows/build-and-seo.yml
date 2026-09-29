@@ -26,6 +26,9 @@ jobs:
       - name: Auth session regression tests
         run: npm run test:auth
 
+      - name: Service detail regression tests
+        run: npm run test:service-detail
+
       - name: Lint
         run: npm run lint
 
