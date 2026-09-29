@@ -15,7 +15,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ThemeMenuButton from "../layout/ThemeMenuButton.jsx";
 import AccountMenu from "../layout/AccountMenu.jsx";
-import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
+import { useProfiles } from "../profile/profileContext.jsx";
 
 const resolveName = (profile) =>
   profile?.display_name ||
@@ -24,17 +24,6 @@ const resolveName = (profile) =>
   profile?.username ||
   profile?.email ||
   "Account";
-
-const resolveInitials = (profile) => {
-  const value = resolveName(profile).trim();
-  const parts = value.split(/\s+/).filter(Boolean);
-  if (!parts.length) return "A";
-  return (
-    parts.length === 1
-      ? parts[0].slice(0, 2)
-      : `${parts[0][0]}${parts[1][0]}`
-  ).toUpperCase();
-};
 
 /**
  * Shared dashboard chrome.
@@ -61,7 +50,6 @@ export default function DashboardNavbar({
     return [...profiles].sort((a, b) => (a.order ?? 999) - (b.order ?? 999))[0];
   }, [profiles]);
 
-  const avatar = resolveProfileImageUrl(currentProfile) || primaryImageUrl || undefined;
   const profileName = resolveName(currentProfile);
 
   // Derive a short section title from the path when in the shell
