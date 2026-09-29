@@ -998,7 +998,7 @@ export default function ServiceDetail() {
         await fetchDeploys(pageInfo.page); await fetchService(true);
       } else setError(resp.data?.detail || "Failed to update DB config.");
     } catch (err) {
-      setError(err.response?.data?.detail || (err.response ? JSON.stringify(err.response.data) : "Error updating DB config"));
+      setError(err, "Could not update the database configuration.");
     } finally {
       if (mountedRef.current) setDbConfigSaving(false);
     }
@@ -1031,11 +1031,7 @@ export default function ServiceDetail() {
         }
       }, 3000);
     } catch (err) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        (err.response ? JSON.stringify(err.response.data) : "Force cancel failed.");
-      setError(typeof msg === "string" ? msg : "Force cancel failed.");
+      setError(err, "Could not force-cancel the deployment.");
     } finally {
       if (mountedRef.current) setForceCancelLoading(false);
     }
@@ -1264,11 +1260,11 @@ export default function ServiceDetail() {
     const volId = volume?.id ?? volume?.pk;
     if (!volId) return;
     try {
-      const token = localStorage.getItem("access");
       const url = `${VOLUME_API_ROOT}${volId}/download/`;
-      const resp = await axios.get(url, {
+      const resp = await apiRequest({
+        method: "GET",
+        url,
         responseType: "blob",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       // If server returned JSON error as blob, surface it
       const ct = String(resp.headers["content-type"] || "");
