@@ -25,6 +25,8 @@ import AdminProfileView from "../components/AdminProfileView";
 import MediaLightbox from "../components/MediaLightbox";
 import { useNavigate } from "react-router-dom";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
+import AdminUserSessionsDialog from "../components/AdminUserSessionsDialog.jsx";
 
 const PAGE_SIZE = 20;
 
@@ -43,6 +45,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", email: "", password: "", is_staff: false });
   const [deleting, setDeleting] = useState(null);
+  const [sessionUser, setSessionUser] = useState(null);
 
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("sm"));
@@ -53,6 +56,8 @@ export default function UsersPanel({ setToast: setToastProp }) {
   // Rules section visible if user can manage rules OR full manage
   const canEditRules = canManage || canManageRules;
   const canDelete = canManage;
+  const canViewSessions = isSessionSuperuser() || hasAnyRule("auth_sessions.view") || hasAnyRule("auth_sessions.manage");
+  const canManageSessions = isSessionSuperuser() || hasAnyRule("auth_sessions.manage");
   const isSuperuser = isSessionSuperuser();
   const navigate = useNavigate();
 
@@ -329,6 +334,13 @@ export default function UsersPanel({ setToast: setToastProp }) {
                             <ChatBubbleOutlineIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        {canViewSessions && (
+                          <Tooltip title="View active sessions">
+                            <IconButton size="small" onClick={() => setSessionUser(u)}>
+                              <DevicesOutlinedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         {canCreate && (
                           <Tooltip title="Edit">
                             <IconButton size="small" onClick={() => setEditUser({ ...u, rules: u.rules || [], password: "" })}>
@@ -578,6 +590,14 @@ export default function UsersPanel({ setToast: setToastProp }) {
           <Button variant="contained" onClick={createUser} disabled={!newUser.username.trim()}>Create</Button>
         </DialogActions>
       </Dialog>
+
+      <AdminUserSessionsDialog
+        open={Boolean(sessionUser)}
+        user={sessionUser}
+        canManage={canManageSessions}
+        onClose={() => setSessionUser(null)}
+        onToast={setToast}
+      />
 
       <AdminProfileView
         open={Boolean(viewUser)}
