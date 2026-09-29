@@ -134,6 +134,7 @@ function isImageFile(file) {
 
 import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
 import { CURSOR_OPTIONS, readCursorPreference, writeCursorPreference } from "../layout/cursorSettings";
+import SessionManager from "../security/SessionManager.jsx";
 
 // --- DND-Kit Imports ---
 import {
@@ -1494,6 +1495,8 @@ const Profile = ({ embedded = false }) => {
             )}
           </Stack>
         </Paper>
+
+        <SessionManager />
 
         {/* Photo Preview Dialog */}
         <Dialog
