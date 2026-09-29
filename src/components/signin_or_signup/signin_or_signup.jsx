@@ -22,6 +22,8 @@ import PersonSearch from "@mui/icons-material/PersonSearch";
 import LockReset from "@mui/icons-material/LockReset";
 import LinkIcon from "@mui/icons-material/Link";
 import Block from "@mui/icons-material/Block";
+import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
+import { isSessionBoundToken } from "../customHooks/authSession.js";
 
 const BASE_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api`;
 const MotionPaper = motion.create(Paper);
@@ -138,6 +140,10 @@ export default function SigninOrSignup() {
   useEffect(() => {
     const token = localStorage.getItem("access");
     if (!token) return;
+    if (!isSessionBoundToken(token)) {
+      clearAuthAndRedirect();
+      return;
+    }
     (async () => {
       try {
         await axios.get(`${BASE_URL}/validateToken/`, {
