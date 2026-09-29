@@ -1,9 +1,10 @@
 import apiRequest from "../customHooks/apiRequest.jsx";
-import { hostBase } from "../admin/adminUtils";
 
-const SELF_SESSIONS_URL = () => `${hostBase()}/auth/api/sessions/`;
-const SELF_LOGOUT_ALL_URL = () => `${hostBase()}/auth/api/sessions/logout-all/`;
-const SELF_DEVICES_URL = () => `${hostBase()}/auth/api/devices/`;
+const API_HOST = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
+
+const SELF_SESSIONS_URL = () => `${API_HOST}/auth/api/sessions/`;
+const SELF_LOGOUT_ALL_URL = () => `${API_HOST}/auth/api/sessions/logout-all/`;
+const SELF_DEVICES_URL = () => `${API_HOST}/auth/api/devices/`;
 
 export async function fetchMySessions() {
   const response = await apiRequest({ method: "GET", url: SELF_SESSIONS_URL() });
@@ -32,7 +33,7 @@ export async function fetchMyDevices() {
 }
 
 export function adminUserSessionsUrl(userId) {
-  return `${hostBase()}/api/users/admin/users/${encodeURIComponent(String(userId))}/sessions/`;
+  return `${API_HOST}/api/users/admin/users/${encodeURIComponent(String(userId))}/sessions/`;
 }
 
 export async function fetchAdminUserSessions(userId) {
