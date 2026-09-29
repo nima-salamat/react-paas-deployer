@@ -2,7 +2,6 @@
  * Deploy history logs: REST history + live DeploymentConsumer WS + poll fallback.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import axios from "axios";
 import apiRequest, { clearAuthAndRedirect } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import {
@@ -13,6 +12,7 @@ import {
   LOG_BUFFER_MAX,
 } from "../constants";
 import { normalizeLogEntry, normalizeTextEntries, mergeEntries, mergeEntriesPrepend } from "../utils";
+import { getApiErrorMessage } from "../errorUtils";
 
 function appendLiveEvent(payload, setEntries) {
   if (!payload || typeof payload !== "object") return;
@@ -270,7 +270,7 @@ export default function useDeployLogs({
       setHasMoreOlder(hasMoreOlderRef.current);
     } catch (err) {
       if (!mountedRef.current) return;
-      setError(err.response?.data?.detail || "Unable to load deploy history.");
+      setError(getApiErrorMessage(err, "Unable to load deployment history."));
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -323,7 +323,7 @@ export default function useDeployLogs({
       });
     } catch (err) {
       if (mountedRef.current) {
-        setError(err.response?.data?.detail || "Unable to load older deploy logs.");
+        setError(getApiErrorMessage(err, "Unable to load older deployment logs."));
       }
     } finally {
       loadingOlderRef.current = false;
@@ -376,15 +376,15 @@ export default function useDeployLogs({
       if (!target) return;
       setExporting(true);
       try {
-        const token = localStorage.getItem("access");
-        const resp = await axios.get(`${DEPLOY_BASE}/${target}/logs/export/`, {
+        const resp = await apiRequest({
+          method: "GET",
+          url: `${DEPLOY_BASE}${target}/logs/export/`,
           params: {
             format: "txt",
             limit: 5000,
             q: filter || undefined,
             level: level !== "all" ? level : undefined,
           },
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
           responseType: "blob",
         });
         const blob = resp.data instanceof Blob ? resp.data : new Blob([resp.data || ""]);
@@ -395,7 +395,7 @@ export default function useDeployLogs({
         URL.revokeObjectURL(a.href);
       } catch (err) {
         if (mountedRef.current) {
-          setError(err?.response?.data?.detail || err?.message || "Export failed");
+          setError(getApiErrorMessage(err, "Could not export deployment logs."));
         }
       } finally {
         if (mountedRef.current) setExporting(false);
