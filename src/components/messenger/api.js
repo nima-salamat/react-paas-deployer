@@ -1,5 +1,6 @@
 /** Messenger API helpers */
-import { clearAuthAndRedirect, isSessionBoundToken } from "../customHooks/apiRequest.jsx";
+import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
+import { isSessionBoundToken } from "../customHooks/authSession.js";
 
 export const API_HOST = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
 export const MSG_API = `${API_HOST}/api/messenger`;
