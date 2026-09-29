@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { hostBase } from "../adminUtils";
+import { clearAuthAndRedirect } from "../../customHooks/apiRequest.jsx";
+import { isSessionBoundToken } from "../../customHooks/authSession.js";
 
 /**
  * useTicketWebSocket — connects to /ws/tickets/ as soon as `enabled` becomes
@@ -21,10 +23,15 @@ export function useTicketWebSocket({ enabled, onEvent }) {
     if (!enabled) return;
     let closed = false;
     let timer;
+    let pingTimer;
 
     const connect = () => {
       const token = localStorage.getItem("access");
       if (!token) return;
+      if (!isSessionBoundToken(token)) {
+        clearAuthAndRedirect();
+        return;
+      }
       let url;
       try {
         const backendUrl = new URL(hostBase());
@@ -39,8 +46,19 @@ export function useTicketWebSocket({ enabled, onEvent }) {
         reconnectRef.current = 0;
         setConnected(true);
         try { socket.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
+        clearInterval(pingTimer);
+        pingTimer = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            try { socket.send(JSON.stringify({ type: "ping" })); } catch { /* */ }
+          }
+        }, 20000);
       };
-      socket.onclose = () => {
+      socket.onclose = (event) => {
+        clearInterval(pingTimer);
+        if (event.code === 4401) {
+          clearAuthAndRedirect();
+          return;
+        }
         setConnected(false);
         if (closed) return;
         const attempt = Math.min(reconnectRef.current + 1, 8);
@@ -61,6 +79,7 @@ export function useTicketWebSocket({ enabled, onEvent }) {
     return () => {
       closed = true;
       clearTimeout(timer);
+      clearInterval(pingTimer);
       try { wsRef.current?.close(); } catch { /* */ }
     };
   }, [enabled]);
