@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearStoredAuth, isAuthRoute, isSessionBoundToken } from "./authSession.js";
+import { clearStoredAuth, getSessionBoundAccessToken, invalidateSessionlessAuth } from "./authSession.js";
 
 /**
  * Build refresh URL consistently with the rest of the app.
@@ -64,18 +64,7 @@ function isAccessTokenExpired(token, leewayMs = 5000) {
 let refreshPromise = null;
 
 function clearAuthAndRedirect() {
-  try {
-    clearStoredAuth(localStorage);
-    window.dispatchEvent(new Event("auth-changed"));
-    window.dispatchEvent(new Event("auth"));
-  } catch {
-    /* ignore */
-  }
-  // Avoid redirect loop if already on auth page
-  const path = window.location?.pathname || "";
-  if (!isAuthRoute(path)) {
-    window.location.href = "/signin_or_signup";
-  }
+  invalidateSessionlessAuth(localStorage);
 }
 
 function buildHeaders(accessToken, data) {
@@ -172,10 +161,10 @@ function refreshAccessToken() {
 }
 
 const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploadProgress, responseType }) => {
-  let accessToken = localStorage.getItem("access");
+  const storedAccessToken = localStorage.getItem("access");
+  let accessToken = getSessionBoundAccessToken(localStorage);
 
-  if (accessToken && !isSessionBoundToken(accessToken)) {
-    clearAuthAndRedirect();
+  if (storedAccessToken && !accessToken) {
     throw new Error("Authentication session is required");
   }
 
