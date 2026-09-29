@@ -9,6 +9,7 @@ import {
   adminMeUrl, adminUsersApi, authMediaSrc, isSessionSuperuser, isSessionStaff,
 } from "../adminUtils";
 import ProfileImageManager from "../components/ProfileImageManager";
+import SessionManager from "../../security/SessionManager.jsx";
 import { useToast } from "../components/ToastContext";
 
 /**
@@ -186,6 +187,8 @@ export default function ProfilePanel({ me: meProp, onMeUpdated }) {
           }}
         />
       </Paper>
+
+      <SessionManager compact />
 
       <Paper
         variant="outlined"
