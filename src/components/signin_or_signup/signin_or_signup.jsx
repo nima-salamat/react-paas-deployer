@@ -145,7 +145,16 @@ export default function SigninOrSignup() {
           timeout: 4000,
         });
         completeLogin(token, localStorage.getItem("refresh"));
-      } catch { /* stay */ }
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          try {
+            localStorage.removeItem("access");
+            localStorage.removeItem("refresh");
+            window.dispatchEvent(new Event("auth-changed"));
+          } catch { /* ignore browser storage errors */ }
+        }
+      }
     })();
   }, []);
 
