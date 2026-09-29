@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { API_BASE, SERVICE_BASE, LOG_BUFFER_MAX, LOG_PAGE_SIZE } from "../constants";
 import { normalizeLogEntry } from "../utils";
+import { clearAuthAndRedirect } from "../../customHooks/apiRequest";
+import { isSessionBoundToken } from "../../customHooks/authSession.js";
 
 const SEARCH_DEBOUNCE_MS = 350;
 
@@ -55,6 +57,7 @@ export default function useServiceLogs({ serviceId, enabled }) {
   const cursorRef = useRef(null);
   const oldestCursorRef = useRef(null);
   const socketRef = useRef(null);
+  const pingTimerRef = useRef(null);
   const shouldReconnect = useRef(true);
   const reconnectTimer = useRef(null);
   const reconnectAttempt = useRef(0);
@@ -196,6 +199,10 @@ export default function useServiceLogs({ serviceId, enabled }) {
       setError("Authentication required for live logs.");
       return;
     }
+    if (!isSessionBoundToken(token)) {
+      clearAuthAndRedirect();
+      return;
+    }
     shouldReconnect.current = true;
     try {
       socketRef.current?.close();
@@ -224,6 +231,12 @@ export default function useServiceLogs({ serviceId, enabled }) {
       } catch {
         /* noop */
       }
+      clearInterval(pingTimerRef.current);
+      pingTimerRef.current = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          try { socket.send(JSON.stringify({ type: "ping" })); } catch { /* noop */ }
+        }
+      }, 20000);
     };
     socket.onmessage = (evt) => {
       if (pausedRef.current) return;
@@ -254,8 +267,14 @@ export default function useServiceLogs({ serviceId, enabled }) {
       }
     };
     socket.onclose = (evt) => {
+      clearInterval(pingTimerRef.current);
+      pingTimerRef.current = null;
       if (!mountedRef.current) return;
       setConnected(false);
+      if (evt.code === 4401) {
+        clearAuthAndRedirect();
+        return;
+      }
       if (!shouldReconnect.current || evt.wasClean) return;
       setReconnecting(true);
       reconnectAttempt.current += 1;
@@ -273,6 +292,8 @@ export default function useServiceLogs({ serviceId, enabled }) {
     return () => {
       shouldReconnect.current = false;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      clearInterval(pingTimerRef.current);
+      pingTimerRef.current = null;
       try {
         socketRef.current?.close();
       } catch {
