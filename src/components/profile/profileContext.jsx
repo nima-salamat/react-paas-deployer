@@ -8,12 +8,13 @@ import React, {
   useState,
 } from "react";
 import apiRequest from "../customHooks/apiRequest";
+import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
 
 function hasAccessToken() {
   try {
-    return Boolean(window.localStorage.getItem("access"));
+    return Boolean(getSessionBoundAccessToken(window.localStorage));
   } catch {
     return false;
   }
@@ -43,7 +44,7 @@ export function resolveProfileImageUrl(profile) {
     }
 
     if (/\/media\//i.test(url) || /\/api\/messenger\/attachments\//i.test(url)) {
-      const token = localStorage.getItem("access");
+      const token = getSessionBoundAccessToken(localStorage);
       if (token) {
         try {
           const u = new URL(url);
