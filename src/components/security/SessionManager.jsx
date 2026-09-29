@@ -200,8 +200,9 @@ export default function SessionManager({ title = "Devices & sessions", compact =
   );
 
   const currentSession = sessions.find((session) => session.current);
+  const hasSessionContext = Boolean(currentSession);
   const hasOtherSessions = sessions.some((session) => !session.current);
-  const canLogoutAll = Boolean(currentSession) && (!hasOtherSessions || management.can_revoke_others);
+  const canLogoutAll = hasSessionContext && (!hasOtherSessions || management.can_revoke_others);
 
   const handleRevoke = async (session) => {
     const isCurrent = Boolean(session?.current);
@@ -247,6 +248,11 @@ export default function SessionManager({ title = "Devices & sessions", compact =
       setActionError(
         `You can sign out all sessions after your current session has been active for ${formatDuration(remainingSeconds)}.`
       );
+      return;
+    }
+
+    if (!hasSessionContext) {
+      setActionError("Sign in again with a session-bound login before using session management.");
       return;
     }
 
@@ -303,7 +309,13 @@ export default function SessionManager({ title = "Devices & sessions", compact =
         )}
       </Stack>
 
-      {!management.can_revoke_others && hasOtherSessions && (
+      {!hasSessionContext && sessions.length > 0 && (
+        <Alert severity="warning" icon={<ShieldOutlinedIcon />} sx={{ mb: 1.5 }}>
+          This login token is not bound to a managed session. Sign in again to manage your devices and sessions.
+        </Alert>
+      )}
+
+      {hasSessionContext && !management.can_revoke_others && hasOtherSessions && (
         <Alert
           severity="info"
           icon={<LockClockOutlinedIcon />}
