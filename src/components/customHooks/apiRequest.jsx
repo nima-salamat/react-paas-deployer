@@ -235,4 +235,4 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
 };
 
 export default apiRequest;
-export { refreshAccessToken, clearAuthAndRedirect, isSessionBoundToken };
+export { refreshAccessToken, clearAuthAndRedirect };
