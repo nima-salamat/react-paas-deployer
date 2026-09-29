@@ -256,8 +256,13 @@ export default function RightPanel({
 
   if (kind === "sessions") {
     return (
-      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.default", overflow: "auto", p: { xs: 0, sm: 1.5 } }}>
-        <SessionManager compact={false} />
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.default", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}>
+          {header}
+        </Box>
+        <Box sx={{ flex: 1, overflow: "auto", p: { xs: 0, sm: 1.5 } }}>
+          <SessionManager compact={false} />
+        </Box>
       </Box>
     );
   }
