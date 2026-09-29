@@ -11,7 +11,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
 import { API_HOST } from "./api";
 import { clearAuthAndRedirect, refreshAccessToken } from "../customHooks/apiRequest.jsx";
-import { isSessionBoundToken } from "../customHooks/authSession.js";
+import { getSessionBoundAccessToken, isSessionBoundToken } from "../customHooks/authSession.js";
 
 const Ctx = createContext(null);
 const MUTE_KEY = "tickets_notify_muted";
@@ -105,7 +105,7 @@ export function TicketNotifyProvider({ children }) {
     }
 
     try {
-      const t = window.localStorage.getItem("access");
+      const t = getSessionBoundAccessToken(window.localStorage);
       return t ? decodeJwtUserId(t) : null;
     } catch {
       return null;
