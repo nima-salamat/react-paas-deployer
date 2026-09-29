@@ -45,6 +45,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import EditIcon from "@mui/icons-material/Edit";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import { getApiErrorMessage } from "../errorUtils";
 
 // ─────────────────────────────────────────────
 // Sub-components
@@ -877,6 +878,8 @@ export default function SettingsPanel({
 
   const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
   const [deleteServiceConfirmOpen, setDeleteServiceConfirmOpen] = useState(false);
+  const [deleteServiceError, setDeleteServiceError] = useState(null);
+  const [volumeActionError, setVolumeActionError] = useState(null);
 
   // Local mount overrides so Detach/Attach UI updates even if parent
   // keeps listing volumes only by service_id (soft-detach keeps ownership).
@@ -1078,7 +1081,7 @@ export default function SettingsPanel({
         err?.response?.data?.errors ||
         err?.message ||
         "Unable to update volume. If it exists in Docker, fields are locked.";
-      setEditVolumeError(typeof msg === "object" ? JSON.stringify(msg) : String(msg));
+      setEditVolumeError(getApiErrorMessage(err, "Unable to update the volume."));
     } finally {
       setEditingVolumeSaving(false);
     }
@@ -1113,7 +1116,7 @@ export default function SettingsPanel({
         err?.response?.data?.detail ||
         err?.message ||
         "Unable to create volume.";
-      setCreateVolumeError(typeof msg === "object" ? JSON.stringify(msg) : String(msg));
+      setCreateVolumeError(getApiErrorMessage(err, "Unable to create volume."));
       throw err;
     } finally {
       setCreatingVolume(false);
@@ -1130,7 +1133,7 @@ export default function SettingsPanel({
       const result = await onViewVolumeFiles?.(volume);
       setFilesDialogList(Array.isArray(result) ? result : []);
     } catch (err) {
-      setFilesDialogError(err?.response?.data?.detail || err?.message || "Unable to load files.");
+      setFilesDialogError(getApiErrorMessage(err, "Unable to load volume files."));
     } finally {
       setFilesDialogLoading(false);
     }
@@ -1161,30 +1164,28 @@ export default function SettingsPanel({
 
   const handleConfirmDeleteService = useCallback(async () => {
     if (!onDeleteService) {
-      window.alert(
-        "onDeleteService prop is not wired in the parent page. " +
-          "Pass onDeleteService={() => api.delete(`/service/${id}/`)} to enable deletion."
-      );
+      setDeleteServiceError("Service deletion is not available from this page.");
       return;
     }
+    setDeleteServiceError(null);
     try {
       await onDeleteService();
       setDeleteServiceConfirmOpen(false);
       if (typeof window !== "undefined") {
-        window.location.href = "/service";
+        window.location.href = "/dashboard/services";
       }
     } catch (err) {
-      console.error(err);
-      window.alert(err?.response?.data?.detail || err?.message || "Delete failed");
+      setDeleteServiceError(getApiErrorMessage(err, "Could not delete the service."));
     }
   }, [onDeleteService]);
 
 
   const handleDetachVolume = useCallback(
     async (id, volume) => {
+      setVolumeActionError(null);
       const vid = String(id ?? volumeIdOf(volume) ?? "");
       if (!vid || vid === "undefined" || vid === "null") {
-        window.alert("Detach failed: volume id is missing");
+        setVolumeActionError("Detach failed because the volume id is missing.");
         return;
       }
       try {
@@ -1204,13 +1205,7 @@ export default function SettingsPanel({
         return result;
       } catch (err) {
         console.error("detach error", err);
-        const msg =
-          err?.response?.data?.error ||
-          err?.response?.data?.detail ||
-          (typeof err?.response?.data === "string" ? err.response.data : null) ||
-          err?.message ||
-          "Detach failed";
-        window.alert(String(msg));
+        setVolumeActionError(getApiErrorMessage(err, "Could not detach the volume."));
       }
     },
     [onDetachVolume]
@@ -1218,6 +1213,7 @@ export default function SettingsPanel({
 
   const handleAttachVolume = useCallback(
     async (idOrVolume) => {
+      setVolumeActionError(null);
       const vid =
         typeof idOrVolume === "object"
           ? volumeIdOf(idOrVolume)
@@ -1247,6 +1243,9 @@ export default function SettingsPanel({
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
+      {volumeActionError ? (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{volumeActionError}</Alert>
+      ) : null}
       {successMessage && <Alert severity="success" sx={{ borderRadius: 2 }}>{successMessage}</Alert>}
 
       {/* ═══════════════ NETWORK ═══════════════ */}
@@ -1800,13 +1799,21 @@ export default function SettingsPanel({
       {/* Delete service confirm */}
       <Dialog
         open={deleteServiceConfirmOpen}
-        onClose={() => !deleteServiceLoading && setDeleteServiceConfirmOpen(false)}
+        onClose={() => {
+          if (!deleteServiceLoading) {
+            setDeleteServiceConfirmOpen(false);
+            setDeleteServiceError(null);
+          }
+        }}
         maxWidth="xs"
         fullWidth
         PaperProps={{ sx: { borderRadius: 2.5 } }}
       >
         <DialogTitle sx={{ fontWeight: 800, color: "error.main" }}>Delete service?</DialogTitle>
         <DialogContent>
+          {deleteServiceError ? (
+            <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{deleteServiceError}</Alert>
+          ) : null}
           <Typography variant="body2" sx={{ mb: 1 }}>
             Permanently delete service <strong>"{service?.name || "this service"}"</strong>.
             This cannot be undone.
