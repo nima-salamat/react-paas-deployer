@@ -29,6 +29,7 @@ import CrownIcon from "@mui/icons-material/EmojiEvents";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
+import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
@@ -45,6 +46,7 @@ import OnlineDot from "./OnlineDot";
 import { CURSOR_OPTIONS, readCursorPreference, writeCursorPreference } from "../../layout/cursorSettings";
 import { useTheme } from "@mui/material/styles";
 import { getPalette } from "../modules/appearance";
+import SessionManager from "../../security/SessionManager.jsx";
 
 /**
  * Right panel — settings menu / contacts / blocked / info / profile / join-requests.
@@ -75,7 +77,7 @@ export default function RightPanel({
   onlineUsers,
   myJoinRequests, convJoinRequests,
   canGoBack, onBack, onClose,
-  onOpenMyProfile, onOpenContacts, onOpenBlocks, onOpenMyRequests, onOpenConvJoinRequests,
+  onOpenMyProfile, onOpenContacts, onOpenBlocks, onOpenMyRequests, onOpenConvJoinRequests, onOpenSessions,
   onOpenCreateGroup, onOpenJoin, onNavigateHome, onOpenMediaSettings,
   themeMode = "system", onThemeModeChange,
   appearance, onAppearanceChange,
@@ -119,6 +121,7 @@ export default function RightPanel({
       case "contacts": return "Contacts";
       case "blocks": return "Blocked users";
       case "profile": return "Profile";
+      case "sessions": return "Devices & sessions";
       case "my-requests": return "My join requests";
       case "conv-requests": return "Join requests";
       default: return activeConv?.type === "group" ? "Group info" : "Chat info";
@@ -172,6 +175,15 @@ export default function RightPanel({
               <ListItemText
                 primary="My profile"
                 secondary="Photos, bio & privacy"
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }}
+              />
+            </ListItemButton>
+            <ListItemButton onClick={onOpenSessions} sx={itemSx}>
+              <ListItemIcon><DevicesOutlinedIcon fontSize="small" /></ListItemIcon>
+              <ListItemText
+                primary="Devices & sessions"
+                secondary="Manage signed-in sessions"
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -241,6 +253,14 @@ export default function RightPanel({
     );
   }
 
+
+  if (kind === "sessions") {
+    return (
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.default", overflow: "auto", p: { xs: 0, sm: 1.5 } }}>
+        <SessionManager compact={false} />
+      </Box>
+    );
+  }
 
   // Appearance — color themes, avatars, bubble style
   if (kind === "appearance") {
