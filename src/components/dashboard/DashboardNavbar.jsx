@@ -1,16 +1,8 @@
 import React, { useMemo, useState } from "react";
 import {
-  Avatar,
   Box,
   Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   IconButton,
-  Menu,
-  MenuItem,
   Stack,
   Tooltip,
   Typography,
@@ -24,6 +16,7 @@ import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ThemeMenuButton from "../layout/ThemeMenuButton.jsx";
+import AccountMenu from "../layout/AccountMenu.jsx";
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 
 const resolveName = (profile) =>
@@ -64,9 +57,7 @@ export default function DashboardNavbar({
   const navigate = useNavigate();
   const location = useLocation();
   const { profiles, primaryImageUrl } = useProfiles();
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
-
+  
   const currentProfile = useMemo(() => {
     if (!Array.isArray(profiles) || profiles.length === 0) return null;
     return [...profiles].sort((a, b) => (a.order ?? 999) - (b.order ?? 999))[0];
@@ -104,23 +95,6 @@ export default function DashboardNavbar({
       return;
     }
     navigate("/dashboard/services");
-  };
-
-  const openLogoutDialog = () => {
-    setMenuAnchor(null);
-    setLogoutDialogOpen(true);
-  };
-
-  const handleLogoutConfirm = () => {
-    try {
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
-      window.dispatchEvent(new Event("auth-changed"));
-    } catch {
-      // Ignore browser storage errors.
-    }
-    setLogoutDialogOpen(false);
-    navigate("/signin_or_signup", { replace: true });
   };
 
   const navButtonSx = {
@@ -279,74 +253,13 @@ export default function DashboardNavbar({
         </Box>
       </Box>
 
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={() => setMenuAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            sx: {
-              mt: 0.75,
-              minWidth: 210,
-              borderRadius: 2.5,
-              border: "1px solid",
-              borderColor: "divider",
-            },
-          },
-        }}
-      >
-        <MenuItem disabled sx={{ opacity: 1, py: 1.25 }}>
-          <Stack spacing={0.15} sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: 13 }}>{profileName}</Typography>
-            <Typography sx={{ color: "text.secondary", fontSize: 11 }}>
-              {currentProfile?.email || "Account"}
-            </Typography>
-          </Stack>
-        </MenuItem>
-        {!profileMode && !location.pathname.startsWith("/dashboard/profile") && (
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              navigate("/dashboard/profile");
-            }}
-          >
-            <PersonOutlineOutlinedIcon fontSize="small" sx={{ mr: 1.2 }} />
-            Profile
-          </MenuItem>
-        )}
-        <MenuItem onClick={openLogoutDialog} sx={{ color: "error.main" }}>
-          <LogoutRoundedIcon fontSize="small" sx={{ mr: 1.2 }} />
-          Sign out
-        </MenuItem>
-      </Menu>
-
-      <Dialog
-        open={logoutDialogOpen}
-        onClose={() => setLogoutDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Confirm logout</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to sign out? You will need to sign in again to
-            access your dashboard.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setLogoutDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={handleLogoutConfirm}
-            color="error"
-            variant="contained"
-            autoFocus
-          >
-            Sign out
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <AccountMenu
+        profilePath="/dashboard/profile"
+        hideProfile={profileMode || location.pathname.startsWith("/dashboard/profile")}
+        size={34}
+        tooltip={profileName}
+        buttonSx={{ ...navButtonSx }}
+      />
     </Box>
   );
 }
