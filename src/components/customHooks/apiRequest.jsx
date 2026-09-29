@@ -46,6 +46,18 @@ function notifyNetworkRecovered() {
   }
 }
 
+function isSessionBoundToken(token) {
+  if (!token) return false;
+  try {
+    const part = token.split(".")[1];
+    if (!part) return false;
+    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    return Boolean(payload?.sid);
+  } catch {
+    return false;
+  }
+}
+
 function isAccessTokenExpired(token, leewayMs = 5000) {
   if (!token) return true;
   try {
@@ -174,6 +186,11 @@ function refreshAccessToken() {
 const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploadProgress, responseType }) => {
   let accessToken = localStorage.getItem("access");
 
+  if (accessToken && !isSessionBoundToken(accessToken)) {
+    clearAuthAndRedirect();
+    throw new Error("Authentication session is required");
+  }
+
   // Avoid an avoidable first 401 when a normal access token has already
   // expired. Refresh before protected requests; the existing 401 path still
   // handles revoked/invalid tokens that cannot be detected locally.
@@ -241,4 +258,4 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
 };
 
 export default apiRequest;
-export { refreshAccessToken, clearAuthAndRedirect };
+export { refreshAccessToken, clearAuthAndRedirect, isSessionBoundToken };
