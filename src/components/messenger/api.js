@@ -1,4 +1,6 @@
 /** Messenger API helpers */
+import { clearAuthAndRedirect, isSessionBoundToken } from "../customHooks/apiRequest.jsx";
+
 export const API_HOST = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
 export const MSG_API = `${API_HOST}/api/messenger`;
 export const USERS_API = `${API_HOST}/users`;
@@ -24,5 +26,9 @@ export function unwrapList(res) {
  *  that bypass apiRequest — e.g. fetching text-attachment content). */
 export function authHeaders(extra = {}) {
   const token = localStorage.getItem("access");
+  if (token && !isSessionBoundToken(token)) {
+    clearAuthAndRedirect();
+    return { ...extra };
+  }
   return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra };
 }
