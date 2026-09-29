@@ -1,8 +1,9 @@
 /** Shared messenger utilities (pure functions, no React). */
+import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
 
 export function useAuthUserId() {
   try {
-    const t = localStorage.getItem("access");
+    const t = getSessionBoundAccessToken(localStorage);
     if (!t) return null;
     const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
     return payload.user_id ?? payload.user ?? null;
