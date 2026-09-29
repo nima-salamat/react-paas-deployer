@@ -32,6 +32,7 @@ const Profile = lazy(() => import("./components/profile/profile.jsx"));
 const Volumes = lazy(() => import("./components/volumes/Volumes.jsx"));
 const Networks = lazy(() => import("./components/networks/Networks.jsx"));
 import FloatingNav from "./components/layout/FloatingNav";
+import { getSessionBoundAccessToken } from "./components/customHooks/authSession.js";
 import NotFound from "./components/not_found/NotFound.jsx";
 const DocsHome = lazy(() => import("./components/docs/DocsHome.jsx"));
 
@@ -137,7 +138,7 @@ const Layout = ({
     try {
       setLoggedIn(
         Boolean(
-          window.localStorage.getItem("access")
+          getSessionBoundAccessToken(window.localStorage)
         )
       );
     } catch {
