@@ -98,7 +98,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // Layout
   const [drawerOpen, setDrawerOpen] = useState(true);
   // Panel history stack — supports back-button navigation inside the modal
-  // Each entry: "settings" | "contacts" | "blocks" | "info" | "profile" | "my-profile"
+  // Each entry: "settings" | "sessions" | "contacts" | "blocks" | "info" | "profile" | "my-profile"
   const [panelHistory, setPanelHistory] = useState([]);
   const rightPanel = panelHistory.length ? panelHistory[panelHistory.length - 1] : null;
   const [mobileShowChat, setMobileShowChat] = useState(false);
@@ -5680,6 +5680,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             onBack={popPanel}
             onClose={closePanel}
             onOpenMyProfile={() => pushPanel("my-profile")}
+            onOpenSessions={() => pushPanel("sessions")}
             onOpenChatInfo={() => {
               // From peer profile → open this chat's info panel
               setPanelHistory(["info"]);
