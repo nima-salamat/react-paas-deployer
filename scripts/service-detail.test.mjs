@@ -156,3 +156,10 @@ test("service detail uses backend service host directly", () => {
   assert.match(source, /service\?\.service_host/);
   assert.doesNotMatch(source, /VITE_DEPLOY_BASE\}/);
 });
+
+test("service detail prefers backend active revision over legacy selected deploy", () => {
+  const source = read("src/components/service_detail/ServiceDetail.jsx");
+  assert.match(source, /const activeRevisionId = service\?\.active_revision/);
+  assert.match(source, /d\.revision\?\.id \?\? d\.revision/);
+  assert.match(source, /service\?\.selected_deploy/);
+});
