@@ -100,9 +100,9 @@ test("authentication route detection avoids redirect loops", () => {
 
 test("api request layer rejects sessionless credentials before network I/O", () => {
   const source = read("src/components/customHooks/apiRequest.jsx");
-  assert.match(source, /isSessionBoundToken\(accessToken\)/);
+  assert.match(source, /getSessionBoundAccessToken\(localStorage\)/);
   assert.match(source, /clearAuthAndRedirect\(\);/);
-  assert.match(source, /clearStoredAuth\(localStorage\);/);
+  assert.match(source, /invalidateSessionlessAuth\(localStorage\)/);
 });
 
 test("sign-in bootstrap clears sessionless stored credentials", () => {
