@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Button,
@@ -12,8 +12,6 @@ import { useTheme } from "@mui/material/styles";
 import { useLocation, useNavigate } from "react-router-dom";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
-import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ThemeMenuButton from "../layout/ThemeMenuButton.jsx";
 import AccountMenu from "../layout/AccountMenu.jsx";
@@ -222,44 +220,17 @@ export default function DashboardNavbar({
               </IconButton>
             </Tooltip>
 
-            <Tooltip title={profileName}>
-              <IconButton
-                size="small"
-                onClick={(event) => setMenuAnchor(event.currentTarget)}
-                sx={{
-                  p: 0.25,
-                  borderRadius: 99,
-                  border: "1px solid",
-                  borderColor: alpha(theme.palette.divider, 0.95),
-                }}
-                aria-label="Account menu"
-              >
-                <Avatar
-                  src={avatar}
-                  alt={profileName}
-                  sx={{
-                    width: { xs: 32, sm: 34 },
-                    height: { xs: 32, sm: 34 },
-                    bgcolor: "primary.main",
-                    fontSize: 12,
-                    fontWeight: 900,
-                  }}
-                >
-                  {resolveInitials(currentProfile)}
-                </Avatar>
-              </IconButton>
-            </Tooltip>
+            <AccountMenu
+              profilePath="/dashboard/profile"
+              hideProfile={profileMode || location.pathname.startsWith("/dashboard/profile")}
+              size={34}
+              tooltip={profileName}
+              buttonSx={{ ...navButtonSx }}
+            />
           </Stack>
         </Box>
       </Box>
 
-      <AccountMenu
-        profilePath="/dashboard/profile"
-        hideProfile={profileMode || location.pathname.startsWith("/dashboard/profile")}
-        size={34}
-        tooltip={profileName}
-        buttonSx={{ ...navButtonSx }}
-      />
     </Box>
   );
 }
