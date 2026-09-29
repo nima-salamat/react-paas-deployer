@@ -880,6 +880,8 @@ export default function SettingsPanel({
   const [deleteServiceConfirmOpen, setDeleteServiceConfirmOpen] = useState(false);
   const [deleteServiceError, setDeleteServiceError] = useState(null);
   const [volumeActionError, setVolumeActionError] = useState(null);
+  const [deleteServiceError, setDeleteServiceError] = useState(null);
+  const [volumeActionError, setVolumeActionError] = useState(null);
 
   // Local mount overrides so Detach/Attach UI updates even if parent
   // keeps listing volumes only by service_id (soft-detach keeps ownership).
