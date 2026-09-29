@@ -630,7 +630,9 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                 size={38}
                 tooltip="Account"
                 ariaLabel="Account menu"
-              />         ) : !checkingAuth ? (
+              />
+              </>
+            ) : !checkingAuth ? (
               <>
                 {/* Mobile View: Icon Only */}
                 {!isAuthPage && (
