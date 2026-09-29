@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
 import apiRequest from "../customHooks/apiRequest";
 
 import {
@@ -17,6 +16,7 @@ import {
   CircularProgress,
   useMediaQuery,
   Paper,
+  Stack,
 } from "@mui/material";
 
 import TabSidebar from "./components/TabSidebar";
@@ -55,6 +55,8 @@ import {
   downloadTextFile,
   getDeployEntryText,
 } from "./utils";
+import { getApiErrorMessage, getApiErrorMeta } from "./errorUtils";
+import ServiceErrorAlert from "./components/ServiceErrorAlert";
 
 export default function ServiceDetail() {
   const { id } = useParams();
@@ -112,7 +114,8 @@ export default function ServiceDetail() {
   const [pageInfo, setPageInfo] = useState({ next: null, previous: null, count: 0, page: 1 });
   const [deploysLoading, setDeploysLoading] = useState(false);
 
-  const [error, setError] = useState(null);
+  const [error, setErrorState] = useState(null);
+  const [errorMeta, setErrorMeta] = useState(null);
   const [snackbar, setSnackbar] = useState(null);
 
   const [name, setName] = useState("");
@@ -142,6 +145,23 @@ export default function ServiceDetail() {
   const [serviceCpu, setServiceCpu] = useState(null);
   const [serviceRam, setServiceRam] = useState(null);
   const [serviceStatusLoadingManual, setServiceStatusLoadingManual] = useState(false);
+  const [serviceStatusError, setServiceStatusError] = useState(null);
+
+  const setError = useCallback((value, fallback = "Something went wrong.") => {
+    if (value == null || value === "") {
+      setErrorState(null);
+      setErrorMeta(null);
+      return;
+    }
+    const source = typeof value === "string" ? { message: value } : value;
+    setErrorState(getApiErrorMessage(source, fallback));
+    setErrorMeta(getApiErrorMeta(source, fallback));
+  }, []);
+
+  const clearError = useCallback(() => {
+    setErrorState(null);
+    setErrorMeta(null);
+  }, []);
 
   const mountedRef = useRef(false);
   const fetchIdRef = useRef(0);
@@ -275,12 +295,12 @@ export default function ServiceDetail() {
     }
 
     try {
-      const token = localStorage.getItem("access");
       const url = `${DEPLOY_BASE}${deployId}/download/`;
 
-      const resp = await axios.get(url, {
+      const resp = await apiRequest({
+        method: "GET",
+        url,
         responseType: "blob",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       const disposition = resp.headers["content-disposition"] || "";
@@ -302,13 +322,15 @@ export default function ServiceDetail() {
       safeSetSnackbar("success", "Download started.");
     } catch (err) {
       const status = err?.response?.status;
-      const msg =
-        status === 404
-          ? "File not found."
-          : status === 401 || status === 403
-          ? "You do not have permission to download this file."
-          : err?.response?.data?.detail || "Download failed.";
-      safeSetSnackbar("error", typeof msg === "string" ? msg : "Download failed.");
+      safeSetSnackbar(
+        "error",
+        getApiErrorMessage(
+          err,
+          status === 404
+            ? "The deployment file was not found."
+            : "Could not download the deployment file."
+        )
+      );
     }
   }, [safeSetSnackbar]);
 
@@ -339,7 +361,10 @@ export default function ServiceDetail() {
 
   const fetchService = useCallback(async (silent = false) => {
     if (!id) return;
-    if (!silent) setError(null);
+    if (!silent) {
+      clearError();
+      setServiceLoading(true);
+    }
 
     try {
       const resp = await apiRequest({ method: "GET", url: `${SERVICE_BASE}${id}/` });
@@ -376,9 +401,11 @@ export default function ServiceDetail() {
         } catch {}
       }
     } catch (err) {
-      if (!silent) setError("Failed to load service info.");
+      if (!silent) setError(err, "Failed to load service information.");
+    } finally {
+      if (!silent && mountedRef.current) setServiceLoading(false);
     }
-  }, [id]);
+  }, [id, clearError]);
 
   const fetchDeploys = useCallback(async (page = 1, silent = false) => {
     if (!id) return;
@@ -410,7 +437,7 @@ export default function ServiceDetail() {
         setPageInfo((prev) => (prev.count === data.count && prev.page === page ? prev : { ...prev, count: data.count, page }));
       }
     } catch (err) {
-      if (!silent) setError("Failed to load deploys.");
+      if (!silent) setError(err, "Failed to load deployments.");
     } finally {
       if (!silent) {
         fetchDeploysLock.current = false;
@@ -466,38 +493,44 @@ export default function ServiceDetail() {
     async (silent = false) => {
       if (!id) return;
       if (!silent && serviceStatusLoadingManual) return;
-      if (!silent) setServiceStatusLoadingManual(true);
+      if (!silent) {
+        setServiceStatusLoadingManual(true);
+        setServiceStatusError(null);
+      }
 
       try {
-        const resp = await apiRequest({ method: "POST", url: `${SERVICE_ACTION_ROOT}service_status/`, data: { service_id: id } });
+        const resp = await apiRequest({
+          method: "POST",
+          url: `${SERVICE_ACTION_ROOT}service_status/`,
+          data: { service_id: id },
+        });
+
         if (resp.status === 200 && resp.data) {
           const running = Boolean(resp.data.running);
           const cpu = resp.data.cpu == null ? null : normalizePercent(resp.data.cpu);
           const ram = resp.data.ram == null ? null : normalizePercent(resp.data.ram);
-          setServiceRunning((prev) => (prev === running ? prev : running));
-          setServiceCpu((prev) => (
-            prev === cpu
-              ? prev
-              : cpu
-          ));
-          setServiceRam((prev) => (
-            prev === ram
-              ? prev
-              : ram
-          ));
+
+          setServiceRunning(running);
+          setServiceCpu(cpu);
+          setServiceRam(ram);
+
+          if (!silent && resp.data.metrics_available === false && resp.data.detail) {
+            setSnackbar((prev) => prev || {
+              severity: "warning",
+              message: String(resp.data.detail),
+            });
+          }
         } else if (!silent) {
-          setServiceRunning(false);
-          setServiceCpu(null);
-          setServiceRam(null);
+          setServiceStatusError({
+            message: "The backend returned an unexpected runtime status response.",
+          });
         }
       } catch (err) {
-        if (!silent) {
-          setServiceRunning(false);
-          setServiceCpu(null);
-          setServiceRam(null);
-        }
+        if (!silent) setServiceStatusError(err);
       } finally {
-        if (!silent) setServiceStatusLoadingManual(false);
+        if (!silent && mountedRef.current) {
+          setServiceStatusLoadingManual(false);
+        }
       }
     },
     [id, serviceStatusLoadingManual, normalizePercent]
@@ -670,11 +703,11 @@ export default function ServiceDetail() {
       const deployId = deploy.id || deploy.pk;
       (async () => {
         try {
-          const access = localStorage.getItem("access");
-          const headers = access ? { Authorization: `Bearer ${access}` } : {};
-          const resp = await fetch(`${DEPLOY_BASE}${deployId}/reveal_db_credentials/`, { headers });
-          if (!resp.ok) return; // silently fail — form still works, just empty
-          const data = await resp.json();
+          const resp = await apiRequest({
+            method: "GET",
+            url: `${DEPLOY_BASE}${deployId}/reveal_db_credentials/`,
+          });
+          const data = resp?.data || {};
           if (data.result === "success" && data.config) {
             const c = data.config;
             setEditDbFields((prev) => ({
@@ -756,9 +789,11 @@ export default function ServiceDetail() {
         if (configPayload) fd.append("config", typeof configPayload === "string" ? configPayload : JSON.stringify(configPayload ?? {}));
         fd.append("zip_file", zipFile);
 
-        const access = localStorage.getItem("access");
-        const headers = access ? { Authorization: `Bearer ${access}` } : {};
-        const resp = await axios.post(`${DEPLOY_BASE}`, fd, { headers });
+        const resp = await apiRequest({
+          method: "POST",
+          url: `${DEPLOY_BASE}`,
+          data: fd,
+        });
 
         if (resp.status === 201) {
           const createdName = resp.data?.deploy?.name || name;
@@ -770,7 +805,7 @@ export default function ServiceDetail() {
         } else { setError("Create upload failed."); }
       }
     } catch (err) {
-      setError(err.response?.data ? JSON.stringify(err.response.data) : "Unexpected error creating deploy.");
+      setError(err, "Unexpected error while creating the deployment.");
     } finally {
       if (mountedRef.current) setSubmitting(false);
     }
@@ -808,15 +843,17 @@ export default function ServiceDetail() {
         if (configPayload) fd.append("config", typeof configPayload === "string" ? configPayload : JSON.stringify(configPayload ?? {}));
         fd.append("zip_file", editZipFile);
 
-        const access = localStorage.getItem("access");
-        const headers = access ? { Authorization: `Bearer ${access}` } : {};
-        const resp = await axios.put(`${DEPLOY_BASE}${deployId}/`, fd, { headers });
+        const resp = await apiRequest({
+          method: "PUT",
+          url: `${DEPLOY_BASE}${deployId}/`,
+          data: fd,
+        });
 
         if (resp.status === 200) { safeSetSnackbar("success", "Deploy updated."); await fetchDeploys(pageInfo.page); handleCancelEdit(); }
         else setError("Update file upload failed.");
       }
     } catch (err) {
-      setError(err.response ? JSON.stringify(err.response.data) : "Unexpected update error");
+      setError(err, "Unexpected error while updating the deployment.");
     } finally {
       setAction(deployId, { updating: false });
     }
@@ -829,7 +866,7 @@ export default function ServiceDetail() {
       if (resp.status >= 200 && resp.status < 300) { safeSetSnackbar("success", "Deploy deleted."); await fetchDeploys(pageInfo.page); }
       else setError("Delete failed.");
     } catch (err) {
-      setError(err.response ? JSON.stringify(err.response.data) : "Unexpected delete error");
+      setError(err, "Unexpected error while deleting the deployment.");
     } finally {
       setAction(deployId, { deleting: false });
     }
@@ -881,7 +918,7 @@ export default function ServiceDetail() {
         setTimeout(() => { if (mountedRef.current) { fetchService(true); checkServiceRunning(true); } }, 4000);
       } else { setError(forceRebuild ? "Failed to rebuild service." : "Failed to start service."); }
     } catch (err) {
-      setError(err.response?.data?.detail || (err.response ? JSON.stringify(err.response.data) : "Error starting service"));
+      setError(err, "Could not start the service.");
     } finally {
       if (forceRebuild && mountedRef.current) setRebuildLoading(false);
     }
@@ -934,7 +971,7 @@ export default function ServiceDetail() {
       // No deploy is selected. Service-level rebuild is the intended fallback.
       await startService({ forceRebuild: true });
     } catch (err) {
-      setError(err.response?.data?.detail || (err.response ? JSON.stringify(err.response.data) : "Error rebuilding service"));
+      setError(err, "Could not rebuild the service.");
     } finally {
       if (mountedRef.current) setRebuildLoading(false);
     }
@@ -1016,7 +1053,7 @@ export default function ServiceDetail() {
         setTimeout(() => { if (mountedRef.current) { fetchService(true); checkServiceRunning(true); } }, 4000);
       } else setError("Failed to stop service.");
     } catch (err) {
-      setError(err.response ? JSON.stringify(err.response.data) : "Error stopping service");
+      setError(err, "Could not stop the service.");
     }
   };
 
@@ -1355,9 +1392,7 @@ export default function ServiceDetail() {
   };
 
   const openServiceInNewTab = () => {
-    const host = service?.service_host || (service?.service_name
-      ? `${service.service_name}.${import.meta.env.VITE_DEPLOY_BASE}`
-      : "");
+    const host = service?.service_host || "";
     if (!host) return;
     const url = /^https?:\/\//i.test(host) ? host : `https://${host}`;
     window.open(url, "_blank", "noopener,noreferrer");
@@ -1393,6 +1428,87 @@ export default function ServiceDetail() {
           onRefresh={silentRefresh}
           navigate={navigate}
         />
+
+        <ServiceErrorAlert
+          error={errorMeta || error}
+          title={!service && !serviceLoading ? "Service unavailable" : "Service action needs attention"}
+          onRetry={() => {
+            clearError();
+            if (service) {
+              silentRefresh();
+            } else {
+              fetchService(false);
+            }
+          }}
+          onClose={clearError}
+        />
+
+        {serviceStatusError ? (
+          <ServiceErrorAlert
+            error={serviceStatusError}
+            title="Runtime status unavailable"
+            onRetry={() => checkServiceRunning(false)}
+            onClose={() => setServiceStatusError(null)}
+          />
+        ) : null}
+
+      {!service && serviceLoading ? (
+        <Paper
+          elevation={0}
+          sx={{
+            minHeight: 300,
+            display: "grid",
+            placeItems: "center",
+            p: 4,
+            mb: 2,
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+            backgroundImage: (t) =>
+              t.palette.mode === "dark"
+                ? "linear-gradient(145deg, rgba(30,41,59,0.45), rgba(15,23,42,0.7))"
+                : "linear-gradient(145deg, #ffffff, #f8fafc)",
+          }}
+        >
+          <Stack spacing={1} alignItems="center" textAlign="center">
+            <CircularProgress size={30} />
+            <Typography sx={{ fontWeight: 850 }}>Loading service</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Fetching service configuration, deployments, and runtime state…
+            </Typography>
+          </Stack>
+        </Paper>
+      ) : null}
+
+      {!service && !serviceLoading && error ? (
+        <Paper
+          elevation={0}
+          sx={{
+            minHeight: 220,
+            display: "grid",
+            placeItems: "center",
+            p: 4,
+            mb: 2,
+            borderRadius: 3,
+            border: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Stack spacing={1.25} alignItems="center" textAlign="center">
+            <Typography sx={{ fontWeight: 850 }}>We couldn’t open this service</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
+              The service data was not available. Use Retry above, or return to the services list.
+            </Typography>
+            <Button
+              variant="outlined"
+              onClick={() => navigate("/dashboard/services")}
+              sx={{ borderRadius: 2, fontWeight: 800 }}
+            >
+              Back to services
+            </Button>
+          </Stack>
+        </Paper>
+      ) : null}
 
       {/* Mobile: single sticky identity header (no duplicate stats elsewhere) */}
       {!isDesktop ? (
