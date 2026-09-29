@@ -36,7 +36,8 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import apiRequest from "../../customHooks/apiRequest";
+import apiRequest, { clearAuthAndRedirect } from "../../customHooks/apiRequest";
+import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import { SERVICE_ACTION_ROOT } from "../constants";
 import { langLabel } from "../../messenger/modules/codeHighlight";
 import hljs from "highlight.js/lib/common";
@@ -439,6 +440,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     const shellToken = session?.token;
     const accessToken = typeof window !== "undefined" ? localStorage.getItem("access") : null;
     if (!shellToken || !accessToken || !serviceId) return undefined;
+    if (!isSessionBoundToken(accessToken)) {
+      clearAuthAndRedirect();
+      return undefined;
+    }
 
     const base = typeof window !== "undefined" ? window.location : null;
     if (!base) return undefined;
@@ -456,8 +461,17 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     const socketUrl = `${protocol}//${backendUrl.host}/ws/services/shell/${serviceId}/?token=${encodeURIComponent(accessToken)}&shell_token=${encodeURIComponent(shellToken)}`;
     const socket = new WebSocket(socketUrl);
     shellSocketRef.current = socket;
+    let pingTimer = null;
 
-    socket.onopen = () => appendHistory({ type: "system", text: "Interactive PTY connected." });
+    socket.onopen = () => {
+      appendHistory({ type: "system", text: "Interactive PTY connected." });
+      clearInterval(pingTimer);
+      pingTimer = setInterval(() => {
+        if (socket.readyState === WebSocket.OPEN) {
+          try { socket.send(JSON.stringify({ type: "ping" })); } catch { /* noop */ }
+        }
+      }, 20000);
+    };
     socket.onmessage = (event) => {
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
@@ -515,13 +529,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       }
     };
     socket.onerror = () => { /* Basic command API remains available when PTY is unavailable. */ };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
+      clearInterval(pingTimer);
+      if (event.code === 4401) {
+        clearAuthAndRedirect();
+      }
       shellSocketRef.current = null;
       setInteractiveRunning(false);
       setInteractiveInput("");
       setInteractiveSecret(false);
     };
     return () => {
+      clearInterval(pingTimer);
       try { socket.close(); } catch { /* noop */ }
       if (shellSocketRef.current === socket) shellSocketRef.current = null;
     };
