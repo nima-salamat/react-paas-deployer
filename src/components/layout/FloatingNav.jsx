@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import apiRequest from "../customHooks/apiRequest.jsx";
+import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
 import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -94,7 +95,7 @@ export default function FloatingNav({
   const navigate = useNavigate();
   const location = useLocation();
 
-  const readLoggedIn = () => Boolean(window.localStorage.getItem("access"));
+  const readLoggedIn = () => Boolean(getSessionBoundAccessToken(window.localStorage));
 
   const [open, setOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(() =>
