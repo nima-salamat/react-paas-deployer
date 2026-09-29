@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import apiRequest, { refreshAccessToken } from "../../customHooks/apiRequest.jsx";
+import apiRequest, { clearAuthAndRedirect, isSessionBoundToken, refreshAccessToken } from "../../customHooks/apiRequest.jsx";
 import { MSG_API, WS_URL } from "../api";
 import { writeComposerDraft } from "../modules/composerDrafts";
 
@@ -421,6 +421,10 @@ useEffect(() => {
     if (!token) {
       // Not logged in — abort. The auth-changed listener will reconnect
       // after the user logs in.
+      return;
+    }
+    if (!isSessionBoundToken(token)) {
+      clearAuthAndRedirect();
       return;
     }
     // Proactively refresh the token if it's about to expire.
