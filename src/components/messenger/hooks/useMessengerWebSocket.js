@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import apiRequest, { clearAuthAndRedirect, isSessionBoundToken, refreshAccessToken } from "../../customHooks/apiRequest.jsx";
+import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest.jsx";
+import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import { MSG_API, WS_URL } from "../api";
 import { writeComposerDraft } from "../modules/composerDrafts";
 
