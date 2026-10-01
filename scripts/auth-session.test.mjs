@@ -313,7 +313,7 @@ test("messenger confirmed uploads cannot disappear with the transient upload row
 
 test("recorded video messages do not perform a redundant second encoding pass", () => {
   const composer = read("src/components/messenger/components/MessageComposer.jsx");
-  const start = composer.indexOf("const filename = mode === "video"");
+  const start = composer.indexOf(`const filename = mode === "video"`);
   const end = composer.indexOf("    mediaRecorderRef.current = mr;", start);
 
   assert.ok(start >= 0 && end > start);
