@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { hostBase } from "../adminUtils";
-import { clearAuthAndRedirect } from "../../customHooks/apiRequest.jsx";
+import { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest.jsx";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 
 /**
@@ -56,7 +56,18 @@ export function useTicketWebSocket({ enabled, onEvent }) {
       socket.onclose = (event) => {
         clearInterval(pingTimer);
         if (event.code === 4401) {
-          clearAuthAndRedirect();
+          setConnected(false);
+          refreshAccessToken()
+            .then(() => {
+              if (!closed) timer = setTimeout(connect, 150);
+            })
+            .catch(() => {
+              // Hard auth rejection is handled by refreshAccessToken; transient
+              // refresh/network failures must not destroy the local session.
+              if (!closed && localStorage.getItem("access")) {
+                timer = setTimeout(connect, 3000);
+              }
+            });
           return;
         }
         setConnected(false);
