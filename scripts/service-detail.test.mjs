@@ -117,7 +117,7 @@ test("service detail regression sources keep critical callback and error state d
 
   assert.match(
     service,
-    /const handleDownloadVolume = useCallback\(async \(volume\) =>[\s\S]*?\n  \}, \[safeSetSnackbar\]\);/,
+    /const handleDownloadVolume = useCallback\(async \(volume\) =>[\s\S]*?\n {2}\}, \[safeSetSnackbar\]\);/,
   );
   assert.equal(
     (settings.match(
@@ -162,6 +162,7 @@ test("service detail keeps the backend route contract", () => {
     "update_db_config/",
     "reveal_db_credentials/",
     "download/",
+    "plans/\${planId}/apply/",
   ]) {
     assert.match(service, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
