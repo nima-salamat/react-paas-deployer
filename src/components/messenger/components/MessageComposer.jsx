@@ -493,69 +493,6 @@ function joinMarkdownCode(prefix, files, suffix) {
 }
 
 
-/** Center-crop recorded video into a square (circle content only, no white frame). */
-async function cropVideoMessageToSquare(blob) {
-  if (!blob || !blob.size) return blob;
-  try {
-    const url = URL.createObjectURL(blob);
-    const video = document.createElement("video");
-    video.muted = true;
-    video.playsInline = true;
-    video.src = url;
-    await new Promise((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = reject;
-    });
-    const w = video.videoWidth || 480;
-    const h = video.videoHeight || 480;
-    const side = Math.min(w, h);
-    const sx = Math.floor((w - side) / 2);
-    const sy = Math.floor((h - side) / 2);
-    const canvas = document.createElement("canvas");
-    canvas.width = side;
-    canvas.height = side;
-    const ctx = canvas.getContext("2d");
-    const stream = canvas.captureStream(30);
-    // Prefer keeping original audio track if present
-    try {
-      const srcStream = video.captureStream?.() || video.mozCaptureStream?.();
-      if (srcStream) {
-        srcStream.getAudioTracks().forEach((tr) => stream.addTrack(tr));
-      }
-    } catch { /* */ }
-    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-      ? "video/webm;codecs=vp9,opus"
-      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
-        ? "video/webm;codecs=vp8,opus"
-        : "video/webm";
-    const chunks = [];
-    const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1_200_000 });
-    rec.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
-    const stopped = new Promise((resolve) => { rec.onstop = resolve; });
-    rec.start(100);
-    await video.play().catch(() => {});
-    const draw = () => {
-      if (video.paused || video.ended) return;
-      try { ctx.drawImage(video, sx, sy, side, side, 0, 0, side, side); } catch { /* */ }
-      requestAnimationFrame(draw);
-    };
-    draw();
-    await new Promise((resolve) => {
-      video.onended = resolve;
-      // safety timeout
-      setTimeout(resolve, Math.min(65000, (video.duration || 15) * 1000 + 500));
-    });
-    try { rec.stop(); } catch { /* */ }
-    await stopped;
-    URL.revokeObjectURL(url);
-    try { stream.getTracks().forEach((tr) => tr.stop()); } catch { /* */ }
-    if (!chunks.length) return blob;
-    return new Blob(chunks, { type: mime });
-  } catch {
-    return blob;
-  }
-}
-
 function MessageComposer({
 
   text, setText, textVersion = 0, files, setFiles,
