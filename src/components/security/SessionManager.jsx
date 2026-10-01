@@ -21,6 +21,10 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import LockClockOutlinedIcon from "@mui/icons-material/LockClockOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
+import LanguageOutlinedIcon from "@mui/icons-material/LanguageOutlined";
+import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
+import PhoneAndroidOutlinedIcon from "@mui/icons-material/PhoneAndroidOutlined";
+import TabletMacOutlinedIcon from "@mui/icons-material/TabletMacOutlined";
 import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
 import {
   fetchMySessions,
@@ -59,7 +63,54 @@ function formatRelative(value) {
 
 function sessionTitle(session) {
   const device = session?.device || {};
-  return device.name || device.client || device.platform || "Unknown device";
+  return device.name || [device.browser, device.os].filter(Boolean).join(" on ") || device.client || "Web browser";
+}
+
+function DeviceIcon({ type }) {
+  if (type === "mobile") return <PhoneAndroidOutlinedIcon color="action" />;
+  if (type === "tablet") return <TabletMacOutlinedIcon color="action" />;
+  return <ComputerOutlinedIcon color="action" />;
+}
+
+function DeviceDetails({ session }) {
+  const device = session?.device || {};
+  const browser = [device.browser, device.browser_version].filter(Boolean).join(" ");
+  const os = [device.os, device.os_version].filter(Boolean).join(" ");
+  const model = device.device_model || "";
+  const client = device.client || "";
+  const location = device.ip || device.last_ip || "";
+  const meta = device.client_metadata || {};
+
+  return (
+    <Stack spacing={0.35} sx={{ mt: 0.35, pr: 8 }}>
+      <Typography component="span" variant="caption" color="text.secondary">
+        {[browser, os, model].filter(Boolean).join(" · ") || client || "Browser session"}
+      </Typography>
+      <Typography component="span" variant="caption" color="text.secondary">
+        {location ? `IP ${location}` : "IP unavailable"}
+        {meta.timezone ? ` · ${meta.timezone}` : ""}
+        {meta.locale ? ` · ${meta.locale}` : ""}
+      </Typography>
+      <Typography component="span" variant="caption" color="text.secondary">
+        Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at)}
+      </Typography>
+      <Typography component="span" variant="caption" color="text.secondary">
+        Expires {formatDate(session?.expires_at)}
+      </Typography>
+      {device.user_agent && (
+        <Tooltip title={device.user_agent} placement="bottom-start">
+          <Typography
+            component="span"
+            variant="caption"
+            color="text.disabled"
+            sx={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {device.user_agent}
+          </Typography>
+        </Tooltip>
+      )}
+    </Stack>
+  );
 }
 
 function SessionRow({ session, canManageOthers, onRevoke, loadingId }) {
@@ -115,7 +166,7 @@ function SessionRow({ session, canManageOthers, onRevoke, loadingId }) {
       }
     >
       <ListItemIcon sx={{ minWidth: 38, pt: 0.25 }}>
-        <DevicesOutlinedIcon color={isCurrent ? "primary" : "action"} />
+        {isCurrent ? <DevicesOutlinedIcon color="primary" /> : <DeviceIcon type={session?.device?.device_type} />}
       </ListItemIcon>
       <ListItemText
         primary={
@@ -125,17 +176,7 @@ function SessionRow({ session, canManageOthers, onRevoke, loadingId }) {
           </Stack>
         }
         secondary={
-          <Stack spacing={0.25} sx={{ mt: 0.35, pr: 8 }}>
-            <Typography component="span" variant="caption" color="text.secondary">
-              {[session?.device?.platform, session?.device?.client].filter(Boolean).join(" · ") || "Device details unavailable"}
-            </Typography>
-            <Typography component="span" variant="caption" color="text.secondary">
-              Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at)}
-            </Typography>
-            <Typography component="span" variant="caption" color="text.secondary">
-              Expires {formatDate(session?.expires_at)}
-            </Typography>
-          </Stack>
+          <DeviceDetails session={session} />
         }
       />
     </ListItem>
