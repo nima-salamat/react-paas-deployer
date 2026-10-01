@@ -291,17 +291,15 @@ export default function Volumes() {
 
   const handleDownloadVolume = async (volume) => {
     try {
-      const token = localStorage.getItem("access");
       const id = volume.id ?? volume.pk;
-      const response = await fetch(`${VOLUME_ROOT}${id}/download/`, {
+      const response = await apiRequest({
         method: "GET",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        url: `${VOLUME_ROOT}${id}/download/`,
+        responseType: "blob",
       });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        throw new Error(body?.detail || body?.error || "Unable to download archive.");
-      }
-      const blob = await response.blob();
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data || ""]);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
