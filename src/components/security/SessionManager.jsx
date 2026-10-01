@@ -194,7 +194,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState("");
-  const [serverNow, setServerNow] = useState(null);
+  const [serverClockOffset, setServerClockOffset] = useState(0);
   const [loadingId, setLoadingId] = useState(null);
 
   const load = useCallback(async ({ silent = false } = {}) => {
@@ -207,7 +207,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
       setSessions(Array.isArray(data?.results) ? data.results : []);
       setActiveCount(Number(data?.active_count || 0));
       setMaxActiveSessions(data?.max_active_sessions ?? null);
-      if (data?.server_now) setServerNow(new Date(data.server_now).getTime());
+      if (data?.server_now) setServerClockOffset(new Date(data.server_now).getTime() - Date.now());
       setManagement({
         minimum_age_seconds: Number(data?.session_management?.minimum_age_seconds || 7200),
         current_session_age_seconds: Number(data?.session_management?.current_session_age_seconds || 0),
@@ -232,7 +232,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
       setSessions((current) => current.map((session) => (
         session.current ? { ...session, last_seen_at: timestamp } : session
       )));
-      setServerNow(new Date(timestamp).getTime());
+      setServerClockOffset(new Date(timestamp).getTime() - Date.now());
     };
     window.addEventListener("session-activity", onActivity);
     load();
@@ -243,7 +243,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
     };
   }, [load]);
 
-  const referenceNow = serverNow != null ? serverNow + (Date.now() - serverNow) : Date.now();
+  const referenceNow = Date.now() + serverClockOffset;
 
   const remainingSeconds = useMemo(
     () =>
