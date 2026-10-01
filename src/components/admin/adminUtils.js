@@ -73,14 +73,15 @@ export function docsAssetAdminUrl(assetId) {
 }
 
 export async function fetchDocsAssetBlob(assetId) {
-  const token = localStorage.getItem("access");
-  const response = await fetch(docsAssetAdminUrl(assetId), {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  const { default: apiRequest } = await import("../customHooks/apiRequest.jsx");
+  const response = await apiRequest({
+    method: "GET",
+    url: docsAssetAdminUrl(assetId),
+    responseType: "blob",
   });
-  if (!response.ok) {
-    throw new Error(`Asset preview failed (${response.status})`);
-  }
-  return response.blob();
+  return response.data instanceof Blob
+    ? response.data
+    : new Blob([response.data || ""]);
 }
 
 export function svcApi() {
