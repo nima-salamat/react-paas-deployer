@@ -3291,12 +3291,17 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const markChatRead = async (conv) => {
     try {
-      await apiRequest({
+      const response = await apiRequest({
         method: "POST",
         url: `${MSG_API}/conversations/${conv.id}/read/`,
         data: { force_all: true },
       });
-      loadConversations({ silent: true });
+      const data = unwrapData(response);
+      seedServerReadState(conv.id, messagesRef.current, data?.last_read_at);
+      setConversations((prev) => prev.map((row) => (
+        String(row.id) === String(conv.id) ? { ...row, unread_count: 0 } : row
+      )));
+      void loadConversations({ silent: true });
     } catch { /* */ }
   };
 
@@ -3852,7 +3857,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       data: {
         message_ids: batch,
       },
-    }).then(() => {
+    }).then((response) => {
+      const data = unwrapData(response);
+      seedServerReadState(cid, messagesRef.current, data?.last_read_at);
       // Keep the list badge responsive without waiting for the next polling
       // cycle. At the live edge, the server's last_read_at cursor covers all
       // earlier incoming messages in this conversation.
