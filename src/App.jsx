@@ -33,6 +33,7 @@ const Volumes = lazy(() => import("./components/volumes/Volumes.jsx"));
 const Networks = lazy(() => import("./components/networks/Networks.jsx"));
 import FloatingNav from "./components/layout/FloatingNav";
 import { getSessionBoundAccessToken } from "./components/customHooks/authSession.js";
+import SessionActivityHeartbeat from "./components/security/SessionActivityHeartbeat.jsx";
 import NotFound from "./components/not_found/NotFound.jsx";
 const DocsHome = lazy(() => import("./components/docs/DocsHome.jsx"));
 
@@ -362,6 +363,7 @@ export function App({ prerender = false }) {
         <CssBaseline enableColorScheme />
 
         <ConnectionReconnectDialog />
+        <SessionActivityHeartbeat />
 
         <TicketNotifyProvider>
           <RouteScrollManager />
