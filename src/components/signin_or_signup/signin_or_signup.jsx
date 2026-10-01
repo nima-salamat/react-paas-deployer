@@ -291,6 +291,7 @@ export default function SigninOrSignup() {
     setLoading(true);
     try {
       const payload = {
+        ...(await getDeviceAuthPayload()),
         code: form.code.trim(),
         password: form.password,
         ...(method === "email" ? { email: form.email.trim() } : { phone_number: form.phone.trim() }),
