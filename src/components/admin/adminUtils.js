@@ -1,3 +1,5 @@
+import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
+
 // Admin panel shared utilities + permission helpers.
 //
 // Centralizes:
@@ -47,13 +49,7 @@ export function authMediaSrc(url) {
   const absolute = url.startsWith("http")
     ? url
     : `${base}${url.startsWith("/") ? "" : "/"}${url}`;
-  let token = null;
-  try {
-    const { getSessionBoundAccessToken } = await import("../customHooks/authSession.js");
-    token = getSessionBoundAccessToken(localStorage);
-  } catch {
-    token = null;
-  }
+  const token = getSessionBoundAccessToken(localStorage);
   if (!token) return absolute;
   try {
     const u = new URL(absolute);
