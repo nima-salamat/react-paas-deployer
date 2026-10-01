@@ -266,12 +266,21 @@ test("session activity heartbeat is visible-aware and server-timestamp driven", 
   const source = read("src/components/security/SessionActivityHeartbeat.jsx");
   const sessionUi = read("src/components/security/SessionManager.jsx");
 
-  assert.match(source, /visibilityState/);
-  assert.match(source, //auth/api/sessions/activity\//);
-  assert.match(source, /HEARTBEAT_MS = 30_000/);
-  assert.match(source, /session-activity/);
-  assert.match(source, /auth-changed/);
-  assert.match(sessionUi, /serverClockOffset/);
-  assert.match(sessionUi, /server_now/);
-  assert.match(sessionUi, /session-activity/);
+  for (const marker of [
+    "visibilityState",
+    "/auth/api/sessions/activity/",
+    "HEARTBEAT_MS = 30_000",
+    "session-activity",
+    "auth-changed",
+  ]) {
+    assert.ok(source.includes(marker), `Missing heartbeat contract marker: ${marker}`);
+  }
+
+  for (const marker of [
+    "serverClockOffset",
+    "server_now",
+    "session-activity",
+  ]) {
+    assert.ok(sessionUi.includes(marker), `Missing session UI contract marker: ${marker}`);
+  }
 });
