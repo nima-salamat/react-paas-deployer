@@ -917,30 +917,12 @@ function MessageComposer({
       const rawFile = new File([blob], filename, { type: recordedType });
       rawFile._messengerAttachmentId = attachmentId;
 
-      // Put the recorded file into the attachment strip immediately. Video-note
-      // square/canvas processing continues in the background instead of blocking
-      // the user from seeing or editing the new attachment.
-      if (mode === "video") rawFile._messengerProcessing = true;
+      // Video notes are already recorded from the persistent 480×480 canvas
+      // stream in startMediaRecorderOnStream(). Re-encoding the finished clip
+      // here only adds a second real-time processing pass and creates a transient
+      // "Preparing…" state. Keep the recorded WebM as-is so it remains available
+      // immediately and can be uploaded without a second encoding race.
       flushSync(() => setFiles((prev) => [...prev, rawFile]));
-
-      if (mode === "video") {
-        cropVideoMessageToSquare(blob)
-          .then((cropped) => {
-            const finalFile = new File([cropped], filename, { type: cropped.type || recordedType });
-            finalFile._messengerAttachmentId = attachmentId;
-            setFiles((prev) => prev.map((item) => (
-              item?._messengerAttachmentId === attachmentId ? finalFile : item
-            )));
-          })
-          .catch(() => {
-            setFiles((prev) => prev.map((item) => {
-              if (item?._messengerAttachmentId !== attachmentId) return item;
-              const fallback = new File([blob], filename, { type: recordedType });
-              fallback._messengerAttachmentId = attachmentId;
-              return fallback;
-            }));
-          });
-      }
     };
     mediaRecorderRef.current = mr;
     mr.start(100);
