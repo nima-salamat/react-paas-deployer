@@ -117,6 +117,12 @@ test("messenger direct media auth rejects sessionless credentials", () => {
   assert.match(source, /clearAuthAndRedirect\(\);/);
 });
 
+test("authenticated navbar renders only imported logout icon symbols", () => {
+  const source = read("src/components/layout/Navbar.jsx");
+  assert.match(source, /import LogoutOutlinedIcon from "@mui\/icons-material\/LogoutOutlined";/);
+  assert.match(source, /<LogoutOutlinedIcon \/>/);
+});
+
 test("all browser websocket entry points enforce session-bound credentials", () => {
   const files = [
     "src/components/messenger/hooks/useMessengerWebSocket.js",
@@ -130,6 +136,25 @@ test("all browser websocket entry points enforce session-bound credentials", () 
   for (const file of files) {
     const source = read(file);
     assert.match(source, /isSessionBoundToken/);
+  }
+});
+
+test("browser websocket clients can recover a 4401 through refresh", () => {
+  const files = [
+    "src/components/messenger/hooks/useMessengerWebSocket.js",
+    "src/components/service_detail/hooks/useServiceLogs.js",
+    "src/components/service_detail/hooks/useDeployLogs.js",
+    "src/components/service_detail/components/ShellPanel.jsx",
+    "src/components/tickets/TicketNotifyContext.jsx",
+    "src/components/admin/hooks/useTicketWebSocket.js",
+  ];
+
+  for (const file of files) {
+    const source = read(file);
+    assert.match(source, /refreshAccessToken/);
+    if (file !== "src/components/tickets/TicketNotifyContext.jsx") {
+      assert.match(source, /4401/);
+    }
   }
 });
 
