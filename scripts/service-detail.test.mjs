@@ -167,6 +167,13 @@ test("service detail keeps the backend route contract", () => {
   }
 
   assert.match(service, /plans\/\$\{planId\}\/apply\//);
+  const downloadStart = service.indexOf("const handleDownloadVolume");
+  const planStart = service.indexOf("const handleApplyPlan");
+  assert.ok(downloadStart >= 0 && planStart > downloadStart);
+  assert.equal(
+    service.slice(downloadStart, planStart).includes("setPlanActionLoading(false)"),
+    false,
+  );
 
   assert.match(overview, /reveal_db_credentials/);
   assert.match(create, /inspect_zip/);
