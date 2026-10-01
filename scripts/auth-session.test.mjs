@@ -284,3 +284,41 @@ test("session activity heartbeat is visible-aware and server-timestamp driven", 
     assert.ok(sessionUi.includes(marker), `Missing session UI contract marker: ${marker}`);
   }
 });
+
+test("messenger read tracking flushes before chat switches and serializes list refreshes", () => {
+  const messenger = read("src/components/messenger/MessengerApp.jsx");
+
+  assert.match(messenger, /flushSeenReceiptsRef/);
+  assert.match(
+    messenger,
+    /Flush viewport reads before switching chats[sS]*flushSeenReceiptsRef.current(leavingId)/,
+  );
+  assert.match(messenger, /conversationRefreshSeqRef/);
+  assert.match(
+    messenger,
+    /Only the newest silent response is allowed to mutate the list state/,
+  );
+});
+
+test("messenger confirmed uploads cannot disappear with the transient upload row", () => {
+  const messenger = read("src/components/messenger/MessengerApp.jsx");
+
+  assert.match(messenger, /upsertConfirmedMessage/);
+  assert.match(messenger, /confirmedMessageId: created.id/);
+  assert.match(
+    messenger,
+    /Remove the transient upload row only after that confirmed message is actually present/,
+  );
+});
+
+test("recorded video messages do not perform a redundant second encoding pass", () => {
+  const composer = read("src/components/messenger/components/MessageComposer.jsx");
+  const start = composer.indexOf("const filename = mode === "video"");
+  const end = composer.indexOf("    mediaRecorderRef.current = mr;", start);
+
+  assert.ok(start >= 0 && end > start);
+  const recordingFinalizeBlock = composer.slice(start, end);
+  assert.doesNotMatch(recordingFinalizeBlock, /_messengerProcessing/);
+  assert.doesNotMatch(recordingFinalizeBlock, /cropVideoMessageToSquare(blob)/);
+  assert.match(recordingFinalizeBlock, /flushSync(() => setFiles/);
+});
