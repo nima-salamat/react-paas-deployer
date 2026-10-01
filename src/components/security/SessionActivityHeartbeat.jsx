@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import apiRequest from "../customHooks/apiRequest.jsx";
-import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
+import { isSessionBoundToken } from "../customHooks/authSession.js";
 
 const ACTIVITY_URL = () => {
   const host = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
@@ -18,7 +18,8 @@ export default function SessionActivityHeartbeat() {
 
     const pulse = async () => {
       if (disposed || document.visibilityState !== "visible") return;
-      if (!getSessionBoundAccessToken(window.localStorage)) return;
+      const access = window.localStorage.getItem("access");
+      if (!access || !isSessionBoundToken(access)) return;
       if (Date.now() - lastSentAt.current < 5_000) return;
 
       try {
