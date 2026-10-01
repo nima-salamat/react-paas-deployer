@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import axios from "axios";
+import apiRequest from "../customHooks/apiRequest.jsx";
 import {
   Box,
   Paper,
@@ -31,9 +31,11 @@ export default function LoggingHealthPanel({ apiPath = "/api/service/admin/loggi
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("access");
-      const resp = await axios.get(apiPath, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const resp = await apiRequest({
+        method: "GET",
+        url: apiPath.startsWith("http")
+          ? apiPath
+          : `https://${import.meta.env.VITE_API_BASE}${apiPath.startsWith("/") ? "" : "/"}${apiPath}`,
       });
       setData(resp.data);
     } catch (e) {
