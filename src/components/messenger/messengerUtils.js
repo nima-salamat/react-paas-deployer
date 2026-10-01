@@ -284,7 +284,7 @@ export function withTokenQuery(url) {
   const rawBase = (import.meta.env.VITE_API_BASE || "").replace(/^https?:\/\//i, "").replace(/\/+$/, "");
   if (!rawBase) {
     // Misconfigured env — still try relative resolution on current origin
-    const token = localStorage.getItem("access");
+    const token = getSessionBoundAccessToken(localStorage);
     if (!token) return url;
     try {
       const u = new URL(url, window.location.origin);
@@ -310,7 +310,7 @@ export function withTokenQuery(url) {
     if (u.origin !== apiOrigin && u.origin !== window.location.origin) {
       return url;
     }
-    const token = localStorage.getItem("access");
+    const token = getSessionBoundAccessToken(localStorage);
     if (!token) {
       // Still return absolute API URL so the browser does not hit the SPA origin
       return u.toString();
