@@ -1330,7 +1330,7 @@ export default function ServiceDetail() {
     } finally {
       if (mountedRef.current) setPlanActionLoading(false);
     }
-  };
+  }, [safeSetSnackbar]);
 
   const handleDownloadEntries = useCallback((filename, entries) => {
     const lines = (entries || []).map((entry) => getDeployEntryText(entry));
