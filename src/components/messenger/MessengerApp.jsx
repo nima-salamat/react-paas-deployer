@@ -162,6 +162,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const flushedSeenRef = useRef(new Set()); // already POSTed to /read/
   const [seenMsgIds, setSeenMsgIds] = useState(() => new Set());
   const seenFlushTimerRef = useRef(null);
+  const flushSeenReceiptsRef = useRef(() => {});
   const typingStopTimerRef = useRef(null);
   const typingSentRef = useRef(false);
   const selectionAutoScrollRef = useRef(null);
@@ -1393,8 +1394,17 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }
     // Persist scroll position of the chat we are leaving
     if (activeIdRef.current && String(activeIdRef.current) !== cid) {
+      const leavingId = String(activeIdRef.current);
+      // Flush viewport reads before switching chats so a quick chat change does
+      // not discard the 250 ms read batch that was waiting for its timer.
+      try { flushSeenReceiptsRef.current(leavingId); } catch { /* */ }
+      if (seenFlushTimerRef.current) {
+        clearTimeout(seenFlushTimerRef.current);
+        seenFlushTimerRef.current = null;
+      }
+
       const el = listRef.current;
-      const prevKey = String(activeIdRef.current);
+      const prevKey = leavingId;
       const prev = messagesCacheRef.current.get(prevKey) || {};
       if (el && !restoringScrollRef.current) {
         const distBottom = Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight);
@@ -1443,6 +1453,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const cached = messagesCacheRef.current.get(cid);
     setNewBelowCount(0);
     pendingNewIdsRef.current = [];
+    if (seenFlushTimerRef.current) {
+      clearTimeout(seenFlushTimerRef.current);
+      seenFlushTimerRef.current = null;
+    }
     seenQueuedRef.current = new Set();
     flushedSeenRef.current = new Set();
     setSeenMsgIds(new Set());
@@ -3663,7 +3677,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const flushSeenReceipts = useCallback((cid) => {
     if (!cid) return;
-    // Only POST ids not yet acknowledged in this session
+    // Only POST ids not yet acknowledged in this session.
     const pending = Array.from(seenQueuedRef.current)
       .filter((id) => !flushedSeenRef.current.has(String(id)));
     if (!pending.length) return;
@@ -3672,23 +3686,37 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       .filter((n) => Number.isFinite(n) && n > 0)
       .slice(-200);
     if (!batch.length) return;
-    // Optimistic: mark flushed so rapid scroll does not spam identical POSTs
+
+    // Optimistic de-duplication: a scrolling user may intersect the same
+    // message repeatedly before the server acknowledges the read.
     batch.forEach((id) => flushedSeenRef.current.add(String(id)));
+
     apiRequest({
       method: "POST",
       url: `${MSG_API}/conversations/${cid}/read/`,
       data: {
         message_ids: batch,
-        // Some backends also accept last_read_id
-        last_read_id: batch[batch.length - 1],
       },
     }).then(() => {
-      loadConversations({ silent: true });
+      // Keep the list badge responsive without waiting for the next polling
+      // cycle. At the live edge, the server's last_read_at cursor covers all
+      // earlier incoming messages in this conversation.
+      if (String(activeIdRef.current) === String(cid) && nearBottomRef.current) {
+        setConversations((prev) => prev.map((c) => (
+          String(c.id) === String(cid) ? { ...c, unread_count: 0 } : c
+        )));
+      }
+      // The backend invalidates the current user's cached list after advancing
+      // last_read_at, so this reconciliation now reads a fresh projection.
+      void loadConversations({ silent: true });
     }).catch(() => {
-      // Allow retry on next visibility pass
+      // A failed request must remain retryable. Do not permanently mark these
+      // ids as flushed just because the optimistic dedupe happened first.
       batch.forEach((id) => flushedSeenRef.current.delete(String(id)));
     });
   }, []);
+
+  flushSeenReceiptsRef.current = flushSeenReceipts;
 
   const markVisibleMessagesRead = useCallback(() => {
     const cid = activeIdRef.current;
