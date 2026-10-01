@@ -1007,6 +1007,14 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       setActiveDetail(data);
       setInviteLinks(data?.invite_links || []);
       if (data?.id) {
+        const selfParticipant = (data.participants || []).find(
+          (participant) => String(participant?.user?.id ?? participant?.user_id) === String(meId)
+        );
+        seedServerReadState(
+          data.id,
+          messagesRef.current,
+          selfParticipant?.last_read_at || null,
+        );
         const key = String(data.id);
         const prev = messagesCacheRef.current.get(key) || {};
         touchMessengerMsgCache(messagesCacheRef.current, key, { ...prev, detail: data });
@@ -1101,6 +1109,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       // Don't update UI if user already switched away
       if (!isActive()) return;
 
+      seedServerReadState(key, items);
       if (!doReplace && (silent || preserveOlder)) {
         setMessages((prev) => normalizeMessages(mergeLists(prev, items)));
         messagesConvIdRef.current = cid;
@@ -1489,6 +1498,17 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
     // Restore from cache instantly (no spinner / no blank flash)
     const cached = messagesCacheRef.current.get(cid);
+    const initialParticipant = (c.participants || []).find(
+      (participant) => String(participant?.user?.id ?? participant?.user_id) === String(meId)
+    );
+    const cachedParticipant = (cached?.detail?.participants || []).find(
+      (participant) => String(participant?.user?.id ?? participant?.user_id) === String(meId)
+    );
+    seedServerReadState(
+      cid,
+      [],
+      initialParticipant?.last_read_at || cachedParticipant?.last_read_at || null,
+    );
     setNewBelowCount(0);
     pendingNewIdsRef.current = [];
     if (seenFlushTimerRef.current) {
@@ -1513,6 +1533,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     setCurrentPinIndex(0);
     if (cached?.messages?.length) {
       messagesConvIdRef.current = c.id;
+      seedServerReadState(cid, cached.messages);
       setMessages(normalizeMessages(cached.messages || []));
       // Prefer cached flags; if missing, assume there may be older history so
       // loadOlder can probe (server returns empty → hasMore false).
