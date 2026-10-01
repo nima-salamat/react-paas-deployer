@@ -33,8 +33,8 @@ Browser (this app)
 Django API  →  Celery  →  Docker
 ```
 
-1. User authenticates; access/refresh tokens are stored in `localStorage`.  
-2. API helper retries once after refresh on `401`.  
+1. User authenticates; session-bound access/refresh tokens are stored in `localStorage`, and legacy sessionless credentials are cleared.  
+2. API helper refreshes access tokens through the backend session endpoint and retries the original request once after `401`.  
 3. Service list and detail pages poll status and open WS streams when needed.  
 4. Creating a service attaches a network and optional volumes, then deploys run through the backend orchestrator.  
 5. Settings UI enforces the same volume rules as the API (no unsafe edits while a container is running).
@@ -174,10 +174,15 @@ Build and validate:
 
 ```bash
 npm ci
+npm run test:auth
+npm run test:service-detail
+npm run lint
 npm run build
 npm run seo:check
 npm run start   # node server.js → port 3000
 ```
+
+The service-detail regression suite includes source-level contracts for the centralized API/error layer and critical callback/state declarations; ESLint remains the parser/build gate for JSX syntax.
 
 For production, the edge proxy should canonicalize the public host (HTTPS and the preferred hostname) before requests reach Node. Keep application routing and SEO redirects at the same canonical URL policy.
 
