@@ -245,3 +245,18 @@ test("browser login payload includes persistent device metadata", () => {
   assert.match(signin, /getDeviceAuthPayload/);
   assert.match(signin, /device_id/);
 });
+
+
+test("session UIs render rich device details instead of unavailable placeholders", () => {
+  const sessionUi = read("src/components/security/SessionManager.jsx");
+  const adminUi = read("src/components/admin/components/AdminUserSessionsDialog.jsx");
+
+  for (const source of [sessionUi, adminUi]) {
+    assert.match(source, /browser/);
+    assert.match(source, /browser_version/);
+    assert.match(source, /device_model/);
+    assert.match(source, /device_type/);
+    assert.match(source, /last_ip/);
+    assert.doesNotMatch(source, /Device details unavailable/);
+  }
+});
