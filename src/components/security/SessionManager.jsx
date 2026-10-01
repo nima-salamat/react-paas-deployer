@@ -21,7 +21,6 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import LockClockOutlinedIcon from "@mui/icons-material/LockClockOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
-import LanguageOutlinedIcon from "@mui/icons-material/LanguageOutlined";
 import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
 import PhoneAndroidOutlinedIcon from "@mui/icons-material/PhoneAndroidOutlined";
 import TabletMacOutlinedIcon from "@mui/icons-material/TabletMacOutlined";
