@@ -4,9 +4,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, SERVICE_BASE, LOG_BUFFER_MAX, LOG_PAGE_SIZE } from "../constants";
 import { normalizeLogEntry } from "../utils";
-import apiRequest from "../../customHooks/apiRequest";
+import apiRequest, { refreshAccessToken } from "../../customHooks/apiRequest";
 import { getApiErrorMessage } from "../errorUtils";
-import { clearAuthAndRedirect } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 
 const SEARCH_DEBOUNCE_MS = 350;
