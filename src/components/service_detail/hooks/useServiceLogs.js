@@ -269,7 +269,16 @@ export default function useServiceLogs({ serviceId, enabled }) {
       if (!mountedRef.current) return;
       setConnected(false);
       if (evt.code === 4401) {
-        clearAuthAndRedirect();
+        refreshAccessToken()
+          .then(() => {
+            if (!mountedRef.current) return;
+            reconnectAttempt.current = 0;
+            reconnectTimer.current = setTimeout(() => connectWs(), 100);
+          })
+          .catch(() => {
+            if (!mountedRef.current || !shouldReconnect.current || !localStorage.getItem("access")) return;
+            reconnectTimer.current = setTimeout(() => connectWs(), 3000);
+          });
         return;
       }
       if (!shouldReconnect.current || evt.wasClean) return;
