@@ -233,3 +233,15 @@ test("home and dashboard account triggers share the same account menu", () => {
   assert.match(accountMenu, /Sign out/);
   assert.match(accountMenu, /Confirm logout/);
 });
+
+
+test("browser login payload includes persistent device metadata", () => {
+  const identity = read("src/components/security/deviceIdentity.js");
+  const signin = read("src/components/signin_or_signup/signin_or_signup.jsx");
+  assert.match(identity, /paas_device_id/);
+  assert.match(identity, /getDeviceAuthPayload/);
+  assert.match(identity, /client_signature/);
+  assert.match(identity, /client_metadata/);
+  assert.match(signin, /getDeviceAuthPayload/);
+  assert.match(signin, /device_id/);
+});
