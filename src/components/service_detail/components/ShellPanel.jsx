@@ -36,7 +36,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import apiRequest, { clearAuthAndRedirect } from "../../customHooks/apiRequest";
+import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import { SERVICE_ACTION_ROOT } from "../constants";
 import { langLabel } from "../../messenger/modules/codeHighlight";
@@ -247,6 +247,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [envItems, setEnvItems] = useState([]);
   const [health, setHealth] = useState(null);
   const [snippetsOpen, setSnippetsOpen] = useState(false);
+  const [authGeneration, setAuthGeneration] = useState(0);
 
   const shellSocketRef = useRef(null);
   // Unified "busy" flag: outer prompt must not appear while a child owns the TTY
@@ -431,6 +432,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, [apiRoot, session?.token]);
 
   useEffect(() => {
+    const onAuthChanged = () => setAuthGeneration((value) => value + 1);
+    window.addEventListener("auth-changed", onAuthChanged);
+    return () => window.removeEventListener("auth-changed", onAuthChanged);
+  }, []);
+
+  useEffect(() => {
     if (!session?.token) return;
     refreshDirectory();
     loadCommandCatalog();
@@ -532,7 +539,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     socket.onclose = (event) => {
       clearInterval(pingTimer);
       if (event.code === 4401) {
-        clearAuthAndRedirect();
+        refreshAccessToken().catch(() => {});
       }
       shellSocketRef.current = null;
       setInteractiveRunning(false);
@@ -544,7 +551,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       try { socket.close(); } catch { /* noop */ }
       if (shellSocketRef.current === socket) shellSocketRef.current = null;
     };
-  }, [appendHistory, focusTerminal, serviceId, session?.token]);
+  }, [appendHistory, focusTerminal, serviceId, session?.token, authGeneration]);
 
   const createSession = useCallback(async () => {
     if (!serviceId || !enabled || sessionLoading || session) return;
