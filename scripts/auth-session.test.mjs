@@ -260,3 +260,18 @@ test("session UIs render rich device details instead of unavailable placeholders
     assert.doesNotMatch(source, /Device details unavailable/);
   }
 });
+
+
+test("session activity heartbeat is visible-aware and server-timestamp driven", () => {
+  const source = read("src/components/security/SessionActivityHeartbeat.jsx");
+  const sessionUi = read("src/components/security/SessionManager.jsx");
+
+  assert.match(source, /visibilityState/);
+  assert.match(source, //auth/api/sessions/activity\//);
+  assert.match(source, /HEARTBEAT_MS = 30_000/);
+  assert.match(source, /session-activity/);
+  assert.match(source, /auth-changed/);
+  assert.match(sessionUi, /serverClockOffset/);
+  assert.match(sessionUi, /server_now/);
+  assert.match(sessionUi, /session-activity/);
+});
