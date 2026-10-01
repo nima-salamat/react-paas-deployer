@@ -18,7 +18,6 @@ import {
   Typography,
   Tooltip,
 } from "@mui/material";
-import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/Refresh";
 import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
