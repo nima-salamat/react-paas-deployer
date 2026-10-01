@@ -47,7 +47,13 @@ export function authMediaSrc(url) {
   const absolute = url.startsWith("http")
     ? url
     : `${base}${url.startsWith("/") ? "" : "/"}${url}`;
-  const token = localStorage.getItem("access");
+  let token = null;
+  try {
+    const { getSessionBoundAccessToken } = await import("../customHooks/authSession.js");
+    token = getSessionBoundAccessToken(localStorage);
+  } catch {
+    token = null;
+  }
   if (!token) return absolute;
   try {
     const u = new URL(absolute);
