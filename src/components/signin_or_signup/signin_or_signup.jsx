@@ -24,6 +24,7 @@ import LinkIcon from "@mui/icons-material/Link";
 import Block from "@mui/icons-material/Block";
 import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
 import { isSessionBoundToken } from "../customHooks/authSession.js";
+import { getDeviceAuthPayload } from "../security/deviceIdentity.js";
 
 const BASE_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api`;
 const MotionPaper = motion.create(Paper);
@@ -83,13 +84,13 @@ export default function SigninOrSignup() {
   const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
   const showError = (msg) => { setError(msg); setSnackOpen(true); };
 
-  const getPayload = () => {
+  const getPayload = async () => {
     const base = {};
     if (settings.allow_username && form.username.trim()) base.username = form.username.trim();
     if (method === "email" && form.email.trim()) base.email = form.email.trim();
     if (method === "phone" && form.phone.trim()) base.phone_number = form.phone.trim();
     if (inviteToken) base.invite = inviteToken;
-    return base;
+    return { ...base, ...(await getDeviceAuthPayload()) };
   };
 
   const getReturnPath = () => {
@@ -177,7 +178,7 @@ export default function SigninOrSignup() {
     if (method === "phone" && !form.phone.trim()) return showError("Phone is required");
     setLoading(true);
     try {
-      const res = await axios.post(`${BASE_URL}/authentication/`, getPayload());
+      const res = await axios.post(`${BASE_URL}/authentication/`, await getPayload());
       if (res.data.created) setAccountCreated(true);
       let next = res.data.next_step || "otp";
       if (res.data.created && (next === "password" || res.data.must_set_password)) next = "set_password";
@@ -193,7 +194,7 @@ export default function SigninOrSignup() {
     if (!form.code.trim()) return showError("Verification code is required");
     setLoading(true);
     try {
-      const res = await axios.post(`${BASE_URL}/login/validate/`, { ...getPayload(), code: form.code.trim() });
+      const res = await axios.post(`${BASE_URL}/login/validate/`, { ...(await getPayload()), code: form.code.trim() });
       let next = res.data.next_step;
       if (next === "set_password" || res.data.must_set_password || (accountCreated && (next === "password" || res.data.twofactor))) {
         setStep("set_password");
@@ -221,7 +222,7 @@ export default function SigninOrSignup() {
     setLoading(true);
     try {
       const endpoint = (step === "set_password" || accountCreated) ? "/set-password/" : "/login/token/";
-      const body = { ...getPayload(), code: form.code.trim(), password: form.password };
+      const body = { ...(await getPayload()), code: form.code.trim(), password: form.password };
       if (isSetPassword && needConfirm) body.password_confirm = form.password_confirm;
       const res = await axios.post(`${BASE_URL}${endpoint}`, body);
       if (res.data.access) completeLogin(res.data.access, res.data.refresh);
