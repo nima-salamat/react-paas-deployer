@@ -1332,6 +1332,67 @@ export default function ServiceDetail() {
     }
   }, [safeSetSnackbar]);
 
+  const handleApplyPlan = useCallback(async (planId, applyImmediately = false) => {
+    if (!planId || !id) return;
+
+    setPlanActionLoading(true);
+    clearError();
+    setSettingsSuccess(null);
+
+    try {
+      const resp = await apiRequest({
+        method: "POST",
+        url: `${PLANS_BASE}plans/${planId}/apply/`,
+        data: {
+          target_type: "service",
+          target_id: id,
+          applyImmediately: Boolean(applyImmediately),
+        },
+      });
+
+      if (resp.status < 200 || resp.status >= 300 || resp.data?.result === "error") {
+        throw new Error(resp.data?.detail || resp.data?.error || "Unable to apply plan.");
+      }
+
+      const detail = resp.data?.detail || "Plan applied.";
+      safeSetSnackbar("success", detail);
+      setSettingsSuccess(detail);
+
+      const applied = (availablePlans || []).find(
+        (p) => String(p.id ?? p.pk ?? "") === String(planId),
+      );
+      if (applied) {
+        setPlanDetail(applied);
+        setService((prev) =>
+          prev
+            ? {
+                ...prev,
+                plan: typeof prev.plan === "object" && prev.plan
+                  ? { ...prev.plan, ...applied }
+                  : applied,
+              }
+            : prev,
+        );
+      }
+
+      setSelectedPlanId("");
+      await fetchService(true);
+      await fetchPlans();
+    } catch (err) {
+      setError(err, "Unable to apply plan.");
+    } finally {
+      if (mountedRef.current) setPlanActionLoading(false);
+    }
+  }, [
+    id,
+    clearError,
+    setError,
+    availablePlans,
+    fetchService,
+    fetchPlans,
+    safeSetSnackbar,
+  ]);
+
   const handleDownloadEntries = useCallback((filename, entries) => {
     const lines = (entries || []).map((entry) => getDeployEntryText(entry));
     if (!lines.length) { safeSetSnackbar("info", "No entries to download."); return; }
