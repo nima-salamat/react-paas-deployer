@@ -49,11 +49,11 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
-function formatRelative(value) {
+function formatRelative(value, referenceNow = Date.now()) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  const seconds = Math.max(0, Math.floor((referenceNow - date.getTime()) / 1000));
   if (seconds < 45) return "just now";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -71,7 +71,7 @@ function DeviceIcon({ type }) {
   return <ComputerOutlinedIcon color="action" />;
 }
 
-function DeviceDetails({ session }) {
+function DeviceDetails({ session, referenceNow }) {
   const device = session?.device || {};
   const browser = [device.browser, device.browser_version].filter(Boolean).join(" ");
   const os = [device.os, device.os_version].filter(Boolean).join(" ");
@@ -91,7 +91,7 @@ function DeviceDetails({ session }) {
         {meta.locale ? ` · ${meta.locale}` : ""}
       </Typography>
       <Typography component="span" variant="caption" color="text.secondary">
-        Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at)}
+        Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at, referenceNow)}
       </Typography>
       <Typography component="span" variant="caption" color="text.secondary">
         Expires {formatDate(session?.expires_at)}
@@ -112,7 +112,7 @@ function DeviceDetails({ session }) {
   );
 }
 
-function SessionRow({ session, canManageOthers, onRevoke, loadingId }) {
+function SessionRow({ session, canManageOthers, onRevoke, loadingId, referenceNow }) {
   const isCurrent = Boolean(session?.current);
   const disabled = !isCurrent && (!canManageOthers || loadingId === session?.id);
 
@@ -175,7 +175,7 @@ function SessionRow({ session, canManageOthers, onRevoke, loadingId }) {
           </Stack>
         }
         secondary={
-          <DeviceDetails session={session} />
+          <DeviceDetails session={session} referenceNow={referenceNow} />
         }
       />
     </ListItem>
@@ -194,6 +194,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [serverNow, setServerNow] = useState(null);
   const [loadingId, setLoadingId] = useState(null);
 
   const load = useCallback(async ({ silent = false } = {}) => {
@@ -206,6 +207,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
       setSessions(Array.isArray(data?.results) ? data.results : []);
       setActiveCount(Number(data?.active_count || 0));
       setMaxActiveSessions(data?.max_active_sessions ?? null);
+      if (data?.server_now) setServerNow(new Date(data.server_now).getTime());
       setManagement({
         minimum_age_seconds: Number(data?.session_management?.minimum_age_seconds || 7200),
         current_session_age_seconds: Number(data?.session_management?.current_session_age_seconds || 0),
@@ -224,10 +226,24 @@ export default function SessionManager({ title = "Devices & sessions", compact =
   }, []);
 
   useEffect(() => {
+    const onActivity = (event) => {
+      const timestamp = event?.detail?.last_seen_at;
+      if (!timestamp) return;
+      setSessions((current) => current.map((session) => (
+        session.current ? { ...session, last_seen_at: timestamp } : session
+      )));
+      setServerNow(new Date(timestamp).getTime());
+    };
+    window.addEventListener("session-activity", onActivity);
     load();
     const timer = window.setInterval(() => load({ silent: true }), 60_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("session-activity", onActivity);
+    };
   }, [load]);
+
+  const referenceNow = serverNow != null ? serverNow + (Date.now() - serverNow) : Date.now();
 
   const remainingSeconds = useMemo(
     () =>
@@ -388,6 +404,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
               canManageOthers={management.can_revoke_others}
               onRevoke={handleRevoke}
               loadingId={loadingId}
+              referenceNow={referenceNow}
             />
           ))}
         </List>
