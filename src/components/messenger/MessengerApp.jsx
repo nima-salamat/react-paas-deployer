@@ -117,6 +117,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [nextBefore, setNextBefore] = useState(null);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [conversationLoadError, setConversationLoadError] = useState(false);
+  const conversationRefreshSeqRef = useRef(0);
   const [websocketConnected, setWebsocketConnected] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -924,6 +925,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   /* -------------------- loaders -------------------- */
 
   const loadConversations = useCallback(async ({ silent = false } = {}) => {
+    // Silent refreshes can overlap (WebSocket events, read receipts, uploads).
+    // Only the newest silent response is allowed to mutate the list state.
+    const refreshSeq = silent ? ++conversationRefreshSeqRef.current : 0;
+
     // Only show the spinner on the very first load — background refreshes
     // (WebSocket-driven) must NOT toggle loadingConvs, otherwise the chat
     // list flickers with a spinner every few seconds.
@@ -935,6 +940,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       const data = unwrapData(res);
       const next = data?.results || [];
+      if (silent && refreshSeq !== conversationRefreshSeqRef.current) return next;
       setConversationLoadError(false);
       // Merge by id: keep previous object reference when payload is unchanged so
       // Sidebar Avatars do not remount / re-download on every silent refresh.
@@ -954,6 +960,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       return next;
     } catch (e) {
+      if (silent && refreshSeq !== conversationRefreshSeqRef.current) return [];
       if (!silent) setConversationLoadError(true);
       setError(e?.response?.data?.message || "Failed to load chats");
       return [];
@@ -2253,13 +2260,35 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       }
       const key = String(created.id);
       const previous = map.get(key);
-      map.set(key, {
+      const nextMessages = Array.from(map.entries())
+        .filter(([entryKey]) => entryKey !== key)
+        .map(([, message]) => message);
+      nextMessages.push({
         ...(previous || {}),
         ...created,
         _pending: false,
         read_state: created.read_state || previous?.read_state || "sent",
       });
-      return Array.from(map.values()).sort((a, b) => {
+      nextMessages.sort((a, b) => {
+        const ta = new Date(a.created_at || 0).getTime();
+        const tb = new Date(b.created_at || 0).getTime();
+        if (ta !== tb) return ta - tb;
+        const aTemp = String(a.id).startsWith("temp-");
+        const bTemp = String(b.id).startsWith("temp-");
+        if (aTemp !== bTemp) return aTemp ? 1 : -1;
+        const na = Number(a.id);
+        const nb = Number(b.id);
+        if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+        return String(a.id).localeCompare(String(b.id));
+      });
+      const cache = messagesCacheRef.current.get(cid) || {};
+      touchMessengerMsgCache(messagesCacheRef.current, cid, {
+        ...cache,
+        messages: nextMessages,
+        savedAt: Date.now(),
+      });
+      try { writeMessengerMsgCache(messagesCacheRef.current); } catch { /* cache is optional */ }
+      return nextMessages.map((message) => ({ ...message }));
         const ta = new Date(a.created_at || 0).getTime();
         const tb = new Date(b.created_at || 0).getTime();
         if (ta !== tb) return ta - tb;
