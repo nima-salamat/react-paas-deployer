@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, SERVICE_BASE, LOG_BUFFER_MAX, LOG_PAGE_SIZE } from "../constants";
 import { normalizeLogEntry } from "../utils";
-import apiRequest, { refreshAccessToken } from "../../customHooks/apiRequest";
+import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest";
 import { getApiErrorMessage } from "../errorUtils";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 
