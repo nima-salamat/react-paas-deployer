@@ -133,6 +133,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const scrollVelRef = useRef({ lastTop: 0, lastTs: 0, velocity: 0 });
   const restoringScrollRef = useRef(false);
   const messagesConvIdRef = useRef(null); // which conversation current messages state belongs to
+  const serverReadAtRef = useRef(new Map()); // conversation id -> authoritative last_read_at
   const hasMoreMsgsRef = useRef(false);
   const nextBeforeRef = useRef(null);
   const pendingJumpRef = useRef(null); // messageId to scroll to after load
@@ -913,6 +914,36 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // Call actions are provided by useMessengerCalls after openChat exists.
 
   /* -------------------- panel navigation -------------------- */
+
+  const seedServerReadState = (cid, items, readAt = null) => {
+    const key = String(cid);
+    if (readAt) {
+      const incomingMs = Date.parse(String(readAt));
+      const currentMs = Date.parse(String(serverReadAtRef.current.get(key) || ""));
+      if (Number.isFinite(incomingMs) && (!Number.isFinite(currentMs) || incomingMs > currentMs)) {
+        serverReadAtRef.current.set(key, String(readAt));
+      }
+    }
+    if (String(activeIdRef.current) !== key) return;
+    const cursorMs = Date.parse(String(serverReadAtRef.current.get(key) || ""));
+    if (!Number.isFinite(cursorMs) || !Array.isArray(items) || !items.length) return;
+
+    let changed = false;
+    for (const message of items) {
+      if (!message?.id || !message.created_at) continue;
+      if (String(message.sender?.id) === String(meId)) continue;
+      const createdMs = Date.parse(String(message.created_at));
+      if (
+        Number.isFinite(createdMs)
+        && createdMs <= cursorMs
+        && !seenQueuedRef.current.has(String(message.id))
+      ) {
+        seenQueuedRef.current.add(String(message.id));
+        changed = true;
+      }
+    }
+    if (changed) setSeenMsgIds(new Set(seenQueuedRef.current));
+  };
 
   const pushPanel = useCallback((kind) => {
     setPanelHistory((prev) => [...prev, kind]);
