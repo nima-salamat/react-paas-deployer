@@ -242,8 +242,8 @@ test("browser login payload includes persistent device metadata", () => {
   assert.match(identity, /getDeviceAuthPayload/);
   assert.match(identity, /client_signature/);
   assert.match(identity, /client_metadata/);
+  assert.match(signin, /await getPayload\\(\\)/);
   assert.match(signin, /getDeviceAuthPayload/);
-  assert.match(signin, /await getPayload\(\)/);\n  assert.match(signin, /getDeviceAuthPayload/);
 });
 
 
