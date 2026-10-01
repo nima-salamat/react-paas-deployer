@@ -2,7 +2,7 @@
  * Deploy history logs: REST history + live DeploymentConsumer WS + poll fallback.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import apiRequest, { clearAuthAndRedirect } from "../../customHooks/apiRequest";
+import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import {
   API_BASE,
@@ -215,7 +215,16 @@ export default function useDeployLogs({
         if (!mountedRef.current) return;
         setConnected(false);
         if (evt.code === 4401) {
-          clearAuthAndRedirect();
+          refreshAccessToken()
+            .then(() => {
+              if (!mountedRef.current || !wsShouldReconnectRef.current) return;
+              wsReconnectAttemptRef.current = 0;
+              wsReconnectTimerRef.current = setTimeout(() => connectWs(id), 100);
+            })
+            .catch(() => {
+              if (!mountedRef.current || !wsShouldReconnectRef.current || !localStorage.getItem("access")) return;
+              wsReconnectTimerRef.current = setTimeout(() => connectWs(id), 3000);
+            });
           return;
         }
         if (!wsShouldReconnectRef.current || evt.wasClean) return;
