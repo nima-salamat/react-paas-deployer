@@ -1010,9 +1010,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         const selfParticipant = (data.participants || []).find(
           (participant) => String(participant?.user?.id ?? participant?.user_id) === String(meId)
         );
+        const detailMessages = String(messagesConvIdRef.current) === String(data.id)
+          ? messagesRef.current
+          : [];
         seedServerReadState(
           data.id,
-          messagesRef.current,
+          detailMessages,
           selfParticipant?.last_read_at || null,
         );
         const key = String(data.id);
