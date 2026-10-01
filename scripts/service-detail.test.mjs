@@ -162,10 +162,11 @@ test("service detail keeps the backend route contract", () => {
     "update_db_config/",
     "reveal_db_credentials/",
     "download/",
-    "plans/\${planId}/apply/",
   ]) {
     assert.match(service, new RegExp(endpoint.replaceAll("/", "\\/")));
   }
+
+  assert.match(service, /plans\/\$\{planId\}\/apply\//);
 
   assert.match(overview, /reveal_db_credentials/);
   assert.match(create, /inspect_zip/);
