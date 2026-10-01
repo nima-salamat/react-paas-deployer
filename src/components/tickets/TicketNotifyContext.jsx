@@ -29,12 +29,12 @@ function decodeJwtUserId(token) {
   }
 }
 
-function buildNotifyWsUrl() {
+function buildNotifyWsUrl(tokenOverride = null) {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const token = window.localStorage.getItem("access");
+  const token = tokenOverride || window.localStorage.getItem("access");
   if (!token) return null;
   try {
     const backendUrl = new URL(API_HOST.startsWith("http") ? API_HOST : `https://${API_HOST}`);
@@ -213,7 +213,7 @@ export function TicketNotifyProvider({ children }) {
       setUserId(uid);
       userIdRef.current = uid;
 
-      const url = buildNotifyWsUrl();
+      const url = buildNotifyWsUrl(token);
       if (!url) {
         setConnected(false);
         return;
