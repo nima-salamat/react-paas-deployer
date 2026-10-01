@@ -930,7 +930,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     try {
       const res = await apiRequest({
         method: "GET",
-        url: `${MSG_API}/conversations/?page_size=50${localStorage.getItem("access") ? `&token=${encodeURIComponent(localStorage.getItem("access"))}` : ""}`,
+        url: `${MSG_API}/conversations/?page_size=50`,
       });
       const data = unwrapData(res);
       const next = data?.results || [];
