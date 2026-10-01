@@ -16,10 +16,14 @@ import {
   ListItemText,
   Stack,
   Typography,
+  Tooltip,
 } from "@mui/material";
 import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/Refresh";
+import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
+import PhoneAndroidOutlinedIcon from "@mui/icons-material/PhoneAndroidOutlined";
+import TabletMacOutlinedIcon from "@mui/icons-material/TabletMacOutlined";
 import {
   fetchAdminUserSessions,
   logoutAllAdminUserSessions,
@@ -45,7 +49,31 @@ function formatRelative(value) {
 
 function titleFor(session) {
   const device = session?.device || {};
-  return device.name || device.client || device.platform || "Unknown device";
+  return device.name || [device.browser, device.os].filter(Boolean).join(" on ") || device.client || "Web browser";
+}
+
+function DeviceIcon({ type }) {
+  if (type === "mobile") return <PhoneAndroidOutlinedIcon />;
+  if (type === "tablet") return <TabletMacOutlinedIcon />;
+  return <ComputerOutlinedIcon />;
+}
+
+function deviceSummary(session) {
+  const device = session?.device || {};
+  const browser = [device.browser, device.browser_version].filter(Boolean).join(" ");
+  const os = [device.os, device.os_version].filter(Boolean).join(" ");
+  const model = device.device_model || "";
+  const meta = device.client_metadata || {};
+  const location = device.ip || device.last_ip || "";
+  return {
+    primary: [browser, os, model].filter(Boolean).join(" · ") || device.client || "Browser session",
+    secondary: [
+      location ? `IP ${location}` : "",
+      meta.timezone || "",
+      meta.locale || "",
+    ].filter(Boolean).join(" · ") || "Network details unavailable",
+    ua: device.user_agent || "",
+  };
 }
 
 export default function AdminUserSessionsDialog({
@@ -189,21 +217,24 @@ export default function AdminUserSessionsDialog({
                   }
                 >
                   <ListItemIcon sx={{ minWidth: 38, pt: 0.25 }}>
-                    <DevicesOutlinedIcon />
+                    <DeviceIcon type={session?.device?.device_type} />
                   </ListItemIcon>
                   <ListItemText
                     primary={<Typography fontWeight={700} pr={10}>{titleFor(session)}</Typography>}
                     secondary={
-                      <Stack spacing={0.25} sx={{ mt: 0.35, pr: 8 }}>
+                      <Stack spacing={0.35} sx={{ mt: 0.35, pr: 8 }}>
+                        <Typography variant="caption" color="text.secondary">{deviceSummary(session).primary}</Typography>
+                        <Typography variant="caption" color="text.secondary">{deviceSummary(session).secondary}</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          {[session?.device?.platform, session?.device?.client].filter(Boolean).join(" · ") || "Device details unavailable"}
+                          Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at)} · Expires {formatDate(session?.expires_at)}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Expires {formatDate(session?.expires_at)}
-                        </Typography>
+                        {deviceSummary(session).ua && (
+                          <Tooltip title={deviceSummary(session).ua} placement="bottom-start">
+                            <Typography variant="caption" color="text.disabled" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {deviceSummary(session).ua}
+                            </Typography>
+                          </Tooltip>
+                        )}
                       </Stack>
                     }
                   />
