@@ -2239,6 +2239,63 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     });
   };
 
+  const upsertConfirmedMessage = useCallback((conversationId, created) => {
+    if (!created?.id) return;
+    const cid = String(conversationId);
+    // The request may finish after the user switches chats. Only mutate the
+    // visible thread when the confirmed message belongs to the active chat.
+    if (String(activeIdRef.current) !== cid) return;
+
+    setMessages((prev) => {
+      const map = new Map();
+      for (const message of prev || []) {
+        if (message?.id != null) map.set(String(message.id), message);
+      }
+      const key = String(created.id);
+      const previous = map.get(key);
+      map.set(key, {
+        ...(previous || {}),
+        ...created,
+        _pending: false,
+        read_state: created.read_state || previous?.read_state || "sent",
+      });
+      return Array.from(map.values()).sort((a, b) => {
+        const ta = new Date(a.created_at || 0).getTime();
+        const tb = new Date(b.created_at || 0).getTime();
+        if (ta !== tb) return ta - tb;
+        const aTemp = String(a.id).startsWith("temp-");
+        const bTemp = String(b.id).startsWith("temp-");
+        if (aTemp !== bTemp) return aTemp ? 1 : -1;
+        const na = Number(a.id);
+        const nb = Number(b.id);
+        if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+        return String(a.id).localeCompare(String(b.id));
+      });
+    });
+  }, []);
+
+  // A successful upload is authoritative as soon as the API returns the
+  // created message. Remove the transient upload row only after that confirmed
+  // message is actually present in the rendered message state.
+  useEffect(() => {
+    if (!pendingUploads.length || !messages.length) return;
+    const messageIds = new Set(messages.map((m) => String(m?.id)).filter(Boolean));
+    setPendingUploads((prev) => {
+      let changed = false;
+      const next = prev.filter((upload) => {
+        if (!upload?.confirmedMessageId) return true;
+        const sameConversation = String(upload.conversationId) === String(activeId);
+        const confirmed = messageIds.has(String(upload.confirmedMessageId));
+        if (sameConversation && confirmed) {
+          changed = true;
+          return false;
+        }
+        return true;
+      });
+      return changed ? next : prev;
+    });
+  }, [messages, pendingUploads, activeId]);
+
   const sendOrEdit = async () => {
     if (!activeId) return;
     const originalBody = String(textRef.current || "");
@@ -2359,10 +2416,22 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         const created = unwrapData(res);
         if (created) {
           if (filesToSend.length) {
-            setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, progress: 100, status: "sent" } : u));
-          }
-          // Replace optimistic temp with confirmed message (server time + id)
-          if (!filesToSend.length) {
+            // The POST response already contains the durable message and its
+            // attachment metadata. Render it immediately instead of waiting for
+            // a second history request that can race Redis cache population.
+            upsertConfirmedMessage(activeId, created);
+            setPendingUploads((prev) => prev.map((u) => (
+              u.id === pendingId
+                ? {
+                    ...u,
+                    progress: 100,
+                    status: "sent",
+                    confirmedMessageId: created.id,
+                  }
+                : u
+            )));
+          } else {
+            // Replace optimistic temp with confirmed message (server time + id)
             setMessages((prev) => {
               const withoutTemp = prev.filter((m) => String(m.id) !== tempMsgId);
               const map = new Map();
@@ -2383,13 +2452,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
                 return String(a.id).localeCompare(String(b.id));
               });
             });
-          } else {
-            await loadMessages(activeId, { silent: true });
           }
           setScheduledFor(null);
           setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
-          loadConversations({ silent: true });
-          if (filesToSend.length) setTimeout(() => setPendingUploads((prev) => prev.filter((u) => u.id !== pendingId)), 600);
+          // Reconcile in the background without withholding the confirmed message.
+          void loadMessages(activeId, { silent: true, preserveOlder: true });
+          void loadConversations({ silent: true });
         }
       } catch (e) {
         const msg = e?.response?.data?.message || "Send failed";
@@ -2440,7 +2508,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       if (mediaSpoiler) form.append("is_spoiler", "1");
       if (mediaViewOnce) form.append("is_view_once", "1");
       try {
-        await apiRequest({
+        const sendResponse = await apiRequest({
           method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`, data: form,
           onUploadProgress: (event) => {
             const total = event.total || Number(file.size || 0);
@@ -2449,7 +2517,14 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, loaded, total, progress } : u));
           },
         });
-        setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, progress: 100, status: "sent" } : u));
+        const created = unwrapData(sendResponse);
+        if (!created?.id) throw new Error("Upload completed but the message was not returned by the server");
+        upsertConfirmedMessage(activeId, created);
+        setPendingUploads((prev) => prev.map((u) => (
+          u.id === pendingId
+            ? { ...u, progress: 100, status: "sent", confirmedMessageId: created.id }
+            : u
+        )));
       } catch (e) {
         const msg = e?.response?.data?.message || `Failed to send ${file.name || "file"}`;
         firstError = firstError || msg;
@@ -2476,12 +2551,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         setReplyTo(null);
       }
     }
-    await loadMessages(activeId, { silent: true });
+    // Reconcile in the background without withholding the confirmed message
+    // rows we inserted from each successful upload response.
+    void loadMessages(activeId, { silent: true, preserveOlder: true });
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 30);
-    loadConversations({ silent: true });
-    setTimeout(() => {
-      setPendingUploads((prev) => prev.filter((u) => String(u.conversationId) !== String(activeId) || u.status === "failed"));
-    }, 700);
+    void loadConversations({ silent: true });
   };
 
   const startEdit = (m) => {
