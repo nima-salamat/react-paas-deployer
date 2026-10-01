@@ -1327,8 +1327,6 @@ export default function ServiceDetail() {
           )
         );
       }
-    } finally {
-      if (mountedRef.current) setPlanActionLoading(false);
     }
   }, [safeSetSnackbar]);
 
