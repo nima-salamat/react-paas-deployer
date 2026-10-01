@@ -36,8 +36,8 @@ Django API  →  Celery  →  Docker
 1. User authenticates; session-bound access/refresh tokens are stored in `localStorage`, and legacy sessionless credentials are cleared.  
 2. API helper refreshes access tokens through the backend session endpoint and retries the original request once after `401`.  
 3. Service list and detail pages poll status and open WS streams when needed.  
-4. Creating a service attaches a network and optional volumes, then deploys run through the backend orchestrator.  
-5. Settings UI enforces the same volume rules as the API (no unsafe edits while a container is running).
+5. Creating a service attaches a network and optional volumes, then deploys run through the backend orchestrator.  
+6. Settings UI enforces the same volume rules as the API (no unsafe edits while a container is running).
 
 ---
 
