@@ -289,17 +289,12 @@ test("messenger read tracking flushes before chat switches and serializes list r
   const messenger = read("src/components/messenger/MessengerApp.jsx");
 
   assert.match(messenger, /flushSeenReceiptsRef/);
-  assert.match(
-    messenger,
-    /Flush viewport reads before switching chats[sS]*flushSeenReceiptsRef.current(leavingId)/,
-  );
-  assert.match(messenger, /conversationRefreshSeqRef/);
-  assert.match(messenger, /serverReadAtRef/);
-  assert.match(messenger, /last_read_at/);
-  assert.match(
-    messenger,
-    /Only the newest silent response is allowed to mutate the list state/,
-  );
+  assert.ok(messenger.includes("Flush viewport reads before switching chats"));
+  assert.ok(messenger.includes("flushSeenReceiptsRef.current(leavingId)"));
+  assert.ok(messenger.includes("conversationRefreshSeqRef"));
+  assert.ok(messenger.includes("serverReadAtRef"));
+  assert.ok(messenger.includes("last_read_at"));
+  assert.ok(messenger.includes("Only the newest silent response is allowed to mutate the list state"));
 });
 
 test("messenger confirmed uploads cannot disappear with the transient upload row", () => {
@@ -321,6 +316,6 @@ test("recorded video messages do not perform a redundant second encoding pass", 
   assert.ok(start >= 0 && end > start);
   const recordingFinalizeBlock = composer.slice(start, end);
   assert.doesNotMatch(recordingFinalizeBlock, /_messengerProcessing/);
-  assert.doesNotMatch(recordingFinalizeBlock, /cropVideoMessageToSquare(blob)/);
-  assert.match(recordingFinalizeBlock, /flushSync(() => setFiles/);
+  assert.doesNotMatch(recordingFinalizeBlock, /cropVideoMessageToSquare/);
+  assert.ok(recordingFinalizeBlock.includes("flushSync(() => setFiles"));
 });
