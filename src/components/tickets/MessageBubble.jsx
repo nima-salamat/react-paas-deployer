@@ -17,6 +17,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import ImageIcon from "@mui/icons-material/Image";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
+import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
 
 function SeenTicks({ seen, mine }) {
   if (!mine) return null;
@@ -92,7 +93,7 @@ function mediaSrc(url) {
   if (!/^https?:\/\//i.test(url) && !url.startsWith("blob:")) {
     absolute = url.startsWith("/") ? `${apiHost()}${url}` : `${apiHost()}/${url}`;
   }
-  const token = localStorage.getItem("access");
+  const token = getSessionBoundAccessToken(localStorage);
   if (!token) return absolute;
   try {
     const u = new URL(absolute, window.location.origin);
