@@ -111,6 +111,28 @@ test("service detail has a persistent structured error surface", () => {
   assert.match(alert, /meta\.code/);
 });
 
+test("service detail regression sources keep critical callback and error state declarations valid", () => {
+  const service = read("src/components/service_detail/ServiceDetail.jsx");
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+
+  assert.match(
+    service,
+    /const handleDownloadVolume = useCallback\(async \(volume\) =>[\s\S]*?\n  \}, \[safeSetSnackbar\]\);/,
+  );
+  assert.equal(
+    (settings.match(
+      /const \[deleteServiceError, setDeleteServiceError\] = useState\(null\);/g,
+    ) || []).length,
+    1,
+  );
+  assert.equal(
+    (settings.match(
+      /const \[volumeActionError, setVolumeActionError\] = useState\(null\);/g,
+    ) || []).length,
+    1,
+  );
+});
+
 test("service detail keeps the backend route contract", () => {
   const constants = read("src/components/service_detail/constants.js");
   const service = read("src/components/service_detail/ServiceDetail.jsx");
