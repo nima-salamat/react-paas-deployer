@@ -294,6 +294,8 @@ test("messenger read tracking flushes before chat switches and serializes list r
     /Flush viewport reads before switching chats[sS]*flushSeenReceiptsRef.current(leavingId)/,
   );
   assert.match(messenger, /conversationRefreshSeqRef/);
+  assert.match(messenger, /serverReadAtRef/);
+  assert.match(messenger, /last_read_at/);
   assert.match(
     messenger,
     /Only the newest silent response is allowed to mutate the list state/,
