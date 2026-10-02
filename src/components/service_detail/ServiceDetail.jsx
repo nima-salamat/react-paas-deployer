@@ -95,6 +95,7 @@ export default function ServiceDetail() {
   const [planDetail, setPlanDetail] = useState(null);
   const [networkDetail, setNetworkDetail] = useState(null);
   const [attachedVolumes, setAttachedVolumes] = useState([]);
+  const [volumeCapabilities, setVolumeCapabilities] = useState(null);
   const [availableNetworks, setAvailableNetworks] = useState([]);
   const [availableVolumes, setAvailableVolumes] = useState([]);
   const [selectedNetworkId, setSelectedNetworkId] = useState("");
@@ -496,6 +497,15 @@ export default function ServiceDetail() {
     }
   }, [setError]);
 
+  const fetchVolumeCapabilities = useCallback(async () => {
+    if (!id) return;
+    try {
+      const resp = await apiRequest({ method: "GET", url: `${SERVICE_ACTION_ROOT}service/${id}/volume-capabilities/` });
+      setVolumeCapabilities(resp?.data?.result === "success" ? resp.data : null);
+    } catch {
+      setVolumeCapabilities(null);
+    }
+  }, [id]);
   const fetchAttachedVolumes = useCallback(async () => {
     if (!id) return;
     try {
@@ -642,6 +652,7 @@ export default function ServiceDetail() {
         fetchAvailableNetworks(),
         fetchAvailableVolumes(),
         fetchAttachedVolumes(),
+        fetchVolumeCapabilities(),
         fetchPlans(),
       ]);
     };
@@ -651,7 +662,7 @@ export default function ServiceDetail() {
     };
     // serviceSeed is only used as a one-shot hint for silent first fetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAvailableNetworks, fetchAvailableVolumes, fetchAttachedVolumes, fetchPlans]);
+  }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAvailableNetworks, fetchAvailableVolumes, fetchAttachedVolumes, fetchVolumeCapabilities, fetchPlans]);
 
   useEffect(() => {
     if (!service?.network?.id) setSelectedNetworkId("");
@@ -682,9 +693,9 @@ export default function ServiceDetail() {
     if (!id || !mountedRef.current || autoRefreshBusyRef.current || (typeof document !== "undefined" && document.hidden)) return;
     autoRefreshBusyRef.current = true;
     try {
-      await Promise.allSettled([fetchService(true), fetchDeploys(pageInfoRef.current?.page || 1, true), checkServiceRunning(true), fetchAttachedVolumes()]);
+      await Promise.allSettled([fetchService(true), fetchDeploys(pageInfoRef.current?.page || 1, true), checkServiceRunning(true), fetchAttachedVolumes(), fetchVolumeCapabilities()]);
     } catch (err) {} finally { autoRefreshBusyRef.current = false; }
-  }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAttachedVolumes]);
+  }, [id, fetchService, fetchDeploys, checkServiceRunning, fetchAttachedVolumes, fetchVolumeCapabilities]);
 
   useEffect(() => {
     if (refreshIntervalRef.current) {
@@ -1610,6 +1621,7 @@ export default function ServiceDetail() {
               planDetail={planDetail}
               networkName={networkName}
               networkDetail={networkDetail}
+              attachedVolumes={attachedVolumes}
               hideServiceIdentity={!isDesktop}
             />
           )}
@@ -1738,19 +1750,21 @@ export default function ServiceDetail() {
               onViewVolumeFiles={handleViewVolumeFiles}
               onDownloadVolume={handleDownloadVolume}
               canMutateVolumes={
-                !["running", "queued", "deploying", "stopping"].includes(
-                  String(service?.status || "").toLowerCase()
-                ) && !serviceRunning
+                volumeCapabilities
+                  ? Boolean(volumeCapabilities.mutable)
+                  : !["running", "queued", "deploying", "stopping", "pending", "updating..."].includes(
+                      String(service?.status || "").toLowerCase()
+                    ) && !serviceRunning
               }
               volumeMutateReason={
-                serviceRunning || String(service?.status || "").toLowerCase() === "running"
-                  ? "Service is running. Stop it, then remove the container before changing volumes."
-                  : ["queued", "deploying", "stopping"].includes(
-                      String(service?.status || "").toLowerCase()
-                    )
-                  ? `Service is ${service.status}. Wait until it is stopped.`
-                  : "If attach/detach fails, remove the container first (image alone does not block volumes)."
+                volumeCapabilities?.reason ||
+                (serviceRunning || ["running", "queued", "deploying", "stopping", "pending", "updating..."].includes(
+                  String(service?.status || "").toLowerCase()
+                )
+                  ? "The backend reports that volume changes are unavailable until the service is idle."
+                  : "")
               }
+              volumeCapabilities={volumeCapabilities}
               onPurgeRuntime={handlePurgeRuntime}
               purgeRuntimeLoading={volumeActionLoading}
               availablePlans={availablePlans}
