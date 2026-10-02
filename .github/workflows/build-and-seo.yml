@@ -32,6 +32,9 @@ jobs:
       - name: Agent regression tests
         run: npm run test:agents
 
+      - name: Ticket editor regression tests
+        run: npm run test:ticket-editor
+
       - name: Lint
         run: npm run lint
 
