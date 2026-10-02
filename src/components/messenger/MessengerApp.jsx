@@ -1460,13 +1460,19 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         const distBottom = Math.max(0, el.scrollHeight - el.scrollTop - el.clientHeight);
         const atBottom = distBottom < NEAR_BOTTOM_PX;
         const snapshot = {
-          scrollTop: Math.max(0, el.scrollTop),
+          scrollTop: atBottom
+            ? Math.max(0, el.scrollHeight - el.clientHeight)
+            : Math.max(0, el.scrollTop),
           distanceBottom: atBottom ? 0 : distBottom,
           nearBottom: atBottom,
+          // Capture the exact anchor at the moment the chat is left.
+          // This prevents an older anchor from being restored for a new viewport.
+          anchorMsgId: atBottom ? null : findAnchorMessageId(el),
           savedAt: Date.now(),
         };
         scrollAnchorRef.current = { convId: prevKey, ...snapshot };
         touchMessengerMsgCache(messagesCacheRef.current, prevKey, { ...prev, ...snapshot });
+        try { writeMessengerMsgCache(messagesCacheRef.current); } catch { /* */ }
         try {
           sessionStorage.setItem(
             "messenger.scrollAnchor." + prevKey,
