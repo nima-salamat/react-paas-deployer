@@ -425,3 +425,23 @@ test("ticket renderer does not auto-detect an unspecified code language", () => 
   assert.match(source, /requestedLanguage === "plaintext"/);
   assert.match(source, /hljs\.highlight\(codeText, \{ language: requestedLanguage \}\)/);
 });
+
+
+test("empty editor can create code and quote blocks without a pre-existing selection", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /Toolbar actions must also work when the editor has never received text/);
+  assert.match(source, /if \(!editor\.textContent\?\.trim\(\) && editor\.children\.length === 0\)/);
+  assert.match(source, /const wrapper = document\.createElement\("p"\)/);
+  assert.match(source, /const block = findBlock\(\) \|\| ensureBlock\(\)/);
+  assert.match(source, /const quoteBlock = document\.createElement\("blockquote"\)/);
+  assert.match(source, /const pre = document\.createElement\("pre"\)/);
+});
+
+test("alignment is explicit on an empty editor instead of relying on browser automatic alignment", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /setBlockAlignment\(emptyBlock, align\)/);
+  assert.match(source, /pendingAlignmentRef\.current = "left"/);
+  assert.doesNotMatch(source, /document\.execCommand\(["']justify/);
+});

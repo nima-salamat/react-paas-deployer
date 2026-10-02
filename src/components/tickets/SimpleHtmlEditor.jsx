@@ -351,13 +351,34 @@ export default function SimpleHtmlEditor({
 
   const ensureBlock = useCallback(() => {
     const editor = ref.current;
+    if (!editor) return null;
+
     const selection = window.getSelection?.();
-    if (!editor || !selection || !selection.rangeCount) return null;
+    let block = selection?.rangeCount ? findBlock() : null;
+    if (block && editor.contains(block)) return block;
 
-    let block = findBlock();
-    if (block) return block;
+    // Toolbar actions must also work when the editor has never received text
+    // and therefore has no usable selection yet.
+    if (!editor.textContent?.trim() && editor.children.length === 0) {
+      const wrapper = document.createElement("p");
+      wrapper.setAttribute("dir", "auto");
+      wrapper.innerHTML = "<br>";
+      if (pendingAlignmentRef.current !== "left") {
+        setBlockAlignment(wrapper, pendingAlignmentRef.current);
+      }
+      editor.appendChild(wrapper);
 
-    const anchor = selection.anchorNode;
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(wrapper);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      return wrapper;
+    }
+
+    const anchor = selection?.rangeCount ? selection.anchorNode : null;
     if (!anchor || !editor.contains(anchor)) return null;
 
     let target = anchor;
@@ -375,11 +396,18 @@ export default function SimpleHtmlEditor({
       wrapper.appendChild(target);
     }
 
-    const range = document.createRange();
-    range.selectNodeContents(wrapper);
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    if (pendingAlignmentRef.current !== "left") {
+      setBlockAlignment(wrapper, pendingAlignmentRef.current);
+      pendingAlignmentRef.current = "left";
+    }
+
+    if (selection) {
+      const range = document.createRange();
+      range.selectNodeContents(wrapper);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
     return wrapper;
   }, [findBlock]);
 
@@ -540,16 +568,25 @@ export default function SimpleHtmlEditor({
     }
 
     if (!blocks.length) {
-      // Keep alignment as an explicit typing preference while the editor is still
-      // completely empty. The first typed block will inherit this alignment.
       const visibleText = (editor.textContent || "").replace(/\u200B/g, "").trim();
       const hasVisualContent = Boolean(
         visibleText ||
         editor.querySelector("img, video, audio, iframe, table")
       );
       if (!hasVisualContent) {
-        pendingAlignmentRef.current = align;
-        setActiveFormats((current) => ({ ...current, align }));
+        // Materialize an actual paragraph immediately. This makes the selected
+        // alignment visible before the user types anything.
+        const emptyBlock = ensureBlock();
+        if (emptyBlock) {
+          setBlockAlignment(emptyBlock, align);
+          pendingAlignmentRef.current = "left";
+          setActiveFormats((current) => ({ ...current, align }));
+          placeCaretAtEnd(emptyBlock);
+          saveSelection();
+          editingRef.current = false;
+          emit();
+          updateActiveFormats();
+        }
         return;
       }
       return;
@@ -564,7 +601,7 @@ export default function SimpleHtmlEditor({
     editingRef.current = false;
     emit();
     updateActiveFormats();
-  }, [disabled, emit, ensureBlock, findBlock, focusEditorSelection, saveSelection, updateActiveFormats]);
+  }, [disabled, emit, ensureBlock, findBlock, focusEditorSelection, placeCaretAtEnd, saveSelection, updateActiveFormats]);
 
   const applyBlockFormat = useCallback((tagName) => {
     if (disabled || !ref.current) return;
