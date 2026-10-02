@@ -406,3 +406,22 @@ test("alignment can be chosen before any text exists and is inherited by the fir
   assert.match(source, /setBlockAlignment\(block, pendingAlignment\)/);
   assert.match(source, /align: block \? getBlockAlignment\(block\) : pendingAlignmentRef\.current/);
 });
+
+
+test("ticket renderer preserves ordered and unordered list semantics", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /"& ul": \{/);
+  assert.match(source, /listStyleType: "disc"/);
+  assert.match(source, /"& ol": \{/);
+  assert.match(source, /listStyleType: "decimal"/);
+  assert.match(source, /display: "list-item"/);
+});
+
+test("ticket renderer does not auto-detect an unspecified code language", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.doesNotMatch(source, /highlightAuto\(codeText\)/);
+  assert.match(source, /requestedLanguage === "plaintext"/);
+  assert.match(source, /hljs\.highlight\(codeText, \{ language: requestedLanguage \}\)/);
+});

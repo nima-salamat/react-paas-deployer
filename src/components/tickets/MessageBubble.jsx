@@ -590,10 +590,6 @@ function enhanceRichTextHtml(html) {
       } else if (requestedLanguage && hljs.getLanguage(requestedLanguage)) {
         highlighted = hljs.highlight(codeText, { language: requestedLanguage }).value;
         detectedLanguage = requestedLanguage;
-      } else if (codeText.trim()) {
-        const auto = hljs.highlightAuto(codeText);
-        highlighted = auto.value;
-        detectedLanguage = auto.language || "";
       }
     } catch {
       highlighted = null;
@@ -827,10 +823,30 @@ export default function MessageBubble({
               "& h3": { fontSize: "1.18em" },
               "& h4": { fontSize: "1.08em" },
               "& ul, & ol": {
+                display: "block",
                 pl: 2.25,
                 my: 0.5,
               },
+              "& ul": {
+                listStyleType: "disc",
+              },
+              "& ol": {
+                listStyleType: "decimal",
+              },
+              "& ul ul": {
+                listStyleType: "circle",
+              },
+              "& ul ul ul": {
+                listStyleType: "square",
+              },
+              "& ol ol": {
+                listStyleType: "lower-alpha",
+              },
+              "& ol ol ol": {
+                listStyleType: "lower-roman",
+              },
               "& li": {
+                display: "list-item",
                 pl: 0.25,
                 mb: 0.2,
               },
@@ -928,7 +944,7 @@ export default function MessageBubble({
               "& .ticket-code-shell code": {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               },
-              "& ul, & ol": { pl: 2.25, my: 0.4 },
+              "& ul, & ol": { pl: 2.25, my: 0.4, display: "block" },
               "& blockquote": {
                 m: "0.65rem 0",
                 pl: 1.5,
