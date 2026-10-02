@@ -40,6 +40,14 @@ export default function ServiceToolbar({
     handleCloseMenu();
   };
 
+  const handleBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate("/dashboard/services");
+  };
+
   const isOff = refreshIntervalMs == null || refreshIntervalMs < 1000;
   const currentLabel = isOff
     ? "Off"
@@ -70,7 +78,7 @@ export default function ServiceToolbar({
         <Button
           size="small"
           startIcon={<ArrowBackIcon fontSize="small" />}
-          onClick={() => navigate("/dashboard/services")}
+          onClick={handleBack}
           variant="text"
           color="inherit"
           sx={{ fontWeight: 600, textTransform: "none" }}
