@@ -235,13 +235,13 @@ export default function AgentDetail() {
         <DialogActions><Button onClick={() => setIssueOpen(false)} disabled={saving}>Cancel</Button><Button variant="contained" onClick={issue} disabled={saving || Number(expiresDays) < 1 || Number(expiresDays) > 3650}>{saving ? "Issuing…" : "Issue token"}</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={tokenDialog.open} onClose={() => setTokenDialog((p) => ({ ...p, open: false }))} fullWidth maxWidth="md">
+      <Dialog open={tokenDialog.open} onClose={() => setTokenDialog({ open: false, token: "", title: "", warning: "" })} fullWidth maxWidth="md">
         <DialogTitle sx={{ fontWeight: 850 }}>{tokenDialog.title}</DialogTitle>
         <DialogContent dividers>
           <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{tokenDialog.warning}</Alert>
           <Box sx={{ p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1.5, bgcolor: "action.hover", fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>{tokenDialog.token || "Token unavailable"}</Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}><Button startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />} onClick={copyToken} disabled={!tokenDialog.token}>{copied ? "Copied" : "Copy token"}</Button><Button variant="contained" onClick={() => setTokenDialog((p) => ({ ...p, open: false }))}>Done</Button></DialogActions>
+        <DialogActions sx={{ px: 3, py: 2 }}><Button startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />} onClick={copyToken} disabled={!tokenDialog.token}>{copied ? "Copied" : "Copy token"}</Button><Button variant="contained" onClick={() => setTokenDialog({ open: false, token: "", title: "", warning: "" })}>Done</Button></DialogActions>
       </Dialog>
     </Container>
   );
