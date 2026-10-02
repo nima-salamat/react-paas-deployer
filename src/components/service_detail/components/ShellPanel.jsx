@@ -43,8 +43,7 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import { SERVICE_ACTION_ROOT } from "../constants";
-import { langLabel } from "../../messenger/modules/codeHighlight";
-import hljs from "highlight.js/lib/common";
+import { langLabel, loadHljs, highlightCode } from "../../messenger/modules/codeHighlight";
 import "highlight.js/styles/github-dark.css";
 import ShellXterm from "./ShellXterm";
 
@@ -160,12 +159,7 @@ function detectLanguage(path) {
 }
 
 function highlightSource(code, language) {
-  const source = String(code ?? "");
-  if (!source) return "";
-  try {
-    if (language && hljs.getLanguage(language)) return hljs.highlight(source, { language, ignoreIllegals: true }).value;
-  } catch { /* plain text fallback */ }
-  return source.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return highlightCode(code, language).html || " ";
 }
 
 function fileIconColor(path) {
@@ -215,7 +209,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [completionOpen, setCompletionOpen] = useState(false);
   const [completionIndex, setCompletionIndex] = useState(0);
   const isMobileLayout = useMediaQuery("(max-width:899px)");
+  const [highlightReady, setHighlightReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadHljs().then(() => {
+      if (!cancelled) setHighlightReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [selectedPaths, setSelectedPaths] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [dropActive, setDropActive] = useState(false);
@@ -1241,7 +1246,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const activeContent = activeFile ? (openFiles[activeFile]?.content || "") : "";
   const activeContentDeferred = useDeferredValue(activeContent);
   const activeLanguage = activeFile ? detectLanguage(activeFile) : "";
-  const highlightedEditorHtml = useMemo(() => highlightSource(activeContentDeferred, activeLanguage) || " ", [activeContentDeferred, activeLanguage]);
+  const highlightedEditorHtml = useMemo(
+    () => highlightSource(activeContentDeferred, activeLanguage) || " ",
+    [activeContentDeferred, activeLanguage, highlightReady],
+  );
   const copyFile = useCallback(async () => {
     if (!activeContent) return;
     try { await navigator.clipboard?.writeText(activeContent); } catch { /* ignore */ }
