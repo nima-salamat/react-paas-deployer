@@ -366,7 +366,7 @@ export default function SimpleHtmlEditor({
     }
 
     return paragraph;
-  }, []);
+  }, [readCodeText]);
 
   const insertCodeNewline = useCallback((range, selection, trailingBreak = false) => {
     if (!range || !selection) return;
