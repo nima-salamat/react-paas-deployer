@@ -119,3 +119,23 @@ test("ticket editor keeps the first toolbar control clear of the rounded corner"
 
   assert.match(source, /px: 0\.75, py: 0\.1/);
 });
+
+
+test("collapsed inline formatting is explicitly toggleable before typing", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const toggleInlineFormat = useCallback/);
+  assert.match(source, /data-editor-typing-mark/);
+  assert.match(source, /isEmptyTypingMark/);
+  assert.match(source, /active\.remove\(\)/);
+  assert.match(source, /Boolean\(findInlineAncestor\("bold"\)\)/);
+});
+
+test("alignment applies directly to the containing and selected blocks", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /if \(range\.collapsed\)/);
+  assert.match(source, /const selected = new Set\(candidates\)/);
+  assert.match(source, /block\.style\.setProperty\("text-align", align\)/);
+  assert.match(source, /const current = findBlock\(\) \|\| ensureBlock\(\)/);
+});

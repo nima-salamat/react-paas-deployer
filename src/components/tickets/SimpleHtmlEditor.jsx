@@ -21,6 +21,12 @@ import RedoIcon from "@mui/icons-material/Redo";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
+const INLINE_TAGS = {
+  bold: ["STRONG", "B"],
+  italic: ["EM", "I"],
+  underline: ["U"],
+};
+
 /**
  * Compact HTML editor. Toolbar hidden by default; expand with button.
  * Enter → new line (send only via toolbar/send button from parent).
@@ -99,7 +105,35 @@ export default function SimpleHtmlEditor({
     return true;
   };
 
-  const cmd = (command, arg = null) => {
+  const findInlineAncestor = useCallback((command) => {
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    if (!editor || !selection?.rangeCount) return null;
+
+    const tags = INLINE_TAGS[command] || [];
+    let node = selection.anchorNode?.nodeType === Node.ELEMENT_NODE
+      ? selection.anchorNode
+      : selection.anchorNode?.parentElement;
+
+    while (node && node !== editor) {
+      if (tags.includes(node.tagName)) return node;
+      node = node.parentElement;
+    }
+    return null;
+  }, []);
+
+  const placeCaretAtBoundary = useCallback((parent, index) => {
+    const selection = window.getSelection?.();
+    if (!selection || !parent) return;
+
+    const range = document.createRange();
+    range.setStart(parent, Math.max(0, Math.min(index, parent.childNodes.length)));
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
+  const toggleInlineFormat = useCallback((command) => {
     if (disabled || !ref.current) return;
     const hadSelection = restoreSelection();
     if (!hadSelection) {
@@ -108,19 +142,72 @@ export default function SimpleHtmlEditor({
       return;
     }
 
+    const selection = window.getSelection?.();
+    if (!selection?.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
     editingRef.current = true;
-    ref.current.focus({ preventScroll: true });
-    restoreSelection();
-    try {
-      document.execCommand(command, false, arg);
-    } catch {
-      // noop
+
+    if (range.collapsed) {
+      const active = findInlineAncestor(command);
+      const tagName = (INLINE_TAGS[command]?.[0] || "STRONG").toLowerCase();
+
+      if (active) {
+        const visibleText = (active.textContent || "").replace(/\u200B/g, "");
+        const isEmptyTypingMark =
+          active.getAttribute("data-editor-typing-mark") === command &&
+          !visibleText.length;
+
+        if (isEmptyTypingMark) {
+          const parent = active.parentNode;
+          if (parent) {
+            const index = Array.prototype.indexOf.call(parent.childNodes, active);
+            active.remove();
+            placeCaretAtBoundary(parent, index);
+          }
+        } else {
+          const parent = active.parentNode;
+          if (parent) {
+            const afterRange = range.cloneRange();
+            afterRange.selectNodeContents(active);
+            afterRange.setStart(range.startContainer, range.startOffset);
+            const afterFragment = afterRange.extractContents();
+
+            const after = active.cloneNode(false);
+            after.removeAttribute("data-editor-typing-mark");
+            after.appendChild(afterFragment);
+            parent.insertBefore(after, active.nextSibling);
+
+            const afterIndex = Array.prototype.indexOf.call(parent.childNodes, after);
+            placeCaretAtBoundary(parent, afterIndex);
+          }
+        }
+      } else {
+        const mark = document.createElement(tagName);
+        const marker = document.createTextNode("\u200B");
+        mark.setAttribute("data-editor-typing-mark", command);
+        mark.appendChild(marker);
+        range.insertNode(mark);
+
+        const caret = document.createRange();
+        caret.setStart(marker, marker.length);
+        caret.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(caret);
+      }
+    } else {
+      try {
+        document.execCommand(command, false, null);
+      } catch {
+        // noop
+      }
     }
+
     saveSelection();
     editingRef.current = false;
     emit();
     updateActiveFormats();
-  };
+  }, [disabled, emit, findInlineAncestor, placeCaretAtBoundary, saveSelection, updateActiveFormats]);
 
   const findBlock = useCallback(() => {
     const editor = ref.current;
@@ -180,7 +267,25 @@ export default function SimpleHtmlEditor({
 
   const readHtml = useCallback(() => {
     if (!ref.current) return "";
-    return ref.current.innerHTML.replace(/^(?:<div><br><\/div>|<br>)$/i, "");
+
+    const clone = ref.current.cloneNode(true);
+    clone.querySelectorAll?.("[data-editor-typing-mark]").forEach((node) => {
+      const visible = (node.textContent || "").replace(/\u200B/g, "");
+      if (!visible) {
+        node.remove();
+      } else {
+        node.removeAttribute("data-editor-typing-mark");
+      }
+    });
+
+    const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      node.nodeValue = node.nodeValue?.replace(/\u200B/g, "") || "";
+      node = walker.nextNode();
+    }
+
+    return clone.innerHTML.replace(/^(?:<div><br><\/div>|<br>)$/i, "");
   }, []);
 
   const recordHistory = useCallback((html) => {
@@ -215,9 +320,9 @@ export default function SimpleHtmlEditor({
     const block = findBlock();
     const list = block?.tagName === "LI" ? block.parentElement : null;
     setActiveFormats({
-      bold: safeQueryState("bold"),
-      italic: safeQueryState("italic"),
-      underline: safeQueryState("underline"),
+      bold: Boolean(findInlineAncestor("bold")) || safeQueryState("bold"),
+      italic: Boolean(findInlineAncestor("italic")) || safeQueryState("italic"),
+      underline: Boolean(findInlineAncestor("underline")) || safeQueryState("underline"),
       bullet: safeQueryState("insertUnorderedList") || list?.tagName === "UL",
       ordered: safeQueryState("insertOrderedList") || list?.tagName === "OL",
       code: block?.tagName === "PRE",
@@ -230,7 +335,7 @@ export default function SimpleHtmlEditor({
         ? getCodeLanguage(block.querySelector?.("code"))
         : "",
     });
-  }, [findBlock]);
+  }, [findBlock, findInlineAncestor]);
 
   React.useEffect(() => {
     const refresh = () => updateActiveFormats();
@@ -275,31 +380,53 @@ export default function SimpleHtmlEditor({
   const applyAlignment = useCallback((align) => {
     if (disabled || !ref.current || !["left", "center", "right"].includes(align)) return;
     const editor = ref.current;
-    restoreSelection();
+    const hadSelection = restoreSelection();
+    if (!hadSelection) {
+      editor.focus({ preventScroll: true });
+      saveSelection();
+    }
+
     const selection = window.getSelection?.();
     if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
 
     const range = selection.getRangeAt(0);
-    let blocks = Array.from(
-      editor.querySelectorAll("p, div, li, blockquote, h1, h2, h3, h4")
-    ).filter((node) => {
-      try {
-        return range.intersectsNode(node);
-      } catch {
-        return false;
-      }
-    });
+    let blocks = [];
 
-    if (!blocks.length) {
-      const block = findBlock() || ensureBlock();
-      if (block) blocks = [block];
+    if (range.collapsed) {
+      const current = findBlock() || ensureBlock();
+      if (current) blocks = [current];
+    } else {
+      const candidates = Array.from(
+        editor.querySelectorAll("p, div, li, blockquote, h1, h2, h3, h4")
+      ).filter((node) => {
+        try {
+          return range.intersectsNode(node);
+        } catch {
+          return false;
+        }
+      });
+
+      const selected = new Set(candidates);
+      blocks = candidates.filter((node) => {
+        let ancestor = node.parentElement;
+        while (ancestor && ancestor !== editor) {
+          if (selected.has(ancestor)) return false;
+          ancestor = ancestor.parentElement;
+        }
+        return true;
+      });
+
+      if (!blocks.length) {
+        const current = findBlock() || ensureBlock();
+        if (current) blocks = [current];
+      }
     }
 
     if (!blocks.length) return;
 
     editingRef.current = true;
     blocks.forEach((block) => {
-      block.style.textAlign = align;
+      block.style.setProperty("text-align", align);
     });
     saveSelection();
     editingRef.current = false;
@@ -660,7 +787,7 @@ export default function SimpleHtmlEditor({
     const mod = e.ctrlKey || e.metaKey;
     if (mod && ["b", "i", "u"].includes(e.key.toLowerCase())) {
       e.preventDefault();
-      cmd({ b: "bold", i: "italic", u: "underline" }[e.key.toLowerCase()]);
+      toggleInlineFormat({ b: "bold", i: "italic", u: "underline" }[e.key.toLowerCase()]);
       return;
     }
     if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); openLink(); return; }
@@ -744,9 +871,9 @@ export default function SimpleHtmlEditor({
         <Collapse in={expanded}>
           <Box sx={{ px: 0.75, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
             <ButtonGroup size="small" variant="text">
-              <Tooltip title="Bold"><span><IconButton size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => cmd("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Italic"><span><IconButton size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => cmd("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Underline"><span><IconButton size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => cmd("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Bold"><span><IconButton size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Italic"><span><IconButton size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Underline"><span><IconButton size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
 <Tooltip title="Bullets"><span><IconButton size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Numbered"><span><IconButton size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
               <Box sx={{ display: "inline-flex", alignItems: "center", mx: 0.25 }}>
