@@ -362,3 +362,13 @@ test("message renderer visibly supports headings, lists and inline formatting", 
   assert.match(source, /"& em, & i"/);
   assert.match(source, /"& u"/);
 });
+
+
+test("ticket renderer scopes alignment and direction styles to semantic message blocks", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /block\.style\.textAlign = alignment/);
+  assert.match(source, /'& \[dir="rtl"\]'/);
+  assert.match(source, /'& \[dir="ltr"\]'/);
+  assert.match(source, /ticket-align-right/);
+});

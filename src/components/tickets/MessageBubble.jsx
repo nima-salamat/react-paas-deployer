@@ -828,11 +828,11 @@ export default function MessageBubble({
               "& u": { textDecoration: "underline", textUnderlineOffset: "2px" },
               "& s": { textDecoration: "line-through" },
               "& br": { content: '""' },
-              "& [dir="rtl"]": {
+              '& [dir="rtl"]': {
                 direction: "rtl",
                 unicodeBidi: "plaintext",
               },
-              "& [dir="ltr"]": {
+              '& [dir="ltr"]': {
                 direction: "ltr",
                 unicodeBidi: "plaintext",
               },
