@@ -1496,7 +1496,9 @@ const Profile = ({ embedded = false }) => {
           </Stack>
         </Paper>
 
-        <SessionManager />
+        <Box sx={{ mt: 2 }}>
+          <SessionManager />
+        </Box>
 
         {/* Photo Preview Dialog */}
         <Dialog
