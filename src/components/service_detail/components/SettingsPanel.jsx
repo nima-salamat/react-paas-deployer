@@ -243,6 +243,9 @@ function VolumeCard({
   remainingMb,
   canMutate,
   mutateReason,
+  canAttach = canMutate,
+  canDetach = canMutate,
+  canDelete = canMutate,
 }) {
   const size = Number(volume.size_mb) || 0;
   const exceeds = !isAttached && remainingMb != null && size > remainingMb;
@@ -392,7 +395,7 @@ function VolumeCard({
               <IconButton
                 size="small"
                 color="error"
-                disabled={loading || (isAttached ? !canDetach : !canAdd)}
+                disabled={loading || !canDelete || (isAttached && !canDetach)}
                 onClick={() => onDelete?.(volume)}
               >
                 <DeleteIcon fontSize="small" />
@@ -1370,6 +1373,9 @@ export default function SettingsPanel({
                 remainingMb={remainingMb}
                 canMutate={effectiveCanMutate}
                 mutateReason={effectiveMutateReason}
+                canAttach={canAttach}
+                canDetach={canDetach}
+                canDelete={volumeCapabilities ? volumeCapabilities.can_delete !== false : effectiveCanMutate}
               />
             ))}
           </Stack>
@@ -1410,6 +1416,9 @@ export default function SettingsPanel({
                     remainingMb={remainingMb}
                     canMutate={effectiveCanMutate}
                     mutateReason={effectiveMutateReason}
+                    canAttach={canAttach}
+                    canDetach={canDetach}
+                    canDelete={volumeCapabilities ? volumeCapabilities.can_delete !== false : effectiveCanMutate}
                   />
                 );
               })
