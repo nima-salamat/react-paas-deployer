@@ -105,7 +105,6 @@ export default function SimpleHtmlEditor({
   });
   const [linkAnchor, setLinkAnchor] = useState(null);
   const [codeMenuAnchor, setCodeMenuAnchor] = useState(null);
-  const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
   const [internalExpanded, setInternalExpanded] = useState(Boolean(expandedProp ?? defaultExpanded));
@@ -1070,7 +1069,7 @@ export default function SimpleHtmlEditor({
         opacity: disabled ? 0.6 : 1,
         flex: 1,
         minWidth: 0,
-        borderRadius: compact ? 2 : 1,
+        borderRadius: compact ? 1 : 1,
         overflow: "hidden",
       }}
     >
@@ -1129,29 +1128,23 @@ export default function SimpleHtmlEditor({
               <Tooltip title="Align left"><span><IconButton size="small" aria-label="Align left" aria-pressed={activeFormats.align === "left"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("left")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "left" ? "action.selected" : undefined, color: activeFormats.align === "left" ? "primary.main" : undefined }}><FormatAlignLeftIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Align center"><span><IconButton size="small" aria-label="Align center" aria-pressed={activeFormats.align === "center"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("center")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "center" ? "action.selected" : undefined, color: activeFormats.align === "center" ? "primary.main" : undefined }}><FormatAlignCenterIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Align right"><span><IconButton size="small" aria-label="Align right" aria-pressed={activeFormats.align === "right"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("right")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "right" ? "action.selected" : undefined, color: activeFormats.align === "right" ? "primary.main" : undefined }}><FormatAlignRightIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip
-                title="Heading style"
-                disableHoverListener={blockMenuOpen}
-                disableFocusListener={blockMenuOpen}
-                disableTouchListener={blockMenuOpen}
-              >
-                <span><FormControl size="small" sx={{ minWidth: 112, mx: 0.25 }}><Select
-                aria-label="Block style"
-                value={["P", "H1", "H2", "H3", "H4"].includes(activeFormats.block) ? activeFormats.block : "P"}
-                onChange={(e) => applyBlockFormat(e.target.value)}
-                onOpen={() => setBlockMenuOpen(true)}
-                onClose={() => setBlockMenuOpen(false)}
-                onMouseDown={() => saveSelection()}
-                IconComponent={FormatSizeIcon}
-                sx={{ height: 30, fontSize: 12, fontWeight: 700 }}
-                disabled={disabled}
-              >
-                <MenuItem value="P">Paragraph</MenuItem>
-                <MenuItem value="H1">Heading 1</MenuItem>
-                <MenuItem value="H2">Heading 2</MenuItem>
-                <MenuItem value="H3">Heading 3</MenuItem>
-                <MenuItem value="H4">Heading 4</MenuItem>
-              </Select></FormControl></span></Tooltip>
+              <FormControl size="small" sx={{ minWidth: 112, mx: 0.25 }}>
+                <Select
+                  aria-label="Block style"
+                  value={["P", "H1", "H2", "H3", "H4"].includes(activeFormats.block) ? activeFormats.block : "P"}
+                  onChange={(e) => applyBlockFormat(e.target.value)}
+                  onMouseDown={() => saveSelection()}
+                  IconComponent={FormatSizeIcon}
+                  sx={{ height: 30, fontSize: 12, fontWeight: 700 }}
+                  disabled={disabled}
+                >
+                  <MenuItem value="P">Paragraph</MenuItem>
+                  <MenuItem value="H1">Heading 1</MenuItem>
+                  <MenuItem value="H2">Heading 2</MenuItem>
+                  <MenuItem value="H3">Heading 3</MenuItem>
+                  <MenuItem value="H4">Heading 4</MenuItem>
+                </Select>
+              </FormControl>
               <Tooltip title="Undo"><span><IconButton size="small" aria-label="Undo" onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={undo} disabled={disabled || historyIndexRef.current <= 0} sx={{ opacity: historyIndexRef.current <= 0 ? 0.45 : 1 }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Redo"><span><IconButton size="small" aria-label="Redo" onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={redo} disabled={disabled || historyIndexRef.current >= historyRef.current.length - 1} sx={{ opacity: historyIndexRef.current >= historyRef.current.length - 1 ? 0.45 : 1 }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
             </ButtonGroup>

@@ -152,15 +152,15 @@ test("code block header label follows its selected language", () => {
   assert.match(source, /language \? getCodeLanguageLabel\(language\) : "Code"/);
 });
 
-test("paragraph tooltip is disabled while the paragraph menu is open", () => {
+test("paragraph selector has no Heading style tooltip that can overlap its menu", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
-  assert.match(source, /const \[blockMenuOpen, setBlockMenuOpen\] = useState\(false\)/);
-  assert.match(source, /disableHoverListener=\{blockMenuOpen\}/);
-  assert.match(source, /disableFocusListener=\{blockMenuOpen\}/);
-  assert.match(source, /disableTouchListener=\{blockMenuOpen\}/);
-  assert.match(source, /onOpen=\{\(\) => setBlockMenuOpen\(true\)\}/);
-  assert.match(source, /onClose=\{\(\) => setBlockMenuOpen\(false\)\}/);
+  assert.doesNotMatch(source, /const \[blockMenuOpen, setBlockMenuOpen\]/);
+  assert.doesNotMatch(source, /title="Heading style"/);
+  assert.doesNotMatch(source, /disableHoverListener=\{blockMenuOpen\}/);
+  assert.doesNotMatch(source, /disableFocusListener=\{blockMenuOpen\}/);
+  assert.doesNotMatch(source, /disableTouchListener=\{blockMenuOpen\}/);
+  assert.match(source, /aria-label="Block style"/);
 });
 
 
@@ -288,4 +288,11 @@ test("selection restoration is hook-safe and reusable by every toolbar action", 
   assert.match(source, /const restoreSelection = useCallback/);
   assert.match(source, /const focusEditorSelection = useCallback/);
   assert.match(source, /\}, \[restoreSelection\]\);/);
+});
+
+
+test("ticket editor uses a smaller corner radius so the text field keeps more usable width", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /borderRadius: compact \? 1 : 1/);
 });
