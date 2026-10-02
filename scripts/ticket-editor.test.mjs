@@ -38,6 +38,7 @@ test("toolbar reflects the active block and inline formatting", () => {
   assert.match(source, /Choose code language/);
   assert.match(source, /applyCodeLanguage/);
   assert.match(source, /highlightEditorCode/);
+  assert.match(source, /requestAnimationFrame\(\(\) => highlightEditorCode/);
   assert.match(source, /px: 0\.75/);
   assert.match(source, /fontSize: "14px"/);
 });
@@ -92,6 +93,8 @@ test("quote blocks have a distinct visual treatment", () => {
   assert.match(renderer, /blockquote::before/);
   assert.match(renderer, /fontStyle: "italic"/);
   assert.match(renderer, /const codeText = \(\(\) =>/);
+  assert.match(renderer, /requestedLanguage === "plaintext"/);
+  assert.match(renderer, /codeText = text/);
   assert.match(renderer, /borderRadius: "0 8px 8px 0"/);
 });
 

@@ -544,10 +544,13 @@ function enhanceRichTextHtml(html) {
     let detectedLanguage = "";
 
     try {
-      if (requestedLanguage && hljs.getLanguage(requestedLanguage)) {
+      if (requestedLanguage === "plaintext") {
+        highlighted = codeText;
+        detectedLanguage = "plaintext";
+      } else if (requestedLanguage && hljs.getLanguage(requestedLanguage)) {
         highlighted = hljs.highlight(codeText, { language: requestedLanguage }).value;
         detectedLanguage = requestedLanguage;
-      } else if ((code.textContent || "").trim()) {
+      } else if (codeText.trim()) {
         const auto = hljs.highlightAuto(codeText);
         highlighted = auto.value;
         detectedLanguage = auto.language || "";
