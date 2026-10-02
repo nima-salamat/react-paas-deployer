@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";\nimport { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Paper, Typography, Box, Stack, Divider, Chip, IconButton, Tooltip,
   InputAdornment, TextField, CircularProgress, Alert, Collapse,
@@ -13,7 +14,8 @@ import apiRequest from "../../customHooks/apiRequest";
 import { getApiErrorMessage } from "../errorUtils";
 import DnsIcon from "@mui/icons-material/Dns";
 import SpeedIcon from "@mui/icons-material/Speed";
-import HubIcon from "@mui/icons-material/Hub";\nimport SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import HubIcon from "@mui/icons-material/Hub";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 
 function InfoRow({ label, value }) {
   return (
@@ -230,7 +232,8 @@ function ConnectionStringBlock({ platform, cfg, serviceName }) {
                 wordBreak: "break-all",
               }}
             >
-              {hints.join("\n")}
+              {hints.join("
+")}
             </Box>
           </Collapse>
         </Box>
@@ -412,7 +415,24 @@ export default function OverviewPanel({
       </SectionCard>
       )}
 
-      <SectionCard\n        icon={<SmartToyOutlinedIcon color="primary" fontSize="small" />}\n        title="Automation"\n      >\n        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>\n          Connect scoped automation clients and AI agents to the PassDeployer control plane. Agents are account-level resources and are not tied to this service.\n        </Typography>\n        <Button\n          variant="outlined"\n          size="small"\n          onClick={() => navigate("/dashboard/agents?service=" + encodeURIComponent(service?.id || service?.pk || ""))}\n          sx={{ mt: 1.5, borderRadius: 1.5, fontWeight: 750 }}\n        >\n          Manage Agents\n        </Button>\n      </SectionCard>\n\n      {/* Database credentials card — only renders for DB-platform deploys. */}
+      <SectionCard
+        icon={<SmartToyOutlinedIcon color="primary" fontSize="small" />}
+        title="Automation"
+      >
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
+          Connect scoped automation clients and AI agents to the PassDeployer control plane. Agents are account-level resources and are not tied to this service.
+        </Typography>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => navigate("/dashboard/agents?service=" + encodeURIComponent(service?.id || service?.pk || ""))}
+          sx={{ mt: 1.5, borderRadius: 1.5, fontWeight: 750 }}
+        >
+          Manage Agents
+        </Button>
+      </SectionCard>
+
+      {/* Database credentials card — only renders for DB-platform deploys. */}
       {selectedDeploy && (
         <DatabaseCredentialsCard
           selectedDeploy={selectedDeploy}
