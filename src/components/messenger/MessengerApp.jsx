@@ -1604,7 +1604,22 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
           }
         } catch { /* */ }
 
-        if (nearBottom) {
+        // A cached message list can exist before we have ever captured a
+        // viewport snapshot for that conversation. In that case there is no
+        // meaningful history position to restore, so open at the live edge
+        // (latest messages) rather than falling back into the middle of the list.
+        const hasKnownViewport =
+          nearBottom
+          || Number.isFinite(scrollTop)
+          || Number.isFinite(distanceBottom)
+          || Boolean(anchorMsgId);
+
+        if (!hasKnownViewport) {
+          nearBottom = true;
+          distanceBottom = 0;
+          scrollTop = null;
+          anchorMsgId = null;
+        } else if (nearBottom) {
           distanceBottom = 0;
           scrollTop = null;
           anchorMsgId = null;
