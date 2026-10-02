@@ -361,10 +361,8 @@ export default function ServicesListMui({
           // Show a spinner only until the first usable CPU/RAM result exists.
           // Background refreshes keep the last values visible and never expose
           // a transient loading state to the user.
-          const hasCachedUsage =
-            previous &&
-            (previous.cpu != null || previous.ram != null);
-          if (!hasCachedUsage) {
+          const hasInitialized = previous?.initialized === true;
+          if (!hasInitialized) {
             if (next === prev) next = { ...prev };
             next[key] = {
               ...(previous || {}),
@@ -397,10 +395,21 @@ export default function ServicesListMui({
                   ram: clampPct(res.data.ram),
                   loading: false,
                   error: false,
+                  initialized: true,
                 },
               ];
             }
-            return [String(sid), { running: null, cpu: null, ram: null, loading: false, error: true }];
+            return [
+              String(sid),
+              {
+                running: null,
+                cpu: null,
+                ram: null,
+                loading: false,
+                error: true,
+                initialized: true,
+              },
+            ];
           } catch {
             const previous = statusMapSnapshot[String(sid)] || {};
             return [
@@ -409,6 +418,7 @@ export default function ServicesListMui({
                 ...previous,
                 loading: false,
                 error: true,
+                initialized: true,
               },
             ];
           }
