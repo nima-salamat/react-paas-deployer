@@ -590,3 +590,16 @@ test("normal editor line breaks remain source-aligned rather than browser-auto-a
   assert.match(source, /copyBlockAlignment\(block, next\)/);
   assert.match(source, /!e\.shiftKey && !enterSends/);
 });
+
+
+test("editor preserves the selected alignment when contentEditable loses it during typing", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /function hasExplicitBlockAlignment/);
+  assert.match(source, /const currentAlignmentRef = useRef\("left"\)/);
+  assert.match(source, /currentAlignmentRef\.current = align/);
+  assert.match(source, /if \(hasExplicitBlockAlignment\(block\)\)/);
+  assert.match(source, /currentAlignmentRef\.current = getBlockAlignment\(block\)/);
+  assert.match(source, /setBlockAlignment\(block, currentAlignmentRef\.current\)/);
+  assert.match(source, /pendingAlignmentRef\.current = "left"/);
+});

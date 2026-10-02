@@ -42,8 +42,22 @@ function getBlockAlignment(block) {
   );
   if (classEntry) return classEntry;
 
+  const dataAlignment = block.getAttribute?.("data-ticket-align") || "";
+  if (ALIGNMENT_VALUES.includes(dataAlignment)) return dataAlignment;
+
   const inlineStyle = block.style?.textAlign || "";
   return ALIGNMENT_VALUES.includes(inlineStyle) ? inlineStyle : "left";
+}
+
+function hasExplicitBlockAlignment(block) {
+  if (!block) return false;
+  if (ALIGNMENT_VALUES.some((align) => block.classList?.contains(ALIGNMENT_CLASSES[align]))) {
+    return true;
+  }
+  if (ALIGNMENT_VALUES.includes(block.getAttribute?.("data-ticket-align") || "")) {
+    return true;
+  }
+  return ALIGNMENT_VALUES.includes((block.style?.textAlign || "").trim().toLowerCase());
 }
 
 function setBlockAlignment(block, align) {
@@ -137,6 +151,7 @@ export default function SimpleHtmlEditor({
   const lastHtml = useRef(value || "");
   const savedRange = useRef(null);
   const pendingAlignmentRef = useRef("left");
+  const currentAlignmentRef = useRef("left");
   const editingRef = useRef(false);
   const historyRef = useRef([value || ""]);
   const historyIndexRef = useRef(0);
@@ -372,7 +387,7 @@ export default function SimpleHtmlEditor({
       const wrapper = document.createElement("p");
       wrapper.setAttribute("dir", "auto");
       wrapper.innerHTML = "<br>";
-      setBlockAlignment(wrapper, pendingAlignmentRef.current);
+      setBlockAlignment(wrapper, currentAlignmentRef.current);
       editor.appendChild(wrapper);
 
       if (selection) {
@@ -498,6 +513,10 @@ export default function SimpleHtmlEditor({
 
     const block = findBlock();
     const list = block?.tagName === "LI" ? block.parentElement : null;
+    const explicitAlignment = hasExplicitBlockAlignment(block);
+    if (explicitAlignment) {
+      currentAlignmentRef.current = getBlockAlignment(block);
+    }
     setActiveFormats({
       bold: Boolean(findInlineAncestor("bold")),
       italic: Boolean(findInlineAncestor("italic")),
@@ -600,6 +619,7 @@ export default function SimpleHtmlEditor({
         const emptyBlock = ensureBlock();
         if (emptyBlock) {
           setBlockAlignment(emptyBlock, align);
+          currentAlignmentRef.current = align;
           pendingAlignmentRef.current = "left";
           setActiveFormats((current) => ({ ...current, align }));
           placeCaretAtEnd(emptyBlock);
@@ -614,6 +634,7 @@ export default function SimpleHtmlEditor({
     }
 
     pendingAlignmentRef.current = align;
+    currentAlignmentRef.current = align;
     editingRef.current = true;
     blocks.forEach((block) => {
       setBlockAlignment(block, align);
@@ -1397,14 +1418,19 @@ export default function SimpleHtmlEditor({
           suppressContentEditableWarning
           onInput={() => {
             editingRef.current = true;
-            const pendingAlignment = pendingAlignmentRef.current;
-            if (pendingAlignment !== "left") {
-              const block = findBlock() || ensureBlock();
-              if (block) {
-                setBlockAlignment(block, pendingAlignment);
-                pendingAlignmentRef.current = "left";
+
+            // Preserve the user's explicit alignment even if contentEditable
+            // creates or mutates a text node without carrying the block class.
+            const block = findBlock() || ensureBlock();
+            if (block) {
+              if (hasExplicitBlockAlignment(block)) {
+                currentAlignmentRef.current = getBlockAlignment(block);
+              } else {
+                setBlockAlignment(block, currentAlignmentRef.current);
               }
             }
+
+            pendingAlignmentRef.current = "left";
             emit();
             saveSelection();
             requestAnimationFrame(() => {
