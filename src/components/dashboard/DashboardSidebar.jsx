@@ -17,7 +17,8 @@ import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
-import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";\nimport SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 
 export const SIDEBAR_WIDTH = 232;
 
@@ -46,7 +47,8 @@ function resolveActiveId(pathname) {
   if (pathname.startsWith("/dashboard/volumes")) return "volumes";
   if (pathname.startsWith("/dashboard/plans")) return "plans";
   if (pathname.startsWith("/dashboard/tickets")) return "tickets";
-  if (pathname.startsWith("/dashboard/agents")) return "agents";\n  if (pathname.startsWith("/dashboard/profile") || pathname === "/profile") return "profile";
+  if (pathname.startsWith("/dashboard/agents")) return "agents";
+  if (pathname.startsWith("/dashboard/profile") || pathname === "/profile") return "profile";
   // legacy query tabs
   return "services";
 }
