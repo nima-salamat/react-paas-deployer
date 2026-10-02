@@ -1419,13 +1419,41 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         </Box>
 
         {activeTab === "shell" ? (
-          <Box sx={{ display: "grid", gridTemplateColumns: sidebarOpen ? { xs: "1fr", md: "minmax(0,1fr) 280px" } : "1fr", height: TERMINAL_HEIGHT, minHeight: 0 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: sidebarOpen ? { xs: "1fr", md: "minmax(0,1fr) 280px" } : "1fr", position: "relative", height: TERMINAL_HEIGHT, minHeight: 0 }}>
             {sidebarOpen ? (
-              <Box sx={{ display: "flex", flexDirection: "column", minHeight: 0, borderRight: { md: "1px solid rgba(148,163,184,.14)" }, borderBottom: { xs: "1px solid rgba(148,163,184,.14)", md: 0 }, bgcolor: "#0d141c" }}>
+              <Box
+                onDragOver={(event) => { event.preventDefault(); if (cwdWritable === true && cwdMountWritable === true) setDropActive(true); }}
+                onDragLeave={() => setDropActive(false)}
+                onDrop={handleExplorerDrop}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  minHeight: 0,
+                  position: { xs: "absolute", md: "relative" },
+                  inset: { xs: "0 0 0 auto", md: "auto" },
+                  width: { xs: "min(88vw, 360px)", md: 280 },
+                  height: { xs: "100%", md: "auto" },
+                  zIndex: { xs: 12, md: "auto" },
+                  borderLeft: { xs: "1px solid rgba(148,163,184,.16)", md: 0 },
+                  borderRight: { md: "1px solid rgba(148,163,184,.14)" },
+                  bgcolor: "#0d141c",
+                  boxShadow: { xs: "0 12px 38px rgba(0,0,0,.38)", md: "none" },
+                  transform: { xs: sidebarOpen ? "translateX(0)" : "translateX(105%)", md: "none" },
+                  transition: "transform 150ms ease",
+                  pointerEvents: { xs: sidebarOpen ? "auto" : "none", md: "auto" },
+                }}
+              >
                 <Box sx={{ px: 1.2, py: .85, display: "flex", alignItems: "center", gap: .6 }}>
                   <Typography sx={{ color: "#6f7d8b", fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", flex: 1 }}>PROJECT</Typography>
-                  <Button size="small" variant="outlined" startIcon={<AddRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFile} disabled={!session || !cwdMountWritable} sx={{ minWidth: 0, px: .85, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2, borderColor: "rgba(96,165,250,.28)", color: "#93bce7" }}>New file</Button>
-                  <Button size="small" variant="outlined" startIcon={<FolderRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFolder} disabled={!session || !cwdMountWritable} sx={{ minWidth: 0, px: .85, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2, borderColor: "rgba(96,165,250,.28)", color: "#93bce7" }}>New Folder</Button>
+                  <Tooltip title={cwdWritable === true ? "Upload files" : cwdWritable === null ? "Checking directory permissions" : "Read-only directory"}>
+                    <span>
+                      <Button size="small" variant="outlined" startIcon={uploading ? <CircularProgress size={13} /> : <UploadFileRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => uploadInputRef.current?.click()} disabled={!session || cwdWritable !== true || cwdMountWritable !== true || uploading} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>Upload</Button>
+                    </span>
+                  </Tooltip>
+                  <input ref={uploadInputRef} hidden type="file" multiple onChange={(event) => uploadFiles(event.target.files)} />
+                  <Button size="small" variant="outlined" startIcon={<AddRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFile} disabled={!session || cwdMountWritable !== true} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>New</Button>
+                  <Button size="small" variant="outlined" startIcon={<FolderRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFolder} disabled={!session || cwdMountWritable !== true} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>Folder</Button>
+                  {selectedItems.length ? <Button size="small" startIcon={<DownloadRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => downloadSelection(selectedItems)} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5 }}>Download</Button> : null}
                   <Tooltip title="Refresh"><span><IconButton size="small" disabled={!session || treeLoading} onClick={refreshDirectory} sx={{ color: "#7d8a98" }}>{treeLoading ? <CircularProgress size={14} /> : <RefreshRoundedIcon sx={{ fontSize: 16 }} />}</IconButton></span></Tooltip>
                 </Box>
                 <Divider sx={{ borderColor: "rgba(148,163,184,.1)" }} />
@@ -1439,13 +1467,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 </Box>
                 <Divider sx={{ borderColor: "rgba(148,163,184,.1)" }} />
                 <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", py: .5 }}>
-                  {!session ? <Typography sx={{ p: 1.3, color: "#5e6d7c", fontSize: 11.5 }}>Open a shell to browse files.</Typography> : explorerEntries.map((item) => (
-                    <Box key={`${item.parent ? "p" : item.directory ? "d" : "f"}-${item.path || item.name}`} onContextMenu={(e) => !item.parent && handleTreeContextMenu(e, item)} onDoubleClick={() => openTreeItem(item)} onClick={() => item.parent || !item.directory ? openTreeItem(item) : null} sx={{ display: "flex", alignItems: "center", gap: .65, px: 1.1, py: .42, cursor: "pointer", color: item.parent ? "#91a9bf" : "#c4ced8", ":hover": { bgcolor: "rgba(96,165,250,.08)" } }}>
-                      {item.parent ? <ChevronRightRoundedIcon sx={{ fontSize: 16, color: "#91a9bf", transform: "rotate(180deg)" }} /> : item.directory ? <FolderRoundedIcon sx={{ fontSize: 16, color: "#77a7d8" }} /> : <InsertDriveFileRoundedIcon sx={{ fontSize: 15, color: fileIconColor(item.name) }} />}
-                      <Typography sx={{ fontFamily: MONO, fontSize: 11.5, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.parent ? 1 : (item.writable === false ? .72 : 1) }}>{item.name}{item.directory && !item.parent ? "/" : ""}</Typography>
-                      {!item.parent ? <Typography sx={{ fontFamily: MONO, fontSize: 9, color: item.mode === "ro" ? "#e8a08f" : (item.effectiveWritable === null ? "#9aabbc" : (item.writable === false ? "#d7b26e" : "#73a386")), flexShrink: 0 }}>{item.mode === "ro" ? "RO" : (item.effectiveWritable === null ? "RW · …" : (item.writable === false ? "RW · LOCKED" : "RW"))}</Typography> : null}
-                    </Box>
-                  ))}
+                  {!session ? <Typography sx={{ p: 1.3, color: "#5e6d7c", fontSize: 11.5 }}>Open a shell to browse files.</Typography> : explorerEntries.map((item) => {
+                    const itemPath = item.path || joinPath(currentCwd, item.name);
+                    const selected = selectedPaths.includes(itemPath);
+                    return (
+                      <Box key={(item.parent ? "p" : item.directory ? "d" : "f") + "-" + itemPath} onContextMenu={(e) => !item.parent && handleTreeContextMenu(e, item)} onDoubleClick={() => openTreeItem(item)} onClick={(e) => toggleTreeSelection(e, item)} aria-selected={selected} sx={{ display: "flex", alignItems: "center", gap: .5, px: 1, py: .38, cursor: "pointer", color: item.parent ? "#91a9bf" : "#c4ced8", bgcolor: selected ? "rgba(96,165,250,.12)" : "transparent", ":hover": { bgcolor: "rgba(96,165,250,.08)" } }}>
+                        {item.parent ? <ChevronRightRoundedIcon sx={{ fontSize: 16, color: "#91a9bf", transform: "rotate(180deg)" }} /> : item.directory ? <FolderRoundedIcon sx={{ fontSize: 16, color: "#77a7d8" }} /> : <InsertDriveFileRoundedIcon sx={{ fontSize: 15, color: fileIconColor(item.name) }} />}
+                        <Typography sx={{ fontFamily: MONO, fontSize: 11.5, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.parent ? 1 : (item.writable === false ? .72 : 1) }}>{item.name}{item.directory && !item.parent ? "/" : ""}</Typography>
+                        {!item.parent ? <Typography sx={{ fontFamily: MONO, fontSize: 9, color: item.mode === "ro" ? "#e8a08f" : (item.effectiveWritable === null ? "#9aabbc" : (item.writable === false ? "#d7b26e" : "#73a386")), flexShrink: 0 }}>{item.mode === "ro" ? "RO" : (item.effectiveWritable === null ? "Checking" : (item.writable === false ? "Locked" : "RW"))}</Typography> : null}
+                        {!item.parent ? <IconButton size="small" aria-label={"Actions for " + item.name} onClick={(e) => { e.stopPropagation(); setContextMenu({ mouseX: e.currentTarget.getBoundingClientRect().left, mouseY: e.currentTarget.getBoundingClientRect().bottom, item }); }} sx={{ p: .15, color: "#6f8091" }}><MoreVertRoundedIcon sx={{ fontSize: 15 }} /></IconButton> : null}
+                      </Box>
+                    );
+                  })}
                 </Box>
               </Box>
             ) : null}
@@ -1701,6 +1734,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         )}
         {contextMenu.item?.parent ? null : <MenuItem onClick={contextRename}><DriveFileRenameOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Rename</MenuItem>}
         <MenuItem onClick={async () => { await navigator.clipboard?.writeText(contextMenu.item?.path || ""); closeContextMenu(); }}><ContentCopyRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Copy path</MenuItem>
+        {contextMenu.item?.parent ? null : <MenuItem onClick={async () => { const item = contextMenu.item; closeContextMenu(); if (item) await downloadSelection([item]); }}><DownloadRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Download</MenuItem>}
         {contextMenu.item?.parent ? null : <MenuItem onClick={contextDelete} sx={{ color: "#f18b82" }}><DeleteOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Delete</MenuItem>}
       </Menu>
 
