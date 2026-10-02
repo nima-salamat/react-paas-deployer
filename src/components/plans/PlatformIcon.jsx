@@ -71,7 +71,6 @@ const ICON_COLORS = {
   node: "#5FA04E",
   flask: "#000000",
   docker: "#2496ED",
-  laravel: "#FF2D20",
   statichtmlcss: "#E34F26",
   html: "#E34F26",
   html5: "#E34F26",
