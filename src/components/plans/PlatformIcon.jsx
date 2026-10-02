@@ -21,7 +21,7 @@ import {
   SiPython,
   SiReact,
   SiRedis,
-  SiVuejs,
+  SiVuedotjs,
 } from "react-icons/si";
 
 /** Map normalized platform key → Simple Icon component */
@@ -38,8 +38,8 @@ const ICON_MAP = {
   statichtmlcss: SiHtml5,
   html: SiHtml5,
   html5: SiHtml5,
-  vuejs: SiVuejs,
-  vue: SiVuejs,
+  vuejs: SiVuedotjs,
+  vue: SiVuedotjs,
   angular: SiAngular,
   react: SiReact,
   dotnet: SiDotnet,
