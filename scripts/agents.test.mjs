@@ -96,7 +96,7 @@ test("agent list uses a styled dialog for permanent Agent deletion", () => {
   assert.match(source, /setDeleteTarget/);
   assert.match(source, /open=\{Boolean\(deleteTarget\)\}/);
   assert.match(source, /Delete permanently/);
-  assert.match(source, /all credentials, enrollment tokens and idempotency records/);
+  assert.match(source, /All credentials, enrollment tokens and idempotency records/);
   assert.doesNotMatch(source, /window\.confirm\(\s*["']Delete Agent/);
 });
 
@@ -116,8 +116,8 @@ test("agent detail uses styled dialogs for Agent and credential deletion", () =>
 test("agent create dialog provides All and Reset scope presets", () => {
   const source = read("src/components/agents/Agents.jsx");
 
-  assert.match(source, />All<\/Button>/);
-  assert.match(source, />Reset<\/Button>/);
+  assert.match(source, />\s*All\s*<\/Button>/);
+  assert.match(source, />\s*Reset\s*<\/Button>/);
   assert.match(source, /scopes: \(scopeCatalog\.scopes \|\| \[\]\)\.map\(\(scope\) => scope\.name\)/);
   assert.match(source, /scopes: \[\.\.\.\(scopeCatalog\.defaults \|\| \[\]\)\]/);
 });
