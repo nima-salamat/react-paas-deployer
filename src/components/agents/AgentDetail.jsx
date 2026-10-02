@@ -54,13 +54,12 @@ export default function AgentDetail() {
 
   useEffect(() => { load(); }, [load]);
 
-  const mutate = async (action, successMessage) => {
+  const mutate = async (action) => {
     setSaving(true); setError("");
     try {
       const data = await action();
       if (data?.agent) setAgent(data.agent);
       await load();
-      if (successMessage) window.dispatchEvent(new CustomEvent("toast", { detail: { severity: "success", message: successMessage } }));
       return data;
     } catch (e) { setError(getApiErrorMessage(e, "Agent operation failed.")); return null; }
     finally { setSaving(false); }
@@ -203,7 +202,7 @@ export default function AgentDetail() {
                     <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
                       <Box sx={{ flex: 1 }}><Typography fontFamily="ui-monospace, monospace" fontWeight={800}>{credential.prefix}</Typography><Typography variant="caption" color="text.secondary">Created {fmt(credential.created_at)} · Expires {fmt(credential.expires_at)} · Last used {fmt(credential.last_used_at)}</Typography></Box>
                       <Chip size="small" label={credential.active ? "active" : "revoked / expired"} color={credential.active ? "success" : "default"} sx={{ fontWeight: 700 }} />
-                      {credential.active ? <Button size="small" color="error" variant="outlined" onClick={() => revokeCredential(id, credential.id).then(load)} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
+                      {credential.active ? <Button size="small" color="error" variant="outlined" onClick={async () => { try { setSaving(true); setError(""); await revokeCredential(id, credential.id); await load(); } catch (e) { setError(getApiErrorMessage(e, "Failed to revoke credential.")); } finally { setSaving(false); } }} disabled={saving} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
                     </Stack>
                   </Paper>
                 )) : <Typography color="text.secondary">No credentials have been issued.</Typography>}
