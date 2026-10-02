@@ -80,6 +80,32 @@ test("service status helpers distinguish busy from runtime state", () => {
   assert.equal(describeServiceStatus(""), "Unknown");
 });
 
+test("service list keeps last known CPU/RAM visible during background status refresh", () => {
+  const service = read("src/components/service/Services.jsx");
+  const item = read("src/components/service/services/ServiceItem.jsx");
+
+  assert.match(
+    service,
+    /cpu: val\.cpu \?\? old\?\.cpu \?\? null/,
+  );
+  assert.match(
+    service,
+    /ram: val\.ram \?\? old\?\.ram \?\? null/,
+  );
+  assert.match(
+    item,
+    /const cpuUsageLoading =\s*usage\.cpu == null && \(!statusEntry \|\| statusEntry\.loading\)/,
+  );
+  assert.match(
+    item,
+    /const ramUsageLoading =\s*usage\.ram == null && \(!statusEntry \|\| statusEntry\.loading\)/,
+  );
+  assert.match(
+    item,
+    /statusEntry\.cpu != null \? \{ cpu_percent: statusEntry\.cpu \} : \{\}/,
+  );
+});
+
 test("service detail uses the central request/error layer", () => {
   const files = [
     "src/components/service_detail/ServiceDetail.jsx",
