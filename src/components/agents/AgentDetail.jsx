@@ -10,9 +10,10 @@ import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
-import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest } from "./agentApi";
+import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest, deleteAgent } from "./agentApi";
 
 function fmt(value) { return value ? new Date(value).toLocaleString() : "Never"; }
 
@@ -99,6 +100,24 @@ export default function AgentDetail() {
     await mutate(() => setAgentStatus(id, action), null);
   };
 
+  const removeAgent = async () => {
+    const confirmed = window.confirm(
+      "Delete Agent \"" + agent.name + "\" permanently? This cannot be undone and all credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted."
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError("");
+    try {
+      await deleteAgent(id);
+      navigate("/dashboard/agents", { replace: true });
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to delete Agent."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const copyToken = async () => {
     if (!tokenDialog.token) return;
     try { await navigator.clipboard.writeText(tokenDialog.token); setCopied(true); setTimeout(() => setCopied(false), 1400); } catch { setCopied(false); }
@@ -151,6 +170,16 @@ export default function AgentDetail() {
             {agent.status === "active" ? <Button color="warning" variant="outlined" startIcon={<BlockRoundedIcon />} onClick={() => statusAction("disable")} disabled={saving} sx={{ borderRadius: 1.5 }}>Disable</Button> : null}
             {agent.status === "disabled" ? <Button variant="outlined" startIcon={<RestartAltRoundedIcon />} onClick={() => statusAction("enable")} disabled={saving} sx={{ borderRadius: 1.5 }}>Enable</Button> : null}
             {agent.status !== "revoked" ? <Button color="error" variant="outlined" onClick={() => statusAction("revoke")} disabled={saving} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
+            <Button
+              color="error"
+              variant="contained"
+              startIcon={<DeleteOutlineRoundedIcon />}
+              onClick={removeAgent}
+              disabled={saving}
+              sx={{ borderRadius: 1.5, fontWeight: 800 }}
+            >
+              {saving ? "Deleting…" : "Delete"}
+            </Button>
           </Stack>
         </Stack>
 
@@ -167,6 +196,9 @@ export default function AgentDetail() {
 
           {tab === 0 ? (
             <Box sx={{ p: { xs: 2, md: 3 } }}>
+              <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                Deleting this Agent is permanent. Its credentials, enrollment tokens and idempotency records are removed with it. A revoked Agent can still be deleted.
+              </Alert>
               <Stack spacing={2.25}>
                 <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                   {[["Status", agent.status], ["Created", fmt(agent.created_at)], ["Last used", fmt(agent.last_used_at)], ["Active credentials", String(agent.active_credential_count)]] .map(([label, value]) => (
