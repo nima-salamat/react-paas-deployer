@@ -32,6 +32,12 @@ const NAV_ITEMS = [
     ],
   },
   {
+    group: "Automation",
+    items: [
+      { id: "agents", label: "Agents", path: "/dashboard/agents", icon: SmartToyOutlinedIcon },
+    ],
+  },
+  {
     group: "Account",
     items: [
       { id: "plans", label: "Plans", path: "/dashboard/plans", icon: SellOutlinedIcon },
