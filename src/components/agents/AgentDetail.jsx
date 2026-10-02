@@ -260,7 +260,7 @@ export default function AgentDetail() {
                 {credentials.length ? credentials.map((credential) => (
                   <Paper key={credential.id} variant="outlined" sx={{ p: 1.75, borderRadius: 2 }}>
                     <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
-                      <Box sx={{ flex: 1 }}><Typography fontFamily="ui-monospace, monospace" fontWeight={800}>{credential.prefix}</Typography><Typography variant="caption" color="text.secondary">Created {fmt(credential.created_at)} · Expires {fmt(credential.expires_at)} · Last used {fmt(credential.last_used_at)}</Typography></Box>
+                      <Box sx={{ flex: 1 }}><Typography fontFamily="ui-monospace, monospace" fontWeight={800}>{credential.prefix}</Typography><Typography variant="caption" color="text.secondary">Created {fmt(credential.created_at)} · Expires {fmt(credential.expires_at)} · Last used {fmt(credential.last_used_at)}{credential.issued_via ? " · Issued via " + provisioningLabel(credential.issued_via === "api_enrollment" ? "api_enrollment" : "dashboard") : ""}</Typography></Box>
                       <Chip size="small" label={credential.active ? "active" : "revoked / expired"} color={credential.active ? "success" : "default"} sx={{ fontWeight: 700 }} />
                       {credential.active ? <Button size="small" color="error" variant="outlined" onClick={async () => {
                         if (!window.confirm("Revoke this credential? It will stop authenticating but its record will remain available for audit/history.")) return;
