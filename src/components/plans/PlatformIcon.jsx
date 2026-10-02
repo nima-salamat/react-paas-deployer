@@ -156,7 +156,7 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
   const Icon = resolveIcon(platformKey, label);
   const pad = Math.max(4, Math.round(size * 0.22));
   const box = size + pad * 2;
-  const bg = resolveBg(platformKey, label);
+  const bg = "transparent";
 
   if (Icon) {
     return (
@@ -166,14 +166,22 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
           width: box,
           height: box,
           borderRadius: 1.25,
-          bgcolor: bg,
+          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.065)" : "rgba(71,85,105,.055)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
           lineHeight: 0,
-          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
-          "& svg": { display: "block" },
+          border: "1px solid",
+          borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.12)" : "rgba(71,85,105,.12)",
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,.05)",
+          "& svg": {
+            display: "block",
+            filter: (theme) => theme.palette.mode === "dark"
+              ? "grayscale(1) brightness(1.45) contrast(.58)"
+              : "grayscale(1) brightness(.68) contrast(.62)",
+            opacity: 0.92,
+          },
         }}
         title={label || platformKey}
       >
@@ -190,8 +198,8 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
         width: box,
         height: box,
         borderRadius: 1.25,
-        bgcolor: bg,
-        color: "#fff",
+        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.065)" : "rgba(71,85,105,.055)",
+        color: "text.secondary",
         fontSize: Math.max(10, size * 0.38),
         fontWeight: 800,
         display: "inline-flex",
@@ -200,7 +208,9 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
         flexShrink: 0,
         letterSpacing: -0.3,
         lineHeight: 1,
-        boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+        border: "1px solid",
+        borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.12)" : "rgba(71,85,105,.12)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,.05)",
       }}
       title={label || platformKey}
     >

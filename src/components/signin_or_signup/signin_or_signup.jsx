@@ -96,7 +96,9 @@ export default function SigninOrSignup() {
   const getReturnPath = () => {
     const from = location.state?.from;
     if (!from) return null;
-    return typeof from === "string" ? from : from.pathname || null;
+    if (typeof from === "string") return from;
+    const pathname = from.pathname || "/";
+    return `${pathname}${from.search || ""}${from.hash || ""}`;
   };
 
   const completeLogin = (access, refresh) => {

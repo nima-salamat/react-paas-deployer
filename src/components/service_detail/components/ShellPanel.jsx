@@ -1020,6 +1020,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     });
   }, [currentCwd]);
 
+  const closeContextMenu = useCallback(() => setContextMenu({ mouseX: null, mouseY: null, item: null }), []);
+
   const downloadSelection = useCallback(async (items) => {
     const list = Array.isArray(items) ? items : [];
     if (!session?.token || !list.length) return;
@@ -1177,8 +1179,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       await refreshDirectory();
     } catch(err){ handleError(err?.response?.data?.detail||err?.message||"Unable to delete file."); }
   }, [activeFile, apiRoot, handleError, openFiles, refreshDirectory, session?.token]);
-
-  const closeContextMenu = useCallback(() => setContextMenu({ mouseX: null, mouseY: null, item: null }), []);
 
   const handleTreeContextMenu = useCallback((event, item) => {
     event.preventDefault();

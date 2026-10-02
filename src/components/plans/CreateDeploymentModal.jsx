@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import PropTypes from "prop-types";
 import apiRequest from "../customHooks/apiRequest";
 import {
@@ -100,6 +100,7 @@ export default function CreateServiceWizard({
 }) {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const steps = ["Service", "Network", "Volumes", "Confirm"];
 
@@ -577,7 +578,22 @@ export default function CreateServiceWizard({
               <Button
                 variant="contained"
                 size="small"
-                onClick={() => navigate("/signin_or_signup")}
+                onClick={() => {
+                  const params = new URLSearchParams(location.search);
+                  const planId = initialData.plan_id ?? initialData.id ?? initialData.plan;
+                  if (planId != null && planId !== "") params.set("create", String(planId));
+                  else params.delete("create");
+                  navigate({
+                    pathname: "/signin_or_signup",
+                    state: {
+                      from: {
+                        pathname: location.pathname,
+                        search: params.toString() ? `?${params.toString()}` : "",
+                        hash: location.hash || "",
+                      },
+                    },
+                  });
+                }}
                 sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
               >
                 Login

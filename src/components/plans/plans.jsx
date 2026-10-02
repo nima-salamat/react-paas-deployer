@@ -9,7 +9,7 @@ import React, {
   useState,
 } from "react";
 import axios from "axios";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import {
   alpha,
   Box,
@@ -323,6 +323,7 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
 export default function PlatformPlans() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [platforms, setPlatforms] = useState([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
@@ -563,6 +564,17 @@ export default function PlatformPlans() {
     setModalOpen(false);
     setModalInitial({});
   };
+
+  useEffect(() => {
+    const createId = searchParams.get("create");
+    if (!createId || loadingPlans || modalOpen || !plans.length) return;
+    const target = plans.find((plan) => String(plan?.id ?? plan?.pk ?? plan?.uuid ?? "") === String(createId));
+    if (!target) return;
+    openCreate(target);
+    const next = new URLSearchParams(searchParams);
+    next.delete("create");
+    setSearchParams(next, { replace: true });
+  }, [loadingPlans, modalOpen, plans, searchParams, setSearchParams]);
 
   const handleCreated = (r) => {
     /* Success feedback is handled inside CreateDeploymentModal
