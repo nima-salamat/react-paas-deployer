@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -805,6 +805,7 @@ function FilesDialog({ open, onClose, volumeName, files, loading, error }) {
 // ─────────────────────────────────────────────
 
 export default function SettingsPanel({
+  onSectionChange,
   service,
   planDetail,
   networkName,
@@ -1239,6 +1240,41 @@ export default function SettingsPanel({
   );
 
   // ─────────────────────────────────────────────────────────────────────
+  const SETTINGS_SECTION_IDS = ["network", "volume", "plan", "danger-zone"];
+
+  useEffect(() => {
+    if (!onSectionChange || typeof IntersectionObserver === "undefined") return undefined;
+
+    const nodes = SETTINGS_SECTION_IDS
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
+
+    if (!nodes.length) return undefined;
+
+    let lastSection = "";
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (!visible.length) return;
+
+        const nextSection = visible[0].target.id;
+        if (!nextSection || nextSection === lastSection) return;
+        lastSection = nextSection;
+        onSectionChange(nextSection);
+      },
+      {
+        root: null,
+        rootMargin: "-16% 0px -62% 0px",
+        threshold: [0, 0.1],
+      }
+    );
+
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [onSectionChange]);
+
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
@@ -1248,7 +1284,7 @@ export default function SettingsPanel({
       {successMessage && <Alert severity="success" sx={{ borderRadius: 2 }}>{successMessage}</Alert>}
 
       {/* ═══════════════ NETWORK ═══════════════ */}
-      <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
+      <Paper id="network" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
           icon={<HubIcon fontSize="small" />}
           title="Network"
@@ -1319,7 +1355,7 @@ export default function SettingsPanel({
       </Paper>
 
       {/* ═══════════════ VOLUMES ═══════════════ */}
-      <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
+      <Paper id="volume" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
           icon={<StorageIcon fontSize="small" />}
           title="Volumes"
@@ -1429,7 +1465,7 @@ export default function SettingsPanel({
       </Paper>
 
       {/* ═══════════════ PLAN ═══════════════ */}
-      <Paper elevation={0} sx={{ p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
+      <Paper id="plan" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
           icon={<SpeedIcon fontSize="small" />}
           title="Plan"
@@ -1500,8 +1536,10 @@ export default function SettingsPanel({
 
       {/* ═══════════════ DANGER ZONE ═══════════════ */}
       <Paper
+        id="danger-zone"
         elevation={0}
         sx={{
+          scrollMarginTop: { xs: 12, md: 16 },
           p: { xs: 2, sm: 2.5 },
           borderRadius: 2.5,
           border: "1px solid",
