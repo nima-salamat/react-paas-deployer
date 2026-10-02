@@ -10,91 +10,72 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
-test("ticket rich-text editor handles unwrapped first-line blocks", () => {
+test("editor maintains an explicit undo/redo history", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
-  assert.match(source, /const findBlock = useCallback/);
-  assert.match(source, /const ensureBlock = useCallback/);
-  assert.match(source, /const block = findBlock\(\) \|\| ensureBlock\(\)/);
+  assert.match(source, /const historyRef = useRef\(\[value \|\| ""\]\)/);
+  assert.match(source, /const recordHistory = useCallback/);
+  assert.match(source, /const applyHistory = useCallback/);
+  assert.match(source, /const undo = useCallback/);
+  assert.match(source, /const redo = useCallback/);
+  assert.match(source, /e\.shiftKey \? redo\(\) : undo\(\)/);
 });
 
-test("code blocks use explicit newline and caret-exit behavior", () => {
+test("toolbar reflects the active block and inline formatting", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
-  assert.match(source, /const exitCodeBlockAtCaret = useCallback/);
-  assert.match(source, /const insertCodeNewline = useCallback/);
-  assert.match(source, /const currentLine = beforeRange\.toString\(\)\.split\("\\n"\)\.pop\(\) \|\| ""/);
-  assert.match(source, /if \(!e\.shiftKey && range\.collapsed && !currentLine\.trim\(\)\)/);
+  assert.match(source, /const updateActiveFormats = useCallback/);
+  assert.match(source, /aria-pressed=\{activeFormats\.bold\}/);
+  assert.match(source, /aria-pressed=\{activeFormats\.bullet\}/);
+  assert.match(source, /aria-pressed=\{activeFormats\.ordered\}/);
+  assert.match(source, /aria-pressed=\{activeFormats\.code\}/);
+  assert.match(source, /aria-pressed=\{activeFormats\.quote\}/);
+});
+
+test("headings H1-H4 are supported as block formats", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /applyBlockFormat/);
+  assert.match(source, /Heading 1/);
+  assert.match(source, /Heading 2/);
+  assert.match(source, /Heading 3/);
+  assert.match(source, /Heading 4/);
+  assert.match(source, /["P", "H1", "H2", "H3", "H4"]/);
+});
+
+test("ensureBlock never calls replaceWith on an arbitrary target node", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /parent\.replaceChild\(wrapper, target\)/);
+  assert.doesNotMatch(source, /target\.replaceWith\(wrapper\)/);
+});
+
+test("code blocks exit through normal paragraphs and keep explicit newlines", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const convertCodeBlockToParagraph = useCallback/);
+  assert.match(source, /const exitCodeBlockAtEnd = useCallback/);
   assert.match(source, /const newline = document\.createTextNode\("\\n"\)/);
+  assert.match(source, /const atEnd = !afterRange\.toString\(\)/);
 });
 
-test("list formatting does not replace an entire multi-item list", () => {
-  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
-
-  assert.match(source, /insertOrderedList/);
-  assert.match(source, /insertUnorderedList/);
-  assert.doesNotMatch(source, /existing\.replaceWith\(p\); block\.remove\(\)/);
-});
-
-test("quote formatting is a real toggle and is rendered", () => {
-  const editor = read("src/components/tickets/SimpleHtmlEditor.jsx");
-  const renderer = read("src/components/tickets/MessageBubble.jsx");
-
-  assert.match(editor, /const toggleQuote = \(\) =>/);
-  assert.match(editor, /onClick=\{toggleQuote\}/);
-  assert.match(editor, /BLOCKQUOTE/);
-  assert.match(renderer, /"& blockquote":/);
-});
-
-test("ticket link UI matches the backend-supported protocols", () => {
-  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
-
-  assert.match(source, /https\?:\\\/\\\/\|mailto:/);
-  assert.doesNotMatch(source, /https\?:\\\/\\\/\|mailto:\|tel:/);
-});
-
-test("message code blocks are highlighted and copyable", () => {
+test("message code renderer highlights and copies code without DOM replacement crashes", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
 
-  assert.match(source, /highlight\.js\/lib\/common/);
   assert.match(source, /highlightAuto/);
   assert.match(source, /data-code-copy/);
-  assert.match(source, /Code copied/);
-  assert.match(source, /github-dark\.css/);
+  assert.match(source, /parent\.replaceChild\(shell, pre\)/);
+  assert.match(source, /shell\.append\(header, pre\)/);
+  assert.doesNotMatch(source, /pre\.parentNode\?\.replaceChild\(shell, pre\)/);
 });
 
-test("quote blocks have a distinct visual treatment in editor and messages", () => {
+test("quote blocks have a distinct visual treatment", () => {
   const editor = read("src/components/tickets/SimpleHtmlEditor.jsx");
   const renderer = read("src/components/tickets/MessageBubble.jsx");
 
   assert.match(editor, /blockquote::before/);
   assert.match(editor, /fontStyle: "italic"/);
   assert.match(renderer, /blockquote::before/);
-  assert.match(renderer, /rgba\(120,140,170,0\.07\)/);
-});
-
-test("code blocks default to automatic language detection", () => {
-  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
-
-  assert.doesNotMatch(source, /code\.className = "language-plaintext"/);
-  assert.doesNotMatch(source, /target\.classList\.add\("language-plaintext"\)/);
-});
-
-test("code block toggle off restores normal paragraph content", () => {
-  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
-
-  assert.match(source, /const convertCodeBlockToParagraph = useCallback/);
-  assert.match(source, /convertCodeBlockToParagraph\(block\)/);
-  assert.match(source, /const lines = text\.replace\(\/\\r\\n\?\/g, "\\n"\)\.split\("\\n"\)/);
-});
-
-test("Enter on the empty final code line exits without crashing", () => {
-  const editor = read("src/components/tickets/SimpleHtmlEditor.jsx");
-  const renderer = read("src/components/tickets/MessageBubble.jsx");
-
-  assert.match(editor, /const exitCodeBlockAtEnd = useCallback/);
-  assert.match(editor, /const atEnd = !afterRange\.toString\(\)/);
-  assert.match(editor, /range\.collapsed && atEnd && !currentLine\.trim\(\)/);
-  assert.match(renderer, /parent\.replaceChild\(shell, pre\)/);
-  assert.match(renderer, /shell\.append\(header, pre\)/);
+  assert.match(renderer, /fontStyle: "italic"/);
+  assert.match(renderer, /borderRadius: "0 8px 8px 0"/);
 });

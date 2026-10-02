@@ -752,7 +752,7 @@ export default function MessageBubble({
               "& a": { color: mine ? "inherit" : "primary.main", textDecoration: "underline" },
               "& .ticket-code-shell": {
                 my: 1,
-                borderRadius: 1.5,
+                borderRadius: 0.75,
                 overflow: "hidden",
                 border: "1px solid",
                 borderColor: mine ? "rgba(255,255,255,0.16)" : "rgba(120,140,170,0.22)",

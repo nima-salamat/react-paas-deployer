@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import { Box, Button, ButtonGroup, Collapse, IconButton, Paper, Popover, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import { Box, Button, ButtonGroup, Collapse, FormControl, IconButton, MenuItem, Paper, Popover, Select, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
 import FormatUnderlinedIcon from "@mui/icons-material/FormatUnderlined";
@@ -8,6 +8,7 @@ import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import CodeIcon from "@mui/icons-material/Code";
 import LinkIcon from "@mui/icons-material/Link";
 import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
+import FormatSizeIcon from "@mui/icons-material/FormatSize";
 import UndoIcon from "@mui/icons-material/Undo";
 import RedoIcon from "@mui/icons-material/Redo";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -35,6 +36,19 @@ export default function SimpleHtmlEditor({
   const lastHtml = useRef(value || "");
   const savedRange = useRef(null);
   const editingRef = useRef(false);
+  const historyRef = useRef([value || ""]);
+  const historyIndexRef = useRef(0);
+  const [, setHistoryRevision] = useState(0);
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    bullet: false,
+    ordered: false,
+    code: false,
+    quote: false,
+    block: "P",
+  });
   const [linkAnchor, setLinkAnchor] = useState(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
@@ -52,6 +66,9 @@ export default function SimpleHtmlEditor({
     if (incoming === lastHtml.current || editingRef.current) return;
     editor.innerHTML = incoming;
     lastHtml.current = incoming;
+    historyRef.current = [incoming];
+    historyIndexRef.current = 0;
+    setHistoryRevision((v) => v + 1);
   }, [value]);
 
   const saveSelection = useCallback(() => {
@@ -61,13 +78,6 @@ export default function SimpleHtmlEditor({
     const range = selection.getRangeAt(0);
     if (editor.contains(range.commonAncestorContainer)) savedRange.current = range.cloneRange();
   }, []);
-
-  const emit = useCallback(() => {
-    if (!ref.current) return;
-    const html = ref.current.innerHTML.replace(/^(?:<div><br><\/div>|<br>)$/i, "");
-    lastHtml.current = html;
-    onChange?.(html);
-  }, [onChange]);
 
   const restoreSelection = () => {
     const editor = ref.current;
@@ -88,6 +98,7 @@ export default function SimpleHtmlEditor({
     saveSelection();
     editingRef.current = false;
     emit();
+    updateActiveFormats();
   };
 
   const findBlock = useCallback(() => {
@@ -96,7 +107,7 @@ export default function SimpleHtmlEditor({
     if (!editor || !selection || !selection.rangeCount) return null;
     const node = selection.anchorNode;
     let block = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-    while (block && block !== editor && !["P", "DIV", "PRE", "LI", "BLOCKQUOTE"].includes(block.tagName)) {
+    while (block && block !== editor && !["P", "DIV", "PRE", "LI", "BLOCKQUOTE", "H1", "H2", "H3", "H4"].includes(block.tagName)) {
       block = block.parentElement;
     }
     if (block && block !== editor) return block;
@@ -121,11 +132,10 @@ export default function SimpleHtmlEditor({
     if (target === editor) {
       wrapper.innerHTML = "<br>";
       editor.appendChild(wrapper);
-    } else if (target.nodeType === Node.TEXT_NODE) {
-      target.replaceWith(wrapper);
-      wrapper.appendChild(target);
     } else {
-      target.replaceWith(wrapper);
+      const parent = target.parentNode;
+      if (!parent) return null;
+      parent.replaceChild(wrapper, target);
       wrapper.appendChild(target);
     }
 
@@ -147,6 +157,117 @@ export default function SimpleHtmlEditor({
     selection.addRange(range);
   }, []);
 
+  const readHtml = useCallback(() => {
+    if (!ref.current) return "";
+    return ref.current.innerHTML.replace(/^(?:<div><br><\/div>|<br>)$/i, "");
+  }, []);
+
+  const recordHistory = useCallback((html) => {
+    const history = historyRef.current;
+    const index = historyIndexRef.current;
+    if (history[index] === html) return;
+
+    history.splice(index + 1);
+    history.push(html);
+    if (history.length > 100) history.shift();
+    historyIndexRef.current = history.length - 1;
+    setHistoryRevision((v) => v + 1);
+  }, []);
+
+  const emit = useCallback((record = true) => {
+    if (!ref.current) return;
+    const html = readHtml();
+    lastHtml.current = html;
+    onChange?.(html);
+    if (record) recordHistory(html);
+  }, [onChange, readHtml, recordHistory]);
+
+  const updateActiveFormats = useCallback(() => {
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    if (!editor || !selection || !selection.rangeCount || !editor.contains(selection.anchorNode)) return;
+
+    const safeQueryState = (command) => {
+      try { return document.queryCommandState(command); } catch { return false; }
+    };
+
+    const block = findBlock();
+    const list = block?.tagName === "LI" ? block.parentElement : null;
+    setActiveFormats({
+      bold: safeQueryState("bold"),
+      italic: safeQueryState("italic"),
+      underline: safeQueryState("underline"),
+      bullet: safeQueryState("insertUnorderedList") || list?.tagName === "UL",
+      ordered: safeQueryState("insertOrderedList") || list?.tagName === "OL",
+      code: block?.tagName === "PRE",
+      quote: block?.tagName === "BLOCKQUOTE",
+      block: block?.tagName || "P",
+    });
+  }, [findBlock]);
+
+  React.useEffect(() => {
+    const refresh = () => updateActiveFormats();
+    document.addEventListener("selectionchange", refresh);
+    window.addEventListener("focus", refresh);
+    refresh();
+    return () => {
+      document.removeEventListener("selectionchange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [updateActiveFormats]);
+
+  const applyHistory = useCallback((index) => {
+    const editor = ref.current;
+    const history = historyRef.current;
+    if (!editor || index < 0 || index >= history.length) return;
+
+    const html = history[index];
+    historyIndexRef.current = index;
+    editingRef.current = true;
+    editor.innerHTML = html;
+    lastHtml.current = html;
+    onChange?.(html);
+    setHistoryRevision((v) => v + 1);
+    placeCaretAtEnd(editor);
+    requestAnimationFrame(() => {
+      editingRef.current = false;
+      updateActiveFormats();
+    });
+  }, [onChange, placeCaretAtEnd, updateActiveFormats]);
+
+  const undo = useCallback(() => {
+    const next = historyIndexRef.current - 1;
+    if (next >= 0) applyHistory(next);
+  }, [applyHistory]);
+
+  const redo = useCallback(() => {
+    const next = historyIndexRef.current + 1;
+    if (next < historyRef.current.length) applyHistory(next);
+  }, [applyHistory]);
+
+  const applyBlockFormat = useCallback((tagName) => {
+    if (disabled || !ref.current) return;
+    restoreSelection();
+    const block = findBlock() || ensureBlock();
+    if (!block || block.tagName === "PRE" || block.tagName === "LI") return;
+
+    const normalized = String(tagName || "P").toUpperCase();
+    if (!["P", "H1", "H2", "H3", "H4"].includes(normalized)) return;
+    if (block.tagName === normalized) return;
+
+    editingRef.current = true;
+    const next = document.createElement(normalized.toLowerCase());
+    next.innerHTML = block.innerHTML || "<br>";
+    const parent = block.parentNode;
+    if (!parent) return;
+    parent.replaceChild(next, block);
+    placeCaretAtEnd(next);
+    saveSelection();
+    editingRef.current = false;
+    emit();
+    updateActiveFormats();
+  }, [disabled, emit, ensureBlock, findBlock, placeCaretAtEnd, saveSelection, updateActiveFormats]);
+
   const convertCodeBlockToParagraph = useCallback((pre) => {
     const paragraph = document.createElement("p");
     const text = pre?.textContent || "";
@@ -156,7 +277,8 @@ export default function SimpleHtmlEditor({
       if (line) paragraph.appendChild(document.createTextNode(line));
     });
     if (!text) paragraph.innerHTML = "<br>";
-    pre?.replaceWith(paragraph);
+    const parent = pre?.parentNode;
+    if (parent) parent.replaceChild(paragraph, pre);
     return paragraph;
   }, []);
 
@@ -225,6 +347,7 @@ export default function SimpleHtmlEditor({
     saveSelection();
     editingRef.current = false;
     emit();
+    updateActiveFormats();
   };
 
   const toggleList = (ordered) => {
@@ -275,6 +398,7 @@ export default function SimpleHtmlEditor({
     saveSelection();
     editingRef.current = false;
     emit();
+    updateActiveFormats();
   };
 
   const openLink = () => {
@@ -347,6 +471,7 @@ export default function SimpleHtmlEditor({
     saveSelection();
     editingRef.current = false;
     emit();
+    updateActiveFormats();
   };
 
   const onKeyDown = (e) => {
@@ -359,8 +484,8 @@ export default function SimpleHtmlEditor({
       return;
     }
     if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); openLink(); return; }
-    if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); cmd(e.shiftKey ? "redo" : "undo"); return; }
-    if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); cmd("redo"); return; }
+    if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+    if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); redo(); return; }
     if (e.key !== "Enter") return;
     if (e.isComposing || e.keyCode === 229) return;
     const selection = window.getSelection?.();
@@ -439,16 +564,31 @@ export default function SimpleHtmlEditor({
         <Collapse in={expanded}>
           <Box sx={{ px: 0.25, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
             <ButtonGroup size="small" variant="text">
-              <Tooltip title="Bold"><span><IconButton size="small" aria-label="Bold" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("bold")} disabled={disabled}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Italic"><span><IconButton size="small" aria-label="Italic" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("italic")} disabled={disabled}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Underline"><span><IconButton size="small" aria-label="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("underline")} disabled={disabled}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
-<Tooltip title="Bullets"><span><IconButton size="small" aria-label="Bulleted list" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(false)} disabled={disabled}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Numbered"><span><IconButton size="small" aria-label="Numbered list" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(true)} disabled={disabled}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Code block"><span><IconButton size="small" aria-label="Code block" onMouseDown={(e) => e.preventDefault()} onClick={toggleCode} disabled={disabled}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Quote"><span><IconButton size="small" aria-label="Quote" onMouseDown={(e) => e.preventDefault()} onClick={toggleQuote} disabled={disabled}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Bold"><span><IconButton size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Italic"><span><IconButton size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Underline"><span><IconButton size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
+<Tooltip title="Bullets"><span><IconButton size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Numbered"><span><IconButton size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Code block"><span><IconButton size="small" aria-label="Code block" aria-pressed={activeFormats.code} onMouseDown={(e) => e.preventDefault()} onClick={toggleCode} disabled={disabled} sx={{ bgcolor: activeFormats.code ? "action.selected" : undefined, color: activeFormats.code ? "primary.main" : undefined }}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Quote"><span><IconButton size="small" aria-label="Quote" aria-pressed={activeFormats.quote} onMouseDown={(e) => e.preventDefault()} onClick={toggleQuote} disabled={disabled} sx={{ bgcolor: activeFormats.quote ? "action.selected" : undefined, color: activeFormats.quote ? "primary.main" : undefined }}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Link"><span><IconButton size="small" aria-label="Link" onMouseDown={(e) => e.preventDefault()} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Undo"><span><IconButton size="small" aria-label="Undo" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("undo")} disabled={disabled}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Redo"><span><IconButton size="small" aria-label="Redo" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("redo")} disabled={disabled}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Heading style"><span><FormControl size="small" sx={{ minWidth: 112, mx: 0.25 }}><Select
+                aria-label="Block style"
+                value={["P", "H1", "H2", "H3", "H4"].includes(activeFormats.block) ? activeFormats.block : "P"}
+                onChange={(e) => applyBlockFormat(e.target.value)}
+                onMouseDown={() => saveSelection()}
+                IconComponent={FormatSizeIcon}
+                sx={{ height: 30, fontSize: 12, fontWeight: 700 }}
+                disabled={disabled}
+              >
+                <MenuItem value="P">Paragraph</MenuItem>
+                <MenuItem value="H1">Heading 1</MenuItem>
+                <MenuItem value="H2">Heading 2</MenuItem>
+                <MenuItem value="H3">Heading 3</MenuItem>
+                <MenuItem value="H4">Heading 4</MenuItem>
+              </Select></FormControl></span></Tooltip>
+              <Tooltip title="Undo"><span><IconButton size="small" aria-label="Undo" onMouseDown={(e) => e.preventDefault()} onClick={undo} disabled={disabled || historyIndexRef.current <= 0} sx={{ opacity: historyIndexRef.current <= 0 ? 0.45 : 1 }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Redo"><span><IconButton size="small" aria-label="Redo" onMouseDown={(e) => e.preventDefault()} onClick={redo} disabled={disabled || historyIndexRef.current >= historyRef.current.length - 1} sx={{ opacity: historyIndexRef.current >= historyRef.current.length - 1 ? 0.45 : 1 }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
             </ButtonGroup>
           </Box>
         </Collapse>
@@ -485,7 +625,7 @@ export default function SimpleHtmlEditor({
             "& pre.editor-code-block": {
               m: "0.65rem 0",
               p: 0,
-              borderRadius: 1.5,
+              borderRadius: 0.75,
               overflow: "auto",
               bgcolor: "#0b1220",
               border: "1px solid",
