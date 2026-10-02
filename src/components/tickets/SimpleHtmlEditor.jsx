@@ -90,27 +90,83 @@ export default function SimpleHtmlEditor({
     emit();
   };
 
+  const findBlock = useCallback(() => {
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    if (!editor || !selection || !selection.rangeCount) return null;
+    const node = selection.anchorNode;
+    let block = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    while (block && block !== editor && !["P", "DIV", "PRE", "LI", "BLOCKQUOTE"].includes(block.tagName)) {
+      block = block.parentElement;
+    }
+    if (block && block !== editor) return block;
+    return null;
+  }, []);
+
+  const ensureBlock = useCallback(() => {
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    if (!editor || !selection || !selection.rangeCount) return null;
+
+    let block = findBlock();
+    if (block) return block;
+
+    const anchor = selection.anchorNode;
+    if (!anchor || !editor.contains(anchor)) return null;
+
+    let target = anchor;
+    while (target.parentNode && target.parentNode !== editor) target = target.parentNode;
+
+    const wrapper = document.createElement("p");
+    if (target === editor) {
+      wrapper.innerHTML = "<br>";
+      editor.appendChild(wrapper);
+    } else if (target.nodeType === Node.TEXT_NODE) {
+      target.replaceWith(wrapper);
+      wrapper.appendChild(target);
+    } else {
+      target.replaceWith(wrapper);
+      wrapper.appendChild(target);
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(wrapper);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return wrapper;
+  }, [findBlock]);
+
+  const placeCaretAtEnd = useCallback((element) => {
+    const selection = window.getSelection?.();
+    if (!selection || !element) return;
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
   const toggleCode = () => {
     if (disabled || !ref.current) return;
     restoreSelection();
     const selection = window.getSelection?.();
-    const start = selection?.anchorNode;
-    let block = start?.nodeType === Node.ELEMENT_NODE ? start : start?.parentElement;
-    while (block && block !== ref.current && !["P","DIV","PRE","LI"].includes(block.tagName)) block = block.parentElement;
-    if (!block || block === ref.current) return;
+    const block = findBlock() || ensureBlock();
+    if (!selection || !block) return;
+
     editingRef.current = true;
     if (block.tagName === "PRE") {
       const p = document.createElement("p");
       p.textContent = block.textContent || "";
       if (!p.textContent) p.innerHTML = "<br>";
       block.replaceWith(p);
-      const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); selection.removeAllRanges(); selection.addRange(r);
+      placeCaretAtEnd(p);
     } else {
       const pre = document.createElement("pre");
       pre.textContent = block.textContent || "";
       if (!pre.textContent) pre.innerHTML = "<br>";
       block.replaceWith(pre);
-      const r = document.createRange(); r.selectNodeContents(pre); r.collapse(false); selection.removeAllRanges(); selection.addRange(r);
+      placeCaretAtEnd(pre);
     }
     saveSelection();
     editingRef.current = false;
@@ -120,21 +176,47 @@ export default function SimpleHtmlEditor({
   const toggleList = (ordered) => {
     if (disabled || !ref.current) return;
     restoreSelection();
-    const selection = window.getSelection?.();
-    let block = selection?.anchorNode;
-    block = block?.nodeType === Node.ELEMENT_NODE ? block : block?.parentElement;
-    while (block && block !== ref.current && !["P","DIV","LI","UL","OL"].includes(block.tagName)) block = block.parentElement;
-    if (!block || block === ref.current) return;
-    const existing = block.tagName === "LI" ? block.parentElement : null;
+    const block = findBlock() || ensureBlock();
+    if (!block || block.tagName === "PRE") return;
+
     editingRef.current = true;
-    if (existing && (existing.tagName === (ordered ? "OL" : "UL"))) {
-      const p = document.createElement("p"); p.innerHTML = block.innerHTML || "<br>";
-      existing.replaceWith(p); block.remove();
-    } else {
-      const list = document.createElement(ordered ? "ol" : "ul");
-      const item = document.createElement("li"); item.innerHTML = block.innerHTML || "<br>";
-      list.appendChild(item); block.replaceWith(list);
-      const r = document.createRange(); r.selectNodeContents(item); r.collapse(false); selection.removeAllRanges(); selection.addRange(r);
+    try {
+      const command = ordered ? "insertOrderedList" : "insertUnorderedList";
+      const applied = document.execCommand(command, false, null);
+      if (!applied) throw new Error("List command unavailable");
+    } catch {
+      const selection = window.getSelection?.();
+      if (!selection) return;
+      const existing = block.tagName === "LI" ? block.parentElement : null;
+      if (existing && existing.tagName === (ordered ? "OL" : "UL")) {
+        const p = document.createElement("p");
+        p.innerHTML = block.innerHTML || "<br>";
+        const parent = existing.parentElement;
+        if (!parent) return;
+        if (existing.children.length === 1) {
+          existing.replaceWith(p);
+        } else if (block === existing.firstElementChild) {
+          existing.removeChild(block);
+          parent.insertBefore(p, existing);
+        } else if (block === existing.lastElementChild) {
+          existing.removeChild(block);
+          parent.insertBefore(p, existing.nextSibling);
+        } else {
+          const after = document.createElement(existing.tagName.toLowerCase());
+          while (block.nextSibling) after.appendChild(block.nextSibling);
+          existing.removeChild(block);
+          existing.after(p);
+          if (after.children.length) p.after(after);
+        }
+        placeCaretAtEnd(p);
+      } else {
+        const list = document.createElement(ordered ? "ol" : "ul");
+        const item = document.createElement("li");
+        item.innerHTML = block.innerHTML || "<br>";
+        list.appendChild(item);
+        block.replaceWith(list);
+        placeCaretAtEnd(item);
+      }
     }
     saveSelection();
     editingRef.current = false;
@@ -152,7 +234,7 @@ export default function SimpleHtmlEditor({
     setLinkAnchor(document.activeElement);
   };
 
-  const validLink = /^(?:https?:\/\/|mailto:|tel:|\/|#)/i.test(linkUrl.trim());
+  const validLink = /^(?:https?:\/\/|mailto:|\/|#)/i.test(linkUrl.trim());
   const applyLink = () => {
     if (disabled || !validLink) return;
     ref.current?.focus();
@@ -184,6 +266,35 @@ export default function SimpleHtmlEditor({
     setLinkAnchor(null); saveSelection(); editingRef.current = false; emit();
   };
 
+  const toggleQuote = () => {
+    if (disabled || !ref.current) return;
+    restoreSelection();
+    const block = findBlock() || ensureBlock();
+    if (!block || block.tagName === "PRE") return;
+
+    editingRef.current = true;
+    if (block.tagName === "BLOCKQUOTE") {
+      const p = document.createElement("p");
+      p.innerHTML = block.innerHTML || "<br>";
+      block.replaceWith(p);
+      placeCaretAtEnd(p);
+    } else if (block.tagName === "LI") {
+      const quote = document.createElement("blockquote");
+      quote.innerHTML = block.innerHTML || "<br>";
+      block.innerHTML = "";
+      block.appendChild(quote);
+      placeCaretAtEnd(quote);
+    } else {
+      const quote = document.createElement("blockquote");
+      quote.innerHTML = block.innerHTML || "<br>";
+      block.replaceWith(quote);
+      placeCaretAtEnd(quote);
+    }
+    saveSelection();
+    editingRef.current = false;
+    emit();
+  };
+
   const onKeyDown = (e) => {
     if (e.isComposing || e.keyCode === 229) return;
     saveSelection();
@@ -205,7 +316,7 @@ export default function SimpleHtmlEditor({
       const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
       if (range) {
         range.setStart(pre, 0);
-        if (!range.toString().split("\\n").pop()?.trim()) {
+        if (!range.toString().split("\n").pop()?.trim()) {
           e.preventDefault();
           const p = document.createElement("p"); p.innerHTML = "<br>"; pre.after(p);
           const caret = document.createRange(); caret.selectNodeContents(p); caret.collapse(false); selection.removeAllRanges(); selection.addRange(caret);
@@ -262,7 +373,7 @@ export default function SimpleHtmlEditor({
 <Tooltip title="Bullets"><span><IconButton size="small" aria-label="Bulleted list" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(false)} disabled={disabled}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Numbered"><span><IconButton size="small" aria-label="Numbered list" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(true)} disabled={disabled}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Code block"><span><IconButton size="small" aria-label="Code block" onMouseDown={(e) => e.preventDefault()} onClick={toggleCode} disabled={disabled}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Quote"><span><IconButton size="small" aria-label="Quote" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("formatBlock", "blockquote")} disabled={disabled}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Quote"><span><IconButton size="small" aria-label="Quote" onMouseDown={(e) => e.preventDefault()} onClick={toggleQuote} disabled={disabled}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Link"><span><IconButton size="small" aria-label="Link" onMouseDown={(e) => e.preventDefault()} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Undo"><span><IconButton size="small" aria-label="Undo" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("undo")} disabled={disabled}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Redo"><span><IconButton size="small" aria-label="Redo" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("redo")} disabled={disabled}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
