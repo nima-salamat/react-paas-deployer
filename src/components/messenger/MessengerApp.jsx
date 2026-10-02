@@ -2344,17 +2344,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       try { writeMessengerMsgCache(messagesCacheRef.current); } catch { /* cache is optional */ }
       return nextMessages.map((message) => ({ ...message }));
-        const ta = new Date(a.created_at || 0).getTime();
-        const tb = new Date(b.created_at || 0).getTime();
-        if (ta !== tb) return ta - tb;
-        const aTemp = String(a.id).startsWith("temp-");
-        const bTemp = String(b.id).startsWith("temp-");
-        if (aTemp !== bTemp) return aTemp ? 1 : -1;
-        const na = Number(a.id);
-        const nb = Number(b.id);
-        if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
-        return String(a.id).localeCompare(String(b.id));
-      });
     });
   }, []);
 
