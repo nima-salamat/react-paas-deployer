@@ -850,16 +850,17 @@ export default function SimpleHtmlEditor({
         const p = document.createElement("p");
         p.innerHTML = block.innerHTML || "<br>";
         copyBlockAlignment(block, p);
-        const listParent = block.parentElement.parentNode;
-        if (listParent) {
-          if (block === block.parentElement.firstElementChild) {
-            block.parentElement.before(p);
+        const list = block.parentElement;
+        const listParent = list?.parentNode;
+        if (list && listParent) {
+          if (block === list.firstElementChild) {
+            list.before(p);
           } else {
-            block.parentElement.after(p);
+            list.after(p);
           }
           block.remove();
-          if (!block.parentElement?.children.length) {
-            block.parentElement?.remove();
+          if (!list.children.length) {
+            list.remove();
           }
           placeCaretAtEnd(p);
         }
