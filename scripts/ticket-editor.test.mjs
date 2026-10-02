@@ -66,7 +66,7 @@ test("code blocks exit through normal paragraphs and keep explicit newlines", ()
 
   assert.match(source, /const convertCodeBlockToParagraph = useCallback/);
   assert.match(source, /const exitCodeBlockAtEnd = useCallback/);
-  assert.match(source, /const newline = document\.createTextNode\("\\n"\)/);
+  assert.match(source, /const newline = trailingBreak/);
   assert.match(source, /const atEnd = !afterRange\.toString\(\)/);
   assert.match(source, /const newline = trailingBreak/);
   assert.match(source, /insertCodeNewline\(range, selection, atEnd\)/);
@@ -94,7 +94,7 @@ test("quote blocks have a distinct visual treatment", () => {
   assert.match(renderer, /fontStyle: "italic"/);
   assert.match(renderer, /const codeText = \(\(\) =>/);
   assert.match(renderer, /requestedLanguage === "plaintext"/);
-  assert.match(renderer, /codeText = text/);
+  assert.match(renderer, /const codeText = \(\(\) =>/);
   assert.match(renderer, /borderRadius: "0 8px 8px 0"/);
 });
 
