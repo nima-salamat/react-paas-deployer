@@ -514,32 +514,72 @@ const RICH_TEXT_ALIGNMENTS = new Map([
   ["ticket-align-right", "right"],
 ]);
 
+const EXPLICIT_ALIGNMENTS = new Set(["left", "center", "right"]);
+
+function getStoredAlignment(block) {
+  const metadata = block.getAttribute("data-ticket-align")?.trim().toLowerCase();
+  if (EXPLICIT_ALIGNMENTS.has(metadata)) return metadata;
+
+  for (const [className, value] of RICH_TEXT_ALIGNMENTS) {
+    if (block.classList.contains(className)) return value;
+  }
+
+  const inline = block.style?.textAlign?.trim().toLowerCase();
+  return EXPLICIT_ALIGNMENTS.has(inline) ? inline : "";
+}
+
+function applyStoredAlignment(block) {
+  const alignment = getStoredAlignment(block);
+  if (!alignment) return "";
+
+  // Use an inline important declaration so theme/global typography rules cannot
+  // silently turn an explicitly aligned ticket message back into auto/left.
+  block.style.setProperty("text-align", alignment, "important");
+  block.setAttribute("data-rendered-ticket-align", alignment);
+  return alignment;
+}
+
 function normalizeRichTextBlocks(root) {
   root.querySelectorAll(RICH_TEXT_BLOCKS.join(",")).forEach((block) => {
-    let alignment = "";
-    for (const [className, value] of RICH_TEXT_ALIGNMENTS) {
-      if (block.classList.contains(className)) {
-        alignment = value;
-        break;
-      }
-    }
+    applyStoredAlignment(block);
 
-    const legacyAlignment = block.style?.textAlign?.trim().toLowerCase();
-    if (!alignment && ["left", "center", "right"].includes(legacyAlignment)) {
-      alignment = legacyAlignment;
-    }
-
-    if (alignment) {
-      block.style.textAlign = alignment;
-    }
-
+    // Never invent a direction while rendering. A missing dir means the stored
+    // HTML did not explicitly choose one, so let normal document bidi handling
+    // render that content rather than replacing it with an artificial auto dir.
     const direction = block.getAttribute("dir");
     if (direction === "rtl" || direction === "ltr") {
-      block.style.direction = direction;
-      block.style.unicodeBidi = "plaintext";
-    } else if (!block.getAttribute("dir")) {
-      block.setAttribute("dir", "auto");
-      block.style.unicodeBidi = "plaintext";
+      block.style.setProperty("direction", direction, "important");
+      block.style.setProperty("unicode-bidi", "plaintext");
+    }
+
+    if (block.tagName === "UL") {
+      block.style.setProperty("display", "block");
+      block.style.setProperty("list-style-type", "disc");
+      block.style.setProperty("list-style-position", "outside");
+    } else if (block.tagName === "OL") {
+      block.style.setProperty("display", "block");
+      block.style.setProperty("list-style-type", "decimal");
+      block.style.setProperty("list-style-position", "outside");
+    } else if (block.tagName === "LI") {
+      block.style.setProperty("display", "list-item");
+    }
+  });
+
+  root.querySelectorAll("ol, ul").forEach((list) => {
+    const listAlignment = getStoredAlignment(list);
+    const alignedItems = Array.from(list.children)
+      .filter((child) => child.tagName === "LI")
+      .map(getStoredAlignment)
+      .filter(Boolean);
+
+    // The list itself may carry explicit alignment in older/newer messages.
+    // Item-level alignment remains authoritative for the actual message lines.
+    if (listAlignment) {
+      list.style.setProperty("text-align", listAlignment, "important");
+      list.setAttribute("data-rendered-ticket-align", listAlignment);
+    } else if (alignedItems.length && alignedItems.every((value) => value === alignedItems[0])) {
+      list.style.setProperty("text-align", alignedItems[0], "important");
+      list.setAttribute("data-rendered-ticket-align", alignedItems[0]);
     }
   });
 }
@@ -807,7 +847,6 @@ function MessageBubble({
               whiteSpace: "normal",
               overflowWrap: "anywhere",
               wordBreak: "break-word",
-              textAlign: "left",
               "& p, & li, & blockquote": { fontSize: "14px", maxWidth: "100%" },
               "& *": { boxSizing: "border-box", maxWidth: "100%" },
               mt: 0.25,
@@ -864,14 +903,14 @@ function MessageBubble({
                 direction: "ltr",
                 unicodeBidi: "plaintext",
               },
-              "& p.ticket-align-left, & h1.ticket-align-left, & h2.ticket-align-left, & h3.ticket-align-left, & h4.ticket-align-left, & li.ticket-align-left, & blockquote.ticket-align-left": {
-                textAlign: "left",
+              "& p.ticket-align-left, & h1.ticket-align-left, & h2.ticket-align-left, & h3.ticket-align-left, & h4.ticket-align-left, & li.ticket-align-left, & blockquote.ticket-align-left, & [data-ticket-align=\"left\"]": {
+                textAlign: "left !important",
               },
-              "& p.ticket-align-center, & h1.ticket-align-center, & h2.ticket-align-center, & h3.ticket-align-center, & h4.ticket-align-center, & li.ticket-align-center, & blockquote.ticket-align-center": {
-                textAlign: "center",
+              "& p.ticket-align-center, & h1.ticket-align-center, & h2.ticket-align-center, & h3.ticket-align-center, & h4.ticket-align-center, & li.ticket-align-center, & blockquote.ticket-align-center, & [data-ticket-align=\"center\"]": {
+                textAlign: "center !important",
               },
-              "& p.ticket-align-right, & h1.ticket-align-right, & h2.ticket-align-right, & h3.ticket-align-right, & h4.ticket-align-right, & li.ticket-align-right, & blockquote.ticket-align-right": {
-                textAlign: "right",
+              "& p.ticket-align-right, & h1.ticket-align-right, & h2.ticket-align-right, & h3.ticket-align-right, & h4.ticket-align-right, & li.ticket-align-right, & blockquote.ticket-align-right, & [data-ticket-align=\"right\"]": {
+                textAlign: "right !important",
               },
               "& a": { color: mine ? "inherit" : "primary.main", textDecoration: "underline" },
               "& pre": {

@@ -515,3 +515,26 @@ test("quote Enter resolves the quote from either the anchor or range container",
   assert.match(source, /quote: false/);
   assert.match(source, /block: "P"/);
 });
+
+
+test("ticket renderer is source-faithful for explicit alignment and never invents dir=auto", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /function getStoredAlignment/);
+  assert.match(source, /data-ticket-align/);
+  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
+  assert.match(source, /data-rendered-ticket-align/);
+  assert.doesNotMatch(source, /block\.setAttribute\("dir", "auto"\)/);
+  assert.doesNotMatch(source, /textAlign: "left",/);
+});
+
+test("ticket renderer preserves ordered lists and aligns list items from stored alignment metadata", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /block\.tagName === "OL"/);
+  assert.match(source, /list-style-type", "decimal"/);
+  assert.match(source, /block\.tagName === "LI"/);
+  assert.match(source, /alignedItems/);
+  assert.match(source, /list\.style\.setProperty\("text-align", alignedItems\[0\], "important"\)/);
+  assert.match(source, /data-ticket-align=\\\"right\\\"/);
+});
