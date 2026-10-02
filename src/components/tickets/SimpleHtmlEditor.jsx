@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import { Box, ButtonGroup, Collapse, IconButton, Paper, Tooltip } from "@mui/material";
+import { Box, Button, ButtonGroup, Collapse, IconButton, Paper, Popover, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
 import FormatUnderlinedIcon from "@mui/icons-material/FormatUnderlined";
@@ -7,6 +7,9 @@ import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import CodeIcon from "@mui/icons-material/Code";
 import LinkIcon from "@mui/icons-material/Link";
+import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
+import UndoIcon from "@mui/icons-material/Undo";
+import RedoIcon from "@mui/icons-material/Redo";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 
@@ -29,8 +32,13 @@ export default function SimpleHtmlEditor({
   onExpandedChange,
 }) {
   const ref = useRef(null);
-  const lastHtml = useRef(value);
-  const [internalExpanded, setInternalExpanded] = useState(false);
+  const lastHtml = useRef(value || "");
+  const savedRange = useRef(null);
+  const editingRef = useRef(false);
+  const [linkAnchor, setLinkAnchor] = useState(null);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkText, setLinkText] = useState("");
+  const [internalExpanded, setInternalExpanded] = useState(Boolean(expandedProp));
   const expanded = expandedProp ?? internalExpanded;
   const setExpanded = (v) => {
     setInternalExpanded(v);
@@ -38,37 +46,185 @@ export default function SimpleHtmlEditor({
   };
 
   React.useEffect(() => {
-    if (!ref.current) return;
-    if (value !== lastHtml.current && value === "") {
-      ref.current.innerHTML = "";
-      lastHtml.current = "";
-    }
+    const editor = ref.current;
+    if (!editor) return;
+    const incoming = typeof value === "string" ? value : "";
+    if (incoming === lastHtml.current || editingRef.current) return;
+    editor.innerHTML = incoming;
+    lastHtml.current = incoming;
   }, [value]);
+
+  const saveSelection = useCallback(() => {
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    if (!editor || !selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (editor.contains(range.commonAncestorContainer)) savedRange.current = range.cloneRange();
+  }, []);
 
   const emit = useCallback(() => {
     if (!ref.current) return;
-    const html = ref.current.innerHTML;
+    const html = ref.current.innerHTML.replace(/^(?:<div><br><\/div>|<br>)$/i, "");
     lastHtml.current = html;
     onChange?.(html);
   }, [onChange]);
 
+  const restoreSelection = () => {
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    const range = savedRange.current;
+    if (!editor || !selection || !range || !editor.contains(range.commonAncestorContainer)) return false;
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return true;
+  };
+
   const cmd = (command, arg = null) => {
     if (disabled) return;
+    editingRef.current = true;
     ref.current?.focus();
-    try {
-      document.execCommand(command, false, arg);
-    } catch { /* */ }
+    restoreSelection();
+    try { document.execCommand(command, false, arg); } catch { /* noop */ }
+    saveSelection();
+    editingRef.current = false;
     emit();
   };
 
-  const addLink = () => {
-    const url = window.prompt("URL");
-    if (url) cmd("createLink", url);
+  const toggleCode = () => {
+    if (disabled || !ref.current) return;
+    restoreSelection();
+    const selection = window.getSelection?.();
+    const start = selection?.anchorNode;
+    let block = start?.nodeType === Node.ELEMENT_NODE ? start : start?.parentElement;
+    while (block && block !== ref.current && !["P","DIV","PRE","LI"].includes(block.tagName)) block = block.parentElement;
+    if (!block || block === ref.current) return;
+    editingRef.current = true;
+    if (block.tagName === "PRE") {
+      const p = document.createElement("p");
+      p.textContent = block.textContent || "";
+      if (!p.textContent) p.innerHTML = "<br>";
+      block.replaceWith(p);
+      const r = document.createRange(); r.selectNodeContents(p); r.collapse(false); selection.removeAllRanges(); selection.addRange(r);
+    } else {
+      const pre = document.createElement("pre");
+      pre.textContent = block.textContent || "";
+      if (!pre.textContent) pre.innerHTML = "<br>";
+      block.replaceWith(pre);
+      const r = document.createRange(); r.selectNodeContents(pre); r.collapse(false); selection.removeAllRanges(); selection.addRange(r);
+    }
+    saveSelection();
+    editingRef.current = false;
+    emit();
+  };
+
+  const toggleList = (ordered) => {
+    if (disabled || !ref.current) return;
+    restoreSelection();
+    const selection = window.getSelection?.();
+    let block = selection?.anchorNode;
+    block = block?.nodeType === Node.ELEMENT_NODE ? block : block?.parentElement;
+    while (block && block !== ref.current && !["P","DIV","LI","UL","OL"].includes(block.tagName)) block = block.parentElement;
+    if (!block || block === ref.current) return;
+    const existing = block.tagName === "LI" ? block.parentElement : null;
+    editingRef.current = true;
+    if (existing && (existing.tagName === (ordered ? "OL" : "UL"))) {
+      const p = document.createElement("p"); p.innerHTML = block.innerHTML || "<br>";
+      existing.replaceWith(p); block.remove();
+    } else {
+      const list = document.createElement(ordered ? "ol" : "ul");
+      const item = document.createElement("li"); item.innerHTML = block.innerHTML || "<br>";
+      list.appendChild(item); block.replaceWith(list);
+      const r = document.createRange(); r.selectNodeContents(item); r.collapse(false); selection.removeAllRanges(); selection.addRange(r);
+    }
+    saveSelection();
+    editingRef.current = false;
+    emit();
+  };
+
+  const openLink = () => {
+    if (disabled) return;
+    saveSelection();
+    const range = savedRange.current;
+    const node = range?.startContainer?.nodeType === Node.ELEMENT_NODE ? range.startContainer : range?.startContainer?.parentElement;
+    const anchor = node?.closest?.("a");
+    setLinkUrl(anchor?.getAttribute("href") || "");
+    setLinkText((range?.toString() || anchor?.textContent || "").trim());
+    setLinkAnchor(document.activeElement);
+  };
+
+  const validLink = /^(?:https?:\\/\\/|mailto:|tel:|\\/|#)/i.test(linkUrl.trim());
+  const applyLink = () => {
+    if (disabled || !validLink) return;
+    ref.current?.focus();
+    if (!restoreSelection()) return;
+    editingRef.current = true;
+    const range = savedRange.current;
+    if (range && !range.collapsed) {
+      try { document.execCommand("createLink", false, linkUrl.trim()); } catch { /* noop */ }
+      const selection = window.getSelection?.();
+      const node = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection?.anchorNode?.parentElement;
+      const anchor = node?.closest?.("a");
+      if (anchor) { anchor.target = "_blank"; anchor.rel = "noopener noreferrer"; }
+    } else if (range && linkText.trim()) {
+      const a = document.createElement("a");
+      a.href = linkUrl.trim(); a.target = "_blank"; a.rel = "noopener noreferrer"; a.textContent = linkText.trim();
+      range.insertNode(a);
+      const caret = document.createRange(); caret.setStartAfter(a); caret.collapse(true);
+      const selection = window.getSelection?.(); selection?.removeAllRanges(); selection?.addRange(caret);
+    }
+    setLinkAnchor(null); saveSelection(); editingRef.current = false; emit();
+  };
+
+  const removeLink = () => {
+    if (disabled) return;
+    ref.current?.focus();
+    if (!restoreSelection()) return;
+    editingRef.current = true;
+    try { document.execCommand("unlink", false, null); } catch { /* noop */ }
+    setLinkAnchor(null); saveSelection(); editingRef.current = false; emit();
   };
 
   const onKeyDown = (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
+    saveSelection();
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && ["b", "i", "u"].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+      cmd({ b: "bold", i: "italic", u: "underline" }[e.key.toLowerCase()]);
+      return;
+    }
+    if (mod && e.key.toLowerCase() === "k") { e.preventDefault(); openLink(); return; }
+    if (mod && e.key.toLowerCase() === "z") { e.preventDefault(); cmd(e.shiftKey ? "redo" : "undo"); return; }
+    if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); cmd("redo"); return; }
     if (e.key !== "Enter") return;
     if (e.isComposing || e.keyCode === 229) return;
+    const selection = window.getSelection?.();
+    const anchor = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection?.anchorNode?.parentElement;
+    const pre = anchor?.closest?.("pre");
+    if (pre && !e.shiftKey) {
+      const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+      if (range) {
+        range.setStart(pre, 0);
+        if (!range.toString().split("\\n").pop()?.trim()) {
+          e.preventDefault();
+          const p = document.createElement("p"); p.innerHTML = "<br>"; pre.after(p);
+          const caret = document.createRange(); caret.selectNodeContents(p); caret.collapse(false); selection.removeAllRanges(); selection.addRange(caret);
+          saveSelection(); emit();
+          return;
+        }
+      }
+    }
+    const li = anchor?.closest?.("li");
+    if (li && !li.textContent.trim()) {
+      e.preventDefault();
+      const list = li.parentElement;
+      const p = document.createElement("p"); p.innerHTML = "<br>";
+      list.after(p); li.remove(); if (!list.children.length) list.remove();
+      const caret = document.createRange(); caret.selectNodeContents(p); caret.collapse(false); selection.removeAllRanges(); selection.addRange(caret);
+      saveSelection(); emit();
+      return;
+    }
+
     // Default: Enter inserts a new line (do not send).
     // Only send on Enter when enterSends=true and Shift is NOT held.
     if (enterSends && !e.shiftKey && onSubmit) {
@@ -100,13 +256,16 @@ export default function SimpleHtmlEditor({
         <Collapse in={expanded}>
           <Box sx={{ px: 0.25, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
             <ButtonGroup size="small" variant="text">
-              <Tooltip title="Bold"><span><IconButton size="small" onClick={() => cmd("bold")} disabled={disabled}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Italic"><span><IconButton size="small" onClick={() => cmd("italic")} disabled={disabled}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Underline"><span><IconButton size="small" onClick={() => cmd("underline")} disabled={disabled}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Bullets"><span><IconButton size="small" onClick={() => cmd("insertUnorderedList")} disabled={disabled}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Numbered"><span><IconButton size="small" onClick={() => cmd("insertOrderedList")} disabled={disabled}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Code"><span><IconButton size="small" onClick={() => cmd("formatBlock", "pre")} disabled={disabled}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Link"><span><IconButton size="small" onClick={addLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Bold"><span><IconButton size="small" aria-label="Bold" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("bold")} disabled={disabled}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Italic"><span><IconButton size="small" aria-label="Italic" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("italic")} disabled={disabled}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Underline"><span><IconButton size="small" aria-label="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("underline")} disabled={disabled}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
+<Tooltip title="Bullets"><span><IconButton size="small" aria-label="Bulleted list" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(false)} disabled={disabled}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Numbered"><span><IconButton size="small" aria-label="Numbered list" onMouseDown={(e) => e.preventDefault()} onClick={() => toggleList(true)} disabled={disabled}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Code block"><span><IconButton size="small" aria-label="Code block" onMouseDown={(e) => e.preventDefault()} onClick={toggleCode} disabled={disabled}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Quote"><span><IconButton size="small" aria-label="Quote" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("formatBlock", "blockquote")} disabled={disabled}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Link"><span><IconButton size="small" aria-label="Link" onMouseDown={(e) => e.preventDefault()} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Undo"><span><IconButton size="small" aria-label="Undo" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("undo")} disabled={disabled}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Redo"><span><IconButton size="small" aria-label="Redo" onMouseDown={(e) => e.preventDefault()} onClick={() => cmd("redo")} disabled={disabled}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
             </ButtonGroup>
           </Box>
         </Collapse>
@@ -117,9 +276,13 @@ export default function SimpleHtmlEditor({
           contentEditable={!disabled}
           dir="auto"
           suppressContentEditableWarning
-          onInput={emit}
-          onBlur={emit}
+          onInput={() => { editingRef.current = true; emit(); saveSelection(); requestAnimationFrame(() => { editingRef.current = false; }); }}
+          onFocus={saveSelection}
+          onBlur={() => { saveSelection(); emit(); }}
+          onKeyUp={saveSelection}
+          onMouseUp={saveSelection}
           onKeyDown={onKeyDown}
+          onPaste={(e) => { const text = e.clipboardData?.getData("text/plain"); if (text == null) return; e.preventDefault(); const selection = window.getSelection?.(); if (!selection?.rangeCount) return; const range = selection.getRangeAt(0); range.deleteContents(); const parts = text.replace(/\r\n?/g, "\n").split("\n"); parts.forEach((part, i) => { if (i) range.insertNode(document.createElement("br")); if (part) range.insertNode(document.createTextNode(part)); range.collapse(false); }); saveSelection(); emit(); }}
           data-placeholder={placeholder}
           sx={{
             flex: 1,
@@ -148,6 +311,26 @@ export default function SimpleHtmlEditor({
           </Tooltip>
         )}
       </Box>
+
+      <Popover
+        open={Boolean(linkAnchor)}
+        anchorEl={linkAnchor}
+        onClose={() => setLinkAnchor(null)}
+        slotProps={{ paper: { sx: { p: 1.5, width: { xs: 300, sm: 360 }, maxWidth: "calc(100vw - 24px)" } } }}
+      >
+        <Stack spacing={1}>
+          <Typography variant="subtitle2" fontWeight={800}>Insert link</Typography>
+          <TextField size="small" autoFocus label="URL" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} error={Boolean(linkUrl) && !validLink} helperText="HTTP(S), mailto, tel, or internal link" />
+          <TextField size="small" label="Text" value={linkText} onChange={(e) => setLinkText(e.target.value)} />
+          <Stack direction="row" justifyContent="space-between" spacing={1}>
+            <Button size="small" color="error" onClick={removeLink} disabled={!linkUrl.trim()}>Remove</Button>
+            <Stack direction="row" spacing={0.5}>
+              <Button size="small" onClick={() => setLinkAnchor(null)}>Cancel</Button>
+              <Button size="small" variant="contained" onClick={applyLink} disabled={!validLink}>Apply</Button>
+            </Stack>
+          </Stack>
+        </Stack>
+      </Popover>
     </Paper>
   );
 }

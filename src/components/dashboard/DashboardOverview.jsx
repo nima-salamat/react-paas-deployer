@@ -1,3 +1,4 @@
+import { Link as RouterLink } from "react-router-dom";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, Paper, Skeleton, Stack, Typography, alpha } from "@mui/material";
 import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
@@ -43,7 +44,7 @@ function ServiceMini({ service }) {
   const platform = String(service?.plan?.platform || service?.platform || "").toLowerCase();
   const status = String(service?.status || "").toLowerCase();
   const id = service?.id ?? service?.pk;
-  return <Button fullWidth href={"/dashboard/services/" + id} sx={{ justifyContent: "flex-start", textAlign: "left", px: 1, py: 0.8, borderRadius: 1.5, color: "text.primary", minWidth: 0, "&:hover": { bgcolor: "action.hover" } }}>
+  return <Button component={RouterLink} to={"/dashboard/services/" + id} sx={{ justifyContent: "flex-start", textAlign: "left", px: 1, py: 0.8, borderRadius: 1.5, color: "text.primary", minWidth: 0, "&:hover": { bgcolor: "action.hover" } }}>
     <PlatformIcon platformKey={platform} label={platform || kind} size={17} />
     <Box sx={{ ml: 1, minWidth: 0, flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{service?.name || "(no name)"}</Typography>
       <Stack direction="row" spacing={0.7} alignItems="center"><Typography variant="caption" color="text.secondary">{kind === "db" ? "Database" : "Application"}</Typography><Chip size="small" label={STATUS_LABELS[status] || status || "Unknown"} color={status === "running" ? "success" : status === "failed" ? "error" : "default"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /></Stack>
@@ -53,7 +54,7 @@ function ServiceMini({ service }) {
 
 function TicketMini({ ticket }) {
   const status = String(ticket?.status || "").toLowerCase();
-  return <Button fullWidth href={"/dashboard/tickets/" + ticket?.id} sx={{ justifyContent: "flex-start", textAlign: "left", px: 1, py: 0.8, borderRadius: 1.5, color: "text.primary", minWidth: 0, "&:hover": { bgcolor: "action.hover" } }}>
+  return <Button component={RouterLink} to={"/dashboard/tickets/" + ticket?.id} sx={{ justifyContent: "flex-start", textAlign: "left", px: 1, py: 0.8, borderRadius: 1.5, color: "text.primary", minWidth: 0, "&:hover": { bgcolor: "action.hover" } }}>
     <ConfirmationNumberOutlinedIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />
     <Box sx={{ minWidth: 0, flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ticket?.subject || ticket?.public_id || "Ticket"}</Typography>
       <Stack direction="row" spacing={0.8} alignItems="center"><Chip size="small" label={status === "in_progress" ? "In progress" : "Open"} color={status === "in_progress" ? "warning" : "info"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /><Typography variant="caption" color="text.secondary">{dateLabel(ticket?.updated_at || ticket?.last_message_at || ticket?.created_at)}</Typography></Stack>
@@ -101,16 +102,16 @@ export default function DashboardOverview() {
     <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
       <Typography variant="h6" sx={{ fontWeight: 850 }}>Quick access</Typography><Typography variant="caption" color="text.secondary">Jump to a workspace area.</Typography>
       <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: { xs: "repeat(2,minmax(0,1fr))", sm: "repeat(4,minmax(0,1fr))", lg: "repeat(7,minmax(0,1fr))" }, gap: 1 }}>
-        {QUICK_LINKS.map(([label,path,Icon]) => <Button key={path} href={path} sx={{ minHeight: 68, p: 1, flexDirection: "column", gap: 0.5, border: "1px solid", borderColor: "divider", borderRadius: 2, color: "text.primary" }}><Icon sx={{ color: "primary.main", fontSize: 21 }} /><Typography variant="caption" sx={{ fontWeight: 750 }}>{label}</Typography></Button>)}
+        {QUICK_LINKS.map(([label,path,Icon]) => <Button key={path} component={RouterLink} to={path} sx={{ minHeight: 68, p: 1, flexDirection: "column", gap: 0.5, border: "1px solid", borderColor: "divider", borderRadius: 2, color: "text.primary" }}><Icon sx={{ color: "primary.main", fontSize: 21 }} /><Typography variant="caption" sx={{ fontWeight: 750 }}>{label}</Typography></Button>)}
       </Box>
     </Paper>
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1.15fr 1fr" }, gap: 2 }}>
       <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center"><Box><Typography variant="h6" sx={{ fontWeight: 850 }}>Recent services</Typography><Typography variant="caption" color="text.secondary">Newest first.</Typography></Box><Button size="small" href="/dashboard/services">View all</Button></Stack>
-        {state.loading ? <Stack spacing={0.6} sx={{ mt: 1 }}><Skeleton variant="rounded" height={52}/><Skeleton variant="rounded" height={52}/><Skeleton variant="rounded" height={52}/></Stack> : state.services.length ? <Stack spacing={0.2} sx={{ mt: 0.8 }}>{state.services.map((s) => <ServiceMini key={s.id ?? s.pk} service={s}/>)}</Stack> : <Box sx={{ py: 4, textAlign: "center" }}><Typography color="text.secondary">No services yet.</Typography><Button sx={{ mt: 1 }} href="/dashboard/services">Open Services</Button></Box>}
+        <Stack direction="row" justifyContent="space-between" alignItems="center"><Box><Typography variant="h6" sx={{ fontWeight: 850 }}>Recent services</Typography><Typography variant="caption" color="text.secondary">Newest first.</Typography></Box><Button component={RouterLink} size="small" to="/dashboard/services">View all</Button></Stack>
+        {state.loading ? <Stack spacing={0.6} sx={{ mt: 1 }}><Skeleton variant="rounded" height={52}/><Skeleton variant="rounded" height={52}/><Skeleton variant="rounded" height={52}/></Stack> : state.services.length ? <Stack spacing={0.2} sx={{ mt: 0.8 }}>{state.services.map((s) => <ServiceMini key={s.id ?? s.pk} service={s}/>)}</Stack> : <Box sx={{ py: 4, textAlign: "center" }}><Typography color="text.secondary">No services yet.</Typography><Button component={RouterLink} sx={{ mt: 1 }} to="/dashboard/services">Open Services</Button></Box>}
       </Paper>
       <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center"><Box><Typography variant="h6" sx={{ fontWeight: 850 }}>Active tickets</Typography><Typography variant="caption" color="text.secondary">Open or in progress · up to 5 shown.</Typography></Box><Button size="small" href="/dashboard/tickets">View all</Button></Stack>
+        <Stack direction="row" justifyContent="space-between" alignItems="center"><Box><Typography variant="h6" sx={{ fontWeight: 850 }}>Active tickets</Typography><Typography variant="caption" color="text.secondary">Open or in progress · up to 5 shown.</Typography></Box><Button component={RouterLink} size="small" to="/dashboard/tickets">View all</Button></Stack>
         {state.tickets.length ? <Stack spacing={0.2} sx={{ mt: 0.8 }}>{state.tickets.map((t) => <TicketMini key={t.id} ticket={t}/>)}</Stack> : <Box sx={{ py: 4, textAlign: "center" }}><Typography color="text.secondary">No open or in-progress tickets.</Typography></Box>}
       </Paper>
     </Box>

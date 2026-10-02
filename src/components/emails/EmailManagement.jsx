@@ -3,7 +3,7 @@ import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, FormControl, Grid, InputLabel, List, ListItemButton,
   ListItemText, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell,
-  TableHead, TableRow, TextField, Typography, Pagination,
+  TableHead, TableRow, TextField, Typography, Pagination, Snackbar,
 } from "@mui/material";
 import apiRequest from "../customHooks/apiRequest";
 import { EMAILS_API, unwrapData } from "../tickets/api";
@@ -31,6 +31,7 @@ export default function EmailManagement() {
   const [logSearch, setLogSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
   // compose
   const [tplId, setTplId] = useState("");
@@ -131,7 +132,7 @@ export default function EmailManagement() {
         url: `${EMAILS_API}/send/`,
         data: { template_id: tplId || null, subject, body, is_test: true, test_email: testEmail },
       });
-      alert("Test email queued");
+      setToast("Test email queued");
     } catch (e) {
       setError(e?.response?.data?.message || "Test send failed");
     } finally {
@@ -154,7 +155,7 @@ export default function EmailManagement() {
           is_test: false,
         },
       });
-      alert("Emails queued");
+      setToast("Emails queued");
       setTab("logs");
     } catch (e) {
       setError(e?.response?.data?.message || "Send failed");

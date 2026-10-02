@@ -156,7 +156,7 @@ function ServiceItem({
       sx={{
         mt: 1.25,
         minHeight: 28,
-        visibility: usage.cpu != null || usage.ram != null ? "visible" : "hidden",
+        
       }}
     >
       <UsageBar label="CPU" value={usage.cpu} loading={!statusEntry || statusEntry.loading} error={statusEntry?.error} dense />
@@ -573,7 +573,7 @@ function statusEntryEqual(a, b) {
   if (a === b) return true;
   if (!a && !b) return true;
   if (!a || !b) return false;
-  return a.cpu === b.cpu && a.ram === b.ram && a.running === b.running;
+  return a.cpu === b.cpu && a.ram === b.ram && a.running === b.running && a.loading === b.loading && a.error === b.error;
 }
 
 export default memo(ServiceItem, (prev, next) => {

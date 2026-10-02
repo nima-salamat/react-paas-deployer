@@ -5,6 +5,7 @@ import {
   Badge, IconButton, Menu, MenuItem, ListItemText, Typography, Snackbar, Alert, Box,
   Divider, ListItemIcon, Switch, Tooltip,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
 import NotificationsOffOutlinedIcon from "@mui/icons-material/NotificationsOffOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -439,6 +440,7 @@ export function useTicketNotify() {
 }
 
 export function TicketNotifyBell() {
+  const navigate = useNavigate();
   const {
     items, unread, clearUnread, connected, muted, setMuted, removeItem, clearAll,
   } = useTicketNotify();
@@ -526,8 +528,8 @@ export function TicketNotifyBell() {
               sx={{ alignItems: "flex-start", py: 1 }}
               onClick={() => {
                 setAnchor(null);
-                const href = it.data?.ticket_id ? `/tickets/${it.data.ticket_id}` : "/tickets";
-                window.location.href = href;
+                const href = it.data?.ticket_id ? `/dashboard/tickets/${it.data.ticket_id}` : "/dashboard/tickets";
+                navigate(href);
               }}
             >
               <ListItemText
