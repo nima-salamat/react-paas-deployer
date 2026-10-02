@@ -27,7 +27,6 @@ import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
-import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import SpeedRoundedIcon from "@mui/icons-material/SpeedRounded";
 import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
@@ -62,6 +61,10 @@ const FAQ_ITEMS = [
   {
     q: "Can resources be changed later?",
     a: "Yes. The platform is structured around service-level resources, so CPU, memory, storage, and runtime configuration can be managed without rebuilding the entire application workflow.",
+  },
+  {
+    q: "Can PassDeployer be automated?",
+    a: "Yes. The Agent API provides scoped access to services, deployments, logs and runtime operations while keeping authentication, auditing and destructive actions explicit.",
   },
   {
     q: "Is the platform open source?",
