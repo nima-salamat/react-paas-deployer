@@ -25,6 +25,7 @@ export default function Agents() {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [error, setError] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState({ name: "", description: "", scopes: [] });
 
@@ -75,13 +76,15 @@ export default function Agents() {
     } finally { setSaving(false); }
   };
 
-  const removeAgent = async (agent) => {
-    const confirmed = window.confirm(
-      "Delete Agent \"" + agent.name + "\" permanently? This cannot be undone and all credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted."
-    );
-    if (!confirmed) return;
+  const removeAgent = (agent) => {
+    setDeleteTarget(agent);
+  };
 
+  const confirmDeleteAgent = async () => {
+    if (!deleteTarget) return;
+    const agent = deleteTarget;
     setSaving(true);
+    setDeleteTarget(null);
     setError("");
     try {
       await deleteAgent(agent.id);
@@ -174,6 +177,58 @@ export default function Agents() {
           </Stack>
         )}
       </Stack>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => !saving && setDeleteTarget(null)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+      >
+        <DialogTitle sx={{ pb: 1.2, fontWeight: 900, letterSpacing: "-0.02em" }}>
+          Delete Agent
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 2.25 }}>
+          <Stack spacing={1.5}>
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                display: "grid",
+                placeItems: "center",
+                bgcolor: "error.main",
+                color: "error.contrastText",
+              }}
+            >
+              <DeleteOutlineRoundedIcon />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>
+                Delete {deleteTarget?.name || "this Agent"} permanently?
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.55, lineHeight: 1.65 }}>
+                This cannot be undone. All credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted.
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, py: 1.75, gap: 1 }}>
+          <Button onClick={() => setDeleteTarget(null)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteOutlineRoundedIcon />}
+            onClick={confirmDeleteAgent}
+            disabled={saving}
+            sx={{ borderRadius: 1.5, fontWeight: 800 }}
+          >
+            {saving ? "Deleting…" : "Delete permanently"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="md">
         <DialogTitle sx={{ fontWeight: 850 }}>Create Agent</DialogTitle>
