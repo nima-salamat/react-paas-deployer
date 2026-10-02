@@ -119,7 +119,7 @@ export default function Agents() {
           </Box>
           <Stack direction="row" spacing={1}>
             <Tooltip title="Refresh">
-              <IconButton onClick={refresh} disabled={loading} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
+              <IconButton onClick={() => refresh(agentPage)} disabled={loading} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
                 <RefreshRoundedIcon />
               </IconButton>
             </Tooltip>
@@ -133,7 +133,7 @@ export default function Agents() {
           You arrived here from a service. Agents remain account-level resources; the service is only navigation context.
         </Alert> : null}
 
-        {error ? <Alert severity="error" sx={{ borderRadius: 2 }} action={<IconButton color="inherit" onClick={refresh}><RefreshRoundedIcon /></IconButton>}>{error}</Alert> : null}
+        {error ? <Alert severity="error" sx={{ borderRadius: 2 }} action={<IconButton color="inherit" onClick={() => refresh(agentPage)}><RefreshRoundedIcon /></IconButton>}>{error}</Alert> : null}
 
         {loading ? <Box sx={{ py: 10, display: "flex", justifyContent: "center" }}><CircularProgress /></Box> : agents.length === 0 ? (
           <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, borderRadius: 2.5, textAlign: "center" }}>

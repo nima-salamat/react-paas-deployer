@@ -49,6 +49,7 @@ test("agent list uses five-item oldest-first pagination", () => {
   assert.match(source, /Math\.ceil\(agentCount \/ 5\)/);
   assert.match(source, /page_size: 5/);
   assert.match(api, /params: \{ page_size: 5, \.\.\.params \}/);
+  assert.match(source, /onClick=\{\(\) => refresh\(agentPage\)\}/);
 });
 
 test("agent detail uses ten-item pagination for credentials and audit", () => {

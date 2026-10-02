@@ -140,7 +140,9 @@ export default function AgentDetail() {
       if (target.type === "agent") {
         navigate("/dashboard/agents", { replace: true });
       } else {
-        await load();
+        const previousPage = credentials.length === 1 && credentialsPage > 1 ? credentialsPage - 1 : credentialsPage;
+        if (previousPage !== credentialsPage) setCredentialsPage(previousPage);
+        else await load();
       }
     } catch (e) {
       setError(getApiErrorMessage(e, "Failed to delete Agent."));
