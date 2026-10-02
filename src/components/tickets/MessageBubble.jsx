@@ -668,6 +668,18 @@ export default function MessageBubble({
                 fontSize: 12,
               },
               "& ul, & ol": { pl: 2.25, my: 0.4 },
+              "& blockquote": {
+                m: 0,
+                my: 0.5,
+                pl: 1.25,
+                borderLeft: "3px solid",
+                borderColor: "primary.main",
+                color: "text.secondary",
+              },
+              "& code": {
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: "0.9em",
+              },
               "& img": { maxWidth: "100%", borderRadius: 1 },
               userSelect: "text",
             }}
