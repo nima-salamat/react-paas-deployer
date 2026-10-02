@@ -201,3 +201,13 @@ test("Create Ticket does not force the editor expanded state", () => {
 
   assert.doesNotMatch(source, /<SimpleHtmlEditor[\s\S]*?expanded\s*\/>/);
 });
+
+
+test("renderer uses adaptive quote contrast and renders persisted alignment classes", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /borderColor: mine \? "rgba\(255,255,255,0\.62\)" : "divider"/);
+  assert.match(source, /bgcolor: mine \? "rgba\(255,255,255,0\.09\)" : "action\.hover"/);
+  assert.match(source, /"& \.ticket-align-center": \{ textAlign: "center" \}/);
+  assert.match(source, /"& \.ticket-align-right": \{ textAlign: "right" \}/);
+});

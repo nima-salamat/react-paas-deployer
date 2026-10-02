@@ -1075,6 +1075,9 @@ export default function SimpleHtmlEditor({
               color: "text.disabled",
             },
             "& p": { m: 0 },
+            "& .ticket-align-left": { textAlign: "left" },
+            "& .ticket-align-center": { textAlign: "center" },
+            "& .ticket-align-right": { textAlign: "right" },
             "& pre.editor-code-block": {
               m: "0.65rem 0",
               p: 0,
