@@ -52,6 +52,7 @@ function setBlockAlignment(block, align) {
     block.classList?.remove(className);
   });
   block.classList?.add(ALIGNMENT_CLASSES[align]);
+  block.setAttribute?.("data-ticket-align", align);
   block.style?.removeProperty("text-align");
 }
 
