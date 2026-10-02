@@ -56,6 +56,7 @@ test("agent detail exposes credential deletion and provisioning source", () => {
   assert.match(source, /Delete this credential permanently/);
   assert.match(source, /Provisioned via/);
   assert.match(source, /Request \{event\.request_id/);
+  assert.match(source, /credential\.issued_via/);
 });
 
 test("agent list exposes provisioning source", () => {
