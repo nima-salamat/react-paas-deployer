@@ -38,7 +38,6 @@ export default function AgentDetail() {
     return acc;
   }, {}), [scopeCatalog.scopes]);
 
-  const scopeByName = useMemo(() => new Map((scopeCatalog.scopes || []).map((s) => [s.name, s])), [scopeCatalog.scopes]);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
