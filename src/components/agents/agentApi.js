@@ -43,6 +43,10 @@ export async function revokeCredential(agentId, credentialId) {
   const res = await apiRequest({ method: "POST", url: AGENTS_API + "/" + agentId + "/credentials/" + credentialId + "/revoke/", data: {} });
   return res?.data || {};
 }
+export async function deleteCredential(agentId, credentialId) {
+  const res = await apiRequest({ method: "DELETE", url: AGENTS_API + "/" + agentId + "/credentials/" + credentialId + "/" });
+  return res?.data || {};
+}
 export async function setAgentStatus(id, action) {
   const res = await apiRequest({ method: "POST", url: AGENTS_API + "/" + id + "/" + action + "/", data: {} });
   return res?.data || {};
