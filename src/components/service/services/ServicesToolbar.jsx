@@ -259,18 +259,49 @@ export default function ServicesToolbar({
             flexWrap="wrap"
             useFlexGap
           >
-            <FilterListIcon sx={{ fontSize: 18, color: "text.secondary" }} />
+            <FilterListIcon
+              sx={(theme) => ({
+                fontSize: 18,
+                color: theme.palette.mode === "dark" ? "#f1f5f8" : "#687581",
+                filter:
+                  theme.palette.mode === "dark"
+                    ? "drop-shadow(0 0 4px rgba(255,255,255,.22))"
+                    : "drop-shadow(0 1px 2px rgba(30,41,59,.18))",
+              })}
+            />
             {[
               { key: "all", label: `All (${kindCounts.all})` },
               {
                 key: "app",
                 label: `App (${kindCounts.app})`,
-                icon: <AppsIcon sx={{ fontSize: 16 }} />,
+                icon: (
+                  <AppsIcon
+                    sx={(theme) => ({
+                      fontSize: 16,
+                      color: theme.palette.mode === "dark" ? "#edf2f5" : "#6f7b86",
+                      filter:
+                        theme.palette.mode === "dark"
+                          ? "drop-shadow(0 0 3px rgba(255,255,255,.18))"
+                          : "drop-shadow(0 1px 2px rgba(30,41,59,.14))",
+                    })}
+                  />
+                ),
               },
               {
                 key: "db",
                 label: `Database (${kindCounts.db})`,
-                icon: <StorageOutlinedIcon sx={{ fontSize: 16 }} />,
+                icon: (
+                  <StorageOutlinedIcon
+                    sx={(theme) => ({
+                      fontSize: 16,
+                      color: theme.palette.mode === "dark" ? "#edf2f5" : "#6f7b86",
+                      filter:
+                        theme.palette.mode === "dark"
+                          ? "drop-shadow(0 0 3px rgba(255,255,255,.18))"
+                          : "drop-shadow(0 1px 2px rgba(30,41,59,.14))",
+                    })}
+                  />
+                ),
                 color: "info",
               },
             ].map((f) => (
@@ -282,7 +313,22 @@ export default function ServicesToolbar({
                 color={kindFilter === f.key ? f.color || "primary" : "default"}
                 variant={kindFilter === f.key ? "filled" : "outlined"}
                 onClick={() => setKindFilter(f.key)}
-                sx={{ fontWeight: 700, height: 28 }}
+                sx={(theme) => ({
+                  fontWeight: 700,
+                  height: 28,
+                  "& .MuiChip-icon": {
+                    color:
+                      kindFilter === f.key
+                        ? theme.palette.common.white
+                        : theme.palette.mode === "dark"
+                        ? "#e9eef2"
+                        : "#6f7b86",
+                    filter:
+                      theme.palette.mode === "dark"
+                        ? "drop-shadow(0 0 3px rgba(255,255,255,.18))"
+                        : "drop-shadow(0 1px 2px rgba(30,41,59,.12))",
+                  },
+                })}
               />
             ))}
           </Stack>
