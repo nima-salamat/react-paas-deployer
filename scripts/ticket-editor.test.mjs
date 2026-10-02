@@ -139,3 +139,24 @@ test("alignment applies directly to the containing and selected blocks", () => {
   assert.match(source, /block\.style\.setProperty\("text-align", align\)/);
   assert.match(source, /const current = findBlock\(\) \|\| ensureBlock\(\)/);
 });
+
+
+test("code block header label follows its selected language", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /getCodeLanguageLabel/);
+  assert.match(source, /data-language-label/);
+  assert.match(source, /content: "attr\(data-language-label\)"/);
+  assert.match(source, /language \? getCodeLanguageLabel\(language\) : "Code"/);
+});
+
+test("paragraph tooltip is disabled while the paragraph menu is open", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const \[blockMenuOpen, setBlockMenuOpen\] = useState\(false\)/);
+  assert.match(source, /disableHoverListener=\{blockMenuOpen\}/);
+  assert.match(source, /disableFocusListener=\{blockMenuOpen\}/);
+  assert.match(source, /disableTouchListener=\{blockMenuOpen\}/);
+  assert.match(source, /onOpen=\{\(\) => setBlockMenuOpen\(true\)\}/);
+  assert.match(source, /onClose=\{\(\) => setBlockMenuOpen\(false\)\}/);
+});

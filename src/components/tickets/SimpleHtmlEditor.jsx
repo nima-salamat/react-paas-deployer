@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from "react";
 import Menu from "@mui/material/Menu";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import hljs from "highlight.js/lib/common";
-import { CODE_LANGUAGES, getCodeLanguage } from "./codeLanguages.js";
+import { CODE_LANGUAGES, getCodeLanguage, getCodeLanguageLabel } from "./codeLanguages.js";
 import { Box, Button, ButtonGroup, Collapse, FormControl, IconButton, MenuItem, Paper, Popover, Select, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
@@ -66,6 +66,7 @@ export default function SimpleHtmlEditor({
   });
   const [linkAnchor, setLinkAnchor] = useState(null);
   const [codeMenuAnchor, setCodeMenuAnchor] = useState(null);
+  const [blockMenuOpen, setBlockMenuOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
   const [internalExpanded, setInternalExpanded] = useState(Boolean(expandedProp ?? defaultExpanded));
@@ -81,6 +82,14 @@ export default function SimpleHtmlEditor({
     const incoming = typeof value === "string" ? value : "";
     if (incoming === lastHtml.current || editingRef.current) return;
     editor.innerHTML = incoming;
+    editor.querySelectorAll("pre.editor-code-block").forEach((pre) => {
+      const code = pre.querySelector("code");
+      const language = getCodeLanguage(code);
+      pre.setAttribute(
+        "data-language-label",
+        language ? getCodeLanguageLabel(language) : "Code"
+      );
+    });
     lastHtml.current = incoming;
     historyRef.current = [incoming];
     historyIndexRef.current = 0;
@@ -585,6 +594,7 @@ export default function SimpleHtmlEditor({
       const text = block.innerText || block.textContent || "";
       code.textContent = text;
       if (!text) code.innerHTML = "<br>";
+      pre.setAttribute("data-language-label", "Code");
       pre.appendChild(code);
       block.replaceWith(pre);
       codeBlock = pre;
@@ -601,6 +611,10 @@ export default function SimpleHtmlEditor({
       .forEach((name) => code.classList.remove(name));
 
     if (language) code.classList.add("language-" + language);
+    codeBlock.setAttribute(
+      "data-language-label",
+      language ? getCodeLanguageLabel(language) : "Code"
+    );
     highlightEditorCode(code, language);
     placeCaretAtEnd(code);
     saveSelection();
@@ -922,10 +936,18 @@ export default function SimpleHtmlEditor({
               <Tooltip title="Align left"><span><IconButton size="small" aria-label="Align left" aria-pressed={activeFormats.align === "left"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("left")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "left" ? "action.selected" : undefined, color: activeFormats.align === "left" ? "primary.main" : undefined }}><FormatAlignLeftIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Align center"><span><IconButton size="small" aria-label="Align center" aria-pressed={activeFormats.align === "center"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("center")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "center" ? "action.selected" : undefined, color: activeFormats.align === "center" ? "primary.main" : undefined }}><FormatAlignCenterIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Align right"><span><IconButton size="small" aria-label="Align right" aria-pressed={activeFormats.align === "right"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("right")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "right" ? "action.selected" : undefined, color: activeFormats.align === "right" ? "primary.main" : undefined }}><FormatAlignRightIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Heading style"><span><FormControl size="small" sx={{ minWidth: 112, mx: 0.25 }}><Select
+              <Tooltip
+                title="Heading style"
+                disableHoverListener={blockMenuOpen}
+                disableFocusListener={blockMenuOpen}
+                disableTouchListener={blockMenuOpen}
+              >
+                <span><FormControl size="small" sx={{ minWidth: 112, mx: 0.25 }}><Select
                 aria-label="Block style"
                 value={["P", "H1", "H2", "H3", "H4"].includes(activeFormats.block) ? activeFormats.block : "P"}
                 onChange={(e) => applyBlockFormat(e.target.value)}
+                onOpen={() => setBlockMenuOpen(true)}
+                onClose={() => setBlockMenuOpen(false)}
                 onMouseDown={() => saveSelection()}
                 IconComponent={FormatSizeIcon}
                 sx={{ height: 30, fontSize: 12, fontWeight: 700 }}
@@ -1014,7 +1036,7 @@ export default function SimpleHtmlEditor({
               whiteSpace: "pre",
             },
             "& pre.editor-code-block::before": {
-              content: '"CODE"',
+              content: "attr(data-language-label)",
               display: "block",
               px: 1,
               py: 0.45,
