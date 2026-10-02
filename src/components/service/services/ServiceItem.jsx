@@ -79,7 +79,11 @@ function ServiceItem({
 
   const usage = resolveUsage(
     statusEntry
-      ? { ...s, cpu_percent: statusEntry.cpu, memory_percent: statusEntry.ram }
+      ? {
+          ...s,
+          cpu_percent: statusEntry.cpu ?? s.cpu_percent,
+          memory_percent: statusEntry.ram ?? s.memory_percent,
+        }
       : s,
     {}
   );
@@ -156,11 +160,30 @@ function ServiceItem({
       sx={{
         mt: 1.25,
         minHeight: 28,
-        visibility: usage.cpu != null || usage.ram != null ? "visible" : "hidden",
+        display:
+          usage.cpu != null ||
+          usage.ram != null ||
+          !statusEntry ||
+          statusEntry?.loading ||
+          statusEntry?.error
+            ? "flex"
+            : "none",
       }}
     >
-      <UsageBar label="CPU" value={usage.cpu} loading={!statusEntry || statusEntry.loading} error={statusEntry?.error} dense />
-      <UsageBar label="RAM" value={usage.ram} loading={!statusEntry || statusEntry.loading} error={statusEntry?.error} dense />
+      <UsageBar
+        label="CPU"
+        value={usage.cpu}
+        loading={(statusEntry?.loading ?? !statusEntry) && usage.cpu == null}
+        error={statusEntry?.error}
+        dense
+      />
+      <UsageBar
+        label="RAM"
+        value={usage.ram}
+        loading={(statusEntry?.loading ?? !statusEntry) && usage.ram == null}
+        error={statusEntry?.error}
+        dense
+      />
     </Stack>
   );
 
