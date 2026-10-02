@@ -4,7 +4,7 @@ const API_BASE = "https://" + import.meta.env.VITE_API_BASE.replace(/\/+$/, "");
 export const AGENTS_API = API_BASE + "/api/agents";
 
 export async function listAgents(params = {}) {
-  const res = await apiRequest({ method: "GET", url: AGENTS_API + "/", params });
+  const res = await apiRequest({ method: "GET", url: AGENTS_API + "/", params: { page_size: 5, ...params } });
   return res?.data || {};
 }
 export async function getAgent(id) {
@@ -27,8 +27,8 @@ export async function listScopes() {
   const res = await apiRequest({ method: "GET", url: AGENTS_API + "/scopes/" });
   return res?.data || {};
 }
-export async function listCredentials(id) {
-  const res = await apiRequest({ method: "GET", url: AGENTS_API + "/" + id + "/credentials/", params: { page_size: 100 } });
+export async function listCredentials(id, params = {}) {
+  const res = await apiRequest({ method: "GET", url: AGENTS_API + "/" + id + "/credentials/", params: { page_size: 10, ...params } });
   return res?.data || {};
 }
 export async function issueCredential(id, payload = {}) {
@@ -51,8 +51,8 @@ export async function setAgentStatus(id, action) {
   const res = await apiRequest({ method: "POST", url: AGENTS_API + "/" + id + "/" + action + "/", data: {} });
   return res?.data || {};
 }
-export async function listAudit(id) {
-  const res = await apiRequest({ method: "GET", url: AGENTS_API + "/" + id + "/audit/", params: { page_size: 100 } });
+export async function listAudit(id, params = {}) {
+  const res = await apiRequest({ method: "GET", url: AGENTS_API + "/" + id + "/audit/", params: { page_size: 10, ...params } });
   return res?.data || {};
 }
 export async function generateManifest(id) {
