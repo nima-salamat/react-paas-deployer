@@ -40,6 +40,8 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import FullscreenRoundedIcon from "@mui/icons-material/FullscreenRounded";
 import FullscreenExitRoundedIcon from "@mui/icons-material/FullscreenExitRounded";
+import KeyboardArrowLeftRoundedIcon from "@mui/icons-material/KeyboardArrowLeftRounded";
+import KeyboardArrowRightRoundedIcon from "@mui/icons-material/KeyboardArrowRightRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest";
@@ -1276,6 +1278,13 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     try { await navigator.clipboard?.writeText(activeContent); } catch { /* ignore */ }
   }, [activeContent]);
 
+  const scrollEditorHorizontally = useCallback((direction) => {
+    const editor = editorInputRef.current;
+    if (!editor) return;
+    const amount = Math.max(140, Math.floor((editor.clientWidth || 360) * 0.72)) * direction;
+    editor.scrollBy({ left: amount, behavior: "smooth" });
+  }, []);
+
   const terminalLines = useMemo(() => history.flatMap((entry) => {
     if (entry.type === "command") return [{ key: `${entry.id}-command`, type: "command", cwd: entry.cwd || currentCwd, text: entry.text }];
     if (entry.type === "output") {
@@ -1481,9 +1490,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   minHeight: 0,
                   order: 2,
                   position: { xs: "absolute", md: "relative" },
-                  inset: { xs: "38px 0 0 auto", md: "auto" },
+                  inset: { xs: "40px 0 0 auto", md: "auto" },
                   width: { xs: "min(90vw, 360px)", md: 280 },
-                  height: { xs: "calc(100% - 38px)", md: "auto" },
+                  height: { xs: "calc(100% - 40px)", md: "auto" },
                   zIndex: { xs: 8, md: "auto" },
                   borderLeft: { xs: "1px solid rgba(148,163,184,.16)", md: 0 },
                   borderRight: { md: "1px solid rgba(148,163,184,.14)" },
@@ -1495,18 +1504,140 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   pointerEvents: { xs: sidebarOpen ? "auto" : "none", md: "auto" },
                 }}
               >
-                <Box sx={{ px: 1.2, py: .85, display: "flex", alignItems: "center", gap: .6 }}>
-                  <Typography sx={{ color: "#6f7d8b", fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", flex: 1 }}>PROJECT</Typography>
-                  <Tooltip title={cwdWritable === true ? "Upload files" : cwdWritable === null ? "Checking directory permissions" : "Read-only directory"}>
-                    <span>
-                      <Button size="small" variant="outlined" startIcon={uploading ? <CircularProgress size={13} /> : <UploadFileRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => uploadInputRef.current?.click()} disabled={!session || cwdWritable !== true || cwdMountWritable !== true || uploading} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>Upload</Button>
-                    </span>
-                  </Tooltip>
-                  <input ref={uploadInputRef} hidden type="file" multiple onChange={(event) => uploadFiles(event.target.files)} />
-                  <Button size="small" variant="outlined" startIcon={<AddRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFile} disabled={!session || cwdMountWritable !== true} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>New</Button>
-                  <Button size="small" variant="outlined" startIcon={<FolderRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFolder} disabled={!session || cwdMountWritable !== true} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>Folder</Button>
-                  {selectedItems.length ? <Button size="small" startIcon={<DownloadRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => downloadSelection(selectedItems)} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5 }}>Download</Button> : null}
-                  <Tooltip title="Refresh"><span><IconButton size="small" disabled={!session || treeLoading} onClick={refreshDirectory} sx={{ color: "#7d8a98" }}>{treeLoading ? <CircularProgress size={14} /> : <RefreshRoundedIcon sx={{ fontSize: 16 }} />}</IconButton></span></Tooltip>
+                <Box
+                  sx={{
+                    px: 1.1,
+                    py: .8,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: .65,
+                    bgcolor: "#101821",
+                    flexShrink: 0,
+                    minWidth: 0,
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: .6, minWidth: 0 }}>
+                    <Typography sx={{ color: "#6f7d8b", fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", flex: 1, minWidth: 0 }}>
+                      PROJECT
+                    </Typography>
+                    <Tooltip title="Refresh">
+                      <span style={{ display: "inline-flex", flexShrink: 0 }}>
+                        <IconButton
+                          size="small"
+                          disabled={!session || treeLoading}
+                          onClick={refreshDirectory}
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            color: "#8fa0b0",
+                            border: "1px solid rgba(148,163,184,.16)",
+                            borderRadius: 1,
+                            flexShrink: 0,
+                            "&:hover": { bgcolor: "rgba(148,163,184,.08)", color: "#dce5ec" },
+                          }}
+                        >
+                          {treeLoading ? <CircularProgress size={14} /> : <RefreshRoundedIcon sx={{ fontSize: 16 }} />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
+
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: .6, minWidth: 0 }}>
+                    <Tooltip title={cwdWritable === true ? "Upload files" : cwdWritable === null ? "Checking directory permissions" : "Read-only directory"}>
+                      <span style={{ display: "block", minWidth: 0 }}>
+                        <Button
+                          fullWidth
+                          size="small"
+                          variant="outlined"
+                          startIcon={uploading ? <CircularProgress size={12} /> : <UploadFileRoundedIcon sx={{ fontSize: 15 }} />}
+                          onClick={() => uploadInputRef.current?.click()}
+                          disabled={!session || cwdWritable !== true || cwdMountWritable !== true || uploading}
+                          sx={{
+                            height: 31,
+                            minWidth: 0,
+                            px: .65,
+                            textTransform: "none",
+                            fontSize: 10.5,
+                            fontWeight: 750,
+                            lineHeight: 1,
+                            whiteSpace: "nowrap",
+                            "& .MuiButton-startIcon": { mr: .45, flexShrink: 0 },
+                          }}
+                        >
+                          Upload
+                        </Button>
+                      </span>
+                    </Tooltip>
+
+                    <input ref={uploadInputRef} hidden type="file" multiple onChange={(event) => uploadFiles(event.target.files)} />
+
+                    <Button
+                      fullWidth
+                      size="small"
+                      variant="outlined"
+                      startIcon={<AddRoundedIcon sx={{ fontSize: 15 }} />}
+                      onClick={createNewFile}
+                      disabled={!session || cwdMountWritable !== true}
+                      sx={{
+                        height: 31,
+                        minWidth: 0,
+                        px: .65,
+                        textTransform: "none",
+                        fontSize: 10.5,
+                        fontWeight: 750,
+                        lineHeight: 1,
+                        whiteSpace: "nowrap",
+                        "& .MuiButton-startIcon": { mr: .45, flexShrink: 0 },
+                      }}
+                    >
+                      New
+                    </Button>
+
+                    <Button
+                      fullWidth
+                      size="small"
+                      variant="outlined"
+                      startIcon={<FolderRoundedIcon sx={{ fontSize: 15 }} />}
+                      onClick={createNewFolder}
+                      disabled={!session || cwdMountWritable !== true}
+                      sx={{
+                        height: 31,
+                        minWidth: 0,
+                        px: .65,
+                        textTransform: "none",
+                        fontSize: 10.5,
+                        fontWeight: 750,
+                        lineHeight: 1,
+                        whiteSpace: "nowrap",
+                        "& .MuiButton-startIcon": { mr: .45, flexShrink: 0 },
+                      }}
+                    >
+                      Folder
+                    </Button>
+
+                    {selectedItems.length ? (
+                      <Button
+                        fullWidth
+                        size="small"
+                        startIcon={<DownloadRoundedIcon sx={{ fontSize: 15 }} />}
+                        onClick={() => downloadSelection(selectedItems)}
+                        sx={{
+                          gridColumn: "1 / -1",
+                          height: 31,
+                          minWidth: 0,
+                          px: .65,
+                          textTransform: "none",
+                          fontSize: 10.5,
+                          fontWeight: 750,
+                          lineHeight: 1,
+                          whiteSpace: "nowrap",
+                          "& .MuiButton-startIcon": { mr: .45, flexShrink: 0 },
+                        }}
+                      >
+                        Download
+                      </Button>
+                    ) : null}
+                  </Box>
                 </Box>
                 <Divider sx={{ borderColor: "rgba(148,163,184,.1)" }} />
                 <Box sx={{ px: 1, py: .65, display: "flex", alignItems: "center", gap: .2, overflowX: "auto" }}>
@@ -1652,7 +1783,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     {/* Outer shell prompt only when idle. During interactive PTY (tinker, etc.)
                         the child process owns the prompt (e.g. PsySH "> "); do not interfere. */}
                     {!interactiveRunning && !commandBusy ? (
-                      <Typography component="span" sx={{ color: "#78b6e7", fontFamily: MONO, fontSize: 13, mr: .7, flexShrink: 0 }}>{currentCwd} $</Typography>
+                      <Typography component="span" sx={{ color: "#78b6e7", fontFamily: MONO, fontSize: 13, mr: .7, flexShrink: 0, minWidth: 0, maxWidth: { xs: "38vw", md: "none" }, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentCwd} $</Typography>
                     ) : interactiveRunning ? (
                       <Typography component="span" sx={{ color: "#5a6a7a", fontFamily: MONO, fontSize: 13, mr: .7, flexShrink: 0, userSelect: "none" }}>…</Typography>
                     ) : null}
@@ -1663,6 +1794,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                       spellCheck={false}
                       role="textbox"
                       aria-label={interactiveRunning ? "Interactive process input" : "Shell command line"}
+                      tabIndex={0}
+                      onClick={() => requestAnimationFrame(() => terminalInputRef.current?.focus())}
+                      onTouchEnd={() => requestAnimationFrame(() => terminalInputRef.current?.focus())}
                       onInput={(e) => {
                         const text = e.currentTarget.textContent || "";
                         if (interactiveRunning) setInteractiveInput(text);
@@ -1808,6 +1942,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 />
               <Box component="textarea"
                 ref={editorInputRef}
+                wrap="off"
                 value={activeContent}
                 onScroll={(e) => setEditorScroll({ top: e.currentTarget.scrollTop, left: e.currentTarget.scrollLeft })}
                 onChange={(e) => updateFileContent(activeFile, e.target.value)}
@@ -1828,10 +1963,43 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     requestAnimationFrame(()=>{ target.selectionStart=start+1; target.selectionEnd=start+1; });
                   }
                 }}
-                sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", resize: "none", boxSizing: "border-box", border: 0, outline: 0, p: "14px 16px", bgcolor: "transparent", color: "transparent", WebkitTextFillColor: "transparent", caretColor: "#f8fafc", "&::selection": { backgroundColor: "rgba(96,165,250,.28)" }, fontFamily: MONO, fontSize: 13, lineHeight: "20px", whiteSpace: "pre", overflow: "auto", tabSize: 2, WebkitFontSmoothing: "antialiased" }}
+                sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", resize: "none", boxSizing: "border-box", border: 0, outline: 0, p: "14px 16px", bgcolor: "transparent", color: "transparent", WebkitTextFillColor: "transparent", caretColor: "#f8fafc", "&::selection": { backgroundColor: "rgba(96,165,250,.28)" }, fontFamily: MONO, fontSize: 13, lineHeight: "20px", whiteSpace: "pre", overflowX: "auto", overflowY: "auto", scrollbarWidth: "thin", "&::-webkit-scrollbar": { width: 8, height: 8 }, "&::-webkit-scrollbar-thumb": { background: "rgba(148,163,184,.34)", borderRadius: 8 }, "&::-webkit-scrollbar-track": { background: "rgba(148,163,184,.06)" }, tabSize: 2, WebkitFontSmoothing: "antialiased" }}
               />
               </Box>
               {openFiles[activeFile]?.writable === false ? <Box sx={{ position: "absolute", right: 12, bottom: 10, px: .8, py: .35, borderRadius: .5, bgcolor: "rgba(20,10,10,.75)", color: "#ffab96", fontFamily: MONO, fontSize: 10 }}>READ ONLY · {openFiles[activeFile]?.readOnlyReason}</Box> : null}
+            </Box>
+            <Box
+              sx={{
+                display: { xs: "flex", md: "none" },
+                alignItems: "center",
+                gap: .5,
+                px: 1,
+                py: .45,
+                minHeight: 38,
+                bgcolor: "#0e151d",
+                borderTop: "1px solid rgba(148,163,184,.10)",
+                flexShrink: 0,
+              }}
+            >
+              <IconButton
+                size="small"
+                aria-label="Scroll editor left"
+                onClick={() => scrollEditorHorizontally(-1)}
+                sx={{ width: 32, height: 32, color: "#9ab0c4", border: "1px solid rgba(148,163,184,.14)" }}
+              >
+                <KeyboardArrowLeftRoundedIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+              <Typography sx={{ flex: 1, minWidth: 0, textAlign: "center", color: "#647689", fontSize: 10.5, fontFamily: MONO }}>
+                Horizontal scroll
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label="Scroll editor right"
+                onClick={() => scrollEditorHorizontally(1)}
+                sx={{ width: 32, height: 32, color: "#9ab0c4", border: "1px solid rgba(148,163,184,.14)" }}
+              >
+                <KeyboardArrowRightRoundedIcon sx={{ fontSize: 20 }} />
+              </IconButton>
             </Box>
           </Box>
         )}
@@ -1841,6 +2009,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         anchorEl={mobileOptionsAnchorEl}
         open={Boolean(mobileOptionsAnchorEl)}
         onClose={() => setMobileOptionsAnchorEl(null)}
+        sx={{ zIndex: 1800 }}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         slotProps={{ paper: { sx: { minWidth: 190 } } }}
