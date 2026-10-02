@@ -1,4 +1,5 @@
 import React, { memo, useState } from "react";
+import { alpha } from "@mui/material/styles";
 import {
   Dialog,
   DialogTitle,
@@ -30,6 +31,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { resolveServiceKind, resolveUsage, getKey } from "./helpers";
+import PlatformIcon from "../../plans/PlatformIcon.jsx";
 import UsageBar from "./UsageBar";
 
 function ServiceItem({
@@ -67,7 +69,7 @@ function ServiceItem({
 
   const kind = resolveServiceKind(s, planCache);
   const isDb = kind === "db";
-  const platformLabel = String(plan?.platform || "").toLowerCase();
+  const platformLabel = String(plan?.platform || s.platform || "").toLowerCase();
   const status = String(s.status || "").toLowerCase();
   const isUpdating = ["updating...", "queued", "deploying", "stopping"].includes(
     status
@@ -83,28 +85,29 @@ function ServiceItem({
   );
 
   const kindChip = (
-    <Chip
-      size="small"
-      icon={
-        isDb ? (
-          <StorageOutlinedIcon sx={{ fontSize: 14 }} />
-        ) : (
-          <AppsIcon sx={{ fontSize: 14 }} />
-        )
-      }
-      label={
-        isDb
-          ? platformLabel
-            ? `DB · ${platformLabel}`
-            : "Database"
-          : platformLabel
-          ? `App · ${platformLabel}`
-          : "App"
-      }
-      color={isDb ? "info" : "default"}
-      variant={isDb ? "filled" : "outlined"}
-      sx={{ height: 22, fontWeight: 700, fontSize: 11 }}
-    />
+    <Stack
+      direction="row"
+      spacing={0.6}
+      alignItems="center"
+      sx={{
+        px: 0.7,
+        py: 0.35,
+        borderRadius: 1.4,
+        border: "1px solid",
+        borderColor: isDb ? "info.light" : "divider",
+        bgcolor: (t) => isDb ? alpha(t.palette.info.main, t.palette.mode === "dark" ? 0.14 : 0.07) : "action.hover",
+      }}
+    >
+      <PlatformIcon platformKey={platformLabel} label={platformLabel || (isDb ? "database" : "application")} size={15} />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="caption" sx={{ display: "block", lineHeight: 1, fontWeight: 800, color: isDb ? "info.main" : "primary.main" }}>
+          {isDb ? "Database" : "Application"}
+        </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1, textTransform: "capitalize" }}>
+          {platformLabel || "Unknown platform"}
+        </Typography>
+      </Box>
+    </Stack>
   );
 
   const metaChips = (
@@ -156,8 +159,8 @@ function ServiceItem({
         visibility: usage.cpu != null || usage.ram != null ? "visible" : "hidden",
       }}
     >
-      <UsageBar label="CPU" value={usage.cpu ?? 0} dense />
-      <UsageBar label="RAM" value={usage.ram ?? 0} dense />
+      <UsageBar label="CPU" value={usage.cpu} loading={!statusEntry || statusEntry.loading} error={statusEntry?.error} dense />
+      <UsageBar label="RAM" value={usage.ram} loading={!statusEntry || statusEntry.loading} error={statusEntry?.error} dense />
     </Stack>
   );
 

@@ -345,8 +345,8 @@ function VolumeCard({
                   size="small"
                   color="warning"
                   variant="outlined"
-                  disabled={loading}
-                  onClick={() => onDetach?.(volume.id ?? volume.pk, volume)}
+                  disabled={loading || blocked}
+                  onClick={() => onDetach?.(volume.id ?? volume.pk, volume)
                   startIcon={<LinkOffIcon fontSize="small" />}
                   sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
                 >
@@ -931,7 +931,7 @@ export default function SettingsPanel({
   );
   // When status is stopped/failed/succeeded/empty, enable volume mutations in UI.
   // Parent canMutateVolumes=false is ignored for idle statuses (was blocking detach incorrectly).
-  const effectiveCanMutate = !statusBusy;
+  const effectiveCanMutate = Boolean(canMutateVolumes) && !statusBusy;
   const effectiveMutateReason = statusBusy
     ? volumeMutateReason ||
       `Service is "${serviceStatus || "busy"}". Stop it before changing volumes.`
@@ -1196,12 +1196,10 @@ export default function SettingsPanel({
           );
         }
         const result = await onDetachVolume(vid, volume);
-        // Mark unmounted locally so UI moves card even if parent list is stale
-        setMountOverrides((prev) => ({ ...prev, [vid]: false }));
-        // If parent returned payload with is_mounted still true, keep override false
-        if (result && result.is_mounted === true) {
-          console.warn("Detach API returned is_mounted=true — backend may not have applied detach", result);
+        if (result?.is_mounted === true) {
+          throw new Error("Detach was not confirmed by the backend.");
         }
+        setMountOverrides((prev) => ({ ...prev, [vid]: false }));
         return result;
       } catch (err) {
         console.error("detach error", err);
@@ -1224,6 +1222,7 @@ export default function SettingsPanel({
         } else {
           throw new Error("onAttachVolume is not provided by parent");
         }
+        if (idOrVolume?.is_mounted === false) throw new Error("Attach was not confirmed by the backend.");
         setMountOverrides((prev) => ({ ...prev, [vid]: true }));
       } catch (err) {
         console.error(err);
