@@ -132,7 +132,6 @@ function StorageQuotaBar({ storage }) {
 }
 
 function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
-  const navigate = useNavigate();
   const handleClick = () => {
     if (isCurrent) { onClearSelection?.(); return; }
     onSelect?.(plan);
@@ -845,6 +844,8 @@ export default function SettingsPanel({
   error,
   successMessage,
 }) {
+  const navigate = useNavigate();
+
   // Network dialog
   const [createNetworkOpen, setCreateNetworkOpen] = useState(false);
   const [newNetworkName, setNewNetworkName] = useState("");
