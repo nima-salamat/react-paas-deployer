@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Paper, Stack, Tab, Tabs, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Pagination, Paper, Stack, Tab, Tabs, TextField, Tooltip, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
@@ -28,7 +28,11 @@ export default function AgentDetail() {
   const [agent, setAgent] = useState(null);
   const [scopeCatalog, setScopeCatalog] = useState({ scopes: [], defaults: [] });
   const [credentials, setCredentials] = useState([]);
+  const [credentialsPage, setCredentialsPage] = useState(1);
+  const [credentialsCount, setCredentialsCount] = useState(0);
   const [audit, setAudit] = useState([]);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditCount, setAuditCount] = useState(0);
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,15 +56,22 @@ export default function AgentDetail() {
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
-      const [agentData, scopesData, credsData, auditData] = await Promise.all([getAgent(id), listScopes(), listCredentials(id), listAudit(id)]);
+      const [agentData, scopesData, credsData, auditData] = await Promise.all([
+        getAgent(id),
+        listScopes(),
+        listCredentials(id, { page: credentialsPage, page_size: 10 }),
+        listAudit(id, { page: auditPage, page_size: 10 }),
+      ]);
       setAgent(agentData);
       setScopeCatalog(scopesData);
       setCredentials(Array.isArray(credsData.results) ? credsData.results : []);
+      setCredentialsCount(Number(credsData.count) || 0);
       setAudit(Array.isArray(auditData.results) ? auditData.results : []);
+      setAuditCount(Number(auditData.count) || 0);
       setDraft({ name: agentData.name || "", description: agentData.description || "", scopes: agentData.scopes || [] });
     } catch (e) { setError(getApiErrorMessage(e, "Failed to load Agent.")); }
     finally { setLoading(false); }
-  }, [id]);
+  }, [id, credentialsPage, auditPage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -295,6 +306,22 @@ export default function AgentDetail() {
                   </Paper>
                 )) : <Typography color="text.secondary">No credentials have been issued.</Typography>}
               </Stack>
+
+              {credentialsCount > 10 ? (
+                <Stack spacing={0.75} alignItems="center" sx={{ pt: 2 }}>
+                  <Pagination
+                    count={Math.max(1, Math.ceil(credentialsCount / 10))}
+                    page={credentialsPage}
+                    onChange={(_, value) => setCredentialsPage(value)}
+                    disabled={saving}
+                    shape="rounded"
+                    color="primary"
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Page {credentialsPage} of {Math.max(1, Math.ceil(credentialsCount / 10))} · {credentialsCount} credentials
+                  </Typography>
+                </Stack>
+              ) : null}
             </Box>
           ) : null}
 
@@ -318,6 +345,22 @@ export default function AgentDetail() {
                   </Paper>
                 )) : <Typography color="text.secondary">No audit events yet.</Typography>}
               </Stack>
+
+              {auditCount > 10 ? (
+                <Stack spacing={0.75} alignItems="center" sx={{ pt: 2 }}>
+                  <Pagination
+                    count={Math.max(1, Math.ceil(auditCount / 10))}
+                    page={auditPage}
+                    onChange={(_, value) => setAuditPage(value)}
+                    disabled={saving}
+                    shape="rounded"
+                    color="primary"
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Page {auditPage} of {Math.max(1, Math.ceil(auditCount / 10))} · {auditCount} audit events
+                  </Typography>
+                </Stack>
+              ) : null}
             </Box>
           ) : null}
         </Paper>
