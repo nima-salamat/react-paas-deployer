@@ -1453,18 +1453,204 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   pointerEvents: { xs: sidebarOpen ? "auto" : "none", md: "auto" },
                 }}
               >
-                <Box sx={{ px: 1.2, py: .85, display: "flex", alignItems: "center", gap: .6 }}>
-                  <Typography sx={{ color: "#6f7d8b", fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", flex: 1 }}>PROJECT</Typography>
-                  <Tooltip title={cwdWritable === true ? "Upload files" : cwdWritable === null ? "Checking directory permissions" : "Read-only directory"}>
-                    <span>
-                      <Button size="small" variant="outlined" startIcon={uploading ? <CircularProgress size={13} /> : <UploadFileRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => uploadInputRef.current?.click()} disabled={!session || cwdWritable !== true || cwdMountWritable !== true || uploading} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>Upload</Button>
-                    </span>
-                  </Tooltip>
-                  <input ref={uploadInputRef} hidden type="file" multiple onChange={(event) => uploadFiles(event.target.files)} />
-                  <Button size="small" variant="outlined" startIcon={<AddRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFile} disabled={!session || cwdMountWritable !== true} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>New</Button>
-                  <Button size="small" variant="outlined" startIcon={<FolderRoundedIcon sx={{ fontSize: 15 }} />} onClick={createNewFolder} disabled={!session || cwdMountWritable !== true} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5, lineHeight: 1.2 }}>Folder</Button>
-                  {selectedItems.length ? <Button size="small" startIcon={<DownloadRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => downloadSelection(selectedItems)} sx={{ minWidth: 0, px: .6, py: .25, textTransform: "none", fontSize: 10.5 }}>Download</Button> : null}
-                  <Tooltip title="Refresh"><span><IconButton size="small" disabled={!session || treeLoading} onClick={refreshDirectory} sx={{ color: "#7d8a98" }}>{treeLoading ? <CircularProgress size={14} /> : <RefreshRoundedIcon sx={{ fontSize: 16 }} />}</IconButton></span></Tooltip>
+                <Box
+                  sx={{
+                    px: 1.2,
+                    py: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    alignItems: { xs: "flex-start", sm: "center" },
+                    justifyContent: "space-between",
+                    gap: 1,
+                    flexWrap: "wrap",
+                    bgcolor: "#101821",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      minWidth: 82,
+                      py: 0.25,
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        color: "#7f8e9d",
+                        fontSize: 10.5,
+                        fontWeight: 850,
+                        letterSpacing: ".09em",
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      PROJECT
+                    </Typography>
+                  </Box>
+
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    useFlexGap
+                    sx={{
+                      flex: "1 1 auto",
+                      minWidth: 0,
+                      justifyContent: { xs: "flex-start", sm: "flex-end" },
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <Tooltip
+                      title={
+                        cwdWritable === true
+                          ? "Upload files"
+                          : cwdWritable === null
+                          ? "Checking directory permissions"
+                          : "Read-only directory"
+                      }
+                    >
+                      <span style={{ display: "inline-flex" }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={
+                            uploading ? (
+                              <CircularProgress size={13} color="inherit" />
+                            ) : (
+                              <UploadFileRoundedIcon sx={{ fontSize: 16 }} />
+                            )
+                          }
+                          onClick={() => uploadInputRef.current?.click()}
+                          disabled={
+                            !session ||
+                            cwdWritable !== true ||
+                            cwdMountWritable !== true ||
+                            uploading
+                          }
+                          sx={{
+                            minWidth: "max-content",
+                            height: 32,
+                            px: 1.1,
+                            borderRadius: 1.25,
+                            flexShrink: 0,
+                            whiteSpace: "nowrap",
+                            textTransform: "none",
+                            fontSize: 11.5,
+                            fontWeight: 750,
+                            lineHeight: 1,
+                            "& .MuiButton-startIcon": { mr: 0.65 },
+                          }}
+                        >
+                          Upload
+                        </Button>
+                      </span>
+                    </Tooltip>
+
+                    <input
+                      ref={uploadInputRef}
+                      hidden
+                      type="file"
+                      multiple
+                      onChange={(event) => uploadFiles(event.target.files)}
+                    />
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
+                      onClick={createNewFile}
+                      disabled={!session || cwdMountWritable !== true}
+                      sx={{
+                        minWidth: "max-content",
+                        height: 32,
+                        px: 1.1,
+                        borderRadius: 1.25,
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                        textTransform: "none",
+                        fontSize: 11.5,
+                        fontWeight: 750,
+                        lineHeight: 1,
+                        "& .MuiButton-startIcon": { mr: 0.65 },
+                      }}
+                    >
+                      New file
+                    </Button>
+
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<FolderRoundedIcon sx={{ fontSize: 16 }} />}
+                      onClick={createNewFolder}
+                      disabled={!session || cwdMountWritable !== true}
+                      sx={{
+                        minWidth: "max-content",
+                        height: 32,
+                        px: 1.1,
+                        borderRadius: 1.25,
+                        flexShrink: 0,
+                        whiteSpace: "nowrap",
+                        textTransform: "none",
+                        fontSize: 11.5,
+                        fontWeight: 750,
+                        lineHeight: 1,
+                        "& .MuiButton-startIcon": { mr: 0.65 },
+                      }}
+                    >
+                      New folder
+                    </Button>
+
+                    {selectedItems.length ? (
+                      <Button
+                        size="small"
+                        variant="text"
+                        startIcon={<DownloadRoundedIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => downloadSelection(selectedItems)}
+                        sx={{
+                          minWidth: "max-content",
+                          height: 32,
+                          px: 1,
+                          borderRadius: 1.25,
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
+                          textTransform: "none",
+                          fontSize: 11.5,
+                          fontWeight: 750,
+                          lineHeight: 1,
+                          "& .MuiButton-startIcon": { mr: 0.65 },
+                        }}
+                      >
+                        Download
+                      </Button>
+                    ) : null}
+
+                    <Tooltip title="Refresh directory">
+                      <span style={{ display: "inline-flex" }}>
+                        <IconButton
+                          size="small"
+                          disabled={!session || treeLoading}
+                          onClick={refreshDirectory}
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 1.25,
+                            color: "#9babb9",
+                            border: "1px solid rgba(148,163,184,.18)",
+                            bgcolor: "rgba(148,163,184,.04)",
+                            flexShrink: 0,
+                            "&:hover": {
+                              bgcolor: "rgba(148,163,184,.09)",
+                              color: "#dce5ec",
+                            },
+                          }}
+                        >
+                          {treeLoading ? (
+                            <CircularProgress size={14} color="inherit" />
+                          ) : (
+                            <RefreshRoundedIcon sx={{ fontSize: 17 }} />
+                          )}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Stack>
                 </Box>
                 <Divider sx={{ borderColor: "rgba(148,163,184,.1)" }} />
                 <Box sx={{ px: 1, py: .65, display: "flex", alignItems: "center", gap: .2, overflowX: "auto" }}>
