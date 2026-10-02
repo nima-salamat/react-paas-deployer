@@ -341,3 +341,24 @@ test("RTL MUI selectors are syntactically valid and direction-aware", () => {
   assert.match(source, /'& \[dir="auto"\]'/);
   assert.match(source, /unicodeBidi: "plaintext"/);
 });
+
+
+test("message renderer normalizes semantic alignment and RTL before injecting rich text", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /function normalizeRichTextBlocks/);
+  assert.match(source, /RICH_TEXT_ALIGNMENTS/);
+  assert.match(source, /block\.style\.textAlign = alignment/);
+  assert.match(source, /block\.style\.direction = direction/);
+  assert.match(source, /normalizeRichTextBlocks\(root\)/);
+});
+
+test("message renderer visibly supports headings, lists and inline formatting", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /"& h1, & h2, & h3, & h4"/);
+  assert.match(source, /"& ul, & ol"/);
+  assert.match(source, /"& strong, & b"/);
+  assert.match(source, /"& em, & i"/);
+  assert.match(source, /"& u"/);
+});

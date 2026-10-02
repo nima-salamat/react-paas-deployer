@@ -506,16 +506,56 @@ function normalizeMessageBody(body) {
 }
 
 
+const RICH_TEXT_BLOCKS = ["p", "h1", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "pre"];
+
+const RICH_TEXT_ALIGNMENTS = new Map([
+  ["ticket-align-left", "left"],
+  ["ticket-align-center", "center"],
+  ["ticket-align-right", "right"],
+]);
+
+function normalizeRichTextBlocks(root) {
+  root.querySelectorAll(RICH_TEXT_BLOCKS.join(",")).forEach((block) => {
+    let alignment = "";
+    for (const [className, value] of RICH_TEXT_ALIGNMENTS) {
+      if (block.classList.contains(className)) {
+        alignment = value;
+        break;
+      }
+    }
+
+    const legacyAlignment = block.style?.textAlign?.trim().toLowerCase();
+    if (!alignment && ["left", "center", "right"].includes(legacyAlignment)) {
+      alignment = legacyAlignment;
+    }
+
+    if (alignment) {
+      block.style.textAlign = alignment;
+    }
+
+    const direction = block.getAttribute("dir");
+    if (direction === "rtl" || direction === "ltr") {
+      block.style.direction = direction;
+      block.style.unicodeBidi = "plaintext";
+    } else if (!block.getAttribute("dir")) {
+      block.setAttribute("dir", "auto");
+      block.style.unicodeBidi = "plaintext";
+    }
+  });
+}
+
 /**
  * Turn stored <pre> blocks into polished, copyable code cards and highlight
  * their code while preserving the original plain-text content for copying.
  */
 function enhanceRichTextHtml(html) {
+
   if (!html) return "";
   const doc = new DOMParser().parseFromString("<div></div>", "text/html");
   const root = doc.body.firstElementChild;
   if (!root) return html;
   root.innerHTML = html;
+  normalizeRichTextBlocks(root);
 
   root.querySelectorAll("pre").forEach((pre) => {
     const code = pre.firstElementChild?.tagName === "CODE"
@@ -765,6 +805,46 @@ export default function MessageBubble({
               mt: 0.25,
               "& p": { m: 0, mb: 0.5 },
               "& p:last-child": { mb: 0 },
+              "& h1, & h2, & h3, & h4": {
+                mt: 0.8,
+                mb: 0.55,
+                lineHeight: 1.2,
+                fontWeight: 800,
+              },
+              "& h1": { fontSize: "1.45em" },
+              "& h2": { fontSize: "1.3em" },
+              "& h3": { fontSize: "1.18em" },
+              "& h4": { fontSize: "1.08em" },
+              "& ul, & ol": {
+                pl: 2.25,
+                my: 0.5,
+              },
+              "& li": {
+                pl: 0.25,
+                mb: 0.2,
+              },
+              "& strong, & b": { fontWeight: 800 },
+              "& em, & i": { fontStyle: "italic" },
+              "& u": { textDecoration: "underline", textUnderlineOffset: "2px" },
+              "& s": { textDecoration: "line-through" },
+              "& br": { content: '""' },
+              "& [dir="rtl"]": {
+                direction: "rtl",
+                unicodeBidi: "plaintext",
+              },
+              "& [dir="ltr"]": {
+                direction: "ltr",
+                unicodeBidi: "plaintext",
+              },
+              "& p.ticket-align-left, & h1.ticket-align-left, & h2.ticket-align-left, & h3.ticket-align-left, & h4.ticket-align-left, & li.ticket-align-left, & blockquote.ticket-align-left": {
+                textAlign: "left",
+              },
+              "& p.ticket-align-center, & h1.ticket-align-center, & h2.ticket-align-center, & h3.ticket-align-center, & h4.ticket-align-center, & li.ticket-align-center, & blockquote.ticket-align-center": {
+                textAlign: "center",
+              },
+              "& p.ticket-align-right, & h1.ticket-align-right, & h2.ticket-align-right, & h3.ticket-align-right, & h4.ticket-align-right, & li.ticket-align-right, & blockquote.ticket-align-right": {
+                textAlign: "right",
+              },
               "& a": { color: mine ? "inherit" : "primary.main", textDecoration: "underline" },
               "& .ticket-code-shell": {
                 my: 1,
@@ -847,9 +927,6 @@ export default function MessageBubble({
                 color: mine ? "rgba(255,255,255,0.78)" : "text.secondary",
                 opacity: 0.9,
               },
-              "& .ticket-align-left": { textAlign: "left" },
-              "& .ticket-align-center": { textAlign: "center" },
-              "& .ticket-align-right": { textAlign: "right" },
               "& code": {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                 fontSize: "0.9em",
