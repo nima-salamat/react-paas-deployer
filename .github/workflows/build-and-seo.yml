@@ -29,6 +29,9 @@ jobs:
       - name: Service detail regression tests
         run: npm run test:service-detail
 
+      - name: Agent regression tests
+        run: npm run test:agents
+
       - name: Lint
         run: npm run lint
 
