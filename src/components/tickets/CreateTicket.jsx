@@ -172,7 +172,6 @@ export default function CreateTicket() {
               enterSends={false}
               compact={false}
               showToolbarToggle
-              expanded
             />
           </Box>
           <Button variant="outlined" component="label">

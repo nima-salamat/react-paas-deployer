@@ -32,6 +32,8 @@ test("toolbar reflects the active block and inline formatting", () => {
   assert.match(source, /aria-pressed=\{activeFormats\.code\}/);
   assert.match(source, /aria-pressed=\{activeFormats\.quote\}/);
   assert.match(source, /const applyAlignment = useCallback/);
+  assert.match(source, /ticket-align-center/);
+  assert.match(source, /setBlockAlignment\(block, align\)/);
   assert.match(source, /activeFormats\.align === "center"/);
   assert.match(source, /FormatAlignRightIcon/);
   assert.match(source, /CODE_LANGUAGES/);
@@ -173,4 +175,29 @@ test("inline formatter does not evaluate later hook bindings during component in
     source.slice(formatterStart, formatterStart + 120).includes("const toggleInlineFormat = (command) =>"),
     "toggleInlineFormat must not be a useCallback whose dependency array references later bindings"
   );
+});
+
+
+test("alignment is persisted with allowlisted classes instead of stripped inline styles", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const ALIGNMENT_CLASSES =/);
+  assert.match(source, /ticket-align-left/);
+  assert.match(source, /ticket-align-center/);
+  assert.match(source, /ticket-align-right/);
+  assert.match(source, /block\.style\?\.removeProperty\("text-align"\)/);
+});
+
+test("italic can exit cleanly at the end of an inline mark without leaving an empty formatted node", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const afterFragment = afterRange\.extractContents\(\)/);
+  assert.match(source, /else if \(afterFragment\.textContent\?\.length\)/);
+  assert.match(source, /const afterIndex = Array\.prototype\.indexOf\.call\(parent\.childNodes, active\) \+ 1/);
+});
+
+test("Create Ticket does not force the editor expanded state", () => {
+  const source = read("src/components/tickets/CreateTicket.jsx");
+
+  assert.doesNotMatch(source, /<SimpleHtmlEditor[\s\S]*?expanded\s*\/>/);
 });

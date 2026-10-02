@@ -27,6 +27,34 @@ const INLINE_TAGS = {
   underline: ["U"],
 };
 
+const ALIGNMENT_CLASSES = {
+  left: "ticket-align-left",
+  center: "ticket-align-center",
+  right: "ticket-align-right",
+};
+
+const ALIGNMENT_VALUES = Object.keys(ALIGNMENT_CLASSES);
+
+function getBlockAlignment(block) {
+  if (!block) return "left";
+  const classEntry = ALIGNMENT_VALUES.find((align) =>
+    block.classList?.contains(ALIGNMENT_CLASSES[align])
+  );
+  if (classEntry) return classEntry;
+
+  const inlineStyle = block.style?.textAlign || "";
+  return ALIGNMENT_VALUES.includes(inlineStyle) ? inlineStyle : "left";
+}
+
+function setBlockAlignment(block, align) {
+  if (!block || !ALIGNMENT_VALUES.includes(align)) return;
+  Object.values(ALIGNMENT_CLASSES).forEach((className) => {
+    block.classList?.remove(className);
+  });
+  block.classList?.add(ALIGNMENT_CLASSES[align]);
+  block.style?.removeProperty("text-align");
+}
+
 /**
  * Compact HTML editor. Toolbar hidden by default; expand with button.
  * Enter → new line (send only via toolbar/send button from parent).
@@ -157,7 +185,17 @@ export default function SimpleHtmlEditor({
     const range = selection.getRangeAt(0);
     editingRef.current = true;
 
-    if (range.collapsed) {
+    ref.current.focus({ preventScroll: true });
+    restoreSelection();
+
+    const currentSelection = window.getSelection?.();
+    if (!currentSelection?.rangeCount) {
+      editingRef.current = false;
+      return;
+    }
+
+    const currentRange = currentSelection.getRangeAt(0);
+    if (currentRange.collapsed) {
       const active = findInlineAncestor(command);
       const tagName = (INLINE_TAGS[command]?.[0] || "STRONG").toLowerCase();
 
@@ -177,18 +215,34 @@ export default function SimpleHtmlEditor({
         } else {
           const parent = active.parentNode;
           if (parent) {
-            const afterRange = range.cloneRange();
+            const afterRange = currentRange.cloneRange();
             afterRange.selectNodeContents(active);
-            afterRange.setStart(range.startContainer, range.startOffset);
+            afterRange.setStart(currentRange.startContainer, currentRange.startOffset);
             const afterFragment = afterRange.extractContents();
+            const remainingText = (active.textContent || "").replace(/\u200B/g, "");
 
-            const after = active.cloneNode(false);
-            after.removeAttribute("data-editor-typing-mark");
-            after.appendChild(afterFragment);
-            parent.insertBefore(after, active.nextSibling);
-
-            const afterIndex = Array.prototype.indexOf.call(parent.childNodes, after);
-            placeCaretAtBoundary(parent, afterIndex);
+            if (!remainingText.length) {
+              const beforeIndex = Array.prototype.indexOf.call(parent.childNodes, active);
+              const next = active.nextSibling;
+              active.remove();
+              if (afterFragment.textContent?.length) {
+                const after = active.cloneNode(false);
+                after.removeAttribute("data-editor-typing-mark");
+                after.appendChild(afterFragment);
+                parent.insertBefore(after, next);
+              }
+              placeCaretAtBoundary(parent, beforeIndex);
+            } else if (afterFragment.textContent?.length) {
+              const after = active.cloneNode(false);
+              after.removeAttribute("data-editor-typing-mark");
+              after.appendChild(afterFragment);
+              parent.insertBefore(after, active.nextSibling);
+              const afterIndex = Array.prototype.indexOf.call(parent.childNodes, after);
+              placeCaretAtBoundary(parent, afterIndex);
+            } else {
+              const afterIndex = Array.prototype.indexOf.call(parent.childNodes, active) + 1;
+              placeCaretAtBoundary(parent, afterIndex);
+            }
           }
         }
       } else {
@@ -196,13 +250,13 @@ export default function SimpleHtmlEditor({
         const marker = document.createTextNode("\u200B");
         mark.setAttribute("data-editor-typing-mark", command);
         mark.appendChild(marker);
-        range.insertNode(mark);
+        currentRange.insertNode(mark);
 
         const caret = document.createRange();
         caret.setStart(marker, marker.length);
         caret.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(caret);
+        currentSelection.removeAllRanges();
+        currentSelection.addRange(caret);
       }
     } else {
       try {
@@ -329,17 +383,15 @@ export default function SimpleHtmlEditor({
     const block = findBlock();
     const list = block?.tagName === "LI" ? block.parentElement : null;
     setActiveFormats({
-      bold: Boolean(findInlineAncestor("bold")) || safeQueryState("bold"),
-      italic: Boolean(findInlineAncestor("italic")) || safeQueryState("italic"),
-      underline: Boolean(findInlineAncestor("underline")) || safeQueryState("underline"),
+      bold: Boolean(findInlineAncestor("bold")),
+      italic: Boolean(findInlineAncestor("italic")),
+      underline: Boolean(findInlineAncestor("underline")),
       bullet: safeQueryState("insertUnorderedList") || list?.tagName === "UL",
       ordered: safeQueryState("insertOrderedList") || list?.tagName === "OL",
       code: block?.tagName === "PRE",
       quote: block?.tagName === "BLOCKQUOTE",
       block: block?.tagName || "P",
-      align: ["left", "center", "right"].includes(block?.style?.textAlign || "")
-        ? block.style.textAlign
-        : "left",
+      align: getBlockAlignment(block),
       language: block?.tagName === "PRE"
         ? getCodeLanguage(block.querySelector?.("code"))
         : "",
@@ -389,11 +441,9 @@ export default function SimpleHtmlEditor({
   const applyAlignment = useCallback((align) => {
     if (disabled || !ref.current || !["left", "center", "right"].includes(align)) return;
     const editor = ref.current;
-    const hadSelection = restoreSelection();
-    if (!hadSelection) {
-      editor.focus({ preventScroll: true });
-      saveSelection();
-    }
+    editor.focus({ preventScroll: true });
+    restoreSelection();
+    saveSelection();
 
     const selection = window.getSelection?.();
     if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
@@ -435,7 +485,7 @@ export default function SimpleHtmlEditor({
 
     editingRef.current = true;
     blocks.forEach((block) => {
-      block.style.setProperty("text-align", align);
+      setBlockAlignment(block, align);
     });
     saveSelection();
     editingRef.current = false;
