@@ -72,3 +72,10 @@ test("quote blocks have a distinct visual treatment in editor and messages", () 
   assert.match(renderer, /blockquote::before/);
   assert.match(renderer, /rgba\(120,140,170,0\.07\)/);
 });
+
+test("code blocks default to automatic language detection", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.doesNotMatch(source, /code\.className = "language-plaintext"/);
+  assert.doesNotMatch(source, /target\.classList\.add\("language-plaintext"\)/);
+});

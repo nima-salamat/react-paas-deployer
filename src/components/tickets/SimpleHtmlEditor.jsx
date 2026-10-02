@@ -199,10 +199,6 @@ export default function SimpleHtmlEditor({
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
-
-    if (target.tagName === "CODE") {
-      target.classList.add("language-plaintext");
-    }
   }, []);
 
   const toggleCode = () => {
@@ -221,7 +217,6 @@ export default function SimpleHtmlEditor({
       const pre = document.createElement("pre");
       pre.className = "editor-code-block";
       const code = document.createElement("code");
-      code.className = "language-plaintext";
       const text = block.innerText || block.textContent || "";
       code.textContent = text;
       if (!text) code.innerHTML = "<br>";
