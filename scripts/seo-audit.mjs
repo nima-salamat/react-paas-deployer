@@ -7,17 +7,17 @@ const ROUTES = [
   {
     path: "index.html",
     url: "https://echonode.website/",
-    title: "PassDeployer | Application Deployment & Management",
+    title: "PaasDeployer | Application Deployment & Management",
   },
   {
     path: "plans/index.html",
     url: "https://echonode.website/plans",
-    title: "Plans & Pricing | PassDeployer",
+    title: "Plans & Pricing | PaasDeployer",
   },
   {
     path: "aboutUs/index.html",
     url: "https://echonode.website/aboutUs",
-    title: "About PassDeployer | Application Deployment Platform",
+    title: "About PaasDeployer | Application Deployment Platform",
   },
 ];
 

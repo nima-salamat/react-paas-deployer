@@ -209,15 +209,15 @@ function loadTemplate() {
 
 const PUBLIC_SHELLS = {
   '/': {
-    eyebrow: 'PassDeployer',
+    eyebrow: 'PaasDeployer',
 
     heading:
       'Deploy faster. Manage more. Worry less.',
 
     paragraphs: [
-      'PassDeployer is an application deployment and infrastructure management platform for teams that want a simpler path from configured service to running application. Create services, choose CPU and memory resources, connect networks, keep persistent storage, and manage operational tasks from one focused control panel. The public experience explains the product clearly while the authenticated workspace remains focused on practical service operations.',
+      'PaasDeployer is an application deployment and infrastructure management platform for teams that want a simpler path from configured service to running application. Create services, choose CPU and memory resources, connect networks, keep persistent storage, and manage operational tasks from one focused control panel. The public experience explains the product clearly while the authenticated workspace remains focused on practical service operations.',
 
-      'Instead of stitching together separate deployment utilities for every workload, PassDeployer brings the most common application operations into a consistent workflow. It is designed for developers and operators who need practical service controls without adding unnecessary infrastructure ceremony.',
+      'Instead of stitching together separate deployment utilities for every workload, PaasDeployer brings the most common application operations into a consistent workflow. It is designed for developers and operators who need practical service controls without adding unnecessary infrastructure ceremony.',
     ],
 
     sections: [
@@ -226,7 +226,7 @@ const PUBLIC_SHELLS = {
           'One place for deployment and infrastructure management',
 
         paragraphs: [
-          'PassDeployer keeps service deployment, resource selection, networking, and persistent storage close together. You can define a service, give it the resources it needs, connect it to the right network, and keep its persistent data available across the service lifecycle.',
+          'PaasDeployer keeps service deployment, resource selection, networking, and persistent storage close together. You can define a service, give it the resources it needs, connect it to the right network, and keep its persistent data available across the service lifecycle.',
 
           '<strong>Service management</strong> covers the everyday actions required to run an application, while <strong>resource controls</strong> help you choose CPU, memory, and storage based on the workload.',
         ],
@@ -246,26 +246,26 @@ const PUBLIC_SHELLS = {
           'Built in the open for developers',
 
         paragraphs: [
-          'PassDeployer is built as an open-source stack with a Django API and a React frontend. <strong>Application deployment</strong>, <strong>service lifecycle management</strong>, <strong>networks</strong>, and <strong>persistent volumes</strong> are the core concepts exposed by the platform.',
+          'PaasDeployer is built as an open-source stack with a Django API and a React frontend. <strong>Application deployment</strong>, <strong>service lifecycle management</strong>, <strong>networks</strong>, and <strong>persistent volumes</strong> are the core concepts exposed by the platform.',
         ],
       },
     ],
 
     links: [
       ['/plans', 'Plans & Pricing'],
-      ['/aboutUs', 'About PassDeployer'],
+      ['/aboutUs', 'About PaasDeployer'],
       ['/signin_or_signup', 'Sign in'],
     ],
   },
 
   '/plans': {
-    eyebrow: 'PassDeployer plans',
+    eyebrow: 'PaasDeployer plans',
 
     heading:
       'Choose resources that fit your application.',
 
     paragraphs: [
-      'PassDeployer plans help you choose an appropriate amount of CPU, memory, and persistent storage for the workload you need to run. Start with the resources that fit your current application, then change the plan when traffic, processing requirements, or stored data grows.',
+      'PaasDeployer plans help you choose an appropriate amount of CPU, memory, and persistent storage for the workload you need to run. Start with the resources that fit your current application, then change the plan when traffic, processing requirements, or stored data grows.',
 
       'The public plans page explains resource options before you enter the authenticated control panel. This makes it easier to compare capacity and understand how <strong>resource limits</strong> relate to day-to-day application deployment and service management.',
     ],
@@ -285,25 +285,25 @@ const PUBLIC_SHELLS = {
           'Scale the service as needs change',
 
         paragraphs: [
-          'A deployment plan should not lock an application into the resources it needed on its first day. PassDeployer is designed so that resource choices can be revisited as the workload changes.',
+          'A deployment plan should not lock an application into the resources it needed on its first day. PaasDeployer is designed so that resource choices can be revisited as the workload changes.',
         ],
       },
     ],
 
     links: [
-      ['/', 'Back to PassDeployer'],
+      ['/', 'Back to PaasDeployer'],
       ['/aboutUs', 'About the platform'],
     ],
   },
 
   '/docs': {
-    eyebrow: 'PassDeployer documentation',
+    eyebrow: 'PaasDeployer documentation',
 
     heading:
       'Documentation for deploying and managing applications.',
 
     paragraphs: [
-      'Browse published PassDeployer guides, references and practical how-tos for deploying, configuring and managing applications.',
+      'Browse published PaasDeployer guides, references and practical how-tos for deploying, configuring and managing applications.',
 
       'Documentation pages are published individually and linked from the documentation index, so each guide can be discovered, shared and indexed on its own canonical URL.',
     ],
@@ -314,7 +314,7 @@ const PUBLIC_SHELLS = {
           'Guides and references',
 
         paragraphs: [
-          'Use the documentation index to find deployment guides, configuration references, service-management instructions, and other practical material for working with PassDeployer.',
+          'Use the documentation index to find deployment guides, configuration references, service-management instructions, and other practical material for working with PaasDeployer.',
         ],
       },
 
@@ -330,18 +330,18 @@ const PUBLIC_SHELLS = {
 
     links: [
       ['/plans', 'Plans & Pricing'],
-      ['/aboutUs', 'About PassDeployer'],
+      ['/aboutUs', 'About PaasDeployer'],
     ],
   },
 
   '/aboutUs': {
-    eyebrow: 'About PassDeployer',
+    eyebrow: 'About PaasDeployer',
 
     heading:
       'A simpler way to run applications.',
 
     paragraphs: [
-      'PassDeployer brings <strong>application deployment</strong> and day-to-day infrastructure management into one focused control plane. The project is designed for developers and operators who want practical service controls without having to navigate a collection of unrelated interfaces for every deployment task.',
+      'PaasDeployer brings <strong>application deployment</strong> and day-to-day infrastructure management into one focused control plane. The project is designed for developers and operators who want practical service controls without having to navigate a collection of unrelated interfaces for every deployment task.',
 
       'The platform combines a Django API with a React frontend so that orchestration logic and the operator experience can evolve independently, with <strong>service management</strong> kept close to the resources an application actually uses.',
     ],
@@ -361,7 +361,7 @@ const PUBLIC_SHELLS = {
           'Open-source architecture',
 
         paragraphs: [
-          'PassDeployer is built as an open-source stack, giving developers a way to inspect the implementation and understand how the deployment workflow works. The public product pages explain the platform, while authenticated routes are reserved for private operational information.',
+          'PaasDeployer is built as an open-source stack, giving developers a way to inspect the implementation and understand how the deployment workflow works. The public product pages explain the platform, while authenticated routes are reserved for private operational information.',
         ],
       },
     ],
@@ -382,7 +382,7 @@ function buildLoadingShell(pathname) {
 
   const label = isPrivate
     ? 'Loading your workspace…'
-    : 'Loading PassDeployer…';
+    : 'Loading PaasDeployer…';
 
   return `
     <div
@@ -478,7 +478,7 @@ function buildDocsNoscriptContent(doc) {
           </a>
 
           <a href="/">
-            PassDeployer home
+            PaasDeployer home
           </a>
         </nav>
       </header>
@@ -518,14 +518,14 @@ function buildNoscriptContent(pathname, docs = null) {
 
           <p>
             The page you requested could not be found.
-            Return to the PassDeployer home page to explore
+            Return to the PaasDeployer home page to explore
             application deployment, resource plans, and
             service management.
           </p>
 
           <nav aria-label="Page navigation">
             <a href="/">
-              Back to PassDeployer
+              Back to PaasDeployer
             </a>
           </nav>
         </main>

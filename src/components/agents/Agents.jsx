@@ -114,7 +114,7 @@ export default function Agents() {
               <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: "-0.03em" }}>Agents</Typography>
             </Stack>
             <Typography color="text.secondary" sx={{ mt: 0.75, maxWidth: 720 }}>
-              Manage scoped machine access to your PassDeployer control plane for automation clients and AI agents.
+              Manage scoped machine access to your PaasDeployer control plane for automation clients and AI agents.
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>

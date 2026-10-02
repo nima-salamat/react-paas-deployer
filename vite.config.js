@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function emitSpaTemplate() {
   return {
-    name: "passdeployer-spa-template",
+    name: "paasdeployer-spa-template",
     generateBundle(_options, bundle) {
       const indexEntry = bundle["index.html"];
       if (!indexEntry || indexEntry.type !== "asset") return;

@@ -10,7 +10,7 @@ export const CURSOR_OPTIONS = [
   {
     id: "custom",
     label: "Custom",
-    description: "Use the PassDeployer ring cursor on desktop.",
+    description: "Use the PaasDeployer ring cursor on desktop.",
   },
 ];
 
@@ -35,7 +35,7 @@ export function writeCursorPreference(value) {
     try {
       window.localStorage.setItem(CURSOR_STORAGE_KEY, normalized);
       window.dispatchEvent(
-        new CustomEvent("passdeployer:cursor-preference", {
+        new CustomEvent("paasdeployer:cursor-preference", {
           detail: normalized,
         }),
       );

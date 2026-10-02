@@ -9,7 +9,7 @@ export default function NotFound() {
   return (
     <>
       <Helmet>
-        <title>404 — Page Not Found | PassDeployer</title>
+        <title>404 — Page Not Found | PaasDeployer</title>
         <meta
           name="description"
           content="The page you are looking for could not be found."

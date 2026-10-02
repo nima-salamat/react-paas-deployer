@@ -69,11 +69,11 @@ export default function CustomCursor() {
     const onStorage = (event) => {
       if (event.key === "paas-cursor-preference") syncPreference();
     };
-    window.addEventListener("passdeployer:cursor-preference", syncPreference);
+    window.addEventListener("paasdeployer:cursor-preference", syncPreference);
     window.addEventListener("storage", onStorage);
     syncPreference();
     return () => {
-      window.removeEventListener("passdeployer:cursor-preference", syncPreference);
+      window.removeEventListener("paasdeployer:cursor-preference", syncPreference);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
