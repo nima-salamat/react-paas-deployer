@@ -5,7 +5,8 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import { createAgent, listAgents, listScopes } from "./agentApi";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import { createAgent, deleteAgent, listAgents, listScopes } from "./agentApi";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
 
 export default function Agents() {
@@ -68,6 +69,24 @@ export default function Agents() {
     } finally { setSaving(false); }
   };
 
+  const removeAgent = async (agent) => {
+    const confirmed = window.confirm(
+      "Delete Agent \"" + agent.name + "\" permanently? This cannot be undone and all credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted."
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError("");
+    try {
+      await deleteAgent(agent.id);
+      setAgents((prev) => prev.filter((item) => item.id !== agent.id));
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to delete Agent."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 } }}>
       <Stack spacing={2.5}>
@@ -127,9 +146,21 @@ export default function Agents() {
                       </Typography>
                     </Stack>
                   </Box>
-                  <Button variant="outlined" endIcon={<ArrowForwardRoundedIcon />} onClick={() => navigate("/dashboard/agents/" + agent.id)} sx={{ borderRadius: 1.5, fontWeight: 750, alignSelf: { xs: "stretch", md: "center" } }}>
-                    Manage
-                  </Button>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignSelf: { xs: "stretch", md: "center" } }}>
+                    <Button variant="outlined" endIcon={<ArrowForwardRoundedIcon />} onClick={() => navigate("/dashboard/agents/" + agent.id)} sx={{ borderRadius: 1.5, fontWeight: 750 }}>
+                      Manage
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteOutlineRoundedIcon />}
+                      onClick={() => removeAgent(agent)}
+                      disabled={saving}
+                      sx={{ borderRadius: 1.5, fontWeight: 750 }}
+                    >
+                      Delete
+                    </Button>
+                  </Stack>
                 </Stack>
               </Paper>
             ))}
