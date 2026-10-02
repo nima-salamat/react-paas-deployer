@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import apiRequest from "../customHooks/apiRequest";
 import {
@@ -98,6 +99,7 @@ export default function CreateServiceWizard({
   resetKey = 0,
 }) {
   const theme = useTheme();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const steps = ["Service", "Network", "Volumes", "Confirm"];
 
@@ -575,7 +577,7 @@ export default function CreateServiceWizard({
               <Button
                 variant="contained"
                 size="small"
-                onClick={() => (window.location.href = "/signin_or_signup")}
+                onClick={() => navigate("/signin_or_signup")}
                 sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
               >
                 Login

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -131,6 +132,7 @@ function StorageQuotaBar({ storage }) {
 }
 
 function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
+  const navigate = useNavigate();
   const handleClick = () => {
     if (isCurrent) { onClearSelection?.(); return; }
     onSelect?.(plan);
@@ -1175,9 +1177,7 @@ export default function SettingsPanel({
     try {
       await onDeleteService();
       setDeleteServiceConfirmOpen(false);
-      if (typeof window !== "undefined") {
-        window.location.href = "/dashboard/services";
-      }
+      navigate("/dashboard/services");
     } catch (err) {
       setDeleteServiceError(getApiErrorMessage(err, "Could not delete the service."));
     }

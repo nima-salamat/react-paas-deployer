@@ -45,6 +45,14 @@ export default function ResponsiveTable({
                 "&:active": onRowClick ? { bgcolor: "action.selected" } : undefined,
               }}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
+              onKeyDown={onRowClick ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onRowClick(row);
+                }
+              } : undefined}
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
             >
               <Stack gap={0.75}>
                 {mobileCols.map((col) => {
@@ -93,6 +101,14 @@ export default function ResponsiveTable({
                 hover={Boolean(onRowClick)}
                 sx={{ cursor: onRowClick ? "pointer" : "default" }}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
+                onKeyDown={onRowClick ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onRowClick(row);
+                  }
+                } : undefined}
+                role={onRowClick ? "button" : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
               >
                 {columns.map((col) => (
                   <TableCell
