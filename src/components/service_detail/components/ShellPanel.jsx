@@ -38,6 +38,8 @@ import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRena
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import FullscreenRoundedIcon from "@mui/icons-material/FullscreenRounded";
+import FullscreenExitRoundedIcon from "@mui/icons-material/FullscreenExitRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest";
@@ -261,6 +263,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [envItems, setEnvItems] = useState([]);
   const [health, setHealth] = useState(null);
   const [snippetsOpen, setSnippetsOpen] = useState(false);
+  const [mobileOptionsAnchorEl, setMobileOptionsAnchorEl] = useState(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const [authGeneration, setAuthGeneration] = useState(0);
 
   const shellSocketRef = useRef(null);
@@ -280,6 +284,23 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   useEffect(() => {
     if (isMobileLayout) setSidebarOpen(false);
   }, [isMobileLayout]);
+
+  useEffect(() => {
+    if (!fullscreen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setFullscreen(false);
+      }
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [fullscreen]);
   const breadcrumbItems = useMemo(() => splitPath(currentCwd), [currentCwd]);
   const parentItem = useMemo(() => {
     if (!session || currentCwd === session.root_path) return null;
@@ -1412,12 +1433,33 @@ export default function ShellPanel({ service, enabled = true, onError }) {
 
   return (
     <>
-      <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 1.25, bgcolor: "#0b1016", borderColor: "rgba(148,163,184,.18)" }}>
-        <Box sx={{ height: 42, display: "flex", alignItems: "stretch", bgcolor: "#121a22", borderBottom: "1px solid rgba(148,163,184,.16)" }}>
+      <Paper
+        variant="outlined"
+        sx={{
+          overflow: "hidden",
+          borderRadius: fullscreen ? 0 : 1.25,
+          bgcolor: "#0b1016",
+          borderColor: "rgba(148,163,184,.18)",
+          ...(fullscreen
+            ? {
+                position: "fixed",
+                inset: 0,
+                width: "100vw",
+                height: "100dvh",
+                maxWidth: "100vw",
+                maxHeight: "100dvh",
+                zIndex: 1500,
+                display: "flex",
+                flexDirection: "column",
+              }
+            : {}),
+        }}
+      >
+        <Box sx={{ height: 42, minHeight: 42, display: "flex", alignItems: "stretch", bgcolor: "#121a22", borderBottom: "1px solid rgba(148,163,184,.16)", flexShrink: 0, overflowX: "auto", overflowY: "hidden" }}>
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (
-              <Box key={tab.id} onClick={() => setActiveTab(tab.id)} sx={{ display: "flex", alignItems: "center", gap: .7, px: 1.35, minWidth: tab.id === "shell" ? 100 : 140, maxWidth: 220, cursor: "pointer", borderRight: "1px solid rgba(148,163,184,.12)", bgcolor: active ? "#0b1016" : "#10171f", borderTop: active ? "2px solid #60a5fa" : "2px solid transparent" }}>
+              <Box key={tab.id} onClick={() => setActiveTab(tab.id)} sx={{ display: "flex", alignItems: "center", gap: .7, px: { xs: 1, sm: 1.35 }, minWidth: { xs: tab.id === "shell" ? 82 : 118, sm: tab.id === "shell" ? 100 : 140 }, maxWidth: { xs: 175, sm: 220 }, flexShrink: 0, cursor: "pointer", borderRight: "1px solid rgba(148,163,184,.12)", bgcolor: active ? "#0b1016" : "#10171f", borderTop: active ? "2px solid #60a5fa" : "2px solid transparent" }}>
                 {tab.type === "shell" ? <TerminalRoundedIcon sx={{ fontSize: 16, color: active ? "#60a5fa" : "#7b8794" }} /> : <InsertDriveFileRoundedIcon sx={{ fontSize: 15, color: fileIconColor(tab.path) }} />}
                 <Typography sx={{ fontFamily: tab.type === "shell" ? "inherit" : MONO, fontSize: 12.5, flex: 1, color: active ? "#e7eef6" : "#97a5b3", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tab.title}{tab.type === "file" && openFiles[tab.path]?.dirty ? " •" : ""}</Typography>
                 {tab.type === "file" ? <IconButton size="small" onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }} sx={{ color: "#6f7c89", p: .25 }}><CloseRoundedIcon sx={{ fontSize: 15 }} /></IconButton> : null}
@@ -1427,7 +1469,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         </Box>
 
         {activeTab === "shell" ? (
-          <Box sx={{ display: "grid", gridTemplateColumns: sidebarOpen ? { xs: "1fr", md: "minmax(0,1fr) 280px" } : "1fr", position: "relative", height: TERMINAL_HEIGHT, minHeight: 0 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: sidebarOpen ? { xs: "1fr", md: "minmax(0,1fr) 280px" } : "1fr", position: "relative", height: fullscreen ? "calc(100dvh - 42px)" : TERMINAL_HEIGHT, minHeight: 0, flex: fullscreen ? 1 : undefined, overflow: "hidden" }}>
             {sidebarOpen ? (
               <Box
                 onDragOver={(event) => { event.preventDefault(); if (cwdWritable === true && cwdMountWritable === true) setDropActive(true); }}
@@ -1439,10 +1481,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   minHeight: 0,
                   order: 2,
                   position: { xs: "absolute", md: "relative" },
-                  inset: { xs: "0 0 0 auto", md: "auto" },
-                  width: { xs: "min(88vw, 360px)", md: 280 },
-                  height: { xs: "100%", md: "auto" },
-                  zIndex: { xs: 12, md: "auto" },
+                  inset: { xs: "38px 0 0 auto", md: "auto" },
+                  width: { xs: "min(90vw, 360px)", md: 280 },
+                  height: { xs: "calc(100% - 38px)", md: "auto" },
+                  zIndex: { xs: 8, md: "auto" },
                   borderLeft: { xs: "1px solid rgba(148,163,184,.16)", md: 0 },
                   borderRight: { md: "1px solid rgba(148,163,184,.14)" },
                   bgcolor: "#0d141c",
@@ -1680,22 +1722,97 @@ export default function ShellPanel({ service, enabled = true, onError }) {
             ) : null}
 
             <Box ref={terminalRef} sx={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", position: "relative", bgcolor: "#0a0f14", color: "#dce6ef" }}>
-              <Box sx={{ height: 38, px: 1, display: "flex", alignItems: "center", gap: .6, borderBottom: "1px solid rgba(148,163,184,.1)", bgcolor: "#0e151d" }}>
-                <Tooltip title={sidebarOpen ? "Hide project" : "Show project"}><IconButton size="small" onClick={(e) => { e.stopPropagation(); setSidebarOpen((v) => !v); }} sx={{ color: "#8291a0" }}>{sidebarOpen ? <MenuOpenRoundedIcon sx={{ fontSize: 18 }} /> : <MenuRoundedIcon sx={{ fontSize: 18 }} />}</IconButton></Tooltip>
-                {session ? <Chip size="small" icon={<CheckCircleRoundedIcon sx={{ fontSize: "13px !important" }} />} label={currentCwd} sx={{ height: 23, color: "#a6b7c8", bgcolor: "rgba(53,211,153,.06)", border: "1px solid rgba(53,211,153,.14)", fontFamily: MONO, maxWidth: 420, ".MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" } }} /> : <Chip size="small" label="Disconnected" sx={{ height: 23, color: "#7f8b97", bgcolor: "rgba(148,163,184,.06)" }} />}
-                <Box sx={{ flex: 1 }} />
+              <Box
+                sx={{
+                  height: { xs: 40, sm: 38 },
+                  minHeight: { xs: 40, sm: 38 },
+                  px: { xs: 0.65, sm: 1 },
+                  display: "flex",
+                  alignItems: "center",
+                  gap: { xs: 0.25, sm: 0.6 },
+                  borderBottom: "1px solid rgba(148,163,184,.1)",
+                  bgcolor: "#0e151d",
+                  position: "relative",
+                  zIndex: 10,
+                  flexShrink: 0,
+                }}
+              >
+                <Tooltip title={sidebarOpen ? "Hide project" : "Show project"}>
+                  <IconButton
+                    size="small"
+                    aria-label={sidebarOpen ? "Hide project explorer" : "Show project explorer"}
+                    onClick={(e) => { e.stopPropagation(); setSidebarOpen((v) => !v); }}
+                    sx={{ color: "#8291a0", width: 32, height: 32, flexShrink: 0 }}
+                  >
+                    {sidebarOpen ? <MenuOpenRoundedIcon sx={{ fontSize: 18 }} /> : <MenuRoundedIcon sx={{ fontSize: 18 }} />}
+                  </IconButton>
+                </Tooltip>
+
+                {session ? (
+                  <Chip
+                    size="small"
+                    icon={<CheckCircleRoundedIcon sx={{ fontSize: "13px !important" }} />}
+                    label={currentCwd}
+                    sx={{
+                      height: 23,
+                      minWidth: 0,
+                      maxWidth: { xs: "min(48vw, 220px)", sm: 420 },
+                      color: "#a6b7c8",
+                      bgcolor: "rgba(53,211,153,.06)",
+                      border: "1px solid rgba(53,211,153,.14)",
+                      fontFamily: MONO,
+                      fontSize: { xs: 9.5, sm: 11 },
+                      flex: "0 1 auto",
+                      ".MuiChip-label": {
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        minWidth: 0,
+                      },
+                    }}
+                  />
+                ) : (
+                  <Chip size="small" label="Disconnected" sx={{ height: 23, color: "#7f8b97", bgcolor: "rgba(148,163,184,.06)", maxWidth: { xs: 125, sm: "none" } }} />
+                )}
+
+                <Box sx={{ flex: 1, minWidth: 0 }} />
+
                 {session ? (
                   <>
-                    <Tooltip title={dryRun ? "Dry-run ON (commands are planned only)" : "Dry-run OFF"}>
-                      <Chip size="small" onClick={(e) => { e.stopPropagation(); setDryRun((v) => !v); }} label={dryRun ? "dry-run" : "live"} sx={{ height: 22, cursor: "pointer", color: dryRun ? "#e9bd69" : "#8fa0b0", bgcolor: dryRun ? "rgba(246,199,108,.1)" : "rgba(148,163,184,.06)" }} />
+                    <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: .2, minWidth: 0 }}>
+                      <Tooltip title={dryRun ? "Dry-run ON (commands are planned only)" : "Dry-run OFF"}>
+                        <Chip size="small" onClick={(e) => { e.stopPropagation(); setDryRun((v) => !v); }} label={dryRun ? "dry-run" : "live"} sx={{ height: 22, cursor: "pointer", color: dryRun ? "#e9bd69" : "#8fa0b0", bgcolor: dryRun ? "rgba(246,199,108,.1)" : "rgba(148,163,184,.06)" }} />
+                      </Tooltip>
+                      <Tooltip title="Snippets"><Button size="small" onClick={(e) => { e.stopPropagation(); setSnippetsOpen(true); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Snippets</Button></Tooltip>
+                      <Tooltip title="Environment (masked)"><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Env</Button></Tooltip>
+                      <Tooltip title="Activity / audit log"><Button size="small" onClick={(e) => { e.stopPropagation(); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Audit</Button></Tooltip>
+                      {health?.container?.running ? <Chip size="small" label="healthy" sx={{ height: 22, color: "#73c9a0", bgcolor: "rgba(53,211,153,.08)" }} /> : session ? <Chip size="small" label="check" onClick={(e) => { e.stopPropagation(); loadHealth(); }} sx={{ height: 22, cursor: "pointer", color: "#9ab0c4" }} /> : null}
+                      <Tooltip title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
+                        <IconButton size="small" aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={(e) => { e.stopPropagation(); setFullscreen((value) => !value); }} sx={{ color: fullscreen ? "#b7d5f0" : "#9ab0c4", width: 32, height: 32, flexShrink: 0 }}>
+                          {fullscreen ? <FullscreenExitRoundedIcon sx={{ fontSize: 18 }} /> : <FullscreenRoundedIcon sx={{ fontSize: 18 }} />}
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+
+                    <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center", flexShrink: 0 }}>
+                      <Tooltip title="Shell options">
+                        <IconButton size="small" aria-label="Shell options" onClick={(e) => { e.stopPropagation(); setMobileOptionsAnchorEl(e.currentTarget); }} sx={{ color: "#9ab0c4", width: 32, height: 32 }}>
+                          <MoreVertRoundedIcon sx={{ fontSize: 19 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+
+                    <Tooltip title="Close session">
+                      <IconButton size="small" aria-label="Close shell session" onClick={(e) => { e.stopPropagation(); closeSession(); }} sx={{ color: "#cc7f7f", width: 32, height: 32, flexShrink: 0 }}>
+                        <StopCircleOutlinedIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
                     </Tooltip>
-                    <Tooltip title="Snippets"><Button size="small" onClick={(e) => { e.stopPropagation(); setSnippetsOpen(true); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Snippets</Button></Tooltip>
-                    <Tooltip title="Environment (masked)"><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Env</Button></Tooltip>
-                    <Tooltip title="Activity / audit log"><Button size="small" onClick={(e) => { e.stopPropagation(); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Audit</Button></Tooltip>
-                    {health?.container?.running ? <Chip size="small" label="healthy" sx={{ height: 22, color: "#73c9a0", bgcolor: "rgba(53,211,153,.08)" }} /> : session ? <Chip size="small" label="check" onClick={(e) => { e.stopPropagation(); loadHealth(); }} sx={{ height: 22, cursor: "pointer", color: "#9ab0c4" }} /> : null}
-                    <Tooltip title="Close session"><IconButton size="small" onClick={(e) => { e.stopPropagation(); closeSession(); }} sx={{ color: "#cc7f7f" }}><StopCircleOutlinedIcon sx={{ fontSize: 18 }} /></IconButton></Tooltip>
                   </>
-                ) : <Button size="small" variant="outlined" startIcon={sessionLoading ? <CircularProgress size={14} color="inherit" /> : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />} onClick={(e) => { e.stopPropagation(); createSession(); }} disabled={sessionLoading} sx={{ borderColor: "rgba(96,165,250,.3)", color: "#9ac2ed", textTransform: "none", fontSize: 11.5 }}>Open Shell</Button>}
+                ) : (
+                  <Button size="small" variant="outlined" startIcon={sessionLoading ? <CircularProgress size={14} color="inherit" /> : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />} onClick={(e) => { e.stopPropagation(); createSession(); }} disabled={sessionLoading} sx={{ borderColor: "rgba(96,165,250,.3)", color: "#9ac2ed", textTransform: "none", fontSize: 11.5, minWidth: 0, whiteSpace: "nowrap", px: { xs: 1, sm: 1.2 } }}>
+                    Open Shell
+                  </Button>
+                )}
               </Box>
 
               <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58, userSelect: "text", WebkitUserSelect: "text" }} onScroll={() => completionOpen && requestAnimationFrame(updateHelperPosition)}>
@@ -1912,6 +2029,35 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           </Box>
         )}
       </Paper>
+
+      <Menu
+        anchorEl={mobileOptionsAnchorEl}
+        open={Boolean(mobileOptionsAnchorEl)}
+        onClose={() => setMobileOptionsAnchorEl(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{ paper: { sx: { minWidth: 190 } } }}
+      >
+        <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setFullscreen((value) => !value); }}>
+          {fullscreen ? <FullscreenExitRoundedIcon sx={{ mr: 1, fontSize: 19 }} /> : <FullscreenRoundedIcon sx={{ mr: 1, fontSize: 19 }} />}
+          {fullscreen ? "Exit fullscreen" : "Fullscreen"}
+        </MenuItem>
+        <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setDryRun((value) => !value); }}>
+          {dryRun ? "Disable dry-run" : "Enable dry-run"}
+        </MenuItem>
+        <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setSnippetsOpen(true); }}>
+          Snippets
+        </MenuItem>
+        <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); loadEnv(); }}>
+          Environment
+        </MenuItem>
+        <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }}>
+          Audit log
+        </MenuItem>
+        <MenuItem disabled={!session} onClick={() => { setMobileOptionsAnchorEl(null); loadHealth(); }}>
+          Refresh health
+        </MenuItem>
+      </Menu>
 
       <Menu
         open={contextMenu.mouseY !== null}
