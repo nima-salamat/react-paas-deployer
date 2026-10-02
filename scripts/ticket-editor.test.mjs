@@ -236,7 +236,7 @@ test("Enter exits quote blocks while Shift+Enter remains inside the same quote",
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
   assert.match(source, /const splitQuoteAtCaret = useCallback/);
-  assert.match(source, /const quote = anchor\?\.closest\?\("blockquote"\)/);
+  assert.ok(source.includes('const quote = anchor?.closest?.("blockquote");'));
   assert.match(source, /insertSoftBreak\(range, selection\)/);
   assert.match(source, /splitQuoteAtCaret\(quote, range\)/);
   assert.doesNotMatch(source, /quote\.after\(document\.createElement\("blockquote"\)\)/);
