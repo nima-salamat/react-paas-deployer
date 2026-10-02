@@ -176,7 +176,35 @@ export default function Agents() {
             <TextField fullWidth multiline minRows={2} label="Description" value={draft.description} onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))} disabled={saving} />
             <Divider />
             <Stack spacing={1}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>Initial scopes</Typography>
+              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap>
+                <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>Initial scopes</Typography>
+                <Stack direction="row" spacing={0.75}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setDraft((prev) => ({
+                      ...prev,
+                      scopes: (scopeCatalog.scopes || []).map((scope) => scope.name),
+                    }))}
+                    disabled={saving || catalogLoading || !(scopeCatalog.scopes || []).length}
+                    sx={{ borderRadius: 1.25, fontWeight: 750 }}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setDraft((prev) => ({
+                      ...prev,
+                      scopes: [...(scopeCatalog.defaults || [])],
+                    }))}
+                    disabled={saving || catalogLoading}
+                    sx={{ borderRadius: 1.25, fontWeight: 750 }}
+                  >
+                    Reset
+                  </Button>
+                </Stack>
+              </Stack>
               {catalogLoading ? <CircularProgress size={20} /> : Object.entries(groupedScopes).map(([category, scopes]) => (
                 <Box key={category}>
                   <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".08em" }}>{category.replace(/_/g, " ")}</Typography>
