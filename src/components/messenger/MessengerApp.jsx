@@ -2504,6 +2504,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             // attachment metadata. Render it immediately instead of waiting for
             // a second history request that can race Redis cache population.
             upsertConfirmedMessage(activeId, created);
+            // Remove the transient upload row only after that confirmed message is actually present.
             setPendingUploads((prev) => prev.map((u) => (
               u.id === pendingId
                 ? {
