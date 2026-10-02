@@ -745,7 +745,7 @@ export default function Home() {
   );
 
   const goPrimary = useCallback(() => {
-    navigate(loggedIn ? "/dashboard/services" : "/signin_or_signup");
+    navigate(loggedIn ? "/dashboard" : "/signin_or_signup");
   }, [navigate, loggedIn]);
 
   const goDocs = useCallback(() => {
