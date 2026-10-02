@@ -75,6 +75,10 @@ export default function ServiceDetail() {
   }, [location.state, id]);
 
   const [activeTab, setActiveTab] = useState("overview");
+  // Distinguish hash changes caused by the Settings section observer from
+  // intentional deep-links. Observer-driven hash changes must never trigger
+  // another smooth scroll, otherwise scrolling creates a scroll/hash feedback loop.
+  const settingsHashChangeSourceRef = useRef("route");
 
   const SERVICE_TAB_VALUES = useMemo(
     () => ["overview", "create", "logs", "settings", "shell"],
@@ -117,6 +121,10 @@ export default function ServiceDetail() {
     if (activeTab !== "settings") return;
     const normalizedHash = String(hash || "").trim().replace(/^#/, "");
     if (!normalizedHash) return;
+    // This hash is produced by IntersectionObserver while the user scrolls.
+    // Mark it so the deep-link effect below updates the URL without
+    // immediately calling scrollIntoView() again.
+    settingsHashChangeSourceRef.current = "observer";
     navigateToServiceTab("settings", normalizedHash, { replace: true });
   }, [activeTab, navigateToServiceTab]);
   const [shareAccess, setShareAccess] = useState({ loading: true, is_owner: true, permissions: null });
@@ -353,6 +361,15 @@ export default function ServiceDetail() {
 
   useEffect(() => {
     if (section !== "settings" || activeTab !== "settings" || !location.hash) return;
+
+    // The Settings IntersectionObserver writes hashes as the user naturally
+    // scrolls. Do not treat those changes as new deep-links: doing so would
+    // call scrollIntoView() and pull the viewport back to the observed section.
+    if (settingsHashChangeSourceRef.current === "observer") {
+      settingsHashChangeSourceRef.current = "route";
+      return;
+    }
+
     const rawHash = location.hash.slice(1);
     let hashId = rawHash;
     try {
