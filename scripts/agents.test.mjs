@@ -41,6 +41,30 @@ test("agent API exposes permanent deletion", () => {
   assert.match(api, /AGENTS_API \+ "\/" \+ id \+ "\/"/);
 });
 
+test("agent credentials expose permanent delete action in the API client", () => {
+  const api = read("src/components/agents/agentApi.js");
+
+  assert.match(api, /export async function deleteCredential\(agentId, credentialId\)/);
+  assert.match(api, /method: "DELETE"/);
+  assert.match(api, /credentials" \+ "\/" \+ credentialId \+ "\/"/);
+});
+
+test("agent detail exposes credential deletion and provisioning source", () => {
+  const source = read("src/components/agents/AgentDetail.jsx");
+
+  assert.match(source, /deleteCredential/);
+  assert.match(source, /Delete this credential permanently/);
+  assert.match(source, /Provisioned via/);
+  assert.match(source, /Request \{event\.request_id/);
+});
+
+test("agent list exposes provisioning source", () => {
+  const source = read("src/components/agents/Agents.jsx");
+
+  assert.match(source, /Provisioned via/);
+  assert.match(source, /provisioningLabel/);
+});
+
 test("agent list exposes permanent delete action", () => {
   const source = read("src/components/agents/Agents.jsx");
 
