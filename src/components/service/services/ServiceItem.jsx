@@ -596,7 +596,13 @@ function statusEntryEqual(a, b) {
   if (a === b) return true;
   if (!a && !b) return true;
   if (!a || !b) return false;
-  return a.cpu === b.cpu && a.ram === b.ram && a.running === b.running;
+  return (
+    a.cpu === b.cpu &&
+    a.ram === b.ram &&
+    a.running === b.running &&
+    a.loading === b.loading &&
+    a.error === b.error
+  );
 }
 
 export default memo(ServiceItem, (prev, next) => {
