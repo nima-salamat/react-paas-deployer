@@ -41,6 +41,7 @@ export default function AgentDetail() {
   const [copied, setCopied] = useState(false);
   const [manifestDialog, setManifestDialog] = useState({ open: false, content: "", filename: "" });
   const [manifestCopied, setManifestCopied] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const groupedScopes = useMemo(() => (scopeCatalog.scopes || []).reduce((acc, scope) => {
     (acc[scope.category] ||= []).push(scope);
@@ -105,17 +106,31 @@ export default function AgentDetail() {
     await mutate(() => setAgentStatus(id, action), null);
   };
 
-  const removeAgent = async () => {
-    const confirmed = window.confirm(
-      "Delete Agent \"" + agent.name + "\" permanently? This cannot be undone and all credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted."
-    );
-    if (!confirmed) return;
+  const removeAgent = () => {
+    setDeleteTarget({ type: "agent" });
+  };
 
+  const removeCredential = (credential) => {
+    setDeleteTarget({ type: "credential", credential });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
     setSaving(true);
+    setDeleteTarget(null);
     setError("");
     try {
-      await deleteAgent(id);
-      navigate("/dashboard/agents", { replace: true });
+      if (target.type === "agent") {
+        await deleteAgent(id);
+      } else {
+        await deleteCredential(id, target.credential.id);
+      }
+      if (target.type === "agent") {
+        navigate("/dashboard/agents", { replace: true });
+      } else {
+        await load();
+      }
     } catch (e) {
       setError(getApiErrorMessage(e, "Failed to delete Agent."));
     } finally {
@@ -266,10 +281,16 @@ export default function AgentDetail() {
                         if (!window.confirm("Revoke this credential? It will stop authenticating but its record will remain available for audit/history.")) return;
                         try { setSaving(true); setError(""); await revokeCredential(id, credential.id); await load(); } catch (e) { setError(getApiErrorMessage(e, "Failed to revoke credential.")); } finally { setSaving(false); }
                       }} disabled={saving} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
-                      <Button size="small" color="error" variant="text" onClick={async () => {
-                        if (!window.confirm("Delete this credential permanently? An active token will stop working immediately. Its audit event is retained without the credential record.")) return;
-                        try { setSaving(true); setError(""); await deleteCredential(id, credential.id); await load(); } catch (e) { setError(getApiErrorMessage(e, "Failed to delete credential.")); } finally { setSaving(false); }
-                      }} disabled={saving} sx={{ borderRadius: 1.5, fontWeight: 750 }}>Delete</Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        variant="text"
+                        onClick={() => removeCredential(credential)}
+                        disabled={saving}
+                        sx={{ borderRadius: 1.5, fontWeight: 750 }}
+                      >
+                        Delete
+                      </Button>
                     </Stack>
                   </Paper>
                 )) : <Typography color="text.secondary">No credentials have been issued.</Typography>}
@@ -301,6 +322,60 @@ export default function AgentDetail() {
           ) : null}
         </Paper>
       </Stack>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => !saving && setDeleteTarget(null)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+      >
+        <DialogTitle sx={{ pb: 1.2, fontWeight: 900, letterSpacing: "-0.02em" }}>
+          {deleteTarget?.type === "credential" ? "Delete credential" : "Delete Agent"}
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 2.25 }}>
+          <Stack spacing={1.5}>
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                display: "grid",
+                placeItems: "center",
+                bgcolor: "error.main",
+                color: "error.contrastText",
+              }}
+            >
+              <DeleteOutlineRoundedIcon />
+            </Box>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>
+                {deleteTarget?.type === "credential"
+                  ? "Delete this credential permanently?"
+                  : "Delete " + (agent?.name || "this Agent") + " permanently?"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.55, lineHeight: 1.65 }}>
+                {deleteTarget?.type === "credential"
+                  ? "An active token will stop working immediately. The credential record will be removed, while its audit event remains available for history."
+                  : "This cannot be undone. All credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted."}
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, py: 1.75, gap: 1 }}>
+          <Button onClick={() => setDeleteTarget(null)} disabled={saving}>Cancel</Button>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<DeleteOutlineRoundedIcon />}
+            onClick={confirmDelete}
+            disabled={saving}
+            sx={{ borderRadius: 1.5, fontWeight: 800 }}
+          >
+            {saving ? "Deleting…" : "Delete permanently"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={manifestDialog.open}
