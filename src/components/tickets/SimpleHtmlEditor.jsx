@@ -411,9 +411,11 @@ export default function SimpleHtmlEditor({
       caretOffset = caretRange.toString().length;
     }
 
-    code.innerHTML = canHighlight
-      ? hljs.highlight(text, { language }).value
-      : text;
+    if (canHighlight) {
+      code.innerHTML = hljs.highlight(text, { language }).value;
+    } else {
+      code.textContent = text;
+    }
 
     if (caretOffset == null) return;
     const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
@@ -494,6 +496,10 @@ export default function SimpleHtmlEditor({
     if (disabled) return;
     saveSelection();
     setCodeMenuAnchor(event.currentTarget);
+  };
+
+  const setCodeLanguage = (language) => {
+    applyCodeLanguage(language);
   };
 
   const toggleCode = () => {
@@ -822,7 +828,7 @@ export default function SimpleHtmlEditor({
           <MenuItem
             key={language.value || "auto"}
             selected={activeFormats.language === language.value}
-            onClick={() => applyCodeLanguage(language.value)}
+            onClick={() => setCodeLanguage(language.value)}
           >
             {language.label}
           </MenuItem>
@@ -838,7 +844,18 @@ export default function SimpleHtmlEditor({
           onInput={() => { editingRef.current = true; emit(); saveSelection(); requestAnimationFrame(() => { editingRef.current = false; }); }}
           onFocus={saveSelection}
           onBlur={() => { saveSelection(); emit(); }}
-          onKeyUp={saveSelection}
+          onKeyUp={() => {
+            saveSelection();
+            const selection = window.getSelection?.();
+            const anchor = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE
+              ? selection.anchorNode
+              : selection?.anchorNode?.parentElement;
+            const code = anchor?.closest?.("code");
+            const language = getCodeLanguage(code);
+            if (code && language && language !== "plaintext") {
+              requestAnimationFrame(() => highlightEditorCode(code, language));
+            }
+          }}
           onMouseUp={saveSelection}
           onKeyDown={onKeyDown}
           onPaste={(e) => { const text = e.clipboardData?.getData("text/plain"); if (text == null) return; e.preventDefault(); const selection = window.getSelection?.(); if (!selection?.rangeCount) return; const range = selection.getRangeAt(0); range.deleteContents(); const parts = text.replace(/\r\n?/g, "\n").split("\n"); parts.forEach((part, i) => { if (i) range.insertNode(document.createElement("br")); if (part) range.insertNode(document.createTextNode(part)); range.collapse(false); }); saveSelection(); emit(); }}
