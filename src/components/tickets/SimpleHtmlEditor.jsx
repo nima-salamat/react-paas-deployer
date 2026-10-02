@@ -142,7 +142,7 @@ export default function SimpleHtmlEditor({
     selection.addRange(range);
   }, []);
 
-  const toggleInlineFormat = useCallback((command) => {
+  const toggleInlineFormat = (command) => {
     if (disabled || !ref.current) return;
     const hadSelection = restoreSelection();
     if (!hadSelection) {
@@ -216,7 +216,7 @@ export default function SimpleHtmlEditor({
     editingRef.current = false;
     emit();
     updateActiveFormats();
-  }, [disabled, emit, findInlineAncestor, placeCaretAtBoundary, saveSelection, updateActiveFormats]);
+  };
 
   const findBlock = useCallback(() => {
     const editor = ref.current;

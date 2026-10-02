@@ -160,3 +160,17 @@ test("paragraph tooltip is disabled while the paragraph menu is open", () => {
   assert.match(source, /onOpen=\{\(\) => setBlockMenuOpen\(true\)\}/);
   assert.match(source, /onClose=\{\(\) => setBlockMenuOpen\(false\)\}/);
 });
+
+
+test("inline formatter does not evaluate later hook bindings during component initialization", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+  const formatterStart = source.indexOf("const toggleInlineFormat =");
+  const emitStart = source.indexOf("const emit = useCallback");
+
+  assert.notEqual(formatterStart, -1);
+  assert.notEqual(emitStart, -1);
+  assert.ok(
+    source.slice(formatterStart, formatterStart + 120).includes("const toggleInlineFormat = (command) =>"),
+    "toggleInlineFormat must not be a useCallback whose dependency array references later bindings"
+  );
+});
