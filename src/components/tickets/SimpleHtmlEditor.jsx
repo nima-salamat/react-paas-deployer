@@ -995,6 +995,8 @@ export default function SimpleHtmlEditor({
 
     editingRef.current = true;
 
+    let firstResult = null;
+
     targets.forEach((block) => {
       if (block.tagName === "BLOCKQUOTE") {
         const paragraph = createParagraphFromText("", block);
@@ -1004,6 +1006,7 @@ export default function SimpleHtmlEditor({
           paragraph.replaceChildren(fragment);
         }
         block.parentNode?.replaceChild(paragraph, block);
+        if (!firstResult) firstResult = paragraph;
         return;
       }
 
@@ -1017,17 +1020,11 @@ export default function SimpleHtmlEditor({
       } else {
         block.parentNode?.replaceChild(quoteBlock, block);
       }
+
+      if (!firstResult) firstResult = quoteBlock;
     });
 
-    const firstTarget = targets[0];
-    const caretTarget =
-      firstTarget.tagName === "LI"
-        ? firstTarget.querySelector?.("blockquote")
-        : firstTarget.isConnected
-          ? firstTarget
-          : editor.querySelector("blockquote") || currentBlock;
-
-    placeCaretAtEnd(caretTarget);
+    placeCaretAtEnd(firstResult || currentBlock);
     saveSelection();
     editingRef.current = false;
     emit();
@@ -1280,9 +1277,9 @@ export default function SimpleHtmlEditor({
             "& .ticket-align-left": { textAlign: "left" },
             "& .ticket-align-center": { textAlign: "center" },
             "& .ticket-align-right": { textAlign: "right" },
-            "& [dir="rtl"]": { direction: "rtl", unicodeBidi: "plaintext" },
-            "& [dir="ltr"]": { direction: "ltr", unicodeBidi: "plaintext" },
-            "& [dir="auto"]": { unicodeBidi: "plaintext" },
+            '& [dir="rtl"]': { direction: "rtl", unicodeBidi: "plaintext" },
+            '& [dir="ltr"]': { direction: "ltr", unicodeBidi: "plaintext" },
+            '& [dir="auto"]': { unicodeBidi: "plaintext" },
             "& pre.editor-code-block": {
               m: "0.65rem 0",
               p: 0,

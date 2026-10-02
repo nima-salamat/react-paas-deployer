@@ -323,3 +323,22 @@ test("an empty editor can create a paragraph and retain an initial alignment bef
   assert.match(source, /blocks = \[current\]/);
   assert.match(source, /setBlockAlignment\(block, align\)/);
 });
+
+
+test("quote toggle tracks the exact first converted block", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /let firstResult = null/);
+  assert.match(source, /if \(!firstResult\) firstResult = paragraph/);
+  assert.match(source, /if \(!firstResult\) firstResult = quoteBlock/);
+  assert.match(source, /placeCaretAtEnd\(firstResult \|\| currentBlock\)/);
+});
+
+test("RTL MUI selectors are syntactically valid and direction-aware", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /'& \[dir="rtl"\]'/);
+  assert.match(source, /'& \[dir="ltr"\]'/);
+  assert.match(source, /'& \[dir="auto"\]'/);
+  assert.match(source, /unicodeBidi: "plaintext"/);
+});
