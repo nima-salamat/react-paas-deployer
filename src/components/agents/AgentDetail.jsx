@@ -7,11 +7,12 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
-import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, setAgentStatus, listAudit, updateAgent, downloadManifest } from "./agentApi";
+import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest } from "./agentApi";
 
 function fmt(value) { return value ? new Date(value).toLocaleString() : "Never"; }
 
@@ -32,6 +33,8 @@ export default function AgentDetail() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ name: "", description: "", scopes: [] });
   const [copied, setCopied] = useState(false);
+  const [manifestDialog, setManifestDialog] = useState({ open: false, content: "", filename: "" });
+  const [manifestCopied, setManifestCopied] = useState(false);
 
   const groupedScopes = useMemo(() => (scopeCatalog.scopes || []).reduce((acc, scope) => {
     (acc[scope.category] ||= []).push(scope);
@@ -103,8 +106,27 @@ export default function AgentDetail() {
 
   const doManifest = async () => {
     setSaving(true); setError("");
-    try { await downloadManifest(id); } catch (e) { setError(getApiErrorMessage(e, "Failed to generate AGENT.md.")); }
-    finally { setSaving(false); }
+    try {
+      const result = await generateManifest(id);
+      if (!result?.content) throw new Error("The server returned an empty AGENT.md.");
+      setManifestDialog({ open: true, content: result.content, filename: result.filename || "AGENT-" + id + ".md" });
+      setManifestCopied(false);
+    } catch (e) {
+      setError(getApiErrorMessage(e, "Failed to generate AGENT.md."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyManifest = async () => {
+    if (!manifestDialog.content) return;
+    try {
+      await navigator.clipboard.writeText(manifestDialog.content);
+      setManifestCopied(true);
+      window.setTimeout(() => setManifestCopied(false), 1400);
+    } catch {
+      setManifestCopied(false);
+    }
   };
 
   if (loading) return <Box sx={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center" }}><CircularProgress /></Box>;
@@ -124,7 +146,7 @@ export default function AgentDetail() {
             <Typography color="text.secondary" sx={{ mt: 0.55 }}>{agent.description || "No description"}</Typography>
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button variant="outlined" startIcon={<DownloadRoundedIcon />} onClick={doManifest} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>AGENT.md</Button>
+            <Button variant="outlined" startIcon={<DescriptionRoundedIcon />} onClick={doManifest} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{saving ? "Generating…" : "View AGENT.md"}</Button>
             <Button variant="outlined" startIcon={<KeyRoundedIcon />} onClick={() => setIssueOpen(true)} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>Issue token</Button>
             {agent.status === "active" ? <Button color="warning" variant="outlined" startIcon={<BlockRoundedIcon />} onClick={() => statusAction("disable")} disabled={saving} sx={{ borderRadius: 1.5 }}>Disable</Button> : null}
             {agent.status === "disabled" ? <Button variant="outlined" startIcon={<RestartAltRoundedIcon />} onClick={() => statusAction("enable")} disabled={saving} sx={{ borderRadius: 1.5 }}>Enable</Button> : null}
@@ -226,6 +248,69 @@ export default function AgentDetail() {
           ) : null}
         </Paper>
       </Stack>
+
+      <Dialog
+        open={manifestDialog.open}
+        onClose={() => setManifestDialog({ open: false, content: "", filename: "" })}
+        fullWidth
+        maxWidth="lg"
+      >
+        <DialogTitle sx={{ fontWeight: 850 }}>AGENT.md</DialogTitle>
+        <DialogContent dividers>
+          <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+            This generated file contains a short-lived, single-use enrollment token. Copy or save it only where the automation client can use it, and do not publish it.
+          </Alert>
+          <Box
+            component="pre"
+            sx={{
+              m: 0,
+              p: 2,
+              minHeight: 320,
+              maxHeight: "62vh",
+              overflow: "auto",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1.5,
+              bgcolor: "action.hover",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontSize: { xs: 12, sm: 13 },
+              lineHeight: 1.6,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {manifestDialog.content}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
+          <Typography variant="caption" color="text.secondary">
+            {manifestDialog.filename || "AGENT.md"} · generated on demand
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button
+              startIcon={manifestCopied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
+              onClick={copyManifest}
+              disabled={!manifestDialog.content}
+            >
+              {manifestCopied ? "Copied" : "Copy"}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadRoundedIcon />}
+              onClick={() => downloadManifest(manifestDialog.content, manifestDialog.filename || "AGENT.md")}
+              disabled={!manifestDialog.content}
+            >
+              Download
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => setManifestDialog({ open: false, content: "", filename: "" })}
+            >
+              Done
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={issueOpen} onClose={() => !saving && setIssueOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 850 }}>Issue Agent access token</DialogTitle>
