@@ -807,6 +807,7 @@ export default function MessageBubble({
               whiteSpace: "normal",
               overflowWrap: "anywhere",
               wordBreak: "break-word",
+              textAlign: "left",
               "& p, & li, & blockquote": { fontSize: "14px", maxWidth: "100%" },
               "& *": { boxSizing: "border-box", maxWidth: "100%" },
               mt: 0.25,

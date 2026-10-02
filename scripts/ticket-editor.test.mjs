@@ -461,3 +461,11 @@ test("editor defaults to explicit left alignment instead of automatic start alig
 
   assert.match(source, /lineHeight: 1\.45,[\s\S]*textAlign: "left"/);
 });
+
+
+test("rendered ticket messages default to explicit left alignment while preserving explicit block alignment", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /wordBreak: "break-word",[\s\S]*textAlign: "left"/);
+  assert.match(source, /block\.style\.textAlign = alignment/);
+});
