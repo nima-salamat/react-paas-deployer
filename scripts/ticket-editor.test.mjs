@@ -348,7 +348,7 @@ test("message renderer normalizes semantic alignment and RTL before injecting ri
 
   assert.match(source, /function normalizeRichTextBlocks/);
   assert.match(source, /RICH_TEXT_ALIGNMENTS/);
-  assert.match(source, /block\.style\.textAlign = alignment/);
+  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
   assert.match(source, /block\.style\.direction = direction/);
   assert.match(source, /normalizeRichTextBlocks\(root\)/);
 });
@@ -367,7 +367,6 @@ test("message renderer visibly supports headings, lists and inline formatting", 
 test("ticket renderer scopes alignment and direction styles to semantic message blocks", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
 
-  assert.match(source, /block\.style\.textAlign = alignment/);
   assert.match(source, /'& \[dir="rtl"\]'/);
   assert.match(source, /'& \[dir="ltr"\]'/);
   assert.match(source, /ticket-align-right/);
@@ -467,7 +466,6 @@ test("rendered ticket messages default to explicit left alignment while preservi
   const source = read("src/components/tickets/MessageBubble.jsx");
 
   assert.match(source, /wordBreak: "break-word",[\s\S]*textAlign: "left"/);
-  assert.match(source, /block\.style\.textAlign = alignment/);
 });
 
 
