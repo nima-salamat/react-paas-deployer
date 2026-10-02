@@ -34,6 +34,11 @@ test("toolbar reflects the active block and inline formatting", () => {
   assert.match(source, /const applyAlignment = useCallback/);
   assert.match(source, /activeFormats\.align === "center"/);
   assert.match(source, /FormatAlignRightIcon/);
+  assert.match(source, /CODE_LANGUAGES/);
+  assert.match(source, /Choose code language/);
+  assert.match(source, /applyCodeLanguage/);
+  assert.match(source, /highlightEditorCode/);
+  assert.match(source, /px: 0\.75/);
   assert.match(source, /fontSize: "14px"/);
 });
 
@@ -71,6 +76,8 @@ test("message code renderer highlights and copies code without DOM replacement c
 
   assert.match(source, /highlightAuto/);
   assert.match(source, /data-code-copy/);
+  assert.match(source, /getCodeLanguageLabel/);
+  assert.match(source, /requestedLanguageLabel/);
   assert.match(source, /parent\.replaceChild\(shell, pre\)/);
   assert.match(source, /shell\.append\(header, pre\)/);
   assert.doesNotMatch(source, /pre\.parentNode\?\.replaceChild\(shell, pre\)/);
@@ -94,4 +101,18 @@ test("Create Ticket uses defaultExpanded so the formatting toggle remains functi
 
   assert.match(source, /defaultExpanded/);
   assert.doesNotMatch(source, /expanded=\{true\}/);
+});
+
+
+test("ticket message code renderer keeps explicit language selection visible", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /requestedLanguageLabel/);
+  assert.match(source, /label\.textContent = requestedLanguage/);
+});
+
+test("ticket editor keeps the first toolbar control clear of the rounded corner", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /px: 0\.75, py: 0\.1/);
 });

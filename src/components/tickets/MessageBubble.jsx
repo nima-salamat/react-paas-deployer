@@ -20,6 +20,7 @@ import AudioFileIcon from "@mui/icons-material/AudioFile";
 import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
 import hljs from "highlight.js/lib/common";
 import "highlight.js/styles/github-dark.css";
+import { getCodeLanguageLabel } from "./codeLanguages.js";
 
 function SeenTicks({ seen, mine }) {
   if (!mine) return null;
@@ -537,6 +538,7 @@ function enhanceRichTextHtml(html) {
     const languageClass = Array.from(code.classList)
       .find((name) => name.startsWith("language-"));
     const requestedLanguage = languageClass?.slice("language-".length).trim().toLowerCase() || "";
+    const requestedLanguageLabel = getCodeLanguageLabel(requestedLanguage);
 
     let highlighted = null;
     let detectedLanguage = "";
@@ -566,7 +568,9 @@ function enhanceRichTextHtml(html) {
 
     const label = doc.createElement("span");
     label.className = "ticket-code-language";
-    label.textContent = detectedLanguage || "code";
+    label.textContent = requestedLanguage
+      ? requestedLanguageLabel
+      : (detectedLanguage ? getCodeLanguageLabel(detectedLanguage) : "Code");
 
     const copyButton = doc.createElement("button");
     copyButton.type = "button";

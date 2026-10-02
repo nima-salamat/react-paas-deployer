@@ -1,4 +1,8 @@
 import React, { useCallback, useRef, useState } from "react";
+import Menu from "@mui/material/Menu";
+import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import hljs from "highlight.js/lib/common";
+import { CODE_LANGUAGES, getCodeLanguage } from "./codeLanguages.js";
 import { Box, Button, ButtonGroup, Collapse, FormControl, IconButton, MenuItem, Paper, Popover, Select, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
@@ -55,6 +59,7 @@ export default function SimpleHtmlEditor({
     align: "left",
   });
   const [linkAnchor, setLinkAnchor] = useState(null);
+  const [codeMenuAnchor, setCodeMenuAnchor] = useState(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
   const [internalExpanded, setInternalExpanded] = useState(Boolean(expandedProp ?? defaultExpanded));
@@ -221,6 +226,9 @@ export default function SimpleHtmlEditor({
       align: ["left", "center", "right"].includes(block?.style?.textAlign || "")
         ? block.style.textAlign
         : "left",
+      language: block?.tagName === "PRE"
+        ? getCodeLanguage(block.querySelector?.("code"))
+        : "",
     });
   }, [findBlock]);
 
@@ -387,6 +395,106 @@ export default function SimpleHtmlEditor({
     selection.removeAllRanges();
     selection.addRange(range);
   }, []);
+
+  const highlightEditorCode = useCallback((code, language) => {
+    if (!code) return;
+    const text = readCodeText(code);
+    const canHighlight = language && language !== "plaintext" && hljs.getLanguage(language);
+    const selection = window.getSelection?.();
+    let caretOffset = null;
+
+    if (selection?.rangeCount && code.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0);
+      const caretRange = document.createRange();
+      caretRange.selectNodeContents(code);
+      caretRange.setEnd(range.startContainer, range.startOffset);
+      caretOffset = caretRange.toString().length;
+    }
+
+    code.innerHTML = canHighlight
+      ? hljs.highlight(text, { language }).value
+      : text;
+
+    if (caretOffset == null) return;
+    const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+    let remaining = caretOffset;
+    let node = walker.nextNode();
+    while (node) {
+      if (remaining <= node.textContent.length) {
+        const range = document.createRange();
+        range.setStart(node, remaining);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return;
+      }
+      remaining -= node.textContent.length;
+      node = walker.nextNode();
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, [readCodeText]);
+
+  const applyCodeLanguage = useCallback((language) => {
+    if (disabled || !ref.current) return;
+    restoreSelection();
+    const block = findBlock() || ensureBlock();
+    if (!block) return;
+
+    editingRef.current = true;
+    let codeBlock = block;
+    let code = block.querySelector?.("code");
+
+    if (block.tagName !== "PRE") {
+      const pre = document.createElement("pre");
+      pre.className = "editor-code-block";
+      code = document.createElement("code");
+      const text = block.innerText || block.textContent || "";
+      code.textContent = text;
+      if (!text) code.innerHTML = "<br>";
+      pre.appendChild(code);
+      block.replaceWith(pre);
+      codeBlock = pre;
+    }
+
+    code = code || codeBlock.querySelector("code");
+    if (!code) {
+      editingRef.current = false;
+      return;
+    }
+
+    Array.from(code.classList)
+      .filter((name) => name.startsWith("language-"))
+      .forEach((name) => code.classList.remove(name));
+
+    if (language) code.classList.add("language-" + language);
+    highlightEditorCode(code, language);
+    placeCaretAtEnd(code);
+    saveSelection();
+    editingRef.current = false;
+    emit();
+    updateActiveFormats();
+    setCodeMenuAnchor(null);
+  }, [
+    disabled,
+    emit,
+    ensureBlock,
+    findBlock,
+    highlightEditorCode,
+    placeCaretAtEnd,
+    saveSelection,
+    updateActiveFormats,
+  ]);
+
+  const openCodeLanguageMenu = (event) => {
+    if (disabled) return;
+    saveSelection();
+    setCodeMenuAnchor(event.currentTarget);
+  };
 
   const toggleCode = () => {
     if (disabled || !ref.current) return;
@@ -628,14 +736,54 @@ export default function SimpleHtmlEditor({
     >
       {showToolbarToggle && (
         <Collapse in={expanded}>
-          <Box sx={{ px: 0.25, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
+          <Box sx={{ px: 0.75, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
             <ButtonGroup size="small" variant="text">
               <Tooltip title="Bold"><span><IconButton size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => cmd("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Italic"><span><IconButton size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => cmd("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Underline"><span><IconButton size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => cmd("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
 <Tooltip title="Bullets"><span><IconButton size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Numbered"><span><IconButton size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Code block"><span><IconButton size="small" aria-label="Code block" aria-pressed={activeFormats.code} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={toggleCode} disabled={disabled} sx={{ bgcolor: activeFormats.code ? "action.selected" : undefined, color: activeFormats.code ? "primary.main" : undefined }}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Box sx={{ display: "inline-flex", alignItems: "center", mx: 0.25 }}>
+                <Button
+                  size="small"
+                  aria-label="Code block"
+                  aria-pressed={activeFormats.code}
+                  startIcon={<CodeIcon fontSize="small" />}
+                  onMouseDown={(e) => { e.preventDefault(); saveSelection(); }}
+                  onClick={toggleCode}
+                  disabled={disabled}
+                  sx={{
+                    minWidth: 0,
+                    px: 1,
+                    height: 30,
+                    textTransform: "none",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    bgcolor: activeFormats.code ? "action.selected" : undefined,
+                    color: activeFormats.code ? "primary.main" : undefined,
+                  }}
+                >
+                  Code
+                </Button>
+                <IconButton
+                  size="small"
+                  aria-label="Choose code language"
+                  aria-haspopup="menu"
+                  aria-expanded={Boolean(codeMenuAnchor)}
+                  onMouseDown={(e) => { e.preventDefault(); saveSelection(); }}
+                  onClick={openCodeLanguageMenu}
+                  disabled={disabled}
+                  sx={{
+                    width: 24,
+                    height: 30,
+                    borderRadius: "0 7px 7px 0",
+                    bgcolor: activeFormats.code ? "action.selected" : undefined,
+                    color: activeFormats.code ? "primary.main" : undefined,
+                  }}
+                >
+                  <ArrowDropDownIcon fontSize="small" />
+                </IconButton>
+              </Box>
               <Tooltip title="Quote"><span><IconButton size="small" aria-label="Quote" aria-pressed={activeFormats.quote} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={toggleQuote} disabled={disabled} sx={{ bgcolor: activeFormats.quote ? "action.selected" : undefined, color: activeFormats.quote ? "primary.main" : undefined }}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Link"><span><IconButton size="small" aria-label="Link" onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Align left"><span><IconButton size="small" aria-label="Align left" aria-pressed={activeFormats.align === "left"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("left")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "left" ? "action.selected" : undefined, color: activeFormats.align === "left" ? "primary.main" : undefined }}><FormatAlignLeftIcon fontSize="small" /></IconButton></span></Tooltip>
@@ -662,6 +810,25 @@ export default function SimpleHtmlEditor({
           </Box>
         </Collapse>
       )}
+
+      <Menu
+        anchorEl={codeMenuAnchor}
+        open={Boolean(codeMenuAnchor)}
+        onClose={() => setCodeMenuAnchor(null)}
+        MenuListProps={{ dense: true }}
+        slotProps={{ paper: { sx: { minWidth: 190, maxHeight: 420 } } }}
+      >
+        {CODE_LANGUAGES.map((language) => (
+          <MenuItem
+            key={language.value || "auto"}
+            selected={activeFormats.language === language.value}
+            onClick={() => applyCodeLanguage(language.value)}
+          >
+            {language.label}
+          </MenuItem>
+        ))}
+      </Menu>
+
       <Box sx={{ display: "flex", alignItems: "flex-end" }}>
         <Box
           ref={ref}
@@ -722,6 +889,9 @@ export default function SimpleHtmlEditor({
               lineHeight: 1.6,
               color: "rgba(255,255,255,0.9)",
               whiteSpace: "pre",
+              "& .hljs-comment, & .hljs-quote": { opacity: 0.65 },
+              "& .hljs-keyword, & .hljs-selector-tag, & .hljs-literal": { fontWeight: 700 },
+              "& .hljs-string, & .hljs-attr, & .hljs-title": { fontWeight: 600 },
             },
             "& ul, & ol": { pl: 2.25, my: 0.4 },
             "& blockquote": {
