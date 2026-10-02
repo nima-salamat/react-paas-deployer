@@ -694,9 +694,13 @@ export default function MessageBubble({
       <Box
         sx={{
           maxWidth: { xs: "88%", sm: "74%" },
-          minWidth: 100,
+          minWidth: 0,
+          width: "fit-content",
+          maxHeight: "none",
           px: 1.4,
           py: 0.95,
+          boxSizing: "border-box",
+          overflow: "hidden",
           borderRadius: mine ? "10px 10px 2px 10px" : "10px 10px 10px 2px",
           bgcolor: mine ? "primary.main" : "background.paper",
           color: mine ? "primary.contrastText" : "text.primary",
@@ -800,8 +804,15 @@ export default function MessageBubble({
             sx={{
               fontSize: "14px",
               lineHeight: 1.55,
-              "& p, & li, & blockquote": { fontSize: "14px" },
+              width: "100%",
+              minWidth: 0,
+              maxWidth: "100%",
+              overflow: "hidden",
+              whiteSpace: "normal",
+              overflowWrap: "anywhere",
               wordBreak: "break-word",
+              "& p, & li, & blockquote": { fontSize: "14px", maxWidth: "100%" },
+              "& *": { boxSizing: "border-box", maxWidth: "100%" },
               mt: 0.25,
               "& p": { m: 0, mb: 0.5 },
               "& p:last-child": { mb: 0 },
@@ -846,6 +857,18 @@ export default function MessageBubble({
                 textAlign: "right",
               },
               "& a": { color: mine ? "inherit" : "primary.main", textDecoration: "underline" },
+              "& pre": {
+                maxWidth: "100%",
+                overflowX: "auto",
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
+              },
+              "& code": {
+                overflowWrap: "anywhere",
+              },
+              "& img, & video, & audio": {
+                maxWidth: "100%",
+              },
               "& .ticket-code-shell": {
                 my: 1,
                 borderRadius: 0.75,
@@ -894,9 +917,12 @@ export default function MessageBubble({
                 m: 0,
                 p: 1.25,
                 overflow: "auto",
+                overflowX: "auto",
+                overflowY: "hidden",
                 fontSize: 12.5,
                 lineHeight: 1.6,
                 whiteSpace: "pre",
+                maxWidth: "100%",
                 bgcolor: "transparent",
               },
               "& .ticket-code-shell code": {

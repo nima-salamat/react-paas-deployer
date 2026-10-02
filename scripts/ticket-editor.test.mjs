@@ -372,3 +372,24 @@ test("ticket renderer scopes alignment and direction styles to semantic message 
   assert.match(source, /'& \[dir="ltr"\]'/);
   assert.match(source, /ticket-align-right/);
 });
+
+
+test("ticket message bubbles contain long rich-text content inside the bubble", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /minWidth: 0/);
+  assert.match(source, /boxSizing: "border-box"/);
+  assert.match(source, /overflow: "hidden"/);
+  assert.match(source, /overflowWrap: "anywhere"/);
+  assert.match(source, /width: "100%"/);
+  assert.match(source, /"& \*": \{ boxSizing: "border-box", maxWidth: "100%" \}/);
+});
+
+test("code blocks stay horizontally scrollable without pushing message content outside the bubble", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /"& pre": \{/);
+  assert.match(source, /"& \.ticket-code-shell pre": \{/);
+  assert.match(source, /overflowX: "auto"/);
+  assert.match(source, /maxWidth: "100%"/);
+});
