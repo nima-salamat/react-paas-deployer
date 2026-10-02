@@ -29,7 +29,7 @@ export default function SimpleHtmlEditor({
   onExpandedChange,
 }) {
   const ref = useRef(null);
-  const lastHtml = useRef(value);
+  const lastHtml = useRef(null);
   const [internalExpanded, setInternalExpanded] = useState(false);
   const expanded = expandedProp ?? internalExpanded;
   const setExpanded = (v) => {
