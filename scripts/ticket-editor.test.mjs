@@ -18,11 +18,14 @@ test("ticket rich-text editor handles unwrapped first-line blocks", () => {
   assert.match(source, /const block = findBlock\(\) \|\| ensureBlock\(\)/);
 });
 
-test("code block exit detection uses real newlines", () => {
+test("code blocks use explicit newline and caret-exit behavior", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
-  assert.match(source, /range\.toString\(\)\.split\("\\n"\)/);
-  assert.doesNotMatch(source, /range\.toString\(\)\.split\("\\\\n"\)/);
+  assert.match(source, /const exitCodeBlockAtCaret = useCallback/);
+  assert.match(source, /const insertCodeNewline = useCallback/);
+  assert.match(source, /const currentLine = beforeRange\.toString\(\)\.split\("\\n"\)\.pop\(\) \|\| ""/);
+  assert.match(source, /if \(!e\.shiftKey && range\.collapsed && !currentLine\.trim\(\)\)/);
+  assert.match(source, /const newline = document\.createTextNode\("\\n"\)/);
 });
 
 test("list formatting does not replace an entire multi-item list", () => {

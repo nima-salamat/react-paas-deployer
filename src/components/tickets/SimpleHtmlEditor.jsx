@@ -147,6 +147,53 @@ export default function SimpleHtmlEditor({
     selection.addRange(range);
   }, []);
 
+  const exitCodeBlockAtCaret = useCallback((pre, range) => {
+    const parent = pre?.parentNode;
+    if (!parent || !range || !pre.contains(range.startContainer)) return null;
+
+    const beforeRange = document.createRange();
+    beforeRange.selectNodeContents(pre);
+    beforeRange.setEnd(range.startContainer, range.startOffset);
+
+    const afterRange = document.createRange();
+    afterRange.selectNodeContents(pre);
+    afterRange.setStart(range.startContainer, range.startOffset);
+
+    const beforeText = beforeRange.toString();
+    const afterText = afterRange.toString();
+    const fragment = document.createDocumentFragment();
+
+    if (beforeText) {
+      const beforePre = document.createElement("pre");
+      beforePre.textContent = beforeText;
+      fragment.appendChild(beforePre);
+    }
+
+    const paragraph = document.createElement("p");
+    paragraph.innerHTML = "<br>";
+    fragment.appendChild(paragraph);
+
+    if (afterText) {
+      const afterPre = document.createElement("pre");
+      afterPre.textContent = afterText;
+      fragment.appendChild(afterPre);
+    }
+
+    pre.replaceWith(fragment);
+    return paragraph;
+  }, []);
+
+  const insertCodeNewline = useCallback((range, selection) => {
+    if (!range || !selection) return;
+    range.deleteContents();
+    const newline = document.createTextNode("\n");
+    range.insertNode(newline);
+    range.setStartAfter(newline);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
   const toggleCode = () => {
     if (disabled || !ref.current) return;
     restoreSelection();
@@ -156,15 +203,14 @@ export default function SimpleHtmlEditor({
 
     editingRef.current = true;
     if (block.tagName === "PRE") {
-      const p = document.createElement("p");
-      p.textContent = block.textContent || "";
-      if (!p.textContent) p.innerHTML = "<br>";
-      block.replaceWith(p);
-      placeCaretAtEnd(p);
+      const range = selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+      const paragraph = exitCodeBlockAtCaret(block, range);
+      if (paragraph) placeCaretAtEnd(paragraph);
     } else {
       const pre = document.createElement("pre");
-      pre.textContent = block.textContent || "";
-      if (!pre.textContent) pre.innerHTML = "<br>";
+      const text = block.innerText || block.textContent || "";
+      pre.textContent = text;
+      if (!text) pre.innerHTML = "<br>";
       block.replaceWith(pre);
       placeCaretAtEnd(pre);
     }
@@ -312,17 +358,30 @@ export default function SimpleHtmlEditor({
     const selection = window.getSelection?.();
     const anchor = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection?.anchorNode?.parentElement;
     const pre = anchor?.closest?.("pre");
-    if (pre && !e.shiftKey) {
+    if (pre) {
       const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-      if (range) {
-        range.setStart(pre, 0);
-        if (!range.toString().split("\n").pop()?.trim()) {
-          e.preventDefault();
-          const p = document.createElement("p"); p.innerHTML = "<br>"; pre.after(p);
-          const caret = document.createRange(); caret.selectNodeContents(p); caret.collapse(false); selection.removeAllRanges(); selection.addRange(caret);
-          saveSelection(); emit();
-          return;
+      if (range && pre.contains(range.startContainer)) {
+        const beforeRange = document.createRange();
+        beforeRange.selectNodeContents(pre);
+        beforeRange.setEnd(range.startContainer, range.startOffset);
+        const currentLine = beforeRange.toString().split("\n").pop() || "";
+
+        e.preventDefault();
+        editingRef.current = true;
+
+        if (!e.shiftKey && range.collapsed && !currentLine.trim()) {
+          const paragraph = exitCodeBlockAtCaret(pre, range);
+          if (paragraph) {
+            placeCaretAtEnd(paragraph);
+          }
+        } else {
+          insertCodeNewline(range, selection);
         }
+
+        saveSelection();
+        editingRef.current = false;
+        emit();
+        return;
       }
     }
     const li = anchor?.closest?.("li");
