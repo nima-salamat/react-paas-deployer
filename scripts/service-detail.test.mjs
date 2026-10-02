@@ -133,6 +133,17 @@ test("service detail regression sources keep critical callback and error state d
   );
 });
 
+test("service detail avoids static shell highlighter loading and hidden shell mounts", () => {
+  const service = read("src/components/service_detail/ServiceDetail.jsx");
+  const shell = read("src/components/service_detail/components/ShellPanel.jsx");
+
+  assert.doesNotMatch(shell, /import\s+hljs\s+from\s+["']highlight\.js\/lib\/common["']/);
+  assert.match(shell, /loadHljs\(\)/);
+  assert.match(shell, /highlightReady/);
+  assert.match(service, /\{activeTab === "shell" \? \(/);
+  assert.doesNotMatch(service, /display: activeTab === "shell" \? "block" : "none"/);
+});
+
 test("service detail keeps the backend route contract", () => {
   const constants = read("src/components/service_detail/constants.js");
   const service = read("src/components/service_detail/ServiceDetail.jsx");
