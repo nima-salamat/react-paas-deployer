@@ -41,6 +41,29 @@ test("agent API exposes permanent deletion", () => {
   assert.match(api, /AGENTS_API \+ "\/" \+ id \+ "\/"/);
 });
 
+test("agent list uses five-item oldest-first pagination", () => {
+  const source = read("src/components/agents/Agents.jsx");
+  const api = read("src/components/agents/agentApi.js");
+
+  assert.match(source, /Pagination/);
+  assert.match(source, /Math\.ceil\(agentCount \/ 5\)/);
+  assert.match(source, /page_size: 5/);
+  assert.match(api, /params: \{ page_size: 5, \.\.\.params \}/);
+});
+
+test("agent detail uses ten-item pagination for credentials and audit", () => {
+  const source = read("src/components/agents/AgentDetail.jsx");
+  const api = read("src/components/agents/agentApi.js");
+
+  assert.match(source, /credentialsPage/);
+  assert.match(source, /auditPage/);
+  assert.match(source, /Math\.ceil\(credentialsCount \/ 10\)/);
+  assert.match(source, /Math\.ceil\(auditCount \/ 10\)/);
+  assert.match(source, /listCredentials\(id, \{ page: credentialsPage, page_size: 10 \}\)/);
+  assert.match(source, /listAudit\(id, \{ page: auditPage, page_size: 10 \}\)/);
+  assert.match(api, /params: \{ page_size: 10, \.\.\.params \}/);
+});
+
 test("agent credentials expose permanent delete action in the API client", () => {
   const api = read("src/components/agents/agentApi.js");
 
