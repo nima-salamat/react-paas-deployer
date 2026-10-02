@@ -108,21 +108,46 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
           width: box,
           height: box,
           borderRadius: 1.25,
-          bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.065)" : "rgba(71,85,105,.055)",
+          position: "relative",
+          overflow: "hidden",
+          bgcolor: (theme) => theme.palette.mode === "dark"
+            ? "rgba(226,232,240,.10)"
+            : "rgba(255,255,255,.72)",
+          backgroundImage: (theme) => theme.palette.mode === "dark"
+            ? "linear-gradient(145deg, rgba(255,255,255,.22) 0%, rgba(203,213,225,.13) 34%, rgba(148,163,184,.08) 62%, rgba(255,255,255,.16) 100%)"
+            : "linear-gradient(145deg, rgba(255,255,255,.98) 0%, rgba(226,232,240,.96) 34%, rgba(148,163,184,.62) 66%, rgba(255,255,255,.96) 100%)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
           lineHeight: 0,
           border: "1px solid",
-          borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.12)" : "rgba(71,85,105,.12)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,.05)",
+          borderColor: (theme) => theme.palette.mode === "dark"
+            ? "rgba(248,250,252,.28)"
+            : "rgba(100,116,139,.26)",
+          boxShadow: (theme) => theme.palette.mode === "dark"
+            ? "inset 0 1px 0 rgba(255,255,255,.24), inset 0 -1px 0 rgba(15,23,42,.35), 0 2px 8px rgba(0,0,0,.18)"
+            : "inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(71,85,105,.22), 0 2px 8px rgba(15,23,42,.10)",
+          "&::after": {
+            content: """",
+            position: "absolute",
+            top: "-30%",
+            left: "-35%",
+            width: "45%",
+            height: "170%",
+            transform: "rotate(24deg)",
+            background: "linear-gradient(90deg, transparent, rgba(255,255,255,.48), transparent)",
+            opacity: 0.55,
+            pointerEvents: "none",
+          },
           "& svg": {
             display: "block",
+            position: "relative",
+            zIndex: 1,
             filter: (theme) => theme.palette.mode === "dark"
-              ? "grayscale(1) brightness(1.45) contrast(.58)"
-              : "grayscale(1) brightness(.68) contrast(.62)",
-            opacity: 0.92,
+              ? "grayscale(1) brightness(1.72) contrast(.68) drop-shadow(0 1px 2px rgba(255,255,255,.18))"
+              : "grayscale(1) brightness(.74) contrast(.72) drop-shadow(0 1px 1px rgba(255,255,255,.72))",
+            opacity: 0.98,
           },
         }}
         title={label || platformKey}
@@ -140,8 +165,15 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
         width: box,
         height: box,
         borderRadius: 1.25,
-        bgcolor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.065)" : "rgba(71,85,105,.055)",
-        color: "text.secondary",
+        position: "relative",
+        overflow: "hidden",
+        bgcolor: (theme) => theme.palette.mode === "dark"
+          ? "rgba(226,232,240,.10)"
+          : "rgba(255,255,255,.72)",
+        backgroundImage: (theme) => theme.palette.mode === "dark"
+          ? "linear-gradient(145deg, rgba(255,255,255,.22) 0%, rgba(203,213,225,.13) 34%, rgba(148,163,184,.08) 62%, rgba(255,255,255,.16) 100%)"
+          : "linear-gradient(145deg, rgba(255,255,255,.98) 0%, rgba(226,232,240,.96) 34%, rgba(148,163,184,.62) 66%, rgba(255,255,255,.96) 100%)",
+        color: (theme) => theme.palette.mode === "dark" ? "#f8fafc" : "#475569",
         fontSize: Math.max(10, size * 0.38),
         fontWeight: 800,
         display: "inline-flex",
@@ -151,8 +183,24 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
         letterSpacing: -0.3,
         lineHeight: 1,
         border: "1px solid",
-        borderColor: (theme) => theme.palette.mode === "dark" ? "rgba(226,232,240,.12)" : "rgba(71,85,105,.12)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,.05)",
+        borderColor: (theme) => theme.palette.mode === "dark"
+          ? "rgba(248,250,252,.28)"
+          : "rgba(100,116,139,.26)",
+        boxShadow: (theme) => theme.palette.mode === "dark"
+          ? "inset 0 1px 0 rgba(255,255,255,.24), inset 0 -1px 0 rgba(15,23,42,.35), 0 2px 8px rgba(0,0,0,.18)"
+          : "inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(71,85,105,.22), 0 2px 8px rgba(15,23,42,.10)",
+        "&::after": {
+          content: """",
+          position: "absolute",
+          top: "-30%",
+          left: "-35%",
+          width: "45%",
+          height: "170%",
+          transform: "rotate(24deg)",
+          background: "linear-gradient(90deg, transparent, rgba(255,255,255,.48), transparent)",
+          opacity: 0.55,
+          pointerEvents: "none",
+        },
       }}
       title={label || platformKey}
     >
