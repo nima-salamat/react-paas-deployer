@@ -636,6 +636,8 @@ export default function SimpleHtmlEditor({
 
     editingRef.current = true;
     const next = document.createElement(normalized.toLowerCase());
+    copyBlockAlignment(block, next);
+    copyBlockDirection(block, next);
     next.innerHTML = block.innerHTML || "<br>";
     const parent = block.parentNode;
     if (!parent) return;
@@ -866,6 +868,7 @@ export default function SimpleHtmlEditor({
       const pre = document.createElement("pre");
       pre.className = "editor-code-block";
       pre.setAttribute("dir", getEditorDirection(block));
+      copyBlockAlignment(block, pre);
       code = document.createElement("code");
       const text = block.innerText || block.textContent || "";
       code.textContent = text;
@@ -935,6 +938,7 @@ export default function SimpleHtmlEditor({
       const pre = document.createElement("pre");
       pre.className = "editor-code-block";
       pre.setAttribute("dir", getEditorDirection(block));
+      copyBlockAlignment(block, pre);
       const code = document.createElement("code");
       const text = block.innerText || block.textContent || "";
       code.textContent = text;
@@ -1443,9 +1447,9 @@ export default function SimpleHtmlEditor({
               color: "text.disabled",
             },
             "& p": { m: 0 },
-            "& .ticket-align-left": { textAlign: "left" },
-            "& .ticket-align-center": { textAlign: "center" },
-            "& .ticket-align-right": { textAlign: "right" },
+            "& .ticket-align-left": { textAlign: "left !important" },
+            "& .ticket-align-center": { textAlign: "center !important" },
+            "& .ticket-align-right": { textAlign: "right !important" },
             '& [dir="rtl"]': { direction: "rtl", unicodeBidi: "plaintext" },
             '& [dir="ltr"]': { direction: "ltr", unicodeBidi: "plaintext" },
             '& [dir="auto"]': { unicodeBidi: "plaintext" },
@@ -1459,6 +1463,9 @@ export default function SimpleHtmlEditor({
               borderColor: "rgba(120,140,170,0.22)",
               whiteSpace: "pre",
             },
+            "& pre.editor-code-block.ticket-align-left": { textAlign: "left !important" },
+            "& pre.editor-code-block.ticket-align-center": { textAlign: "center !important" },
+            "& pre.editor-code-block.ticket-align-right": { textAlign: "right !important" },
             "& pre.editor-code-block::before": {
               content: "attr(data-language-label)",
               display: "block",

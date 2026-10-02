@@ -568,3 +568,22 @@ test("normal Enter creates a new block that preserves the current alignment", ()
   assert.match(source, /const next = splitStandardBlockAtCaret\(currentBlock, range\)/);
   assert.match(source, /if \(next\) placeCaretAtStart\(next\)/);
 });
+
+
+test("editor block conversions preserve the selected alignment while typing", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /copyBlockAlignment\(block, next\)/);
+  assert.match(source, /copyBlockDirection\(block, next\)/);
+  assert.match(source, /copyBlockAlignment\(block, pre\)/);
+  assert.match(source, /\.ticket-align-center": \{ textAlign: "center !important" \}/);
+  assert.match(source, /\.ticket-align-right": \{ textAlign: "right !important" \}/);
+});
+
+test("normal editor line breaks remain source-aligned rather than browser-auto-aligned", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const splitStandardBlockAtCaret = useCallback/);
+  assert.match(source, /copyBlockAlignment\(block, next\)/);
+  assert.match(source, /!e\.shiftKey && !enterSends/);
+});
