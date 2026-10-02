@@ -13,9 +13,14 @@ import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
-import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest, deleteAgent } from "./agentApi";
+import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, deleteCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest, deleteAgent } from "./agentApi";
 
 function fmt(value) { return value ? new Date(value).toLocaleString() : "Never"; }
+function provisioningLabel(value) {
+  if (value === "dashboard") return "Dashboard";
+  if (value === "api_enrollment") return "API enrollment";
+  return "Legacy / unspecified";
+}
 
 export default function AgentDetail() {
   const { id } = useParams();
@@ -161,6 +166,7 @@ export default function AgentDetail() {
               <SmartToyOutlinedIcon color="primary" />
               <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: "-0.03em" }}>{agent.name}</Typography>
               <Chip size="small" label={agent.status} color={agent.status === "active" ? "success" : agent.status === "disabled" ? "warning" : "default"} sx={{ height: 24, fontWeight: 750 }} />
+              <Chip size="small" variant="outlined" label={"Provisioned via " + provisioningLabel(agent.provisioning_source)} sx={{ height: 24, fontWeight: 700 }} />
             </Stack>
             <Typography color="text.secondary" sx={{ mt: 0.55 }}>{agent.description || "No description"}</Typography>
           </Box>
@@ -201,7 +207,7 @@ export default function AgentDetail() {
               </Alert>
               <Stack spacing={2.25}>
                 <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                  {[["Status", agent.status], ["Created", fmt(agent.created_at)], ["Last used", fmt(agent.last_used_at)], ["Active credentials", String(agent.active_credential_count)]] .map(([label, value]) => (
+                  {[["Status", agent.status], ["Provisioned via", provisioningLabel(agent.provisioning_source)], ["Created", fmt(agent.created_at)], ["Last used", fmt(agent.last_used_at)], ["Active credentials", String(agent.active_credential_count)]] .map(([label, value]) => (
                     <Paper key={label} variant="outlined" sx={{ p: 1.75, flex: 1, borderRadius: 2 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography sx={{ mt: 0.3, fontWeight: 750 }}>{value}</Typography></Paper>
                   ))}
                 </Stack>
@@ -256,7 +262,14 @@ export default function AgentDetail() {
                     <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
                       <Box sx={{ flex: 1 }}><Typography fontFamily="ui-monospace, monospace" fontWeight={800}>{credential.prefix}</Typography><Typography variant="caption" color="text.secondary">Created {fmt(credential.created_at)} · Expires {fmt(credential.expires_at)} · Last used {fmt(credential.last_used_at)}</Typography></Box>
                       <Chip size="small" label={credential.active ? "active" : "revoked / expired"} color={credential.active ? "success" : "default"} sx={{ fontWeight: 700 }} />
-                      {credential.active ? <Button size="small" color="error" variant="outlined" onClick={async () => { try { setSaving(true); setError(""); await revokeCredential(id, credential.id); await load(); } catch (e) { setError(getApiErrorMessage(e, "Failed to revoke credential.")); } finally { setSaving(false); } }} disabled={saving} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
+                      {credential.active ? <Button size="small" color="error" variant="outlined" onClick={async () => {
+                        if (!window.confirm("Revoke this credential? It will stop authenticating but its record will remain available for audit/history.")) return;
+                        try { setSaving(true); setError(""); await revokeCredential(id, credential.id); await load(); } catch (e) { setError(getApiErrorMessage(e, "Failed to revoke credential.")); } finally { setSaving(false); }
+                      }} disabled={saving} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
+                      <Button size="small" color="error" variant="text" onClick={async () => {
+                        if (!window.confirm("Delete this credential permanently? An active token will stop working immediately. Its audit event is retained without the credential record.")) return;
+                        try { setSaving(true); setError(""); await deleteCredential(id, credential.id); await load(); } catch (e) { setError(getApiErrorMessage(e, "Failed to delete credential.")); } finally { setSaving(false); }
+                      }} disabled={saving} sx={{ borderRadius: 1.5, fontWeight: 750 }}>Delete</Button>
                     </Stack>
                   </Paper>
                 )) : <Typography color="text.secondary">No credentials have been issued.</Typography>}
@@ -270,7 +283,15 @@ export default function AgentDetail() {
                 {audit.length ? audit.map((event) => (
                   <Paper key={event.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
                     <Stack direction={{ xs: "column", md: "row" }} spacing={1.2} justifyContent="space-between">
-                      <Box><Typography fontWeight={800}>{event.action}</Typography><Typography variant="caption" color="text.secondary">{event.resource_type || "agent"}{event.resource_id ? " · " + event.resource_id : ""} · {fmt(event.occurred_at)}</Typography></Box>
+                      <Box>
+                        <Typography fontWeight={800}>{event.action}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {event.resource_type || "agent"}{event.resource_id ? " · " + event.resource_id : ""} · {fmt(event.occurred_at)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          Request {event.request_id || "—"} · {event.duration_ms != null ? event.duration_ms + " ms" : "duration —"}{event.error_code ? " · " + event.error_code : ""}
+                        </Typography>
+                      </Box>
                       <Stack direction="row" spacing={0.7} alignItems="center"><Chip size="small" label={event.success ? "success" : "failed"} color={event.success ? "success" : "error"} /><Typography variant="caption" color="text.secondary">{event.http_status || "—"}</Typography></Stack>
                     </Stack>
                   </Paper>
