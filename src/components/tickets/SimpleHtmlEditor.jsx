@@ -143,7 +143,7 @@ export default function SimpleHtmlEditor({
     if (editor.contains(range.commonAncestorContainer)) savedRange.current = range.cloneRange();
   }, []);
 
-  const restoreSelection = () => {
+  const restoreSelection = useCallback(() => {
     const editor = ref.current;
     const selection = window.getSelection?.();
     const range = savedRange.current;
@@ -151,7 +151,7 @@ export default function SimpleHtmlEditor({
     selection.removeAllRanges();
     selection.addRange(range);
     return true;
-  };
+  }, []);
 
   const focusEditorSelection = useCallback(() => {
     const editor = ref.current;
@@ -171,7 +171,7 @@ export default function SimpleHtmlEditor({
     selection.addRange(range);
     savedRange.current = range.cloneRange();
     return true;
-  }, []);
+  }, [restoreSelection]);
 
   const findInlineAncestor = useCallback((command) => {
     const editor = ref.current;

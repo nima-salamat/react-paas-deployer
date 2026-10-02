@@ -280,3 +280,12 @@ test("list conversion preserves paragraph alignment", () => {
   assert.match(block, /setBlockAlignment\(item, alignments\[index\]/);
   assert.match(block, /const desiredListTag = ordered \? "OL" : "UL"/);
 });
+
+
+test("selection restoration is hook-safe and reusable by every toolbar action", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const restoreSelection = useCallback/);
+  assert.match(source, /const focusEditorSelection = useCallback/);
+  assert.match(source, /\}, \[restoreSelection\]\);/);
+});
