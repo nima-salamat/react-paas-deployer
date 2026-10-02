@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from "react";
 import {
   Box, Button, FormControl, InputLabel, MenuItem, Paper, Select,
-  Stack, TextField, Typography, Alert, CircularProgress, LinearProgress,
+  Stack, TextField, Typography, Alert, CircularProgress, LinearProgress, IconButton, Tooltip,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API, unwrapData, unwrapList } from "./api";
 import SimpleHtmlEditor, { htmlToPlain } from "./SimpleHtmlEditor";
+import PendingFilesBar from "./PendingFilesBar";
 
 export default function CreateTicket() {
   const navigate = useNavigate();
@@ -112,7 +114,17 @@ export default function CreateTicket() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 720, mx: "auto" }}>
-      <Typography variant="h5" fontWeight={700} mb={3}>Create Ticket</Typography>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 2 }}>
+        <Tooltip title="Back to tickets">
+          <IconButton onClick={() => navigate("/dashboard/tickets")} size="small" aria-label="Back to tickets">
+            <ArrowBackIcon />
+          </IconButton>
+        </Tooltip>
+        <Box minWidth={0}>
+          <Typography variant="h5" fontWeight={700}>Create Ticket</Typography>
+          <Typography variant="caption" color="text.secondary">Open a new support ticket</Typography>
+        </Box>
+      </Stack>
       <Paper sx={{ p: 3 }} component="form" onSubmit={submit}>
         {depsError && (
           <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={loadOptions}>Retry</Button>}>
@@ -174,11 +186,22 @@ export default function CreateTicket() {
               showToolbarToggle
             />
           </Box>
-          <Button variant="outlined" component="label">
-            Attach files
-            <input hidden type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files || []))} />
-          </Button>
-          {files.length > 0 && <Typography variant="body2">{files.map((f) => f.name).join(", ")}</Typography>}
+          <Box>
+            <Button variant="outlined" component="label" disabled={loading}>
+              Attach files
+              <input
+                hidden
+                type="file"
+                multiple
+                onChange={(e) => setFiles((current) => [...current, ...Array.from(e.target.files || [])])}
+              />
+            </Button>
+            <PendingFilesBar
+              files={files}
+              onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))}
+              onClear={() => setFiles([])}
+            />
+          </Box>
           {loading && <LinearProgress />}
           <Stack direction="row" gap={2} justifyContent="flex-end">
             <Button onClick={() => navigate("/dashboard/tickets")}>Cancel</Button>

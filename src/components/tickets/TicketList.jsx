@@ -168,12 +168,13 @@ export default function TicketList() {
                   <TableCell>Status</TableCell>
                   <TableCell>Priority</TableCell>
                   <TableCell>Updated</TableCell>
+                  <TableCell align="right">Action</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {tickets.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={7}>
                       <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
                     </TableCell>
                   </TableRow>
@@ -209,6 +210,19 @@ export default function TicketList() {
                             ? new Date(t.last_message_at || t.updated_at).toLocaleString()
                             : "—"}
                         </Typography>
+                      </TableCell>
+                      <TableCell align="right" sx={{ width: 92 }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openTicket(t.id);
+                          }}
+                          aria-label={"Open ticket " + t.public_id}
+                        >
+                          Open
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
@@ -270,9 +284,23 @@ export default function TicketList() {
                           >
                             {t.subject}
                           </Typography>
-                          <Stack direction="row" gap={0.75} flexWrap="wrap">
-                            <Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} />
-                            <Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
+                          <Stack direction={{ xs: "column", sm: "row" }} gap={0.75} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
+                            <Stack direction="row" gap={0.75} flexWrap="wrap">
+                              <Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} />
+                              <Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
+                            </Stack>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openTicket(t.id);
+                              }}
+                              aria-label={"Open ticket " + t.public_id}
+                              sx={{ alignSelf: { xs: "stretch", sm: "auto" }, minWidth: 76 }}
+                            >
+                              Open
+                            </Button>
                           </Stack>
                         </Box>
                       </Stack>

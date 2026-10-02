@@ -536,3 +536,23 @@ test("ticket renderer preserves ordered lists and aligns list items from stored 
   assert.match(source, /list\.style\.setProperty\("text-align", alignedItems\[0\], "important"\)/);
   assert.match(source, /data-ticket-align=\\\"right\\\"/);
 });
+
+
+test("Create Ticket has a back arrow and uses the shared attachment preview below the attach control", () => {
+  const source = read("src/components/tickets/CreateTicket.jsx");
+
+  assert.match(source, /ArrowBackIcon/);
+  assert.match(source, /Back to tickets/);
+  assert.match(source, /PendingFilesBar/);
+  assert.match(source, /onRemove=\{/);
+  assert.match(source, /onClear=\{\(\) => setFiles\(\[\]\)\}/);
+});
+
+test("ticket list has an explicit Open button on desktop and mobile", () => {
+  const source = read("src/components/tickets/TicketList.jsx");
+
+  assert.match(source, /TableCell align="right">Action/);
+  assert.match(source, /Open ticket/);
+  assert.match(source, /e\.stopPropagation\(\)/);
+  assert.match(source, /<TableCell colSpan=\{7\}>/);
+});
