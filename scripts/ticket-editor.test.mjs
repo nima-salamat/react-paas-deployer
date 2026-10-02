@@ -68,10 +68,10 @@ test("code blocks exit through normal paragraphs and keep explicit newlines", ()
 
   assert.match(source, /const convertCodeBlockToParagraph = useCallback/);
   assert.match(source, /const exitCodeBlockAtEnd = useCallback/);
-  assert.match(source, /const newline = trailingBreak/);
-  assert.match(source, /const atEnd = !afterRange\.toString\(\)/);
-  assert.match(source, /const newline = trailingBreak/);
-  assert.match(source, /insertCodeNewline\(range, selection, atEnd\)/);
+  assert.match(source, /const insertSoftBreak = useCallback/);
+  assert.match(source, /const insertCodeNewline = useCallback/);
+  assert.match(source, /splitCodeBlockAtCaret\(pre, range\)/);
+  assert.match(source, /insertCodeNewline\(range, selection\)/);
 });
 
 test("message code renderer highlights and copies code without DOM replacement crashes", () => {
@@ -128,7 +128,7 @@ test("collapsed inline formatting is explicitly toggleable before typing", () =>
 
   assert.match(source, /const toggleInlineFormat = \(command\) =>/);
   assert.match(source, /data-editor-typing-mark/);
-  assert.match(source, /isEmptyTypingMark/);
+  assert.match(source, /const boundary = document\.createTextNode\("\\u200B"\)/);
   assert.match(source, /active\.remove\(\)/);
   assert.match(source, /Boolean\(findInlineAncestor\("bold"\)\)/);
 });
@@ -192,7 +192,8 @@ test("italic can exit cleanly at the end of an inline mark without leaving an em
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
   assert.match(source, /const afterFragment = afterRange\.extractContents\(\)/);
-  assert.match(source, /else if \(afterFragment\.textContent\?\.length\)/);
+  assert.match(source, /const beforeFragment = beforeRange\.cloneContents\(\)/);
+  assert.match(source, /const afterFragment = afterRange\.cloneContents\(\)/);
   assert.match(source, /const afterIndex = Array\.prototype\.indexOf\.call\(parent\.childNodes, active\) \+ 1/);
 });
 
