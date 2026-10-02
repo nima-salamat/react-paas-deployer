@@ -1,84 +1,59 @@
 import React, { memo } from "react";
 import { Box } from "@mui/material";
 
-/* react-devicons — per-platform path imports (tree-shake friendly) */
-import DjangoPlain from "react-devicons/django/plain";
-import FlaskOriginal from "react-devicons/flask/original";
-import NodejsOriginal from "react-devicons/nodejs/original";
-import NextjsOriginal from "react-devicons/nextjs/original";
-import ReactOriginal from "react-devicons/react/original";
-import VuejsOriginal from "react-devicons/vuejs/original";
-import NuxtjsOriginal from "react-devicons/nuxtjs/original";
-import PythonOriginal from "react-devicons/python/original";
-import GoOriginal from "react-devicons/go/original";
-import RustOriginal from "react-devicons/rust/original";
-import JavaOriginal from "react-devicons/java/original";
-import SpringOriginal from "react-devicons/spring/original";
-import PhpOriginal from "react-devicons/php/original";
-import LaravelOriginal from "react-devicons/laravel/original";
-import RailsPlain from "react-devicons/rails/plain";
-import RubyOriginal from "react-devicons/ruby/original";
-import DockerOriginal from "react-devicons/docker/original";
-import PostgresqlOriginal from "react-devicons/postgresql/original";
-import MysqlOriginal from "react-devicons/mysql/original";
-import MongodbOriginal from "react-devicons/mongodb/original";
-import RedisOriginal from "react-devicons/redis/original";
-import SqliteOriginal from "react-devicons/sqlite/original";
-import ElasticsearchOriginal from "react-devicons/elasticsearch/original";
-import FastapiOriginal from "react-devicons/fastapi/original";
-import AngularOriginal from "react-devicons/angular/original";
-import SvelteOriginal from "react-devicons/svelte/original";
-import TypescriptOriginal from "react-devicons/typescript/original";
-import JavascriptOriginal from "react-devicons/javascript/original";
-import CsharpOriginal from "react-devicons/csharp/original";
-import KafkaOriginal from "react-devicons/apachekafka/original";
-import LinuxOriginal from "react-devicons/linux/original";
+/* Simple Icons via react-icons — consistent brand marks across the dashboard */
+import {
+  SiAngular,
+  SiDjango,
+  SiDocker,
+  SiDotnet,
+  SiFlask,
+  SiGo,
+  SiHtml5,
+  SiMariadb,
+  SiMongodb,
+  SiMysql,
+  SiNextdotjs,
+  SiNodedotjs,
+  SiOracle,
+  SiPhp,
+  SiPostgresql,
+  SiPython,
+  SiReact,
+  SiRedis,
+  SiVuejs,
+} from "react-icons/si";
 
-/** Map normalized platform key → Devicon component */
+/** Map normalized platform key → Simple Icon component */
 const ICON_MAP = {
-  django: DjangoPlain,
-  flask: FlaskOriginal,
-  fastapi: FastapiOriginal,
-  node: NodejsOriginal,
-  nodejs: NodejsOriginal,
-  next: NextjsOriginal,
-  nextjs: NextjsOriginal,
-  react: ReactOriginal,
-  vue: VuejsOriginal,
-  vuejs: VuejsOriginal,
-  nuxt: NuxtjsOriginal,
-  nuxtjs: NuxtjsOriginal,
-  python: PythonOriginal,
-  go: GoOriginal,
-  golang: GoOriginal,
-  rust: RustOriginal,
-  java: JavaOriginal,
-  spring: SpringOriginal,
-  php: PhpOriginal,
-  laravel: LaravelOriginal,
-  rails: RailsPlain,
-  ruby: RubyOriginal,
-  docker: DockerOriginal,
-  postgres: PostgresqlOriginal,
-  postgresql: PostgresqlOriginal,
-  mysql: MysqlOriginal,
-  mariadb: MysqlOriginal,
-  mongo: MongodbOriginal,
-  mongodb: MongodbOriginal,
-  redis: RedisOriginal,
-  sqlite: SqliteOriginal,
-  elasticsearch: ElasticsearchOriginal,
-  elastic: ElasticsearchOriginal,
-  angular: AngularOriginal,
-  svelte: SvelteOriginal,
-  typescript: TypescriptOriginal,
-  javascript: JavascriptOriginal,
-  js: JavascriptOriginal,
-  ts: TypescriptOriginal,
-  csharp: CsharpOriginal,
-  kafka: KafkaOriginal,
-  apachekafka: KafkaOriginal,
-  linux: LinuxOriginal,
+  php: SiPhp,
+  python: SiPython,
+  django: SiDjango,
+  nextjs: SiNextdotjs,
+  next: SiNextdotjs,
+  nodejs: SiNodedotjs,
+  node: SiNodedotjs,
+  flask: SiFlask,
+  docker: SiDocker,
+  statichtmlcss: SiHtml5,
+  html: SiHtml5,
+  html5: SiHtml5,
+  vuejs: SiVuejs,
+  vue: SiVuejs,
+  angular: SiAngular,
+  react: SiReact,
+  dotnet: SiDotnet,
+  ".net": SiDotnet,
+  mysql: SiMysql,
+  postgresql: SiPostgresql,
+  postgres: SiPostgresql,
+  mariadb: SiMariadb,
+  mongodb: SiMongodb,
+  mongo: SiMongodb,
+  redis: SiRedis,
+  go: SiGo,
+  golang: SiGo,
+  oracle: SiOracle,
 };
 
 function resolveIcon(key, label) {
@@ -92,7 +67,7 @@ function resolveIcon(key, label) {
 }
 
 /**
- * Platform brand icon via react-devicons.
+ * Platform brand icon via Simple Icons (`react-icons/si`).
  * Falls back to a letter badge when no matching icon exists.
  */
 const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 }) {
