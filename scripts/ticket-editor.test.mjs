@@ -77,7 +77,7 @@ test("code blocks exit through normal paragraphs and keep explicit newlines", ()
 test("message code renderer highlights and copies code without DOM replacement crashes", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
 
-  assert.match(source, /highlightAuto/);
+  assert.doesNotMatch(source, /highlightAuto/);
   assert.match(source, /data-code-copy/);
   assert.match(source, /getCodeLanguageLabel/);
   assert.match(source, /requestedLanguageLabel/);
