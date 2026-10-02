@@ -22,8 +22,26 @@ export default function ChatComposer({
 }) {
   const valueRef = useRef(value);
   const filesRef = useRef(files);
-  useEffect(() => { valueRef.current = value; }, [value]);
+  const changeFrameRef = useRef(null);
+  const pendingValueRef = useRef(value);
+  useEffect(() => {
+    valueRef.current = value;
+    pendingValueRef.current = value;
+  }, [value]);
   useEffect(() => { filesRef.current = files; }, [files]);
+  useEffect(() => () => {
+    if (changeFrameRef.current != null) cancelAnimationFrame(changeFrameRef.current);
+  }, []);
+
+  const scheduleChange = useCallback((nextValue) => {
+    valueRef.current = nextValue;
+    pendingValueRef.current = nextValue;
+    if (changeFrameRef.current != null) return;
+    changeFrameRef.current = requestAnimationFrame(() => {
+      changeFrameRef.current = null;
+      onChange?.(pendingValueRef.current);
+    });
+  }, [onChange]);
 
   const canSend = !sending && !disabled && (htmlToPlain(value) || files.length > 0);
 
@@ -78,10 +96,7 @@ export default function ChatComposer({
         <SimpleHtmlEditor
           enterSends={false}
           value={value}
-          onChange={(html) => {
-            valueRef.current = html;
-            onChange?.(html);
-          }}
+          onChange={scheduleChange}
           onSubmit={handleSubmitFromEditor}
           placeholder={placeholder}
           minHeight={40}

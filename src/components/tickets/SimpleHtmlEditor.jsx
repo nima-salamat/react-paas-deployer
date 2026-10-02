@@ -139,6 +139,7 @@ export default function SimpleHtmlEditor({
   const editingRef = useRef(false);
   const historyRef = useRef([value || ""]);
   const historyIndexRef = useRef(0);
+  const historyRevisionFrameRef = useRef(null);
   const [, setHistoryRevision] = useState(0);
   const [activeFormats, setActiveFormats] = useState({
     bold: false,
@@ -468,7 +469,13 @@ export default function SimpleHtmlEditor({
     history.push(html);
     if (history.length > 100) history.shift();
     historyIndexRef.current = history.length - 1;
-    setHistoryRevision((v) => v + 1);
+
+    if (historyRevisionFrameRef.current == null) {
+      historyRevisionFrameRef.current = requestAnimationFrame(() => {
+        historyRevisionFrameRef.current = null;
+        setHistoryRevision((v) => v + 1);
+      });
+    }
   }, []);
 
   const emit = useCallback((record = true) => {
@@ -507,13 +514,21 @@ export default function SimpleHtmlEditor({
   }, [findBlock, findInlineAncestor]);
 
   React.useEffect(() => {
-    const refresh = () => updateActiveFormats();
+    let frame = null;
+    const refresh = () => {
+      if (frame != null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        updateActiveFormats();
+      });
+    };
     document.addEventListener("selectionchange", refresh);
     window.addEventListener("focus", refresh);
     refresh();
     return () => {
       document.removeEventListener("selectionchange", refresh);
       window.removeEventListener("focus", refresh);
+      if (frame != null) cancelAnimationFrame(frame);
     };
   }, [updateActiveFormats]);
 
@@ -706,7 +721,7 @@ export default function SimpleHtmlEditor({
 
   const splitQuoteAtCaret = useCallback((quote, range) => {
     const parent = quote?.parentNode;
-    if (!quote || !parent || !range) return null;
+    if (!quote || !parent || !range || !quote.contains(range.startContainer)) return null;
 
     const afterRange = range.cloneRange();
     afterRange.selectNodeContents(quote);
@@ -714,14 +729,16 @@ export default function SimpleHtmlEditor({
     const afterFragment = afterRange.extractContents();
 
     const paragraph = document.createElement("p");
+    paragraph.setAttribute("dir", getEditorDirection(quote));
+    copyBlockAlignment(quote, paragraph);
+
     if (afterFragment.childNodes.length) {
       paragraph.appendChild(afterFragment);
     } else {
       paragraph.innerHTML = "<br>";
     }
-    copyBlockAlignment(quote, paragraph);
-    parent.insertBefore(paragraph, quote.nextSibling);
 
+    parent.insertBefore(paragraph, quote.nextSibling);
     return paragraph;
   }, []);
 
@@ -1145,7 +1162,10 @@ export default function SimpleHtmlEditor({
           insertSoftBreak(range, selection);
         } else {
           const paragraph = splitQuoteAtCaret(quote, range);
-          if (paragraph) placeCaretAtStart(paragraph);
+          if (paragraph) {
+            placeCaretAtStart(paragraph);
+            ref.current?.focus({ preventScroll: true });
+          }
         }
 
         saveSelection();

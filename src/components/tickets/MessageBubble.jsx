@@ -628,7 +628,7 @@ function enhanceRichTextHtml(html) {
   return root.innerHTML;
 }
 
-export default function MessageBubble({
+function MessageBubble({
   message: m,
   mine = false,
   showHtmlToggle = true,
@@ -1028,3 +1028,5 @@ export default function MessageBubble({
     </Stack>
   );
 }
+
+export default React.memo(MessageBubble);

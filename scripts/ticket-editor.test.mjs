@@ -469,3 +469,38 @@ test("rendered ticket messages default to explicit left alignment while preservi
   assert.match(source, /wordBreak: "break-word",[\s\S]*textAlign: "left"/);
   assert.match(source, /block\.style\.textAlign = alignment/);
 });
+
+
+test("editor coalesces high-frequency history and selection renders", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const historyRevisionFrameRef = useRef\(null\)/);
+  assert.match(source, /historyRevisionFrameRef\.current = requestAnimationFrame/);
+  assert.match(source, /cancelAnimationFrame\(frame\)/);
+  assert.match(source, /frame = requestAnimationFrame\(\(\) =>/);
+});
+
+test("quote Enter creates a hard boundary in one keypress", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /!quote\.contains\(range\.startContainer\)/);
+  assert.match(source, /paragraph\.setAttribute\("dir", getEditorDirection\(quote\)\)/);
+  assert.match(source, /placeCaretAtStart\(paragraph\)/);
+  assert.match(source, /ref\.current\?\.focus\(\{ preventScroll: true \}\)/);
+});
+
+test("chat composer coalesces draft updates without delaying Send", () => {
+  const source = read("src/components/tickets/ChatComposer.jsx");
+
+  assert.match(source, /const changeFrameRef = useRef\(null\)/);
+  assert.match(source, /const scheduleChange = useCallback/);
+  assert.match(source, /requestAnimationFrame/);
+  assert.match(source, /valueRef\.current = nextValue/);
+  assert.match(source, /onChange=\{scheduleChange\}/);
+});
+
+test("ticket messages are memoized so draft typing does not rerender the full message history", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /export default React\.memo\(MessageBubble\)/);
+});
