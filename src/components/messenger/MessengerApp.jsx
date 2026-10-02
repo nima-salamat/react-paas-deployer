@@ -150,6 +150,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [newBelowCount, setNewBelowCount] = useState(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [scrollDownOpacity, setScrollDownOpacity] = useState(0);
+  // Cold-open chats need a post-render bottom lock because message content
+  // (especially media) can increase the scroll height after the first paint.
+  const initialBottomPendingRef = useRef(null);
+  const initialBottomTimersRef = useRef([]);
   const [scrollDownBottomOffset, setScrollDownBottomOffset] = useState(86);
   const scrollDownFadeTimerRef = useRef(null);
   const scrollDownDismissedRef = useRef(false);
@@ -1395,6 +1399,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   }, []);
 
   const closeChat = useCallback(() => {
+    initialBottomPendingRef.current = null;
+    for (const timer of initialBottomTimersRef.current) {
+      try { clearTimeout(timer); } catch { /* */ }
+    }
+    initialBottomTimersRef.current = [];
     // Persist draft before clearing composer so Esc / back never loses text
     const leavingId = activeIdRef.current;
     if (leavingId != null && !editingMsgRef.current) {
@@ -1482,6 +1491,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       }
     }
 
+    // Cancel any stale cold-open bottom lock from another conversation.
+    initialBottomPendingRef.current = null;
+    for (const timer of initialBottomTimersRef.current) {
+      try { clearTimeout(timer); } catch { /* */ }
+    }
+    initialBottomTimersRef.current = [];
     setActiveId(c.id);
     activeIdRef.current = c.id;
     setMobileShowChat(true);
@@ -1809,14 +1824,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       };
       setTimeout(() => { tryJump(); }, 80);
     } else if (!cached?.messages?.length) {
-      requestAnimationFrame(() => {
-        const box = listRef.current;
-        if (!box || String(activeIdRef.current) !== String(cid)) return;
-        restoringScrollRef.current = true;
-        box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight);
+      // Do not rely on a single post-fetch rAF. The message DOM can grow after
+      // the first paint, so the layout effect above owns the initial bottom lock.
+      if (!jumpToMessageId) {
+        initialBottomPendingRef.current = cid;
         nearBottomRef.current = true;
-        requestAnimationFrame(() => { restoringScrollRef.current = false; });
-      });
+      }
     }
     // Ensure overlay is gone even if loadMessages was skipped / failed early
     if (String(activeIdRef.current) === String(c.id)) setChatOpening(false);
@@ -4403,6 +4416,64 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       document.removeEventListener("visibilitychange", onVis);
     };
   }, []);
+
+  // Cold-open viewport: wait for the message DOM to render and stabilize before
+  // deciding the initial viewport. This is intentionally separate from the
+  // user's saved scroll position logic.
+  useLayoutEffect(() => {
+    const cid = initialBottomPendingRef.current;
+    if (!cid || String(activeId) !== String(cid) || !messages.length || loadingMsgs) return;
+
+    const box = listRef.current;
+    if (!box) return;
+
+    initialBottomPendingRef.current = null;
+    for (const timer of initialBottomTimersRef.current) {
+      try { clearTimeout(timer); } catch { /* */ }
+    }
+    initialBottomTimersRef.current = [];
+
+    let stopped = false;
+    let frame = 0;
+    const pinBottom = () => {
+      if (stopped || String(activeIdRef.current) !== String(cid)) return;
+      // A real user gesture takes ownership of the viewport immediately.
+      if (userScrollIntentRef.current) {
+        stopped = true;
+        return;
+      }
+      const maxTop = Math.max(0, box.scrollHeight - box.clientHeight);
+      if (box.scrollTop < maxTop || nearBottomRef.current) {
+        box.scrollTop = maxTop;
+      }
+      nearBottomRef.current = true;
+    };
+
+    // First layout + several subsequent paints catch async media/layout growth.
+    pinBottom();
+    const runFrame = () => {
+      if (stopped) return;
+      pinBottom();
+      frame += 1;
+      if (frame < 10) requestAnimationFrame(runFrame);
+    };
+    const raf = requestAnimationFrame(runFrame);
+
+    // Also catch delayed image/font/content layout without forcing a smooth scroll.
+    [40, 100, 200, 350, 550, 800, 1200].forEach((delay) => {
+      const timer = setTimeout(() => pinBottom(), delay);
+      initialBottomTimersRef.current.push(timer);
+    });
+
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      for (const timer of initialBottomTimersRef.current) {
+        try { clearTimeout(timer); } catch { /* */ }
+      }
+      initialBottomTimersRef.current = [];
+    };
+  }, [activeId, loadingMsgs, messages]);
 
   // After inbound messages land (WS → loadMessages), stick to bottom if the user
   // was already following the chat. Fixes race where scroll ran before paint.
