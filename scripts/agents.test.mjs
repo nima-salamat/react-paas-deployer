@@ -32,3 +32,28 @@ test("agent detail exposes manifest content for review, copy and download", () =
   assert.match(source, /This generated file contains a short-lived, single-use enrollment token/);
   assert.doesNotMatch(source, /await downloadManifest\(id\)/);
 });
+
+test("agent API exposes permanent deletion", () => {
+  const api = read("src/components/agents/agentApi.js");
+
+  assert.match(api, /export async function deleteAgent\(id\)/);
+  assert.match(api, /method: "DELETE"/);
+  assert.match(api, /AGENTS_API \+ "\/" \+ id \+ "\/"/);
+});
+
+test("agent list exposes permanent delete action", () => {
+  const source = read("src/components/agents/Agents.jsx");
+
+  assert.match(source, /deleteAgent/);
+  assert.match(source, /Delete/);
+  assert.match(source, /all credentials, enrollment tokens and idempotency records/);
+});
+
+test("agent detail exposes permanent delete action for revoked Agents too", () => {
+  const source = read("src/components/agents/AgentDetail.jsx");
+
+  assert.match(source, /deleteAgent\(id\)/);
+  assert.match(source, /Delete/);
+  assert.match(source, /A revoked Agent can still be deleted/);
+  assert.match(source, /navigate\("\/dashboard\/agents", \{ replace: true \}\)/);
+});
