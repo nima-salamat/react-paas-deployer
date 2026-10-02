@@ -1,4 +1,5 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useMediaQuery } from "@mui/material";
 import {
   Box,
   Button,
@@ -36,6 +37,9 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DriveFileRenameOutlineRoundedIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import apiRequest, { clearAuthAndRedirect, refreshAccessToken } from "../../customHooks/apiRequest";
 import { isSessionBoundToken } from "../../customHooks/authSession.js";
 import { SERVICE_ACTION_ROOT } from "../constants";
@@ -210,7 +214,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const [commandCatalog, setCommandCatalog] = useState([]);
   const [completionOpen, setCompletionOpen] = useState(false);
   const [completionIndex, setCompletionIndex] = useState(0);
+  const isMobileLayout = useMediaQuery("(max-width:899px)");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [selectedPaths, setSelectedPaths] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [dropActive, setDropActive] = useState(false);
+  const uploadInputRef = useRef(null);
   const [tree, setTree] = useState([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeMetadataLoading, setTreeMetadataLoading] = useState(false);
@@ -263,6 +272,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const platform = normalizePlatform(service?.platform || service?.framework || service?.selected_platform);
   const apiRoot = `${SERVICE_ACTION_ROOT}services/${serviceId}/shell`;
   const currentCwd = session?.cwd || "/";
+  useEffect(() => {
+    if (isMobileLayout) setSidebarOpen(false);
+  }, [isMobileLayout]);
   const breadcrumbItems = useMemo(() => splitPath(currentCwd), [currentCwd]);
   const parentItem = useMemo(() => {
     if (!session || currentCwd === session.root_path) return null;
@@ -1341,7 +1353,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         </Box>
 
         {activeTab === "shell" ? (
-          <Box sx={{ display: "grid", gridTemplateColumns: sidebarOpen ? { xs: "1fr", md: "250px minmax(0,1fr)" } : "1fr", height: TERMINAL_HEIGHT, minHeight: 0 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: sidebarOpen ? { xs: "1fr", md: "minmax(0,1fr) 280px" } : "1fr", height: TERMINAL_HEIGHT, minHeight: 0 }}>
             {sidebarOpen ? (
               <Box sx={{ display: "flex", flexDirection: "column", minHeight: 0, borderRight: { md: "1px solid rgba(148,163,184,.14)" }, borderBottom: { xs: "1px solid rgba(148,163,184,.14)", md: 0 }, bgcolor: "#0d141c" }}>
                 <Box sx={{ px: 1.2, py: .85, display: "flex", alignItems: "center", gap: .6 }}>
