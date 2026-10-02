@@ -79,10 +79,19 @@ function ServiceItem({
 
   const usage = resolveUsage(
     statusEntry
-      ? { ...s, cpu_percent: statusEntry.cpu, memory_percent: statusEntry.ram }
+      ? {
+          ...s,
+          ...(statusEntry.cpu != null ? { cpu_percent: statusEntry.cpu } : {}),
+          ...(statusEntry.ram != null ? { memory_percent: statusEntry.ram } : {}),
+        }
       : s,
     {}
   );
+
+  const cpuUsageLoading =
+    usage.cpu == null && (!statusEntry || statusEntry.loading);
+  const ramUsageLoading =
+    usage.ram == null && (!statusEntry || statusEntry.loading);
 
   const kindChip = (
     <Stack
@@ -159,8 +168,8 @@ function ServiceItem({
         
       }}
     >
-      <UsageBar label="CPU" value={usage.cpu} loading={!statusEntry || statusEntry.loading} error={statusEntry?.error} dense />
-      <UsageBar label="RAM" value={usage.ram} loading={!statusEntry || statusEntry.loading} error={statusEntry?.error} dense />
+      <UsageBar label="CPU" value={usage.cpu} loading={cpuUsageLoading} error={statusEntry?.error} dense />
+      <UsageBar label="RAM" value={usage.ram} loading={ramUsageLoading} error={statusEntry?.error} dense />
     </Stack>
   );
 
