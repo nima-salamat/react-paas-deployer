@@ -136,6 +136,7 @@ export default function ServicesListMui({
   const volumesRef = useRef([]);
   const servicesRef = useRef([]);
   const statusBusyRef = useRef(false);
+  const statusMapRef = useRef({});
   const serviceFetchSeqRef = useRef(0);
 
   useEffect(() => {
@@ -159,6 +160,9 @@ export default function ServicesListMui({
   useEffect(() => {
     servicesRef.current = services;
   }, [services]);
+  useEffect(() => {
+    statusMapRef.current = statusMap;
+  }, [statusMap]);
 
   const showAlert = useCallback((severity, message) => {
     setAlertState({ severity, message });
@@ -347,13 +351,33 @@ export default function ServicesListMui({
       // Limit concurrent status checks to avoid hammering API
       const slice = list.slice(0, 12);
       setStatusMap((prev) => {
-        const next = { ...prev };
-        slice.forEach((s) => {
+        let next = prev;
+        let changed = false;
+        for (const s of slice) {
           const sid = s.id ?? s.pk;
-          if (sid != null) next[String(sid)] = { ...(prev[String(sid)] || {}), loading: true, error: false };
-        });
-        return next;
+          if (sid == null) continue;
+          const key = String(sid);
+          const previous = prev[key];
+          // Show a spinner only until the first usable CPU/RAM result exists.
+          // Background refreshes keep the last values visible and never expose
+          // a transient loading state to the user.
+          const hasCachedUsage =
+            previous &&
+            (previous.cpu != null || previous.ram != null);
+          if (!hasCachedUsage) {
+            if (next === prev) next = { ...prev };
+            next[key] = {
+              ...(previous || {}),
+              loading: true,
+              error: false,
+            };
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
       });
+      const statusMapSnapshot = statusMapRef.current;
+
       const entries = await Promise.all(
         slice.map(async (s) => {
           const sid = s.id ?? s.pk;
@@ -376,8 +400,17 @@ export default function ServicesListMui({
                 },
               ];
             }
-          } catch {
             return [String(sid), { running: null, cpu: null, ram: null, loading: false, error: true }];
+          } catch {
+            const previous = statusMapSnapshot[String(sid)] || {};
+            return [
+              String(sid),
+              {
+                ...previous,
+                loading: false,
+                error: true,
+              },
+            ];
           }
         })
       );
