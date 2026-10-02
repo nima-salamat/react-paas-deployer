@@ -21,7 +21,7 @@ import ConnectionReconnectDialog from "./components/layout/ConnectionReconnectDi
 
 import Navbar from "./components/layout/Navbar.jsx";
 import Home from "./components/home/home.jsx";
-const Services = lazy(() => import("./components/service/Services.jsx"));
+const Services = lazy(() => import("./components/service/Services.jsx"));\nconst Agents = lazy(() => import("./components/agents/Agents.jsx"));\nconst AgentDetail = lazy(() => import("./components/agents/AgentDetail.jsx"));
 const Dashboard = lazy(() => import("./components/dashboard/Dashboard.jsx"));
 import SigninOrSignup from "./components/signin_or_signup/signin_or_signup.jsx";
 import Plans from "./components/plans/plans.jsx";
@@ -407,7 +407,7 @@ export function App({ prerender = false }) {
 
               <Route path="dashboard" element={<Dashboard themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}>
                 <Route index element={<Navigate to="services" replace />} />
-                <Route path="services" element={<Services />} />
+                <Route path="services" element={<Services />} />\n                <Route path="agents" element={<Agents />} />\n                <Route path="agents/:id" element={<AgentDetail />} />
                 <Route path="networks" element={<Networks />} />
                 <Route path="volumes" element={<Volumes />} />
                 <Route path="plans" element={<Plans />} />
