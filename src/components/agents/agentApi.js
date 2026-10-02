@@ -47,16 +47,31 @@ export async function listAudit(id) {
   const res = await apiRequest({ method: "GET", url: AGENTS_API + "/" + id + "/audit/", params: { page_size: 100 } });
   return res?.data || {};
 }
-export async function downloadManifest(id) {
-  const res = await apiRequest({ method: "POST", url: AGENTS_API + "/" + id + "/manifest/", responseType: "blob" });
-  const blob = new Blob([res.data], { type: "text/markdown;charset=utf-8" });
+export async function generateManifest(id) {
+  const res = await apiRequest({
+    method: "POST",
+    url: AGENTS_API + "/" + id + "/manifest/",
+    responseType: "text",
+  });
+  const disposition = String(res?.headers?.["content-disposition"] || "");
+  const match = disposition.match(/filename="([^"]+)"/i);
+  return {
+    content: String(res?.data || ""),
+    filename: match?.[1] || "AGENT-" + id + ".md",
+  };
+}
+
+export function downloadManifest(content, filename = "AGENT.md") {
+  const blob = new Blob([String(content || "")], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   try {
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "AGENT-" + id + ".md";
+    anchor.download = filename;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-  } finally { URL.revokeObjectURL(url); }
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
