@@ -70,7 +70,7 @@ test("agent credentials expose permanent delete action in the API client", () =>
 
   assert.match(api, /export async function deleteCredential\(agentId, credentialId\)/);
   assert.match(api, /method: "DELETE"/);
-  assert.match(api, /AGENTS_API \+ "\/" \+ agentId \+ "\/credentials" \+ "\/" \+ credentialId \+ "\/"/);
+  assert.ok(api.includes('url: AGENTS_API + "/" + agentId + "/credentials/" + credentialId + "/"'));
 });
 
 test("agent detail exposes credential deletion and provisioning source", () => {
