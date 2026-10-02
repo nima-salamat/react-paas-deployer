@@ -358,14 +358,19 @@ export default function SimpleHtmlEditor({
     if (block && editor.contains(block)) return block;
 
     // Toolbar actions must also work when the editor has never received text
-    // and therefore has no usable selection yet.
-    if (!editor.textContent?.trim() && editor.children.length === 0) {
+    // or when the browser left behind only an empty <br> after all text was deleted.
+    const structuralBlock = editor.querySelector(EDITOR_BLOCK_SELECTOR);
+    const hasVisualContent = Boolean(
+      editor.textContent?.replace(/\u200B/g, "").trim() ||
+      editor.querySelector("img, video, audio, iframe, table")
+    );
+    if (!hasVisualContent && !structuralBlock) {
+      editor.replaceChildren();
+
       const wrapper = document.createElement("p");
       wrapper.setAttribute("dir", "auto");
       wrapper.innerHTML = "<br>";
-      if (pendingAlignmentRef.current !== "left") {
-        setBlockAlignment(wrapper, pendingAlignmentRef.current);
-      }
+      setBlockAlignment(wrapper, pendingAlignmentRef.current);
       editor.appendChild(wrapper);
 
       if (selection) {
@@ -1337,6 +1342,7 @@ export default function SimpleHtmlEditor({
             outline: "none",
             fontSize: "14px",
             lineHeight: 1.45,
+            textAlign: "left",
             "& p, & li, & blockquote": { fontSize: "14px" },
             "&:empty:before": {
               content: "attr(data-placeholder)",

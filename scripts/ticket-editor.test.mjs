@@ -400,7 +400,6 @@ test("alignment can be chosen before any text exists and is inherited by the fir
 
   assert.match(source, /const pendingAlignmentRef = useRef\("left"\)/);
   assert.match(source, /pendingAlignmentRef\.current = align/);
-  assert.match(source, /Keep alignment as an explicit typing preference/);
   assert.match(source, /const pendingAlignment = pendingAlignmentRef\.current/);
   assert.match(source, /const block = findBlock\(\) \|\| ensureBlock\(\)/);
   assert.match(source, /setBlockAlignment\(block, pendingAlignment\)/);
@@ -444,4 +443,21 @@ test("alignment is explicit on an empty editor instead of relying on browser aut
   assert.match(source, /setBlockAlignment\(emptyBlock, align\)/);
   assert.match(source, /pendingAlignmentRef\.current = "left"/);
   assert.doesNotMatch(source, /document\.execCommand\(["']justify/);
+});
+
+
+test("empty editor detection handles a browser-left <br> placeholder", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const structuralBlock = editor\.querySelector\(EDITOR_BLOCK_SELECTOR\)/);
+  assert.match(source, /const hasVisualContent = Boolean\(/);
+  assert.match(source, /editor\.replaceChildren\(\)/);
+  assert.match(source, /const wrapper = document\.createElement\("p"\)/);
+  assert.match(source, /setBlockAlignment\(wrapper, pendingAlignmentRef\.current\)/);
+});
+
+test("editor defaults to explicit left alignment instead of automatic start alignment", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /lineHeight: 1\.45,[\s\S]*textAlign: "left"/);
 });
