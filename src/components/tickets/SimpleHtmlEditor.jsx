@@ -66,6 +66,53 @@ function copyBlockAlignment(source, target) {
   }
 }
 
+function copyBlockDirection(source, target) {
+  if (!target) return;
+  const direction = source?.getAttribute?.("dir");
+  target.setAttribute("dir", direction === "ltr" || direction === "rtl" ? direction : "auto");
+}
+
+const EDITOR_BLOCK_SELECTOR = "p, div, li, blockquote, h1, h2, h3, h4";
+
+function getSelectedEditorBlocks(editor, range) {
+  if (!editor || !range) return [];
+
+  const candidates = Array.from(editor.querySelectorAll(EDITOR_BLOCK_SELECTOR)).filter((node) => {
+    try {
+      if (range.collapsed) return false;
+      const nodeRange = document.createRange();
+      nodeRange.selectNodeContents(node);
+      const endsBeforeSelection = nodeRange.compareBoundaryPoints(Range.END_TO_START, range) <= 0;
+      const startsAfterSelection = nodeRange.compareBoundaryPoints(Range.START_TO_END, range) >= 0;
+      return !endsBeforeSelection && !startsAfterSelection;
+    } catch {
+      return false;
+    }
+  });
+
+  const selected = new Set(candidates);
+  return candidates.filter((node) => {
+    let ancestor = node.parentElement;
+    while (ancestor && ancestor !== editor) {
+      if (selected.has(ancestor)) return false;
+      ancestor = ancestor.parentElement;
+    }
+    return true;
+  });
+}
+
+function getEditorDirection(block) {
+  const explicit = block?.getAttribute?.("dir");
+  return explicit === "ltr" || explicit === "rtl" ? explicit : "auto";
+}
+
+function normalizeEditorDirection(editor) {
+  if (!editor) return;
+  editor.querySelectorAll?.(EDITOR_BLOCK_SELECTOR).forEach((block) => {
+    if (!block.getAttribute("dir")) block.setAttribute("dir", "auto");
+  });
+}
+
 /**
  * Compact HTML editor. Toolbar hidden by default; expand with button.
  * Enter → new line (send only via toolbar/send button from parent).
@@ -120,6 +167,7 @@ export default function SimpleHtmlEditor({
     const incoming = typeof value === "string" ? value : "";
     if (incoming === lastHtml.current || editingRef.current) return;
     editor.innerHTML = incoming;
+    normalizeEditorDirection(editor);
     editor.querySelectorAll("pre.editor-code-block").forEach((pre) => {
       const code = pre.querySelector("code");
       const language = getCodeLanguage(code);
@@ -315,6 +363,7 @@ export default function SimpleHtmlEditor({
     while (target.parentNode && target.parentNode !== editor) target = target.parentNode;
 
     const wrapper = document.createElement("p");
+    wrapper.setAttribute("dir", "auto");
     if (target === editor) {
       wrapper.innerHTML = "<br>";
       editor.appendChild(wrapper);
@@ -471,32 +520,17 @@ export default function SimpleHtmlEditor({
     const selection = window.getSelection?.();
     if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
 
-    const range = selection.getRangeAt(0);
+    let range = selection.getRangeAt(0);
     let blocks = [];
 
     if (range.collapsed) {
       const current = findBlock() || ensureBlock();
-      if (current) blocks = [current];
+      if (current) {
+        blocks = [current];
+        range = selection.getRangeAt(0);
+      }
     } else {
-      const candidates = Array.from(
-        editor.querySelectorAll("p, div, li, blockquote, h1, h2, h3, h4")
-      ).filter((node) => {
-        try {
-          return range.intersectsNode(node);
-        } catch {
-          return false;
-        }
-      });
-
-      const selected = new Set(candidates);
-      blocks = candidates.filter((node) => {
-        let ancestor = node.parentElement;
-        while (ancestor && ancestor !== editor) {
-          if (selected.has(ancestor)) return false;
-          ancestor = ancestor.parentElement;
-        }
-        return true;
-      });
+      blocks = getSelectedEditorBlocks(editor, range);
 
       if (!blocks.length) {
         const current = findBlock() || ensureBlock();
@@ -560,6 +594,7 @@ export default function SimpleHtmlEditor({
 
     if (!normalized) paragraph.innerHTML = "<br>";
     copyBlockAlignment(alignmentSource, paragraph);
+    copyBlockDirection(alignmentSource, paragraph);
     return paragraph;
   }, []);
 
@@ -714,6 +749,7 @@ export default function SimpleHtmlEditor({
     if (block.tagName !== "PRE") {
       const pre = document.createElement("pre");
       pre.className = "editor-code-block";
+      pre.setAttribute("dir", getEditorDirection(block));
       code = document.createElement("code");
       const text = block.innerText || block.textContent || "";
       code.textContent = text;
@@ -782,6 +818,7 @@ export default function SimpleHtmlEditor({
     } else {
       const pre = document.createElement("pre");
       pre.className = "editor-code-block";
+      pre.setAttribute("dir", getEditorDirection(block));
       const code = document.createElement("code");
       const text = block.innerText || block.textContent || "";
       code.textContent = text;
@@ -809,7 +846,7 @@ export default function SimpleHtmlEditor({
     if (!anchorBlock || anchorBlock.tagName === "PRE") return;
 
     const candidates = Array.from(
-      editor.querySelectorAll("p, div, li, blockquote, h1, h2, h3, h4")
+      editor.querySelectorAll(EDITOR_BLOCK_SELECTOR)
     ).filter((node) => {
       try {
         return range.collapsed
@@ -941,27 +978,56 @@ export default function SimpleHtmlEditor({
   const toggleQuote = () => {
     if (disabled || !ref.current) return;
     if (!focusEditorSelection()) return;
-    const block = findBlock() || ensureBlock();
-    if (!block || block.tagName === "PRE") return;
+
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    if (!selection?.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    const currentBlock = findBlock() || ensureBlock();
+    if (!currentBlock || currentBlock.tagName === "PRE") return;
+
+    let targets = range.collapsed
+      ? [currentBlock]
+      : getSelectedEditorBlocks(editor, range);
+
+    if (!targets.length) targets = [currentBlock];
 
     editingRef.current = true;
-    if (block.tagName === "BLOCKQUOTE") {
-      const p = document.createElement("p");
-      p.innerHTML = block.innerHTML || "<br>";
-      block.replaceWith(p);
-      placeCaretAtEnd(p);
-    } else if (block.tagName === "LI") {
-      const quote = document.createElement("blockquote");
-      quote.innerHTML = block.innerHTML || "<br>";
-      block.innerHTML = "";
-      block.appendChild(quote);
-      placeCaretAtEnd(quote);
-    } else {
-      const quote = document.createElement("blockquote");
-      quote.innerHTML = block.innerHTML || "<br>";
-      block.replaceWith(quote);
-      placeCaretAtEnd(quote);
-    }
+
+    targets.forEach((block) => {
+      if (block.tagName === "BLOCKQUOTE") {
+        const paragraph = createParagraphFromText("", block);
+        const fragment = document.createDocumentFragment();
+        while (block.firstChild) fragment.appendChild(block.firstChild);
+        if (fragment.childNodes.length) {
+          paragraph.replaceChildren(fragment);
+        }
+        block.parentNode?.replaceChild(paragraph, block);
+        return;
+      }
+
+      const quoteBlock = document.createElement("blockquote");
+      quoteBlock.setAttribute("dir", getEditorDirection(block));
+      copyBlockAlignment(block, quoteBlock);
+      quoteBlock.innerHTML = block.innerHTML || "<br>";
+
+      if (block.tagName === "LI") {
+        block.replaceChildren(quoteBlock);
+      } else {
+        block.parentNode?.replaceChild(quoteBlock, block);
+      }
+    });
+
+    const firstTarget = targets[0];
+    const caretTarget =
+      firstTarget.tagName === "LI"
+        ? firstTarget.querySelector?.("blockquote")
+        : firstTarget.isConnected
+          ? firstTarget
+          : editor.querySelector("blockquote") || currentBlock;
+
+    placeCaretAtEnd(caretTarget);
     saveSelection();
     editingRef.current = false;
     emit();
@@ -1214,6 +1280,9 @@ export default function SimpleHtmlEditor({
             "& .ticket-align-left": { textAlign: "left" },
             "& .ticket-align-center": { textAlign: "center" },
             "& .ticket-align-right": { textAlign: "right" },
+            "& [dir="rtl"]": { direction: "rtl", unicodeBidi: "plaintext" },
+            "& [dir="ltr"]": { direction: "ltr", unicodeBidi: "plaintext" },
+            "& [dir="auto"]": { unicodeBidi: "plaintext" },
             "& pre.editor-code-block": {
               m: "0.65rem 0",
               p: 0,
