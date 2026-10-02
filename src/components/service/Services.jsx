@@ -389,15 +389,21 @@ export default function ServicesListMui({
           if (!entry) continue;
           const [id, val] = entry;
           const old = prev[id];
+          const merged = {
+            ...val,
+            cpu: val.cpu ?? old?.cpu ?? null,
+            ram: val.ram ?? old?.ram ?? null,
+            running: val.running ?? old?.running ?? null,
+          };
           if (
             !old ||
-            old.cpu !== val.cpu ||
-            old.ram !== val.ram ||
-            old.running !== val.running ||
-            old.loading !== val.loading ||
-            old.error !== val.error
+            old.cpu !== merged.cpu ||
+            old.ram !== merged.ram ||
+            old.running !== merged.running ||
+            old.loading !== merged.loading ||
+            old.error !== merged.error
           ) {
-            next[id] = val;
+            next[id] = merged;
             changed = true;
           }
         }
