@@ -431,7 +431,7 @@ export default function SimpleHtmlEditor({
       >
         <Stack spacing={1}>
           <Typography variant="subtitle2" fontWeight={800}>Insert link</Typography>
-          <TextField size="small" autoFocus label="URL" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} error={Boolean(linkUrl) && !validLink} helperText="HTTP(S), mailto, tel, or internal link" />
+          <TextField size="small" autoFocus label="URL" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} error={Boolean(linkUrl) && !validLink} helperText="HTTP(S), mailto, or internal link" />
           <TextField size="small" label="Text" value={linkText} onChange={(e) => setLinkText(e.target.value)} />
           <Stack direction="row" justifyContent="space-between" spacing={1}>
             <Button size="small" color="error" onClick={removeLink} disabled={!linkUrl.trim()}>Remove</Button>
