@@ -513,8 +513,9 @@ export default function SimpleHtmlEditor({
 
     const block = findBlock();
     const list = block?.tagName === "LI" ? block.parentElement : null;
-    const explicitAlignment = hasExplicitBlockAlignment(block);
-    if (explicitAlignment) {
+    if (block) {
+      // The active block is the source of truth. An unaligned block is
+      // explicitly treated as left, never as "inherit the previous block".
       currentAlignmentRef.current = getBlockAlignment(block);
     }
     setActiveFormats({

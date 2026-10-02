@@ -603,3 +603,11 @@ test("editor preserves the selected alignment when contentEditable loses it duri
   assert.match(source, /setBlockAlignment\(block, currentAlignmentRef\.current\)/);
   assert.match(source, /pendingAlignmentRef\.current = "left"/);
 });
+
+
+test("moving to an unaligned block resets the typing alignment to explicit left", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /if \(block\) \{[\s\S]*currentAlignmentRef\.current = getBlockAlignment\(block\)/);
+  assert.match(source, /An unaligned block is[\s\S]*explicitly treated as left/);
+});
