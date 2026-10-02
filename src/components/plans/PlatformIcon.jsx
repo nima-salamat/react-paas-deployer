@@ -60,6 +60,46 @@ const ICON_MAP = {
   oracle: TbDatabase,
 };
 
+const ICON_COLORS = {
+  php: "#777BB4",
+  laravel: "#FF2D20",
+  python: "#3776AB",
+  django: "#0C4B33",
+  nextjs: "#000000",
+  next: "#000000",
+  nodejs: "#5FA04E",
+  node: "#5FA04E",
+  flask: "#000000",
+  docker: "#2496ED",
+  laravel: "#FF2D20",
+  statichtmlcss: "#E34F26",
+  html: "#E34F26",
+  html5: "#E34F26",
+  vuejs: "#42B883",
+  vue: "#42B883",
+  angular: "#DD0031",
+  react: "#61DAFB",
+  dotnet: "#512BD4",
+  ".net": "#512BD4",
+  mysql: "#4479A1",
+  postgresql: "#4169E1",
+  postgres: "#4169E1",
+  mariadb: "#003545",
+  mongodb: "#47A248",
+  mongo: "#47A248",
+  redis: "#DC382D",
+  go: "#00ADD8",
+  golang: "#00ADD8",
+  oracle: "#F80000",
+};
+
+function resolveIconColor(key, label) {
+  const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const k = norm(key);
+  const l = norm(label);
+  return ICON_COLORS[k] || ICON_COLORS[l] || "#7C8EA6";
+}
+
 function resolveIcon(key, label) {
   const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const k = norm(key);
@@ -92,9 +132,12 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
           bgcolor: (theme) => theme.palette.mode === "dark"
             ? "rgba(226,232,240,.10)"
             : "rgba(255,255,255,.72)",
-          backgroundImage: (theme) => theme.palette.mode === "dark"
-            ? "linear-gradient(145deg, rgba(255,255,255,.22) 0%, rgba(203,213,225,.13) 34%, rgba(148,163,184,.08) 62%, rgba(255,255,255,.16) 100%)"
-            : "linear-gradient(145deg, rgba(255,255,255,.98) 0%, rgba(226,232,240,.96) 34%, rgba(148,163,184,.62) 66%, rgba(255,255,255,.96) 100%)",
+          backgroundImage: (theme) => {
+            const iconColor = resolveIconColor(platformKey, label);
+            return theme.palette.mode === "dark"
+              ? `radial-gradient(circle at 30% 24%, ${iconColor}20 0%, transparent 42%), linear-gradient(145deg, rgba(255,255,255,.22) 0%, rgba(203,213,225,.13) 34%, rgba(148,163,184,.08) 62%, rgba(255,255,255,.16) 100%)`
+              : `radial-gradient(circle at 30% 24%, ${iconColor}18 0%, transparent 42%), linear-gradient(145deg, rgba(255,255,255,.98) 0%, rgba(226,232,240,.96) 34%, rgba(148,163,184,.62) 66%, rgba(255,255,255,.96) 100%)`;
+          },
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -123,10 +166,15 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
             display: "block",
             position: "relative",
             zIndex: 1,
+            color: resolveIconColor(platformKey, label),
             filter: (theme) => theme.palette.mode === "dark"
-              ? "grayscale(1) brightness(1.72) contrast(.68) drop-shadow(0 1px 2px rgba(255,255,255,.18))"
-              : "grayscale(1) brightness(.74) contrast(.72) drop-shadow(0 1px 1px rgba(255,255,255,.72))",
-            opacity: 0.98,
+              ? "saturate(1.1) brightness(1.08) drop-shadow(0 2px 5px rgba(0,0,0,.34))"
+              : "saturate(1.06) brightness(.98) drop-shadow(0 2px 4px rgba(15,23,42,.18))",
+            opacity: 1,
+            transition: "transform 180ms ease, filter 180ms ease",
+          },
+          "&:hover svg": {
+            transform: "translateY(-1px) scale(1.05)",
           },
         }}
         title={label || platformKey}
