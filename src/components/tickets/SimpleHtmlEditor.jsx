@@ -720,6 +720,46 @@ export default function SimpleHtmlEditor({
     selection.addRange(range);
   }, []);
 
+  const splitStandardBlockAtCaret = useCallback((block, range) => {
+    const parent = block?.parentNode;
+    if (!block || !parent || !range || !block.contains(range.startContainer)) return null;
+
+    const tagName = ["P", "H1", "H2", "H3", "H4"].includes(block.tagName)
+      ? block.tagName.toLowerCase()
+      : "p";
+    const beforeRange = range.cloneRange();
+    beforeRange.selectNodeContents(block);
+    beforeRange.setEnd(range.startContainer, range.startOffset);
+
+    const afterRange = range.cloneRange();
+    afterRange.selectNodeContents(block);
+    afterRange.setStart(range.startContainer, range.startOffset);
+    const afterFragment = afterRange.extractContents();
+
+    const next = document.createElement(tagName);
+    copyBlockAlignment(block, next);
+    copyBlockDirection(block, next);
+
+    if (afterFragment.childNodes.length) {
+      next.appendChild(afterFragment);
+    } else {
+      next.innerHTML = "<br>";
+    }
+
+    // Keep the content before the caret in the original block. Empty blocks
+    // use a real <br> so the caret remains visible and editable.
+    const beforeFragment = beforeRange.cloneContents();
+    block.replaceChildren();
+    if (beforeFragment.childNodes.length) {
+      block.appendChild(beforeFragment);
+    } else {
+      block.innerHTML = "<br>";
+    }
+
+    parent.insertBefore(next, block.nextSibling);
+    return next;
+  }, []);
+
   const splitQuoteAtCaret = useCallback((quote, range) => {
     const parent = quote?.parentNode;
     if (!quote || !parent || !range || !quote.contains(range.startContainer)) return null;
@@ -1196,6 +1236,29 @@ export default function SimpleHtmlEditor({
       const caret = document.createRange(); caret.selectNodeContents(p); caret.collapse(false); selection.removeAllRanges(); selection.addRange(caret);
       saveSelection(); emit();
       return;
+    }
+
+    // Normal content blocks get an explicit next paragraph so the browser
+    // cannot silently change the selected alignment when creating a new line.
+    if (!e.shiftKey && !enterSends && selection?.rangeCount) {
+      const range = selection.getRangeAt(0).cloneRange();
+      const currentBlock = findBlock();
+      if (
+        range.collapsed &&
+        currentBlock &&
+        ["P", "H1", "H2", "H3", "H4"].includes(currentBlock.tagName) &&
+        currentBlock.contains(range.startContainer)
+      ) {
+        e.preventDefault();
+        editingRef.current = true;
+        const next = splitStandardBlockAtCaret(currentBlock, range);
+        if (next) placeCaretAtStart(next);
+        saveSelection();
+        editingRef.current = false;
+        emit();
+        updateActiveFormats();
+        return;
+      }
     }
 
     // Default: Enter inserts a new line (do not send).

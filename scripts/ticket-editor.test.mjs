@@ -556,3 +556,15 @@ test("ticket list has an explicit Open button on desktop and mobile", () => {
   assert.match(source, /e\.stopPropagation\(\)/);
   assert.match(source, /<TableCell colSpan=\{7\}>/);
 });
+
+
+test("normal Enter creates a new block that preserves the current alignment", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const splitStandardBlockAtCaret = useCallback/);
+  assert.match(source, /copyBlockAlignment\(block, next\)/);
+  assert.match(source, /copyBlockDirection\(block, next\)/);
+  assert.match(source, /!e\.shiftKey && !enterSends/);
+  assert.match(source, /const next = splitStandardBlockAtCaret\(currentBlock, range\)/);
+  assert.match(source, /if \(next\) placeCaretAtStart\(next\)/);
+});
