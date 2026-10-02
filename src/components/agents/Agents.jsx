@@ -9,6 +9,12 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { createAgent, deleteAgent, listAgents, listScopes } from "./agentApi";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
 
+function provisioningLabel(value) {
+  if (value === "dashboard") return "Dashboard";
+  if (value === "api_enrollment") return "API enrollment";
+  return "Legacy / unspecified";
+}
+
 export default function Agents() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -141,6 +147,7 @@ export default function Agents() {
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
                       <Chip size="small" variant="outlined" label={agent.scope_count + " scopes"} />
                       <Chip size="small" variant="outlined" label={agent.active_credential_count + " active credentials"} />
+                      <Chip size="small" variant="outlined" label={"Provisioned via " + provisioningLabel(agent.provisioning_source)} />
                       <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
                         Last used {agent.last_used_at ? new Date(agent.last_used_at).toLocaleString() : "never"}
                       </Typography>
