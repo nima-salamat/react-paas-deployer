@@ -306,12 +306,12 @@ function VolumeCard({
         </Box>
 
         <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0} flexWrap="wrap" useFlexGap>
-          <Tooltip title={blocked ? mutateReason || "Cannot edit now" : "Edit volume metadata"}>
+          <Tooltip title={volume.docker_exists === true ? "Volume is already provisioned in Docker; metadata is locked." : blocked ? mutateReason || "Cannot edit now" : "Edit volume metadata"}>
             <span>
               <IconButton
                 size="small"
                 color="primary"
-                disabled={loading || blocked}
+                disabled={loading || blocked || volume.docker_exists === true}
                 onClick={() => onEdit?.(volume)}
               >
                 <EditIcon fontSize="small" />
@@ -345,8 +345,8 @@ function VolumeCard({
                   size="small"
                   color="warning"
                   variant="outlined"
-                  disabled={loading || blocked}
-                  onClick={() => onDetach?.(volume.id ?? volume.pk, volume)
+                  disabled={loading || !canDetach}
+                  onClick={() => onDetach?.(volume.id ?? volume.pk, volume)}
                   startIcon={<LinkOffIcon fontSize="small" />}
                   sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
                 >
@@ -369,7 +369,7 @@ function VolumeCard({
                   size="small"
                   variant="contained"
                   startIcon={<LinkIcon />}
-                  disabled={loading || exceeds || blocked}
+                  disabled={loading || exceeds || !canAttach}
                   onClick={() => onAttach(volume)}
                   sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
                 >
@@ -392,7 +392,7 @@ function VolumeCard({
               <IconButton
                 size="small"
                 color="error"
-                disabled={loading || (isAttached && blocked)}
+                disabled={loading || (isAttached ? !canDetach : !canAdd)}
                 onClick={() => onDelete?.(volume)}
               >
                 <DeleteIcon fontSize="small" />
@@ -826,6 +826,7 @@ export default function SettingsPanel({
   onDownloadVolume,
   canMutateVolumes = true,
   volumeMutateReason = "",
+  volumeCapabilities = null,
   onPurgeRuntime,
   purgeRuntimeLoading = false,
   onDeleteService,
@@ -929,13 +930,13 @@ export default function SettingsPanel({
   const statusBusy = ["queued", "deploying", "stopping", "running", "pending", "updating..."].includes(
     serviceStatus
   );
-  // When status is stopped/failed/succeeded/empty, enable volume mutations in UI.
-  // Parent canMutateVolumes=false is ignored for idle statuses (was blocking detach incorrectly).
-  const effectiveCanMutate = Boolean(canMutateVolumes) && !statusBusy;
-  const effectiveMutateReason = statusBusy
-    ? volumeMutateReason ||
-      `Service is "${serviceStatus || "busy"}". Stop it before changing volumes.`
-    : volumeMutateReason || "";
+  const effectiveCanMutate = Boolean(volumeCapabilities ? volumeCapabilities.mutable : canMutateVolumes) && !statusBusy;
+  const canAttach = effectiveCanMutate && (volumeCapabilities ? volumeCapabilities.can_attach !== false : true);
+  const canDetach = effectiveCanMutate && (volumeCapabilities ? volumeCapabilities.can_detach !== false : true);
+  const canAdd = effectiveCanMutate && (volumeCapabilities ? volumeCapabilities.can_add !== false : true);
+  const effectiveMutateReason = !effectiveCanMutate
+    ? (volumeCapabilities?.reason || volumeMutateReason || "Volume changes are unavailable for the current service state.")
+    : "";
 
   const serviceIdStr = String(
     service?.id ?? service?.pk ?? service?.uuid ?? ""
@@ -1323,7 +1324,7 @@ export default function SettingsPanel({
             <Button
               size="small" startIcon={<AddIcon />} variant="outlined"
               onClick={() => { setCreateVolumeError(null); setCreateVolumeOpen(true); }}
-              disabled={(remainingMb != null && remainingMb <= 0) || !effectiveCanMutate}
+              disabled={(remainingMb != null && remainingMb <= 0) || !canAdd}
               sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
             >
               New
