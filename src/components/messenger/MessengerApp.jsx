@@ -1790,6 +1790,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         });
       });
     } else {
+      // Arm the cold-open viewport before the async request starts so the
+      // post-render layout effect cannot miss the first message render.
+      if (!jumpToMessageId) {
+        initialBottomPendingRef.current = cid;
+        nearBottomRef.current = true;
+      }
       try {
         await loadMessages(c.id);
       } finally {
@@ -1824,12 +1830,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       };
       setTimeout(() => { tryJump(); }, 80);
     } else if (!cached?.messages?.length) {
-      // Do not rely on a single post-fetch rAF. The message DOM can grow after
-      // the first paint, so the layout effect above owns the initial bottom lock.
-      if (!jumpToMessageId) {
-        initialBottomPendingRef.current = cid;
-        nearBottomRef.current = true;
-      }
+      // Initial bottom lock was armed before loadMessages() above.
     }
     // Ensure overlay is gone even if loadMessages was skipped / failed early
     if (String(activeIdRef.current) === String(c.id)) setChatOpening(false);
