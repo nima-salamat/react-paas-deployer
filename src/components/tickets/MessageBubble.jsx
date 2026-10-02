@@ -566,9 +566,10 @@ function enhanceRichTextHtml(html) {
     copyButton.setAttribute("aria-label", "Copy code");
     copyButton.textContent = "Copy";
 
+    const parent = pre.parentNode;
     header.append(label, copyButton);
     shell.append(header, pre);
-    pre.parentNode?.replaceChild(shell, pre);
+    parent?.replaceChild(shell, pre);
   });
 
   return root.innerHTML;
