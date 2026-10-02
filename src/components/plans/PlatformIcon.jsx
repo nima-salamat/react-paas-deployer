@@ -1,5 +1,6 @@
 import React, { memo } from "react";
 import { Box } from "@mui/material";
+import { TbDatabase } from "react-icons/tb";
 
 /* Simple Icons via react-icons — consistent brand marks across the dashboard */
 import {
@@ -10,12 +11,12 @@ import {
   SiFlask,
   SiGo,
   SiHtml5,
+  SiLaravel,
   SiMariadb,
   SiMongodb,
   SiMysql,
   SiNextdotjs,
   SiNodedotjs,
-  SiOracle,
   SiPhp,
   SiPostgresql,
   SiPython,
@@ -35,6 +36,7 @@ const ICON_MAP = {
   node: SiNodedotjs,
   flask: SiFlask,
   docker: SiDocker,
+  laravel: SiLaravel,
   statichtmlcss: SiHtml5,
   html: SiHtml5,
   html5: SiHtml5,
@@ -53,7 +55,9 @@ const ICON_MAP = {
   redis: SiRedis,
   go: SiGo,
   golang: SiGo,
-  oracle: SiOracle,
+  // Simple Icons removed Oracle in the version bundled by react-icons 5.7.
+  // Keep Oracle covered with a neutral database glyph instead of a missing brand export.
+  oracle: TbDatabase,
 };
 
 function resolveIcon(key, label) {
