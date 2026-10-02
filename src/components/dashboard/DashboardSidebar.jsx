@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useLocation, useNavigate } from "react-router-dom";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
 import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
@@ -23,6 +24,12 @@ import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 export const SIDEBAR_WIDTH = 232;
 
 const NAV_ITEMS = [
+  {
+    group: "Workspace",
+    items: [
+      { id: "overview", label: "Overview", path: "/dashboard", icon: DashboardOutlinedIcon },
+    ],
+  },
   {
     group: "Infrastructure",
     items: [
@@ -48,6 +55,7 @@ const NAV_ITEMS = [
 ];
 
 function resolveActiveId(pathname) {
+  if (pathname === "/dashboard") return "overview";
   if (pathname.startsWith("/dashboard/services")) return "services";
   if (pathname.startsWith("/dashboard/networks")) return "networks";
   if (pathname.startsWith("/dashboard/volumes")) return "volumes";

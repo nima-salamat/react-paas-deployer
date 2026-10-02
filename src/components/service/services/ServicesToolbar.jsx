@@ -27,6 +27,7 @@ export default function ServicesToolbar({
   query,
   setQuery,
   onSearch,
+  onClearSearch = null,
   viewMode,
   setViewMode,
   kindFilter,
@@ -178,7 +179,18 @@ export default function ServicesToolbar({
               size="small"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name…"
+              placeholder="Search services by name or owner…"
+            InputProps={{
+                endAdornment: query ? (
+                  <IconButton
+                    size="small"
+                    aria-label="Clear search"
+                    onClick={() => (onClearSearch ? onClearSearch() : setQuery(""))}
+                  >
+                    <Typography component="span" sx={{ fontSize: 16, lineHeight: 1 }}>×</Typography>
+                  </IconButton>
+                ) : null,
+              }}
             />
             <Button
               variant="contained"

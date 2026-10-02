@@ -98,6 +98,7 @@ export default function ServicesListMui({
   const [page, setPage] = useState(1);
   const [hasNext, setHasNext] = useState(false);
   const [query, setQuery] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
   const [kindFilter, setKindFilter] = useState("all");
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -135,6 +136,7 @@ export default function ServicesListMui({
   const volumesRef = useRef([]);
   const servicesRef = useRef([]);
   const statusBusyRef = useRef(false);
+  const serviceFetchSeqRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -180,18 +182,21 @@ export default function ServicesListMui({
   // ─── Services list ───────────────────────────────────────────────────────
 
   const fetchServices = useCallback(
-    async (isBackground = false) => {
+    async (isBackground = false, overrides = {}) => {
       if (isBackground && editingOpenRef.current) return;
+      const requestSeq = ++serviceFetchSeqRef.current;
+      const effectivePage = Number(overrides.pageOverride ?? page) || 1;
+      const effectiveQuery = overrides.queryOverride ?? query;
 
       if (!isBackground) {
-        setLoading(page === 1);
-        setLoadingMore(page > 1);
+        setLoading(effectivePage === 1);
+        setLoadingMore(effectivePage > 1);
         setServicesFetchError(null);
       }
       try {
-        const targetPage = isBackground ? 1 : page;
+        const targetPage = isBackground ? 1 : effectivePage;
         const targetPageSize = isBackground
-          ? Math.max(page * pageSize, pageSize)
+          ? Math.max(effectivePage * pageSize, pageSize)
           : pageSize;
         
         const params = JSON.parse(extraQueryParamsStr);
@@ -200,44 +205,41 @@ export default function ServicesListMui({
           params,
           targetPage,
           targetPageSize,
-          query
+          effectiveQuery
         );
         const res = await apiRequest({ method: "GET", url });
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || requestSeq !== serviceFetchSeqRef.current) return;
 
         const results = extractList(res.data);
 
         setServices((prev) => {
-          if (isBackground) {
-            // Soft merge by id — keep previous object refs when fields unchanged
-            const byId = new Map(prev.map((s) => [getKey(s), s]));
-            let changed = false;
-            const merged = results.map((r) => {
-              const key = getKey(r);
-              const old = byId.get(key);
-              if (
-                old &&
-                old.name === r.name &&
-                old.status === r.status &&
-                old.plan === r.plan &&
-                old.network === r.network
-              ) {
-                return old;
-              }
-              changed = true;
-              return old ? { ...old, ...r } : r;
-            });
-            if (!changed && merged.length === prev.length) return prev;
-            return merged;
+          if (!isBackground) {
+            return effectivePage === 1
+              ? results
+              : [
+                  ...prev,
+                  ...results.filter((r) => !prev.some((p) => getKey(p) === getKey(r))),
+                ];
           }
-          return page === 1
-            ? results
-            : [
-                ...prev,
-                ...results.filter(
-                  (r) => !prev.some((p) => getKey(p) === getKey(r))
-                ),
-              ];
+          const incomingIds = new Set(results.map(getKey));
+          const previousById = new Map(prev.map((item) => [getKey(item), item]));
+          const merged = results.map((item) => {
+            const previous = previousById.get(getKey(item));
+            return previous &&
+              previous.name === item.name &&
+              previous.status === item.status &&
+              previous.plan === item.plan &&
+              previous.network === item.network &&
+              previous.created_at === item.created_at
+              ? previous
+              : previous
+              ? { ...previous, ...item }
+              : item;
+          });
+          prev.forEach((item) => {
+            if (!incomingIds.has(getKey(item))) merged.push(item);
+          });
+          return merged;
         });
 
         setPlanCache((prev) => {
@@ -267,7 +269,7 @@ export default function ServicesListMui({
           return next;
         });
 
-        if (!isBackground) setHasNext(Boolean(res.data?.next));
+        if (!isBackground && requestSeq === serviceFetchSeqRef.current) setHasNext(Boolean(res.data?.next));
       } catch (e) {
         if (!mountedRef.current) return;
         if (handleAuthError(e)) return;
@@ -278,7 +280,7 @@ export default function ServicesListMui({
             setServicesFetchError(null);
           } else {
             setServicesFetchError(friendlyError(e, "Failed to load services."));
-            if (page === 1) setServices([]);
+            if (effectivePage === 1) setServices([]);
             setHasNext(false);
           }
         }
@@ -340,6 +342,14 @@ export default function ServicesListMui({
     try {
       // Limit concurrent status checks to avoid hammering API
       const slice = list.slice(0, 12);
+      setStatusMap((prev) => {
+        const next = { ...prev };
+        slice.forEach((s) => {
+          const sid = s.id ?? s.pk;
+          if (sid != null) next[String(sid)] = { ...(prev[String(sid)] || {}), loading: true, error: false };
+        });
+        return next;
+      });
       const entries = await Promise.all(
         slice.map(async (s) => {
           const sid = s.id ?? s.pk;
@@ -357,13 +367,14 @@ export default function ServicesListMui({
                   running: Boolean(res.data.running),
                   cpu: clampPct(res.data.cpu),
                   ram: clampPct(res.data.ram),
+                  loading: false,
+                  error: false,
                 },
               ];
             }
           } catch {
-            /* skip */
+            return [String(sid), { running: null, cpu: null, ram: null, loading: false, error: true }];
           }
-          return null;
         })
       );
       if (!mountedRef.current) return;
@@ -378,7 +389,9 @@ export default function ServicesListMui({
             !old ||
             old.cpu !== val.cpu ||
             old.ram !== val.ram ||
-            old.running !== val.running
+            old.running !== val.running ||
+            old.loading !== val.loading ||
+            old.error !== val.error
           ) {
             next[id] = val;
             changed = true;
@@ -931,11 +944,21 @@ export default function ServicesListMui({
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 } }}>
       <ServicesToolbar
-        query={query}
-        setQuery={setQuery}
+        query={searchDraft}
+        setQuery={setSearchDraft}
         onSearch={() => {
+          const nextQuery = searchDraft.trim();
+          setQuery(nextQuery);
           setPage(1);
-          fetchServices(false);
+          setServices([]);
+          fetchServices(false, { pageOverride: 1, queryOverride: nextQuery });
+        }}
+        onClearSearch={() => {
+          setSearchDraft("");
+          setQuery("");
+          setPage(1);
+          setServices([]);
+          fetchServices(false, { pageOverride: 1, queryOverride: "" });
         }}
         viewMode={viewMode}
         setViewMode={setViewMode}
@@ -948,7 +971,7 @@ export default function ServicesListMui({
         setRefreshInterval={setRefreshInterval}
         onRefresh={() => {
           setPage(1);
-          fetchServices(false);
+          fetchServices(false, { pageOverride: 1 });
           fetchStatusBatch();
         }}
         refreshDisabled={loading || Boolean(editingDraft)}

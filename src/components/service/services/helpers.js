@@ -56,7 +56,7 @@ export function buildUrl(apiUrl, extraQueryParams, page, pageSize, query) {
   const params = new URLSearchParams();
   params.set("page", String(page));
   params.set("page_size", String(pageSize));
-  if (query?.trim()) params.set("search", query.trim());
+  if (query?.trim()) params.set("q_search", query.trim());
   Object.entries(extraQueryParams || {}).forEach(([k, v]) => {
     if (v != null && v !== "") params.set(k, String(v));
   });

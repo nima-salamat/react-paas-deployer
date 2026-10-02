@@ -20,10 +20,6 @@ export default function Dashboard({ themeMode, onThemeModeChange }) {
       return <Navigate to={`/dashboard/${tab}`} replace />;
     }
   }
-  if (location.pathname === "/dashboard") {
-    return <Navigate to="/dashboard/services" replace />;
-  }
-
   return (
     <Box
       sx={{

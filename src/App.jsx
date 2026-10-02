@@ -25,6 +25,7 @@ const Services = lazy(() => import("./components/service/Services.jsx"));
 const Agents = lazy(() => import("./components/agents/Agents.jsx"));
 const AgentDetail = lazy(() => import("./components/agents/AgentDetail.jsx"));
 const Dashboard = lazy(() => import("./components/dashboard/Dashboard.jsx"));
+const DashboardOverview = lazy(() => import("./components/dashboard/DashboardOverview.jsx"));
 import SigninOrSignup from "./components/signin_or_signup/signin_or_signup.jsx";
 import Plans from "./components/plans/plans.jsx";
 import Footer from "./components/layout/Footer.jsx";
@@ -408,7 +409,7 @@ export function App({ prerender = false }) {
               />
 
               <Route path="dashboard" element={<Dashboard themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}>
-                <Route index element={<Navigate to="services" replace />} />
+                <Route index element={<DashboardOverview />} />
                 <Route path="services" element={<Services />} />
                 <Route path="agents" element={<Agents />} />
                 <Route path="agents/:id" element={<AgentDetail />} />
