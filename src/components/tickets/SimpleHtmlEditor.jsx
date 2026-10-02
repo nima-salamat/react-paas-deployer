@@ -185,6 +185,13 @@ export default function SimpleHtmlEditor({
 
   const insertCodeNewline = useCallback((range, selection) => {
     if (!range || !selection) return;
+    const startElement = range.startContainer?.nodeType === Node.ELEMENT_NODE
+      ? range.startContainer
+      : range.startContainer?.parentElement;
+    const code = startElement?.closest?.("code");
+    const target = code || startElement?.closest?.("pre") || null;
+    if (!target) return;
+
     range.deleteContents();
     const newline = document.createTextNode("\n");
     range.insertNode(newline);
@@ -192,6 +199,10 @@ export default function SimpleHtmlEditor({
     range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
+
+    if (target.tagName === "CODE") {
+      target.classList.add("language-plaintext");
+    }
   }, []);
 
   const toggleCode = () => {
@@ -208,11 +219,15 @@ export default function SimpleHtmlEditor({
       if (paragraph) placeCaretAtEnd(paragraph);
     } else {
       const pre = document.createElement("pre");
+      pre.className = "editor-code-block";
+      const code = document.createElement("code");
+      code.className = "language-plaintext";
       const text = block.innerText || block.textContent || "";
-      pre.textContent = text;
-      if (!text) pre.innerHTML = "<br>";
+      code.textContent = text;
+      if (!text) code.innerHTML = "<br>";
+      pre.appendChild(code);
       block.replaceWith(pre);
-      placeCaretAtEnd(pre);
+      placeCaretAtEnd(code);
     }
     saveSelection();
     editingRef.current = false;
@@ -469,7 +484,62 @@ export default function SimpleHtmlEditor({
               color: "text.disabled",
             },
             "& p": { m: 0 },
-            "& pre": { bgcolor: "action.hover", p: 1, borderRadius: 1, overflow: "auto" },
+            "& pre.editor-code-block": {
+              m: "0.65rem 0",
+              p: 0,
+              borderRadius: 1.5,
+              overflow: "auto",
+              bgcolor: "#0b1220",
+              border: "1px solid",
+              borderColor: "rgba(120,140,170,0.22)",
+              whiteSpace: "pre",
+            },
+            "& pre.editor-code-block::before": {
+              content: '"CODE"',
+              display: "block",
+              px: 1,
+              py: 0.45,
+              fontSize: 9,
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              color: "rgba(255,255,255,0.48)",
+              bgcolor: "rgba(255,255,255,0.045)",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
+            },
+            "& pre.editor-code-block > code": {
+              display: "block",
+              p: 1.25,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontSize: 12.5,
+              lineHeight: 1.6,
+              color: "rgba(255,255,255,0.9)",
+              whiteSpace: "pre",
+            },
+            "& ul, & ol": { pl: 2.25, my: 0.4 },
+            "& blockquote": {
+              m: "0.65rem 0",
+              pl: 1.5,
+              pr: 1,
+              py: 0.8,
+              borderLeft: "3px solid",
+              borderColor: "primary.main",
+              borderRadius: "0 8px 8px 0",
+              bgcolor: "action.hover",
+              color: "text.secondary",
+              fontStyle: "italic",
+              position: "relative",
+            },
+            "& blockquote::before": {
+              content: '"“"',
+              position: "absolute",
+              left: 6,
+              top: -4,
+              fontSize: 28,
+              fontWeight: 800,
+              lineHeight: 1,
+              color: "primary.main",
+              opacity: 0.65,
+            },
             "& a": { color: "primary.main" },
           }}
         />

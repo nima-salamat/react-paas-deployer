@@ -18,6 +18,8 @@ import ImageIcon from "@mui/icons-material/Image";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import AudioFileIcon from "@mui/icons-material/AudioFile";
 import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
+import hljs from "highlight.js/lib/common";
+import "highlight.js/styles/github-dark.css";
 
 function SeenTicks({ seen, mine }) {
   if (!mine) return null;
@@ -502,6 +504,76 @@ function normalizeMessageBody(body) {
   return String(body);
 }
 
+
+/**
+ * Turn stored <pre> blocks into polished, copyable code cards and highlight
+ * their code while preserving the original plain-text content for copying.
+ */
+function enhanceRichTextHtml(html) {
+  if (!html) return "";
+  const doc = new DOMParser().parseFromString("<div></div>", "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return html;
+  root.innerHTML = html;
+
+  root.querySelectorAll("pre").forEach((pre) => {
+    const code = pre.firstElementChild?.tagName === "CODE"
+      ? pre.firstElementChild
+      : (() => {
+        const node = doc.createElement("code");
+        node.textContent = pre.textContent || "";
+        pre.replaceChildren(node);
+        return node;
+      })();
+
+    const languageClass = Array.from(code.classList)
+      .find((name) => name.startsWith("language-"));
+    const requestedLanguage = languageClass?.slice("language-".length).trim().toLowerCase() || "";
+
+    let highlighted = null;
+    let detectedLanguage = "";
+
+    try {
+      if (requestedLanguage && hljs.getLanguage(requestedLanguage)) {
+        highlighted = hljs.highlight(code.textContent || "", { language: requestedLanguage }).value;
+        detectedLanguage = requestedLanguage;
+      } else if ((code.textContent || "").trim()) {
+        const auto = hljs.highlightAuto(code.textContent);
+        highlighted = auto.value;
+        detectedLanguage = auto.language || "";
+      }
+    } catch {
+      highlighted = null;
+    }
+
+    if (highlighted != null) code.innerHTML = highlighted;
+    code.classList.add("hljs");
+
+    const shell = doc.createElement("div");
+    shell.className = "ticket-code-shell";
+    shell.setAttribute("data-code-shell", "true");
+
+    const header = doc.createElement("div");
+    header.className = "ticket-code-header";
+
+    const label = doc.createElement("span");
+    label.className = "ticket-code-language";
+    label.textContent = detectedLanguage || "code";
+
+    const copyButton = doc.createElement("button");
+    copyButton.type = "button";
+    copyButton.setAttribute("data-code-copy", "true");
+    copyButton.setAttribute("aria-label", "Copy code");
+    copyButton.textContent = "Copy";
+
+    header.append(label, copyButton);
+    shell.append(header, pre);
+    pre.parentNode?.replaceChild(shell, pre);
+  });
+
+  return root.innerHTML;
+}
+
 export default function MessageBubble({
   message: m,
   mine = false,
@@ -527,6 +599,8 @@ export default function MessageBubble({
     d.innerHTML = bodyHtml;
     return (d.textContent || d.innerText || "").trim();
   }, [bodyHtml]);
+
+  const renderedBodyHtml = useMemo(() => enhanceRichTextHtml(bodyHtml), [bodyHtml]);
 
   const flash = (msg) => {
     setToast(msg);
@@ -652,6 +726,19 @@ export default function MessageBubble({
 
         {hasBody && !showRaw && (
           <Box
+            onClick={async (e) => {
+              const copyButton = e.target.closest?.("[data-code-copy]");
+              if (!copyButton) return;
+              e.preventDefault();
+              const shell = copyButton.closest?.("[data-code-shell]");
+              const code = shell?.querySelector?.("code");
+              const ok = await copyText(code?.textContent || "");
+              copyButton.textContent = ok ? "Copied" : "Retry";
+              flash(ok ? "Code copied" : "Copy failed");
+              setTimeout(() => {
+                copyButton.textContent = "Copy";
+              }, 1400);
+            }}
             sx={{
               fontSize: 14.5,
               lineHeight: 1.55,
@@ -660,21 +747,86 @@ export default function MessageBubble({
               "& p": { m: 0, mb: 0.5 },
               "& p:last-child": { mb: 0 },
               "& a": { color: mine ? "inherit" : "primary.main", textDecoration: "underline" },
-              "& pre": {
-                bgcolor: mine ? "rgba(0,0,0,0.15)" : "action.hover",
-                p: 1,
-                borderRadius: 1,
+              "& .ticket-code-shell": {
+                my: 1,
+                borderRadius: 1.5,
+                overflow: "hidden",
+                border: "1px solid",
+                borderColor: mine ? "rgba(255,255,255,0.16)" : "rgba(120,140,170,0.22)",
+                bgcolor: "#0b1220",
+              },
+              "& .ticket-code-header": {
+                minHeight: 34,
+                px: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 1,
+                bgcolor: "rgba(255,255,255,0.045)",
+                borderBottom: "1px solid rgba(255,255,255,0.08)",
+              },
+              "& .ticket-code-language": {
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "rgba(255,255,255,0.58)",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+              },
+              "& [data-code-copy]": {
+                border: 0,
+                borderRadius: 0.8,
+                px: 1,
+                py: 0.35,
+                fontSize: 11,
+                fontWeight: 700,
+                color: "rgba(255,255,255,0.82)",
+                bgcolor: "rgba(255,255,255,0.08)",
+                cursor: "pointer",
+                transition: "background-color .15s ease, transform .15s ease",
+              },
+              "& [data-code-copy]:hover": {
+                bgcolor: "rgba(255,255,255,0.15)",
+              },
+              "& [data-code-copy]:active": {
+                transform: "translateY(1px)",
+              },
+              "& .ticket-code-shell pre": {
+                m: 0,
+                p: 1.25,
                 overflow: "auto",
-                fontSize: 12,
+                fontSize: 12.5,
+                lineHeight: 1.6,
+                whiteSpace: "pre",
+                bgcolor: "transparent",
+              },
+              "& .ticket-code-shell code": {
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               },
               "& ul, & ol": { pl: 2.25, my: 0.4 },
               "& blockquote": {
-                m: 0,
-                my: 0.5,
-                pl: 1.25,
+                m: "0.65rem 0",
+                pl: 1.5,
+                pr: 1,
+                py: 0.8,
                 borderLeft: "3px solid",
                 borderColor: "primary.main",
-                color: "text.secondary",
+                borderRadius: "0 8px 8px 0",
+                bgcolor: mine ? "rgba(255,255,255,0.06)" : "rgba(120,140,170,0.07)",
+                color: mine ? "rgba(255,255,255,0.86)" : "text.secondary",
+                fontStyle: "italic",
+                position: "relative",
+              },
+              "& blockquote::before": {
+                content: '"“"',
+                position: "absolute",
+                left: 6,
+                top: -4,
+                fontSize: 28,
+                fontWeight: 800,
+                lineHeight: 1,
+                color: "primary.main",
+                opacity: 0.65,
               },
               "& code": {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -683,7 +835,7 @@ export default function MessageBubble({
               "& img": { maxWidth: "100%", borderRadius: 1 },
               userSelect: "text",
             }}
-            dangerouslySetInnerHTML={{ __html: bodyHtml }}
+            dangerouslySetInnerHTML={{ __html: renderedBodyHtml }}
           />
         )}
 

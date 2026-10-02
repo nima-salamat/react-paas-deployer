@@ -52,3 +52,23 @@ test("ticket link UI matches the backend-supported protocols", () => {
   assert.match(source, /https\?:\\\/\\\/\|mailto:/);
   assert.doesNotMatch(source, /https\?:\\\/\\\/\|mailto:\|tel:/);
 });
+
+test("message code blocks are highlighted and copyable", () => {
+  const source = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(source, /highlight\.js\/lib\/common/);
+  assert.match(source, /highlightAuto/);
+  assert.match(source, /data-code-copy/);
+  assert.match(source, /Code copied/);
+  assert.match(source, /github-dark\.css/);
+});
+
+test("quote blocks have a distinct visual treatment in editor and messages", () => {
+  const editor = read("src/components/tickets/SimpleHtmlEditor.jsx");
+  const renderer = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(editor, /blockquote::before/);
+  assert.match(editor, /fontStyle: "italic"/);
+  assert.match(renderer, /blockquote::before/);
+  assert.match(renderer, /rgba\(120,140,170,0\.07\)/);
+});
