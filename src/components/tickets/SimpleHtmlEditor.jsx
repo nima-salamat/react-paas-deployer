@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Box, ButtonGroup, Collapse, IconButton, Paper, Tooltip } from "@mui/material";
 import FormatBoldIcon from "@mui/icons-material/FormatBold";
 import FormatItalicIcon from "@mui/icons-material/FormatItalic";
@@ -37,12 +37,24 @@ export default function SimpleHtmlEditor({
     onExpandedChange?.(v);
   };
 
-  React.useEffect(() => {
-    if (!ref.current) return;
-    if (value !== lastHtml.current && value === "") {
-      ref.current.innerHTML = "";
-      lastHtml.current = "";
+  useEffect(() => {
+    const editor = ref.current;
+    if (!editor) return;
+
+    const nextValue =
+      typeof value === "string"
+        ? value
+        : value == null
+        ? ""
+        : String(value);
+
+    // Keep the contentEditable in sync with external state without
+    // rewriting it after every keystroke. Rewriting on each render would
+    // destroy the caret/selection and make formatting feel broken.
+    if (nextValue !== lastHtml.current && nextValue !== editor.innerHTML) {
+      editor.innerHTML = nextValue;
     }
+    lastHtml.current = nextValue;
   }, [value]);
 
   const emit = useCallback(() => {
@@ -53,12 +65,19 @@ export default function SimpleHtmlEditor({
   }, [onChange]);
 
   const cmd = (command, arg = null) => {
-    if (disabled) return;
-    ref.current?.focus();
+    if (disabled || !ref.current) return;
+    ref.current.focus();
     try {
       document.execCommand(command, false, arg);
-    } catch { /* */ }
+    } catch {
+      /* browser command unavailable */
+    }
     emit();
+  };
+
+  const keepSelection = (event) => {
+    // Prevent the toolbar button from stealing focus before execCommand runs.
+    event.preventDefault();
   };
 
   const addLink = () => {
@@ -100,13 +119,13 @@ export default function SimpleHtmlEditor({
         <Collapse in={expanded}>
           <Box sx={{ px: 0.25, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
             <ButtonGroup size="small" variant="text">
-              <Tooltip title="Bold"><span><IconButton size="small" onClick={() => cmd("bold")} disabled={disabled}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Italic"><span><IconButton size="small" onClick={() => cmd("italic")} disabled={disabled}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Underline"><span><IconButton size="small" onClick={() => cmd("underline")} disabled={disabled}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Bullets"><span><IconButton size="small" onClick={() => cmd("insertUnorderedList")} disabled={disabled}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Numbered"><span><IconButton size="small" onClick={() => cmd("insertOrderedList")} disabled={disabled}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Code"><span><IconButton size="small" onClick={() => cmd("formatBlock", "pre")} disabled={disabled}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Link"><span><IconButton size="small" onClick={addLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Bold"><span><IconButton size="small" onMouseDown={keepSelection} onClick={() => cmd("bold")} disabled={disabled}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Italic"><span><IconButton size="small" onMouseDown={keepSelection} onClick={() => cmd("italic")} disabled={disabled}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Underline"><span><IconButton size="small" onMouseDown={keepSelection} onClick={() => cmd("underline")} disabled={disabled}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Bullets"><span><IconButton size="small" onMouseDown={keepSelection} onClick={() => cmd("insertUnorderedList")} disabled={disabled}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Numbered"><span><IconButton size="small" onMouseDown={keepSelection} onClick={() => cmd("insertOrderedList")} disabled={disabled}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Code block"><span><IconButton size="small" onMouseDown={keepSelection} onClick={() => cmd("formatBlock", "pre")} disabled={disabled}><CodeIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Link"><span><IconButton size="small" onMouseDown={keepSelection} onClick={addLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
             </ButtonGroup>
           </Box>
         </Collapse>
@@ -135,9 +154,44 @@ export default function SimpleHtmlEditor({
               content: "attr(data-placeholder)",
               color: "text.disabled",
             },
-            "& p": { m: 0 },
-            "& pre": { bgcolor: "action.hover", p: 1, borderRadius: 1, overflow: "auto" },
-            "& a": { color: "primary.main" },
+            "& p": { m: 0, mb: 0.55 },
+            "& p:last-child": { mb: 0 },
+            "& strong, & b": { fontWeight: 800 },
+            "& em, & i": { fontStyle: "italic" },
+            "& u": { textDecoration: "underline", textUnderlineOffset: "2px" },
+            "& ul, & ol": {
+              m: 0,
+              my: 0.5,
+              pl: 2.5,
+            },
+            "& li": { mb: 0.2 },
+            "& blockquote": {
+              m: 0,
+              my: 0.75,
+              pl: 1.25,
+              borderLeft: "3px solid",
+              borderColor: "divider",
+              color: "text.secondary",
+            },
+            "& pre": {
+              bgcolor: "action.hover",
+              p: 1,
+              my: 0.6,
+              borderRadius: 1,
+              overflow: "auto",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontSize: 12.5,
+              whiteSpace: "pre-wrap",
+            },
+            "& code": {
+              bgcolor: "action.hover",
+              px: 0.45,
+              py: 0.1,
+              borderRadius: 0.5,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontSize: "0.92em",
+            },
+            "& a": { color: "primary.main", textDecoration: "underline", textUnderlineOffset: "2px" },
           }}
         />
         {showToolbarToggle && (
