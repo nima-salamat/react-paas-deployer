@@ -10,7 +10,7 @@ export const CURSOR_OPTIONS = [
   {
     id: "custom",
     label: "Custom",
-    description: "Use the PaasDeployer ring cursor on desktop.",
+    description: "Use the PaaSDeployer ring cursor on desktop.",
   },
 ];
 

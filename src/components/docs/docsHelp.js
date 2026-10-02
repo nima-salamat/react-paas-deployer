@@ -93,7 +93,7 @@ export const DOCS_HELP_ITEMS = [
   { id: "i18n", group: "Content", label: "i18n note", icon: "文", help: "Other-language edition note.", syntax: ":::i18n fa\n:::", snippet: ":::i18n Persian\n:::\n", aiHint: "Other locales → :::i18n." },
 ];
 
-export const AI_WRITER_GUIDE = `You are using a documentation-writing SKILL for PaasDeployer's Docs-as-Code system.
+export const AI_WRITER_GUIDE = `You are using a documentation-writing SKILL for PaaSDeployer's Docs-as-Code system.
 
 THIS IS AN INSTRUCTION LAYER, NOT THE TOPIC
 - This text describes how to use the documentation system and how to write output for it.
@@ -109,7 +109,7 @@ PRIMARY JOB
 - Improve structure, clarity, examples, headings, tables, callouts, and diagrams when useful.
 
 OUTPUT CONTRACT
-- Output ONLY Markdown understood by the PaasDeployer Docs renderer.
+- Output ONLY Markdown understood by the PaaSDeployer Docs renderer.
 - Do not output React, JSX, HTML applications, YAML front matter, JSON, or a commentary around the Markdown.
 - When the user asks for an .md file, output the raw Markdown file content directly. Do NOT wrap the entire file in a \`\`\`markdown fence.
 - Do not add a "Subject", "slug", "category", or other import metadata block at the top of an imported Markdown file unless the user explicitly asks for metadata.

@@ -505,7 +505,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                 <Box
                   component="img"
                   src={DEFAULT_ICON}
-                  alt="PaasDeployer"
+                  alt="PaaSDeployer"
                   sx={{
                     width: 36,
                     height: 36,
@@ -532,7 +532,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                     }}
                     noWrap
                   >
-                    PaasDeployer
+                    PaaSDeployer
                   </Typography>
                   <Typography
                     variant="caption"
@@ -759,7 +759,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
             <Box
               component="img"
               src={DEFAULT_ICON}
-              alt="PaasDeployer"
+              alt="PaaSDeployer"
               sx={{
                 width: 44,
                 height: 44,
@@ -776,7 +776,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
 
             <Box sx={{ minWidth: 0 }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>
-                PaasDeployer
+                PaaSDeployer
               </Typography>
               <Typography variant="body2" color="text.secondary" noWrap>
                 Navigation & theme controls

@@ -53,9 +53,9 @@ import { hostBase, publicDocsAssetSrc } from "../admin/adminUtils";
 import { renderMarkdown } from "./markdown";
 import MarkdownPreview from "./MarkdownPreview";
 
-/** PaasDeployer brand mark (public/icon.svg) — the "back to home" affordance. */
+/** PaaSDeployer brand mark (public/icon.svg) — the "back to home" affordance. */
 const BRAND_LOGO_URL = "/icon.svg";
-const BRAND_NAME = "PaasDeployer";
+const BRAND_NAME = "PaaSDeployer";
 
 const HEADER_HEIGHT = { xs: 60, sm: 68 };
 const SIDEBAR_WIDTH = 312;
@@ -965,7 +965,7 @@ export default function DocsHome({ themeMode = "system", onThemeModeChange }) {
           <ButtonBase
             onClick={goDocs}
             focusRipple
-            aria-label="Open PaasDeployer documentation"
+            aria-label="Open PaaSDeployer documentation"
             sx={{
               borderRadius: 2,
               px: 1,

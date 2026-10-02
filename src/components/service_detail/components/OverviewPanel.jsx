@@ -443,7 +443,7 @@ export default function OverviewPanel({
         title="Automation"
       >
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
-          Connect scoped automation clients and AI agents to the PaasDeployer control plane. Agents are account-level resources and are not tied to this service.
+          Connect scoped automation clients and AI agents to the PaaSDeployer control plane. Agents are account-level resources and are not tied to this service.
         </Typography>
         <Button
           variant="outlined"

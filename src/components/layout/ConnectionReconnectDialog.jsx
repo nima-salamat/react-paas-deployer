@@ -233,7 +233,7 @@ export default function ConnectionReconnectDialog() {
       return {
         icon: <WifiOffRoundedIcon sx={{ fontSize: 30 }} />,
         title: "No internet connection",
-        body: "PaasDeployer cannot reach the network right now. Check your connection and reconnect.",
+        body: "PaaSDeployer cannot reach the network right now. Check your connection and reconnect.",
       };
     }
 
@@ -248,7 +248,7 @@ export default function ConnectionReconnectDialog() {
     return {
       icon: <CloudOffRoundedIcon sx={{ fontSize: 30 }} />,
       title: "Connection lost",
-      body: "We could not reach the PaasDeployer service. Check your connection and reconnect to continue.",
+      body: "We could not reach the PaaSDeployer service. Check your connection and reconnect to continue.",
     };
   }, [offline, failure]);
 

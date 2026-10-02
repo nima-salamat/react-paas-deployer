@@ -1,33 +1,33 @@
 const DEFAULT_SITE_URL = "https://echonode.website";
-const DEFAULT_SITE_NAME = "PaasDeployer";
+const DEFAULT_SITE_NAME = "PaaSDeployer";
 const DEFAULT_API_ORIGIN = "https://api.echonode.website";
 const DEFAULT_DESCRIPTION = "Deploy applications, manage services, and control the infrastructure around your workloads from one focused platform.";
 
 export const PUBLIC_PAGES = {
   "/": {
-    title: "PaasDeployer | Application Deployment & Management",
+    title: "PaaSDeployer | Application Deployment & Management",
     description:
       "Deploy applications, manage services, and choose the resources you need. Start small, use hourly plans when they fit, and scale as your workload grows.",
   },
   "/plans": {
-    title: "Plans & Pricing | PaasDeployer",
+    title: "Plans & Pricing | PaaSDeployer",
     description:
-      "Compare PaasDeployer plans for CPU, memory and storage. Choose the right capacity for your application and scale when your workload changes.",
+      "Compare PaaSDeployer plans for CPU, memory and storage. Choose the right capacity for your application and scale when your workload changes.",
   },
   "/aboutUs": {
-    title: "About PaasDeployer | Application Deployment Platform",
+    title: "About PaaSDeployer | Application Deployment Platform",
     description:
-      "Learn how PaasDeployer brings application deployment and day-to-day service management into one focused developer platform.",
+      "Learn how PaaSDeployer brings application deployment and day-to-day service management into one focused developer platform.",
   },
   "/docs": {
-    title: "Documentation | PaasDeployer",
+    title: "Documentation | PaaSDeployer",
     description:
-      "Read PaasDeployer guides, references and how-tos for deploying, configuring and managing applications.",
+      "Read PaaSDeployer guides, references and how-tos for deploying, configuring and managing applications.",
   },
   "/signin_or_signup": {
-    title: "Sign in or Sign up | PaasDeployer",
+    title: "Sign in or Sign up | PaaSDeployer",
     description:
-      "Sign in to your PaasDeployer account or create an account to start deploying and managing applications.",
+      "Sign in to your PaaSDeployer account or create an account to start deploying and managing applications.",
   },
 };
 
@@ -166,11 +166,11 @@ export const SEO_FALLBACK_CONTENT = {
   "/aboutUs": {
     heading: "A simpler way to run applications.",
     intro:
-      "PaasDeployer brings application deployment and day-to-day infrastructure management into one focused control plane.",
+      "PaaSDeployer brings application deployment and day-to-day infrastructure management into one focused control plane.",
   },
   "/docs": {
     heading: "Documentation for deploying and managing applications.",
     intro:
-      "Browse published guides, references and practical how-tos for PaasDeployer.",
+      "Browse published guides, references and practical how-tos for PaaSDeployer.",
   },
 };

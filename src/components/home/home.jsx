@@ -52,7 +52,7 @@ const GITHUB_FRONTEND = "https://github.com/nima-salamat/react-paas-deployer";
 const FAQ_ITEMS = [
   {
     q: "What can I deploy?",
-    a: "PaasDeployer is designed for modern web workloads, including React frontends, Node.js services, Django and Flask applications, databases, caches, and Docker-based workloads.",
+    a: "PaaSDeployer is designed for modern web workloads, including React frontends, Node.js services, Django and Flask applications, databases, caches, and Docker-based workloads.",
   },
   {
     q: "Do I need to manage Docker manually?",
@@ -63,7 +63,7 @@ const FAQ_ITEMS = [
     a: "Yes. The platform is structured around service-level resources, so CPU, memory, storage, and runtime configuration can be managed without rebuilding the entire application workflow.",
   },
   {
-    q: "Can PaasDeployer be automated?",
+    q: "Can PaaSDeployer be automated?",
     a: "Yes. The Agent API provides scoped access to services, deployments, logs and runtime operations while keeping authentication, auditing and destructive actions explicit.",
   },
   {
@@ -105,7 +105,7 @@ const CAPABILITIES = [
   ["Storage", StorageRoundedIcon, "Persistent volumes remain first-class resources in the platform."],
   ["Resource controls", MemoryRoundedIcon, "Keep CPU, memory and storage close to the service definition."],
   ["Security", SecurityRoundedIcon, "Use isolated containers and clear service boundaries as the execution model."],
-  ["Agent API", SmartToyOutlinedIcon, "Connect scoped automation clients and AI agents to the PaasDeployer control plane with audited, idempotent operations."],
+  ["Agent API", SmartToyOutlinedIcon, "Connect scoped automation clients and AI agents to the PaaSDeployer control plane with audited, idempotent operations."],
 ];
 
 const STACK_HIGHLIGHTS = [
@@ -801,7 +801,7 @@ export default function Home() {
           whiteSpace: "nowrap",
         }}
       >
-        PaasDeployer is a self-hosted platform as a service for deploying React, Node.js, Django and Flask applications
+        PaaSDeployer is a self-hosted platform as a service for deploying React, Node.js, Django and Flask applications
         with Docker, PostgreSQL, Redis, networking, persistent storage, logs and service management in one control plane.
       </Typography>
 
@@ -1129,7 +1129,7 @@ export default function Home() {
               sx={{ mt: 1.75, maxWidth: 700, lineHeight: 1.75, fontSize: { xs: "0.95rem", md: "1.05rem" } }}
               color="text.secondary"
             >
-              PaasDeployer keeps the operational surface area small: one place to create services, ship releases, read
+              PaaSDeployer keeps the operational surface area small: one place to create services, ship releases, read
               logs and manage the runtime boundary around your workloads.
             </Typography>
           </Reveal>
@@ -1468,7 +1468,7 @@ export default function Home() {
                 sx={{ mt: 2, lineHeight: 1.75, fontSize: { xs: "0.95rem", md: "1.05rem" } }}
                 color="text.secondary"
               >
-                PaasDeployer is intentionally broad enough to support the application layer and focused enough to keep
+                PaaSDeployer is intentionally broad enough to support the application layer and focused enough to keep
                 the operations experience understandable.
               </Typography>
               <Stack spacing={1.15} sx={{ mt: 2.75 }}>

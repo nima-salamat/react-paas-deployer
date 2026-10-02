@@ -93,7 +93,7 @@ const Footer = () => {
                 variant="caption"
                 sx={{ fontWeight: 800, color: "text.primary" }}
               >
-                PaasDeployer
+                PaaSDeployer
               </Typography>
             </Stack>
 
@@ -128,7 +128,7 @@ const Footer = () => {
             </Stack>
 
             <Typography variant="caption" sx={{ fontSize: "0.75rem" }}>
-              © {year} PaasDeployer
+              © {year} PaaSDeployer
             </Typography>
           </Stack>
         </Container>
@@ -161,7 +161,7 @@ const Footer = () => {
                 sx={{ width: 22, height: 22 }}
               />
               <Typography sx={{ fontWeight: 800, color: "text.primary" }}>
-                PaasDeployer
+                PaaSDeployer
               </Typography>
             </Stack>
             <Typography variant="body2" sx={{ maxWidth: 340, lineHeight: 1.7 }}>
@@ -236,7 +236,7 @@ const Footer = () => {
           sx={{ py: 2 }}
         >
           <Typography variant="caption">
-            © {year} PaasDeployer — open-source PaaS platform.
+            © {year} PaaSDeployer — open-source PaaS platform.
           </Typography>
 
           <Typography
