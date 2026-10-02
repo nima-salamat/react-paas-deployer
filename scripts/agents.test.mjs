@@ -66,21 +66,27 @@ test("agent list exposes provisioning source", () => {
   assert.match(source, /provisioningLabel/);
 });
 
-test("agent list exposes permanent delete action", () => {
+test("agent list uses a styled dialog for permanent Agent deletion", () => {
   const source = read("src/components/agents/Agents.jsx");
 
-  assert.match(source, /deleteAgent/);
-  assert.match(source, /Delete/);
+  assert.match(source, /setDeleteTarget/);
+  assert.match(source, /open=\{Boolean\(deleteTarget\)\}/);
+  assert.match(source, /Delete permanently/);
   assert.match(source, /all credentials, enrollment tokens and idempotency records/);
+  assert.doesNotMatch(source, /window\.confirm\(\s*["']Delete Agent/);
 });
 
-test("agent detail exposes permanent delete action for revoked Agents too", () => {
+test("agent detail uses styled dialogs for Agent and credential deletion", () => {
   const source = read("src/components/agents/AgentDetail.jsx");
 
   assert.match(source, /deleteAgent\(id\)/);
-  assert.match(source, /Delete/);
+  assert.match(source, /deleteCredential\(id, target\.credential\.id\)/);
+  assert.match(source, /open=\{Boolean\(deleteTarget\)\}/);
+  assert.match(source, /Delete credential/);
+  assert.match(source, /Delete permanently/);
   assert.match(source, /A revoked Agent can still be deleted/);
-  assert.match(source, /navigate\("\/dashboard\/agents", \{ replace: true \}\)/);
+  assert.doesNotMatch(source, /window\.confirm\(\s*["']Delete this credential/);
+  assert.doesNotMatch(source, /window\.confirm\(\s*["']Delete Agent/);
 });
 
 test("agent create dialog provides All and Reset scope presets", () => {
