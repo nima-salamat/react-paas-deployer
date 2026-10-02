@@ -55,6 +55,17 @@ function setBlockAlignment(block, align) {
   block.style?.removeProperty("text-align");
 }
 
+function copyBlockAlignment(source, target) {
+  if (!source || !target) return;
+  const hasExplicitClass = ALIGNMENT_VALUES.some((align) =>
+    source.classList?.contains(ALIGNMENT_CLASSES[align])
+  );
+  const hasInlineAlignment = Boolean(source.style?.textAlign);
+  if (hasExplicitClass || hasInlineAlignment) {
+    setBlockAlignment(target, getBlockAlignment(source));
+  }
+}
+
 /**
  * Compact HTML editor. Toolbar hidden by default; expand with button.
  * Enter → new line (send only via toolbar/send button from parent).
@@ -142,6 +153,26 @@ export default function SimpleHtmlEditor({
     return true;
   };
 
+  const focusEditorSelection = useCallback(() => {
+    const editor = ref.current;
+    if (!editor) return false;
+
+    editor.focus({ preventScroll: true });
+
+    if (restoreSelection()) return true;
+
+    const selection = window.getSelection?.();
+    if (!selection) return false;
+
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    savedRange.current = range.cloneRange();
+    return true;
+  }, []);
+
   const findInlineAncestor = useCallback((command) => {
     const editor = ref.current;
     const selection = window.getSelection?.();
@@ -171,13 +202,8 @@ export default function SimpleHtmlEditor({
   }, []);
 
   const toggleInlineFormat = (command) => {
-    if (disabled || !ref.current) return;
-    const hadSelection = restoreSelection();
-    if (!hadSelection) {
-      ref.current.focus({ preventScroll: true });
-      saveSelection();
-      return;
-    }
+    if (disabled || !ref.current || !INLINE_TAGS[command]) return;
+    if (!focusEditorSelection()) return;
 
     const selection = window.getSelection?.();
     if (!selection?.rangeCount) return;
@@ -185,78 +211,79 @@ export default function SimpleHtmlEditor({
     const range = selection.getRangeAt(0);
     editingRef.current = true;
 
-    ref.current.focus({ preventScroll: true });
-    restoreSelection();
-
-    const currentSelection = window.getSelection?.();
-    if (!currentSelection?.rangeCount) {
-      editingRef.current = false;
-      return;
-    }
-
-    const currentRange = currentSelection.getRangeAt(0);
-    if (currentRange.collapsed) {
+    if (range.collapsed) {
       const active = findInlineAncestor(command);
       const tagName = (INLINE_TAGS[command]?.[0] || "STRONG").toLowerCase();
 
-      if (active) {
-        const visibleText = (active.textContent || "").replace(/\u200B/g, "");
-        const isEmptyTypingMark =
-          active.getAttribute("data-editor-typing-mark") === command &&
-          !visibleText.length;
-
-        if (isEmptyTypingMark) {
-          const parent = active.parentNode;
-          if (parent) {
-            const index = Array.prototype.indexOf.call(parent.childNodes, active);
-            active.remove();
-            placeCaretAtBoundary(parent, index);
-          }
-        } else {
-          const parent = active.parentNode;
-          if (parent) {
-            const afterRange = currentRange.cloneRange();
-            afterRange.selectNodeContents(active);
-            afterRange.setStart(currentRange.startContainer, currentRange.startOffset);
-            const afterFragment = afterRange.extractContents();
-            const remainingText = (active.textContent || "").replace(/\u200B/g, "");
-
-            if (!remainingText.length) {
-              const beforeIndex = Array.prototype.indexOf.call(parent.childNodes, active);
-              const next = active.nextSibling;
-              active.remove();
-              if (afterFragment.textContent?.length) {
-                const after = active.cloneNode(false);
-                after.removeAttribute("data-editor-typing-mark");
-                after.appendChild(afterFragment);
-                parent.insertBefore(after, next);
-              }
-              placeCaretAtBoundary(parent, beforeIndex);
-            } else if (afterFragment.textContent?.length) {
-              const after = active.cloneNode(false);
-              after.removeAttribute("data-editor-typing-mark");
-              after.appendChild(afterFragment);
-              parent.insertBefore(after, active.nextSibling);
-              const afterIndex = Array.prototype.indexOf.call(parent.childNodes, after);
-              placeCaretAtBoundary(parent, afterIndex);
-            } else {
-              const afterIndex = Array.prototype.indexOf.call(parent.childNodes, active) + 1;
-              placeCaretAtBoundary(parent, afterIndex);
-            }
-          }
-        }
-      } else {
+      if (!active) {
         const mark = document.createElement(tagName);
         const marker = document.createTextNode("\u200B");
         mark.setAttribute("data-editor-typing-mark", command);
         mark.appendChild(marker);
-        currentRange.insertNode(mark);
+        range.insertNode(mark);
 
         const caret = document.createRange();
         caret.setStart(marker, marker.length);
         caret.collapse(true);
-        currentSelection.removeAllRanges();
-        currentSelection.addRange(caret);
+        selection.removeAllRanges();
+        selection.addRange(caret);
+      } else {
+        const parent = active.parentNode;
+        if (parent) {
+          const before = range.cloneRange();
+          before.selectNodeContents(active);
+          before.setEnd(range.startContainer, range.startOffset);
+
+          const after = range.cloneRange();
+          after.selectNodeContents(active);
+          after.setStart(range.startContainer, range.startOffset);
+
+          const afterFragment = after.extractContents();
+          const nextSibling = active.nextSibling;
+
+          if (!before.toString().replace(/\u200B/g, "") && !afterFragment.textContent?.replace(/\u200B/g, "")) {
+            const index = Array.prototype.indexOf.call(parent.childNodes, active);
+            active.remove();
+            const marker = document.createTextNode("\u200B");
+            parent.insertBefore(marker, parent.childNodes[index] || null);
+            const caret = document.createRange();
+            caret.setStart(marker, marker.length);
+            caret.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(caret);
+          } else {
+            // Keep the content before the caret formatted, move the content
+            // after it into a separate formatted sibling, and place a real
+            // unformatted typing boundary between them.
+            active.textContent = "";
+            const beforeFragment = before.extractContents();
+            active.appendChild(beforeFragment);
+
+            const boundary = document.createTextNode("\u200B");
+            parent.insertBefore(boundary, nextSibling);
+
+            if (afterFragment.textContent?.replace(/\u200B/g, "")) {
+              const afterMark = active.cloneNode(false);
+              afterMark.removeAttribute("data-editor-typing-mark");
+              afterMark.appendChild(afterFragment);
+              parent.insertBefore(afterMark, boundary.nextSibling);
+            }
+
+            if (!active.textContent?.replace(/\u200B/g, "")) {
+              const index = Array.prototype.indexOf.call(parent.childNodes, active);
+              active.remove();
+              parent.insertBefore(boundary, parent.childNodes[index] || null);
+            } else {
+              active.removeAttribute("data-editor-typing-mark");
+            }
+
+            const caret = document.createRange();
+            caret.setStart(boundary, boundary.length);
+            caret.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(caret);
+          }
+        }
       }
     } else {
       try {
@@ -441,9 +468,7 @@ export default function SimpleHtmlEditor({
   const applyAlignment = useCallback((align) => {
     if (disabled || !ref.current || !["left", "center", "right"].includes(align)) return;
     const editor = ref.current;
-    editor.focus({ preventScroll: true });
-    restoreSelection();
-    saveSelection();
+    if (!focusEditorSelection()) return;
 
     const selection = window.getSelection?.();
     if (!selection?.rangeCount || !editor.contains(selection.anchorNode)) return;
@@ -491,11 +516,11 @@ export default function SimpleHtmlEditor({
     editingRef.current = false;
     emit();
     updateActiveFormats();
-  }, [disabled, emit, ensureBlock, findBlock, restoreSelection, saveSelection, updateActiveFormats]);
+  }, [disabled, emit, ensureBlock, findBlock, focusEditorSelection, saveSelection, updateActiveFormats]);
 
   const applyBlockFormat = useCallback((tagName) => {
     if (disabled || !ref.current) return;
-    restoreSelection();
+    if (!focusEditorSelection()) return;
     const block = findBlock() || ensureBlock();
     if (!block || block.tagName === "PRE" || block.tagName === "LI") return;
 
@@ -525,34 +550,101 @@ export default function SimpleHtmlEditor({
     return clone.textContent || "";
   }, []);
 
-  const convertCodeBlockToParagraph = useCallback((pre) => {
+  const createParagraphFromText = useCallback((text, alignmentSource = null) => {
     const paragraph = document.createElement("p");
-    const code = pre?.querySelector?.("code") || pre;
-    const text = readCodeText(code);
-    const lines = text.replace(/\r\n?/g, "\n").split("\n");
+    const normalized = String(text || "").replace(/\r\n?/g, "\n");
+    const lines = normalized.split("\n");
+
     lines.forEach((line, index) => {
       if (index > 0) paragraph.appendChild(document.createElement("br"));
       if (line) paragraph.appendChild(document.createTextNode(line));
     });
-    if (!text) paragraph.innerHTML = "<br>";
+
+    if (!normalized) paragraph.innerHTML = "<br>";
+    copyBlockAlignment(alignmentSource, paragraph);
+    return paragraph;
+  }, []);
+
+  const convertCodeBlockToParagraph = useCallback((pre) => {
+    const code = pre?.querySelector?.("code") || pre;
+    const text = readCodeText(code);
+    const paragraph = createParagraphFromText(text, pre);
     const parent = pre?.parentNode;
     if (parent) parent.replaceChild(paragraph, pre);
     return paragraph;
-  }, [readCodeText]);
+  }, [createParagraphFromText, readCodeText]);
+
+  const splitCodeBlockAtCaret = useCallback((pre, range) => {
+    const code = pre?.querySelector?.("code") || pre;
+    const parent = pre?.parentNode;
+    if (!pre || !code || !parent || !range) return null;
+
+    const beforeRange = range.cloneRange();
+    beforeRange.selectNodeContents(code);
+    beforeRange.setEnd(range.startContainer, range.startOffset);
+
+    const afterRange = range.cloneRange();
+    afterRange.selectNodeContents(code);
+    afterRange.setStart(range.startContainer, range.startOffset);
+
+    const beforeText = readCodeText(beforeRange.cloneContents());
+    const afterText = readCodeText(afterRange.cloneContents());
+
+    if (!beforeText) {
+      const paragraph = createParagraphFromText(afterText, pre);
+      parent.replaceChild(paragraph, pre);
+      return paragraph;
+    }
+
+    code.textContent = beforeText;
+    const paragraph = createParagraphFromText(afterText, pre);
+    parent.insertBefore(paragraph, pre.nextSibling);
+    return paragraph;
+  }, [createParagraphFromText, readCodeText]);
+
+  const insertSoftBreak = useCallback((range, selection) => {
+    if (!range || !selection) return;
+    range.deleteContents();
+    const br = document.createElement("br");
+    range.insertNode(br);
+    range.setStartAfter(br);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
+  const splitQuoteAtCaret = useCallback((quote, range) => {
+    const parent = quote?.parentNode;
+    if (!quote || !parent || !range) return null;
+
+    const afterRange = range.cloneRange();
+    afterRange.selectNodeContents(quote);
+    afterRange.setStart(range.startContainer, range.startOffset);
+    const afterFragment = afterRange.extractContents();
+
+    const paragraph = document.createElement("p");
+    if (afterFragment.childNodes.length) {
+      paragraph.appendChild(afterFragment);
+    } else {
+      paragraph.innerHTML = "<br>";
+    }
+    copyBlockAlignment(quote, paragraph);
+    parent.insertBefore(paragraph, quote.nextSibling);
+
+    return paragraph;
+  }, []);
 
   const exitCodeBlockAtEnd = useCallback((pre) => {
     const code = pre?.querySelector?.("code") || pre;
     if (!pre || !code) return null;
 
-    const text = readCodeText(code);
+    const text = readCodeText(code).replace(/\r\n?/g, "\n");
     const remaining = text.endsWith("\n") ? text.slice(0, -1) : text;
     const parent = pre.parentNode;
     if (!parent) return null;
 
-    const paragraph = document.createElement("p");
-    paragraph.innerHTML = "<br>";
-
-    if (remaining.trim()) {
+    const paragraph = createParagraphFromText("", pre);
+    if (remaining) {
       code.textContent = remaining;
       parent.insertBefore(paragraph, pre.nextSibling);
     } else {
@@ -560,27 +652,11 @@ export default function SimpleHtmlEditor({
     }
 
     return paragraph;
-  }, [readCodeText]);
+  }, [createParagraphFromText, readCodeText]);
 
-  const insertCodeNewline = useCallback((range, selection, trailingBreak = false) => {
-    if (!range || !selection) return;
-    const startElement = range.startContainer?.nodeType === Node.ELEMENT_NODE
-      ? range.startContainer
-      : range.startContainer?.parentElement;
-    const code = startElement?.closest?.("code");
-    const target = code || startElement?.closest?.("pre") || null;
-    if (!target) return;
-
-    range.deleteContents();
-    const newline = trailingBreak
-      ? document.createElement("br")
-      : document.createTextNode("\n");
-    range.insertNode(newline);
-    range.setStartAfter(newline);
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }, []);
+  const insertCodeNewline = useCallback((range, selection) => {
+    insertSoftBreak(range, selection);
+  }, [insertSoftBreak]);
 
   const highlightEditorCode = useCallback((code, language) => {
     if (!code) return;
@@ -677,6 +753,7 @@ export default function SimpleHtmlEditor({
     emit,
     ensureBlock,
     findBlock,
+    focusEditorSelection,
     highlightEditorCode,
     placeCaretAtEnd,
     saveSelection,
@@ -695,7 +772,7 @@ export default function SimpleHtmlEditor({
 
   const toggleCode = () => {
     if (disabled || !ref.current) return;
-    restoreSelection();
+    if (!focusEditorSelection()) return;
     const selection = window.getSelection?.();
     const block = findBlock() || ensureBlock();
     if (!selection || !block) return;
@@ -723,7 +800,7 @@ export default function SimpleHtmlEditor({
 
   const toggleList = (ordered) => {
     if (disabled || !ref.current) return;
-    restoreSelection();
+    if (!focusEditorSelection()) return;
     const block = findBlock() || ensureBlock();
     if (!block || block.tagName === "PRE") return;
 
@@ -860,39 +937,58 @@ export default function SimpleHtmlEditor({
     if (e.key !== "Enter") return;
     if (e.isComposing || e.keyCode === 229) return;
     const selection = window.getSelection?.();
-    const anchor = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode : selection?.anchorNode?.parentElement;
+    const anchor = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE
+      ? selection.anchorNode
+      : selection?.anchorNode?.parentElement;
     const pre = anchor?.closest?.("pre");
-    if (pre) {
-      const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-      if (range && pre.contains(range.startContainer)) {
-        const beforeRange = document.createRange();
-        beforeRange.selectNodeContents(pre);
-        beforeRange.setEnd(range.startContainer, range.startOffset);
-        const afterRange = document.createRange();
-        afterRange.selectNodeContents(pre);
-        afterRange.setStart(range.startContainer, range.startOffset);
+    const quote = anchor?.closest?.("blockquote");
 
-        const currentLine = beforeRange.toString().split("\n").pop() || "";
-        const atEnd = !afterRange.toString();
-
+    if (pre && selection?.rangeCount) {
+      const range = selection.getRangeAt(0).cloneRange();
+      if (range.collapsed && pre.contains(range.startContainer)) {
         e.preventDefault();
         editingRef.current = true;
 
-        if (!e.shiftKey && range.collapsed && atEnd && !currentLine.trim()) {
-          const paragraph = exitCodeBlockAtEnd(pre);
-          if (paragraph) {
-            placeCaretAtEnd(paragraph);
-          }
+        if (e.shiftKey) {
+          insertCodeNewline(range, selection);
+          saveSelection();
+          editingRef.current = false;
+          emit();
+          return;
+        }
+
+        const paragraph = splitCodeBlockAtCaret(pre, range);
+        if (paragraph) placeCaretAtEnd(paragraph);
+
+        saveSelection();
+        editingRef.current = false;
+        emit();
+        updateActiveFormats();
+        return;
+      }
+    }
+
+    if (quote && selection?.rangeCount) {
+      const range = selection.getRangeAt(0).cloneRange();
+      if (range.collapsed && quote.contains(range.startContainer)) {
+        e.preventDefault();
+        editingRef.current = true;
+
+        if (e.shiftKey) {
+          insertSoftBreak(range, selection);
         } else {
-          insertCodeNewline(range, selection, atEnd);
+          const paragraph = splitQuoteAtCaret(quote, range);
+          if (paragraph) placeCaretAtEnd(paragraph);
         }
 
         saveSelection();
         editingRef.current = false;
         emit();
+        updateActiveFormats();
         return;
       }
     }
+
     const li = anchor?.closest?.("li");
     if (li && !li.textContent.trim()) {
       e.preventDefault();

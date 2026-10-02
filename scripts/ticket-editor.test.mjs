@@ -211,3 +211,42 @@ test("renderer uses adaptive quote contrast and renders persisted alignment clas
   assert.match(source, /"& \.ticket-align-center": \{ textAlign: "center" \}/);
   assert.match(source, /"& \.ticket-align-right": \{ textAlign: "right" \}/);
 });
+
+
+test("empty paragraphs can choose alignment before typing", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const focusEditorSelection = useCallback/);
+  assert.match(source, /const current = findBlock\(\) \|\| ensureBlock\(\)/);
+  assert.match(source, /setBlockAlignment\(block, align\)/);
+  assert.match(source, /ALIGNMENT_CLASSES/);
+});
+
+test("Enter exits code blocks while Shift+Enter inserts a soft line break inside them", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const splitCodeBlockAtCaret = useCallback/);
+  assert.match(source, /if \(e\.shiftKey\)/);
+  assert.match(source, /insertCodeNewline\(range, selection\)/);
+  assert.match(source, /splitCodeBlockAtCaret\(pre, range\)/);
+});
+
+test("Enter exits quote blocks while Shift+Enter remains inside the same quote", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const splitQuoteAtCaret = useCallback/);
+  assert.match(source, /const quote = anchor\?\.closest\?\("blockquote"\)/);
+  assert.match(source, /insertSoftBreak\(range, selection\)/);
+  assert.match(source, /splitQuoteAtCaret\(quote, range\)/);
+  assert.doesNotMatch(source, /quote\.after\(document\.createElement\("blockquote"\)\)/);
+});
+
+test("list commands restore the editor selection before invoking browser list behavior", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+  const start = source.indexOf("const toggleList =");
+  const end = source.indexOf("const openLink =", start);
+  const block = source.slice(start, end);
+
+  assert.match(block, /if \(!focusEditorSelection\(\)\) return;/);
+  assert.match(block, /document\.execCommand\(command/);
+});
