@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Paper, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Pagination, Paper, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
@@ -20,6 +20,8 @@ export default function Agents() {
   const [searchParams] = useSearchParams();
   const serviceContext = searchParams.get("service");
   const [agents, setAgents] = useState([]);
+  const [agentPage, setAgentPage] = useState(1);
+  const [agentCount, setAgentCount] = useState(0);
   const [scopeCatalog, setScopeCatalog] = useState({ scopes: [], defaults: [] });
   const [loading, setLoading] = useState(true);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -29,12 +31,17 @@ export default function Agents() {
   const [saving, setSaving] = useState(false);
   const [draft, setDraft] = useState({ name: "", description: "", scopes: [] });
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (pageNumber = 1) => {
     setLoading(true);
     setError("");
     try {
-      const [agentsData, scopesData] = await Promise.all([listAgents(), listScopes()]);
+      const [agentsData, scopesData] = await Promise.all([
+        listAgents({ page: pageNumber, page_size: 5 }),
+        listScopes(),
+      ]);
       setAgents(Array.isArray(agentsData.results) ? agentsData.results : Array.isArray(agentsData) ? agentsData : []);
+      setAgentCount(Number(agentsData.count) || (Array.isArray(agentsData) ? agentsData.length : 0));
+      setAgentPage(pageNumber);
       setScopeCatalog(scopesData);
       setDraft((prev) => ({ ...prev, scopes: prev.scopes.length ? prev.scopes : scopesData.defaults || [] }));
     } catch (e) {
@@ -45,7 +52,7 @@ export default function Agents() {
     }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh(1); }, [refresh]);
 
   const groupedScopes = useMemo(() => (scopeCatalog.scopes || []).reduce((acc, scope) => {
     (acc[scope.category] ||= []).push(scope);
@@ -88,7 +95,8 @@ export default function Agents() {
     setError("");
     try {
       await deleteAgent(agent.id);
-      setAgents((prev) => prev.filter((item) => item.id !== agent.id));
+      const targetPage = agents.length === 1 && agentPage > 1 ? agentPage - 1 : agentPage;
+      await refresh(targetPage);
     } catch (e) {
       setError(getApiErrorMessage(e, "Failed to delete Agent."));
     } finally {
@@ -176,6 +184,22 @@ export default function Agents() {
             ))}
           </Stack>
         )}
+
+        {agentCount > 5 ? (
+          <Stack spacing={0.75} alignItems="center" sx={{ pt: 0.5 }}>
+            <Pagination
+              count={Math.max(1, Math.ceil(agentCount / 5))}
+              page={agentPage}
+              onChange={(_, value) => refresh(value)}
+              disabled={loading}
+              shape="rounded"
+              color="primary"
+            />
+            <Typography variant="caption" color="text.secondary">
+              Page {agentPage} of {Math.max(1, Math.ceil(agentCount / 5))} · {agentCount} Agents
+            </Typography>
+          </Stack>
+        ) : null}
       </Stack>
 
       <Dialog
