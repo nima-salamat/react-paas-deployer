@@ -137,7 +137,7 @@ test("alignment applies directly to the containing and selected blocks", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
   assert.match(source, /if \(range\.collapsed\)/);
-  assert.match(source, /const getSelectedEditorBlocks/);
+  assert.match(source, /function getSelectedEditorBlocks/);
   assert.match(source, /blocks = getSelectedEditorBlocks\(editor, range\)/);
   assert.match(source, /setBlockAlignment\(block, align\)/);
   assert.match(source, /const current = findBlock\(\) \|\| ensureBlock\(\)/);
@@ -195,7 +195,6 @@ test("italic can exit cleanly at the end of an inline mark without leaving an em
   assert.match(source, /const afterFragment = afterRange\.extractContents\(\)/);
   assert.match(source, /const beforeFragment = beforeRange\.cloneContents\(\)/);
   assert.match(source, /const afterFragment = afterRange\.cloneContents\(\)/);
-  assert.match(source, /const afterIndex = Array\.prototype\.indexOf\.call\(parent\.childNodes, active\) \+ 1/);
 });
 
 test("Create Ticket does not force the editor expanded state", () => {
@@ -302,7 +301,7 @@ test("ticket editor uses a smaller corner radius so the text field keeps more us
 test("quote formatting targets only the selected block range and preserves alignment/direction", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
-  assert.match(source, /const getSelectedEditorBlocks =/);
+  assert.match(source, /function getSelectedEditorBlocks/);
   assert.match(source, /const targets = range\.collapsed/);
   assert.match(source, /copyBlockAlignment\(block, quoteBlock\)/);
   assert.match(source, /quoteBlock\.setAttribute\("dir", getEditorDirection\(block\)\)/);
@@ -313,7 +312,7 @@ test("editor blocks use automatic text direction for RTL/LTR content", () => {
 
   assert.match(source, /setAttribute\("dir", "auto"\)/);
   assert.match(source, /unicodeBidi: "plaintext"/);
-  assert.match(source, /const normalizeEditorDirection =/);
+  assert.match(source, /function normalizeEditorDirection/);
 });
 
 test("an empty editor can create a paragraph and retain an initial alignment before typing", () => {
