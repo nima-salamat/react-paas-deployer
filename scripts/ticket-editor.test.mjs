@@ -19,6 +19,7 @@ test("editor maintains an explicit undo/redo history", () => {
   assert.match(source, /const undo = useCallback/);
   assert.match(source, /const redo = useCallback/);
   assert.match(source, /e\.shiftKey \? redo\(\) : undo\(\)/);
+  assert.match(source, /defaultExpanded = false/);
 });
 
 test("toolbar reflects the active block and inline formatting", () => {
@@ -30,6 +31,10 @@ test("toolbar reflects the active block and inline formatting", () => {
   assert.match(source, /aria-pressed=\{activeFormats\.ordered\}/);
   assert.match(source, /aria-pressed=\{activeFormats\.code\}/);
   assert.match(source, /aria-pressed=\{activeFormats\.quote\}/);
+  assert.match(source, /const applyAlignment = useCallback/);
+  assert.match(source, /activeFormats\.align === "center"/);
+  assert.match(source, /FormatAlignRightIcon/);
+  assert.match(source, /fontSize: "14px"/);
 });
 
 test("headings H1-H4 are supported as block formats", () => {
@@ -57,6 +62,8 @@ test("code blocks exit through normal paragraphs and keep explicit newlines", ()
   assert.match(source, /const exitCodeBlockAtEnd = useCallback/);
   assert.match(source, /const newline = document\.createTextNode\("\\n"\)/);
   assert.match(source, /const atEnd = !afterRange\.toString\(\)/);
+  assert.match(source, /const newline = trailingBreak/);
+  assert.match(source, /insertCodeNewline\(range, selection, atEnd\)/);
 });
 
 test("message code renderer highlights and copies code without DOM replacement crashes", () => {
@@ -77,5 +84,14 @@ test("quote blocks have a distinct visual treatment", () => {
   assert.match(editor, /fontStyle: "italic"/);
   assert.match(renderer, /blockquote::before/);
   assert.match(renderer, /fontStyle: "italic"/);
+  assert.match(renderer, /const codeText = \(\(\) =>/);
   assert.match(renderer, /borderRadius: "0 8px 8px 0"/);
+});
+
+
+test("Create Ticket uses defaultExpanded so the formatting toggle remains functional", () => {
+  const source = read("src/components/tickets/CreateTicket.jsx");
+
+  assert.match(source, /defaultExpanded/);
+  assert.doesNotMatch(source, /expanded=\{true\}/);
 });

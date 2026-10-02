@@ -166,6 +166,7 @@ export default function CreateTicket() {
               value={body}
               onChange={setBody}
               placeholder="Describe your issue…"
+              defaultExpanded
               minHeight={140}
               maxHeight={320}
               enterSends={false}

@@ -526,6 +526,14 @@ function enhanceRichTextHtml(html) {
         return node;
       })();
 
+    const codeText = (() => {
+      const clone = code.cloneNode(true);
+      clone.querySelectorAll?.("br").forEach((br) => {
+        br.replaceWith(doc.createTextNode("\n"));
+      });
+      return clone.textContent || "";
+    })();
+
     const languageClass = Array.from(code.classList)
       .find((name) => name.startsWith("language-"));
     const requestedLanguage = languageClass?.slice("language-".length).trim().toLowerCase() || "";
@@ -535,10 +543,10 @@ function enhanceRichTextHtml(html) {
 
     try {
       if (requestedLanguage && hljs.getLanguage(requestedLanguage)) {
-        highlighted = hljs.highlight(code.textContent || "", { language: requestedLanguage }).value;
+        highlighted = hljs.highlight(codeText, { language: requestedLanguage }).value;
         detectedLanguage = requestedLanguage;
       } else if ((code.textContent || "").trim()) {
-        const auto = hljs.highlightAuto(code.textContent);
+        const auto = hljs.highlightAuto(codeText);
         highlighted = auto.value;
         detectedLanguage = auto.language || "";
       }
@@ -743,8 +751,9 @@ export default function MessageBubble({
               }, 1400);
             }}
             sx={{
-              fontSize: 14.5,
+              fontSize: "14px",
               lineHeight: 1.55,
+              "& p, & li, & blockquote": { fontSize: "14px" },
               wordBreak: "break-word",
               mt: 0.25,
               "& p": { m: 0, mb: 0.5 },
