@@ -999,6 +999,72 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     }
   }, [apiRoot, handleError, openFiles, session?.token]);
 
+  const selectedItems = useMemo(() => explorerEntries.filter((item) => {
+    const path = item.path || joinPath(currentCwd, item.name);
+    return !item.parent && selectedPaths.includes(path);
+  }), [currentCwd, explorerEntries, selectedPaths]);
+
+  const toggleTreeSelection = useCallback((event, item) => {
+    if (!item || item.parent) return;
+    const path = item.path || joinPath(currentCwd, item.name);
+    setSelectedPaths((prev) => {
+      if (event.ctrlKey || event.metaKey) {
+        return prev.includes(path) ? prev.filter((value) => value !== path) : [...prev, path];
+      }
+      return prev.length === 1 && prev[0] === path ? prev : [path];
+    });
+  }, [currentCwd]);
+
+  const downloadSelection = useCallback(async (items) => {
+    const list = Array.isArray(items) ? items : [];
+    if (!session?.token || !list.length) return;
+    closeContextMenu();
+    try {
+      const response = await apiRequest({
+        method: "POST",
+        url: `${apiRoot}/download/`,
+        data: { token: session.token, paths: list.map((item) => item.path || joinPath(currentCwd, item.name)) },
+        responseType: "blob",
+      });
+      const disposition = response.headers?.["content-disposition"] || "";
+      const match = disposition.match(/filename="?([^"]+)"?/i);
+      const fallback = list.length === 1 && !list[0].directory ? (list[0].name || "download") : "selection.zip";
+      const filename = match?.[1] || fallback;
+      const blobUrl = URL.createObjectURL(new Blob([response.data], { type: response.headers?.["content-type"] || "application/octet-stream" }));
+      const link = document.createElement("a");
+      link.href = blobUrl; link.download = filename; document.body.appendChild(link); link.click(); link.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      handleError(err?.response?.data?.detail || err?.message || "Unable to download selection.");
+    }
+  }, [apiRoot, closeContextMenu, currentCwd, handleError, session?.token]);
+
+  const uploadFiles = useCallback(async (files) => {
+    if (!session?.token || cwdWritable !== true || cwdMountWritable !== true || !files?.length) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        const form = new FormData();
+        form.append("token", session.token);
+        form.append("action", "upload");
+        form.append("path", currentCwd);
+        form.append("file", file, file.name);
+        await apiRequest({ method: "POST", url: `${apiRoot}/file/`, data: form });
+      }
+      await refreshDirectory();
+    } catch (err) {
+      handleError(err?.response?.data?.detail || err?.message || "Unable to upload file.");
+    } finally {
+      setUploading(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
+    }
+  }, [apiRoot, currentCwd, cwdMountWritable, cwdWritable, handleError, refreshDirectory, session?.token]);
+
+  const handleExplorerDrop = useCallback((event) => {
+    event.preventDefault();
+    setDropActive(false);
+    if (cwdWritable === true && cwdMountWritable === true) uploadFiles(event.dataTransfer?.files);
+  }, [cwdMountWritable, cwdWritable, uploadFiles]);
   const closeTab = useCallback((tabId) => {
     if (tabId === "shell") return;
     const index = tabs.findIndex((tab) => tab.id === tabId);
