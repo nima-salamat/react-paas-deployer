@@ -209,8 +209,10 @@ test("renderer uses adaptive quote contrast and renders persisted alignment clas
 
   assert.match(source, /borderColor: mine \? "rgba\(255,255,255,0\.62\)" : "divider"/);
   assert.match(source, /bgcolor: mine \? "rgba\(255,255,255,0\.09\)" : "action\.hover"/);
-  assert.match(source, /"& \.ticket-align-center": \{ textAlign: "center" \}/);
-  assert.match(source, /"& \.ticket-align-right": \{ textAlign: "right" \}/);
+  assert.match(source, /data-ticket-align=\\"center\\"/);
+  assert.match(source, /data-ticket-align=\\"right\\"/);
+  assert.match(source, /text-align\", "center"/);
+  assert.match(source, /text-align\", "right"/);
 });
 
 
@@ -236,7 +238,7 @@ test("Enter exits quote blocks while Shift+Enter remains inside the same quote",
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
   assert.match(source, /const splitQuoteAtCaret = useCallback/);
-  assert.ok(source.includes('const quote = anchor?.closest?.("blockquote");'));
+  assert.match(source, /const quote = anchor\?\.closest\?\.\("blockquote"\) \|\| rangeNode\?\.closest\?\.\("blockquote"\)/);
   assert.match(source, /insertSoftBreak\(range, selection\)/);
   assert.match(source, /splitQuoteAtCaret\(quote, range\)/);
   assert.doesNotMatch(source, /quote\.after\(document\.createElement\("blockquote"\)\)/);
@@ -349,7 +351,7 @@ test("message renderer normalizes semantic alignment and RTL before injecting ri
   assert.match(source, /function normalizeRichTextBlocks/);
   assert.match(source, /RICH_TEXT_ALIGNMENTS/);
   assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
-  assert.match(source, /block\.style\.direction = direction/);
+  assert.match(source, /block\.style\.setProperty\("direction", direction, "important"\)/);
   assert.match(source, /normalizeRichTextBlocks\(root\)/);
 });
 
@@ -429,7 +431,7 @@ test("empty editor can create code and quote blocks without a pre-existing selec
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
   assert.match(source, /Toolbar actions must also work when the editor has never received text/);
-  assert.match(source, /if \(!editor\.textContent\?\.trim\(\) && editor\.children\.length === 0\)/);
+  assert.match(source, /if \(!hasVisualContent && !structuralBlock\)/);
   assert.match(source, /const wrapper = document\.createElement\("p"\)/);
   assert.match(source, /const block = findBlock\(\) \|\| ensureBlock\(\)/);
   assert.match(source, /const quoteBlock = document\.createElement\("blockquote"\)/);
@@ -462,10 +464,11 @@ test("editor defaults to explicit left alignment instead of automatic start alig
 });
 
 
-test("rendered ticket messages default to explicit left alignment while preserving explicit block alignment", () => {
+test("rendered ticket messages do not impose a renderer-wide alignment default", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
 
-  assert.match(source, /wordBreak: "break-word",[\s\S]*textAlign: "left"/);
+  assert.match(source, /function getStoredAlignment/);
+  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
 });
 
 
@@ -523,7 +526,7 @@ test("ticket renderer is source-faithful for explicit alignment and never invent
   assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
   assert.match(source, /data-rendered-ticket-align/);
   assert.doesNotMatch(source, /block\.setAttribute\("dir", "auto"\)/);
-  assert.doesNotMatch(source, /textAlign: "left",/);
+  assert.doesNotMatch(source, /normalizeRichTextBlocks[\s\S]*textAlign: "left",/);
 });
 
 test("ticket renderer preserves ordered lists and aligns list items from stored alignment metadata", () => {
