@@ -27,7 +27,7 @@ import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
-import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
+import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";\nimport SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import SpeedRoundedIcon from "@mui/icons-material/SpeedRounded";
 import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
@@ -101,7 +101,7 @@ const CAPABILITIES = [
   ["Storage", StorageRoundedIcon, "Persistent volumes remain first-class resources in the platform."],
   ["Resource controls", MemoryRoundedIcon, "Keep CPU, memory and storage close to the service definition."],
   ["Security", SecurityRoundedIcon, "Use isolated containers and clear service boundaries as the execution model."],
-  ["Automation", AutoAwesomeRoundedIcon, "Reduce repeated operational work by keeping the lifecycle in one control plane."],
+  ["Agent API", SmartToyOutlinedIcon, "Connect scoped automation clients and AI agents to the PassDeployer control plane with audited, idempotent operations."],
 ];
 
 const STACK_HIGHLIGHTS = [
