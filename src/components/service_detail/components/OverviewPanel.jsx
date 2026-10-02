@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Paper, Typography, Box, Stack, Divider, Chip, IconButton, Tooltip,
-  InputAdornment, TextField, CircularProgress, Alert, Collapse,
+  InputAdornment, TextField, CircularProgress, Alert, Collapse, Button,
 } from "@mui/material";
 import {
   Visibility, VisibilityOff, ContentCopy, Refresh as RefreshIcon,
@@ -232,8 +232,7 @@ function ConnectionStringBlock({ platform, cfg, serviceName }) {
                 wordBreak: "break-all",
               }}
             >
-              {hints.join("
-")}
+              {hints.join("\n")}
             </Box>
           </Collapse>
         </Box>
@@ -351,6 +350,7 @@ export default function OverviewPanel({
   networkDetail,
   hideServiceIdentity = false,
 }) {
+  const navigate = useNavigate();
   const serviceHost = service?.service_host || null;
 
   return (
