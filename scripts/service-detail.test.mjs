@@ -144,6 +144,15 @@ test("service detail avoids static shell highlighter loading and hidden shell mo
   assert.doesNotMatch(service, /display: activeTab === "shell" \? "block" : "none"/);
 });
 
+test("service detail declares shell context-menu callback before consumers", () => {
+  const source = read("src/components/service_detail/components/ShellPanel.jsx");
+  const closeIndex = source.indexOf("const closeContextMenu = useCallback");
+  const downloadIndex = source.indexOf("const downloadSelection = useCallback");
+  assert.ok(closeIndex >= 0);
+  assert.ok(downloadIndex >= 0);
+  assert.ok(closeIndex < downloadIndex);
+});
+
 test("service detail keeps the backend route contract", () => {
   const constants = read("src/components/service_detail/constants.js");
   const service = read("src/components/service_detail/ServiceDetail.jsx");
