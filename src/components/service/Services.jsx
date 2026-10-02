@@ -271,7 +271,7 @@ export default function ServicesListMui({
 
         if (!isBackground && requestSeq === serviceFetchSeqRef.current) setHasNext(Boolean(res.data?.next));
       } catch (e) {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || requestSeq !== serviceFetchSeqRef.current) return;
         if (handleAuthError(e)) return;
         if (!isBackground) {
           if (e?.response?.status === 404) {
@@ -285,7 +285,7 @@ export default function ServicesListMui({
           }
         }
       } finally {
-        if (mountedRef.current && !isBackground) {
+        if (mountedRef.current && !isBackground && requestSeq === serviceFetchSeqRef.current) {
           setLoading(false);
           setLoadingMore(false);
         }
