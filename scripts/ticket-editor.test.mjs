@@ -79,3 +79,22 @@ test("code blocks default to automatic language detection", () => {
   assert.doesNotMatch(source, /code\.className = "language-plaintext"/);
   assert.doesNotMatch(source, /target\.classList\.add\("language-plaintext"\)/);
 });
+
+test("code block toggle off restores normal paragraph content", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const convertCodeBlockToParagraph = useCallback/);
+  assert.match(source, /convertCodeBlockToParagraph\(block\)/);
+  assert.match(source, /const lines = text\.replace\(\/\\r\\n\?\/g, "\\n"\)\.split\("\\n"\)/);
+});
+
+test("Enter on the empty final code line exits without crashing", () => {
+  const editor = read("src/components/tickets/SimpleHtmlEditor.jsx");
+  const renderer = read("src/components/tickets/MessageBubble.jsx");
+
+  assert.match(editor, /const exitCodeBlockAtEnd = useCallback/);
+  assert.match(editor, /const atEnd = !afterRange\.toString\(\)/);
+  assert.match(editor, /range\.collapsed && atEnd && !currentLine\.trim\(\)/);
+  assert.match(renderer, /parent\.replaceChild\(shell, pre\)/);
+  assert.match(renderer, /shell\.append\(header, pre\)/);
+});

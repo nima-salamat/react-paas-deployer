@@ -568,8 +568,10 @@ function enhanceRichTextHtml(html) {
 
     const parent = pre.parentNode;
     header.append(label, copyButton);
-    shell.append(header, pre);
-    parent?.replaceChild(shell, pre);
+    if (parent) {
+      parent.replaceChild(shell, pre);
+      shell.append(header, pre);
+    }
   });
 
   return root.innerHTML;

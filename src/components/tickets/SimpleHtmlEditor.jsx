@@ -147,39 +147,38 @@ export default function SimpleHtmlEditor({
     selection.addRange(range);
   }, []);
 
-  const exitCodeBlockAtCaret = useCallback((pre, range) => {
-    const parent = pre?.parentNode;
-    if (!parent || !range || !pre.contains(range.startContainer)) return null;
+  const convertCodeBlockToParagraph = useCallback((pre) => {
+    const paragraph = document.createElement("p");
+    const text = pre?.textContent || "";
+    const lines = text.replace(/\r\n?/g, "\n").split("\n");
+    lines.forEach((line, index) => {
+      if (index > 0) paragraph.appendChild(document.createElement("br"));
+      if (line) paragraph.appendChild(document.createTextNode(line));
+    });
+    if (!text) paragraph.innerHTML = "<br>";
+    pre?.replaceWith(paragraph);
+    return paragraph;
+  }, []);
 
-    const beforeRange = document.createRange();
-    beforeRange.selectNodeContents(pre);
-    beforeRange.setEnd(range.startContainer, range.startOffset);
+  const exitCodeBlockAtEnd = useCallback((pre) => {
+    const code = pre?.querySelector?.("code") || pre;
+    if (!pre || !code) return null;
 
-    const afterRange = document.createRange();
-    afterRange.selectNodeContents(pre);
-    afterRange.setStart(range.startContainer, range.startOffset);
-
-    const beforeText = beforeRange.toString();
-    const afterText = afterRange.toString();
-    const fragment = document.createDocumentFragment();
-
-    if (beforeText) {
-      const beforePre = document.createElement("pre");
-      beforePre.textContent = beforeText;
-      fragment.appendChild(beforePre);
-    }
+    const text = code.textContent || "";
+    const remaining = text.endsWith("\n") ? text.slice(0, -1) : text;
+    const parent = pre.parentNode;
+    if (!parent) return null;
 
     const paragraph = document.createElement("p");
     paragraph.innerHTML = "<br>";
-    fragment.appendChild(paragraph);
 
-    if (afterText) {
-      const afterPre = document.createElement("pre");
-      afterPre.textContent = afterText;
-      fragment.appendChild(afterPre);
+    if (remaining.trim()) {
+      code.textContent = remaining;
+      parent.insertBefore(paragraph, pre.nextSibling);
+    } else {
+      parent.replaceChild(paragraph, pre);
     }
 
-    pre.replaceWith(fragment);
     return paragraph;
   }, []);
 
@@ -210,8 +209,7 @@ export default function SimpleHtmlEditor({
 
     editingRef.current = true;
     if (block.tagName === "PRE") {
-      const range = selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
-      const paragraph = exitCodeBlockAtCaret(block, range);
+      const paragraph = convertCodeBlockToParagraph(block);
       if (paragraph) placeCaretAtEnd(paragraph);
     } else {
       const pre = document.createElement("pre");
@@ -374,13 +372,18 @@ export default function SimpleHtmlEditor({
         const beforeRange = document.createRange();
         beforeRange.selectNodeContents(pre);
         beforeRange.setEnd(range.startContainer, range.startOffset);
+        const afterRange = document.createRange();
+        afterRange.selectNodeContents(pre);
+        afterRange.setStart(range.startContainer, range.startOffset);
+
         const currentLine = beforeRange.toString().split("\n").pop() || "";
+        const atEnd = !afterRange.toString();
 
         e.preventDefault();
         editingRef.current = true;
 
-        if (!e.shiftKey && range.collapsed && !currentLine.trim()) {
-          const paragraph = exitCodeBlockAtCaret(pre, range);
+        if (!e.shiftKey && range.collapsed && atEnd && !currentLine.trim()) {
+          const paragraph = exitCodeBlockAtEnd(pre);
           if (paragraph) {
             placeCaretAtEnd(paragraph);
           }
