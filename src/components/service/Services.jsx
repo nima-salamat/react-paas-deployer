@@ -296,9 +296,13 @@ export default function ServicesListMui({
 
   /** Live CPU/RAM via service_status (same API as ServiceDetail). */
 
-  const fetchShares = useCallback(async () => {
+  const fetchShares = useCallback(async (queryOverride = query) => {
     try {
-      const res = await apiRequest({ method: "GET", url: SHARE_UNIFIED_URL });
+      const params = new URLSearchParams();
+      const q = String(queryOverride || "").trim();
+      if (q) params.set("q_search", q);
+      const url = params.toString() ? SHARE_UNIFIED_URL + "?" + params.toString() : SHARE_UNIFIED_URL;
+      const res = await apiRequest({ method: "GET", url });
       if (!mountedRef.current) return;
       const data = res?.data || {};
       setSharedWithMe(Array.isArray(data.shared_with_me) ? data.shared_with_me : []);
@@ -952,6 +956,7 @@ export default function ServicesListMui({
           setPage(1);
           setServices([]);
           fetchServices(false, { pageOverride: 1, queryOverride: nextQuery });
+          fetchShares(nextQuery);
         }}
         onClearSearch={() => {
           setSearchDraft("");
@@ -959,6 +964,7 @@ export default function ServicesListMui({
           setPage(1);
           setServices([]);
           fetchServices(false, { pageOverride: 1, queryOverride: "" });
+          fetchShares("");
         }}
         viewMode={viewMode}
         setViewMode={setViewMode}
