@@ -230,59 +230,48 @@ export default function SimpleHtmlEditor({
       } else {
         const parent = active.parentNode;
         if (parent) {
-          const before = range.cloneRange();
-          before.selectNodeContents(active);
-          before.setEnd(range.startContainer, range.startOffset);
+          const beforeRange = range.cloneRange();
+          beforeRange.selectNodeContents(active);
+          beforeRange.setEnd(range.startContainer, range.startOffset);
 
-          const after = range.cloneRange();
-          after.selectNodeContents(active);
-          after.setStart(range.startContainer, range.startOffset);
+          const afterRange = range.cloneRange();
+          afterRange.selectNodeContents(active);
+          afterRange.setStart(range.startContainer, range.startOffset);
 
-          const afterFragment = after.extractContents();
-          const nextSibling = active.nextSibling;
+          const beforeFragment = beforeRange.cloneContents();
+          const afterFragment = afterRange.cloneContents();
+          const beforeVisible = (beforeFragment.textContent || "").replace(/\u200B/g, "");
+          const afterVisible = (afterFragment.textContent || "").replace(/\u200B/g, "");
+          const index = Array.prototype.indexOf.call(parent.childNodes, active);
 
-          if (!before.toString().replace(/\u200B/g, "") && !afterFragment.textContent?.replace(/\u200B/g, "")) {
-            const index = Array.prototype.indexOf.call(parent.childNodes, active);
-            active.remove();
-            const marker = document.createTextNode("\u200B");
-            parent.insertBefore(marker, parent.childNodes[index] || null);
-            const caret = document.createRange();
-            caret.setStart(marker, marker.length);
-            caret.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(caret);
+          const boundary = document.createTextNode("\u200B");
+          const beforeMark = active.cloneNode(false);
+          beforeMark.removeAttribute("data-editor-typing-mark");
+
+          const afterMark = active.cloneNode(false);
+          afterMark.removeAttribute("data-editor-typing-mark");
+
+          if (beforeVisible) beforeMark.appendChild(beforeFragment);
+          if (afterVisible) afterMark.appendChild(afterFragment);
+
+          active.remove();
+
+          if (beforeVisible) {
+            parent.insertBefore(beforeMark, parent.childNodes[index] || null);
+            parent.insertBefore(boundary, beforeMark.nextSibling);
           } else {
-            // Keep the content before the caret formatted, move the content
-            // after it into a separate formatted sibling, and place a real
-            // unformatted typing boundary between them.
-            active.textContent = "";
-            const beforeFragment = before.extractContents();
-            active.appendChild(beforeFragment);
-
-            const boundary = document.createTextNode("\u200B");
-            parent.insertBefore(boundary, nextSibling);
-
-            if (afterFragment.textContent?.replace(/\u200B/g, "")) {
-              const afterMark = active.cloneNode(false);
-              afterMark.removeAttribute("data-editor-typing-mark");
-              afterMark.appendChild(afterFragment);
-              parent.insertBefore(afterMark, boundary.nextSibling);
-            }
-
-            if (!active.textContent?.replace(/\u200B/g, "")) {
-              const index = Array.prototype.indexOf.call(parent.childNodes, active);
-              active.remove();
-              parent.insertBefore(boundary, parent.childNodes[index] || null);
-            } else {
-              active.removeAttribute("data-editor-typing-mark");
-            }
-
-            const caret = document.createRange();
-            caret.setStart(boundary, boundary.length);
-            caret.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(caret);
+            parent.insertBefore(boundary, parent.childNodes[index] || null);
           }
+
+          if (afterVisible) {
+            parent.insertBefore(afterMark, boundary.nextSibling);
+          }
+
+          const caret = document.createRange();
+          caret.setStart(boundary, boundary.length);
+          caret.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(caret);
         }
       }
     } else {
@@ -351,6 +340,16 @@ export default function SimpleHtmlEditor({
     const range = document.createRange();
     range.selectNodeContents(element);
     range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }, []);
+
+  const placeCaretAtStart = useCallback((element) => {
+    const selection = window.getSelection?.();
+    if (!selection || !element) return;
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(true);
     selection.removeAllRanges();
     selection.addRange(range);
   }, []);
@@ -539,7 +538,7 @@ export default function SimpleHtmlEditor({
     editingRef.current = false;
     emit();
     updateActiveFormats();
-  }, [disabled, emit, ensureBlock, findBlock, placeCaretAtEnd, saveSelection, updateActiveFormats]);
+  }, [disabled, emit, ensureBlock, findBlock, focusEditorSelection, placeCaretAtEnd, saveSelection, updateActiveFormats]);
 
   const readCodeText = useCallback((node) => {
     if (!node) return "";
@@ -705,7 +704,7 @@ export default function SimpleHtmlEditor({
 
   const applyCodeLanguage = useCallback((language) => {
     if (disabled || !ref.current) return;
-    restoreSelection();
+    if (!focusEditorSelection()) return;
     const block = findBlock() || ensureBlock();
     if (!block) return;
 
@@ -801,48 +800,95 @@ export default function SimpleHtmlEditor({
   const toggleList = (ordered) => {
     if (disabled || !ref.current) return;
     if (!focusEditorSelection()) return;
-    const block = findBlock() || ensureBlock();
-    if (!block || block.tagName === "PRE") return;
+
+    const editor = ref.current;
+    const selection = window.getSelection?.();
+    if (!selection?.rangeCount) return;
+
+    const range = selection.getRangeAt(0);
+    const anchorBlock = findBlock() || ensureBlock();
+    if (!anchorBlock || anchorBlock.tagName === "PRE") return;
+
+    const candidates = Array.from(
+      editor.querySelectorAll("p, div, li, blockquote, h1, h2, h3, h4")
+    ).filter((node) => {
+      try {
+        return range.collapsed
+          ? node === anchorBlock
+          : range.intersectsNode(node);
+      } catch {
+        return false;
+      }
+    });
+
+    const selected = new Set(candidates);
+    const blocks = candidates.filter((node) => {
+      let ancestor = node.parentElement;
+      while (ancestor && ancestor !== editor) {
+        if (selected.has(ancestor)) return false;
+        ancestor = ancestor.parentElement;
+      }
+      return true;
+    });
+
+    const targets = blocks.length ? blocks : [anchorBlock];
+    const alignments = targets.map((block) => getBlockAlignment(block));
+    const desiredListTag = ordered ? "OL" : "UL";
 
     editingRef.current = true;
+    let applied = false;
     try {
       const command = ordered ? "insertOrderedList" : "insertUnorderedList";
-      const applied = document.execCommand(command, false, null);
-      if (!applied) throw new Error("List command unavailable");
+      applied = Boolean(document.execCommand(command, false, null));
     } catch {
-      const selection = window.getSelection?.();
-      if (!selection) return;
-      const existing = block.tagName === "LI" ? block.parentElement : null;
-      if (existing && existing.tagName === (ordered ? "OL" : "UL")) {
+      applied = false;
+    }
+
+    if (!applied) {
+      const block = targets[0];
+      if (block.tagName === "LI" && block.parentElement?.tagName === desiredListTag) {
         const p = document.createElement("p");
         p.innerHTML = block.innerHTML || "<br>";
-        const parent = existing.parentElement;
-        if (!parent) return;
-        if (existing.children.length === 1) {
-          existing.replaceWith(p);
-        } else if (block === existing.firstElementChild) {
-          existing.removeChild(block);
-          parent.insertBefore(p, existing);
-        } else if (block === existing.lastElementChild) {
-          existing.removeChild(block);
-          parent.insertBefore(p, existing.nextSibling);
-        } else {
-          const after = document.createElement(existing.tagName.toLowerCase());
-          while (block.nextSibling) after.appendChild(block.nextSibling);
-          existing.removeChild(block);
-          existing.after(p);
-          if (after.children.length) p.after(after);
+        copyBlockAlignment(block, p);
+        const listParent = block.parentElement.parentNode;
+        if (listParent) {
+          if (block === block.parentElement.firstElementChild) {
+            block.parentElement.before(p);
+          } else {
+            block.parentElement.after(p);
+          }
+          block.remove();
+          if (!block.parentElement?.children.length) {
+            block.parentElement?.remove();
+          }
+          placeCaretAtEnd(p);
         }
-        placeCaretAtEnd(p);
       } else {
-        const list = document.createElement(ordered ? "ol" : "ul");
-        const item = document.createElement("li");
-        item.innerHTML = block.innerHTML || "<br>";
-        list.appendChild(item);
-        block.replaceWith(list);
-        placeCaretAtEnd(item);
+        const listElement = document.createElement(ordered ? "ol" : "ul");
+        targets.forEach((block, index) => {
+          const item = document.createElement("li");
+          item.innerHTML = block.innerHTML || "<br>";
+          setBlockAlignment(item, alignments[index] || "left");
+          listElement.appendChild(item);
+        });
+        const first = targets[0];
+        first.parentNode?.insertBefore(listElement, first);
+        targets.forEach((block) => block.remove());
+        placeCaretAtEnd(listElement.lastElementChild || listElement);
+      }
+    } else {
+      const resultingItems = Array.from(editor.querySelectorAll("li"));
+      if (targets.length === 1) {
+        const current = findBlock();
+        if (current?.tagName === "LI") {
+          setBlockAlignment(current, alignments[0]);
+        }
+      } else if (resultingItems.length >= targets.length) {
+        const recent = resultingItems.slice(-targets.length);
+        recent.forEach((item, index) => setBlockAlignment(item, alignments[index] || "left"));
       }
     }
+
     saveSelection();
     editingRef.current = false;
     emit();
@@ -894,7 +940,7 @@ export default function SimpleHtmlEditor({
 
   const toggleQuote = () => {
     if (disabled || !ref.current) return;
-    restoreSelection();
+    if (!focusEditorSelection()) return;
     const block = findBlock() || ensureBlock();
     if (!block || block.tagName === "PRE") return;
 
@@ -958,7 +1004,7 @@ export default function SimpleHtmlEditor({
         }
 
         const paragraph = splitCodeBlockAtCaret(pre, range);
-        if (paragraph) placeCaretAtEnd(paragraph);
+        if (paragraph) placeCaretAtStart(paragraph);
 
         saveSelection();
         editingRef.current = false;
@@ -978,7 +1024,7 @@ export default function SimpleHtmlEditor({
           insertSoftBreak(range, selection);
         } else {
           const paragraph = splitQuoteAtCaret(quote, range);
-          if (paragraph) placeCaretAtEnd(paragraph);
+          if (paragraph) placeCaretAtStart(paragraph);
         }
 
         saveSelection();

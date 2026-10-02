@@ -250,3 +250,32 @@ test("list commands restore the editor selection before invoking browser list be
   assert.match(block, /if \(!focusEditorSelection\(\)\) return;/);
   assert.match(block, /document\.execCommand\(command/);
 });
+
+
+test("inline formatting creates an unformatted typing boundary when toggled off", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const boundary = document\.createTextNode\("\\u200B"\)/);
+  assert.match(source, /const beforeFragment = beforeRange\.cloneContents\(\)/);
+  assert.match(source, /const afterFragment = afterRange\.cloneContents\(\)/);
+  assert.match(source, /selection\.addRange\(caret\)/);
+});
+
+test("code and quote exits place the caret in the new paragraph", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const placeCaretAtStart = useCallback/);
+  assert.match(source, /if \(paragraph\) placeCaretAtStart\(paragraph\)/);
+});
+
+test("list conversion preserves paragraph alignment", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  const start = source.indexOf("const toggleList =");
+  const end = source.indexOf("const openLink =", start);
+  const block = source.slice(start, end);
+
+  assert.match(block, /const alignments = targets\.map\(\(block\) => getBlockAlignment\(block\)\)/);
+  assert.match(block, /setBlockAlignment\(item, alignments\[index\]/);
+  assert.match(block, /const desiredListTag = ordered \? "OL" : "UL"/);
+});
