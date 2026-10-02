@@ -508,6 +508,23 @@ function MessageComposer({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Prevent duplicate sends while a heavy attachment is still being uploaded.
+  // The ref locks synchronously before React has a chance to rerender.
+  const sendInFlightRef = useRef(false);
+  const [sendInFlight, setSendInFlight] = useState(false);
+
+  const handleSendClick = useCallback(async () => {
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
+    setSendInFlight(true);
+    try {
+      await onSend?.();
+    } finally {
+      sendInFlightRef.current = false;
+      setSendInFlight(false);
+    }
+  }, [onSend]);
+
   // Local text — typing re-renders only this component, not the whole messenger shell.
   // Parent forces value via text + textVersion (open draft, edit, clear after send).
   const [localText, setLocalText] = useState(() => text || "");
@@ -2559,7 +2576,7 @@ function MessageComposer({
             )}
             <IconButton
               color="primary"
-              disabled={hasPendingMedia}
+              disabled={hasPendingMedia || sendInFlight}
               title={
                 hasPendingMedia
                   ? "Preparing attachment…"
@@ -2574,7 +2591,7 @@ function MessageComposer({
                   sendLongPressFired.current = false;
                   return;
                 }
-                onSend?.();
+                void handleSendClick();
               }}
               onPointerDown={(e) => {
                 if (!isMobile || editingMsg || !setScheduledFor) return;
