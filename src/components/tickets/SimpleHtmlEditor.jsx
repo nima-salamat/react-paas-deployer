@@ -152,7 +152,7 @@ export default function SimpleHtmlEditor({
     setLinkAnchor(document.activeElement);
   };
 
-  const validLink = /^(?:https?:\\/\\/|mailto:|tel:|\\/|#)/i.test(linkUrl.trim());
+  const validLink = /^(?:https?:\/\/|mailto:|tel:\/|\/|#)/i.test(linkUrl.trim());
   const applyLink = () => {
     if (disabled || !validLink) return;
     ref.current?.focus();
