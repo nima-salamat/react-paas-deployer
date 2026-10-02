@@ -19,8 +19,8 @@ export default function UsageBar({ label, value, loading = false, error = false,
         </Tooltip>
       </Stack>
       <LinearProgress
-        variant={hasValue ? "determinate" : "indeterminate"}
-        value={hasValue ? pct : undefined}
+        variant="determinate"
+        value={hasValue ? pct : 0}
         sx={{
           height: dense ? 5 : 6,
           borderRadius: 99,
