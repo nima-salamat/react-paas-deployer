@@ -19,6 +19,10 @@ export async function updateAgent(id, payload) {
   const res = await apiRequest({ method: "PATCH", url: AGENTS_API + "/" + id + "/", data: payload });
   return res?.data || {};
 }
+export async function deleteAgent(id) {
+  const res = await apiRequest({ method: "DELETE", url: AGENTS_API + "/" + id + "/" });
+  return res?.data || {};
+}
 export async function listScopes() {
   const res = await apiRequest({ method: "GET", url: AGENTS_API + "/scopes/" });
   return res?.data || {};
