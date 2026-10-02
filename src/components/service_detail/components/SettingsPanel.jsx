@@ -1252,6 +1252,15 @@ export default function SettingsPanel({
     if (!nodes.length) return undefined;
 
     let lastSection = "";
+    try {
+      const currentHash = decodeURIComponent(String(window.location.hash || "").replace(/^#/, ""));
+      if (SETTINGS_SECTION_IDS.includes(currentHash)) {
+        lastSection = currentHash;
+      }
+    } catch {
+      /* keep empty */
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
