@@ -504,3 +504,14 @@ test("ticket messages are memoized so draft typing does not rerender the full me
 
   assert.match(source, /export default React\.memo\(MessageBubble\)/);
 });
+
+
+test("quote Enter resolves the quote from either the anchor or range container", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const range = selection\?\.rangeCount \? selection\.getRangeAt\(0\) : null/);
+  assert.match(source, /const rangeNode = range\?\.commonAncestorContainer/);
+  assert.match(source, /const quote = anchor\?\.closest\?\.\("blockquote"\) \|\| rangeNode\?\.closest\?\.\("blockquote"\)/);
+  assert.match(source, /quote: false/);
+  assert.match(source, /block: "P"/);
+});

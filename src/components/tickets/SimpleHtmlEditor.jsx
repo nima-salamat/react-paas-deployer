@@ -1121,11 +1121,15 @@ export default function SimpleHtmlEditor({
     if (e.key !== "Enter") return;
     if (e.isComposing || e.keyCode === 229) return;
     const selection = window.getSelection?.();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
     const anchor = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE
       ? selection.anchorNode
       : selection?.anchorNode?.parentElement;
-    const pre = anchor?.closest?.("pre");
-    const quote = anchor?.closest?.("blockquote");
+    const rangeNode = range?.commonAncestorContainer?.nodeType === Node.ELEMENT_NODE
+      ? range.commonAncestorContainer
+      : range?.commonAncestorContainer?.parentElement;
+    const pre = anchor?.closest?.("pre") || rangeNode?.closest?.("pre");
+    const quote = anchor?.closest?.("blockquote") || rangeNode?.closest?.("blockquote");
 
     if (pre && selection?.rangeCount) {
       const range = selection.getRangeAt(0).cloneRange();
@@ -1153,18 +1157,24 @@ export default function SimpleHtmlEditor({
     }
 
     if (quote && selection?.rangeCount) {
-      const range = selection.getRangeAt(0).cloneRange();
-      if (range.collapsed && quote.contains(range.startContainer)) {
+      const quoteRange = selection.getRangeAt(0).cloneRange();
+      if (quoteRange.collapsed && quote.contains(quoteRange.startContainer)) {
         e.preventDefault();
         editingRef.current = true;
 
         if (e.shiftKey) {
-          insertSoftBreak(range, selection);
+          insertSoftBreak(quoteRange, selection);
         } else {
-          const paragraph = splitQuoteAtCaret(quote, range);
+          const paragraph = splitQuoteAtCaret(quote, quoteRange);
           if (paragraph) {
             placeCaretAtStart(paragraph);
             ref.current?.focus({ preventScroll: true });
+            setActiveFormats((current) => ({
+              ...current,
+              quote: false,
+              block: "P",
+              align: getBlockAlignment(paragraph),
+            }));
           }
         }
 
