@@ -135,6 +135,7 @@ export default function SimpleHtmlEditor({
   const ref = useRef(null);
   const lastHtml = useRef(value || "");
   const savedRange = useRef(null);
+  const pendingAlignmentRef = useRef("left");
   const editingRef = useRef(false);
   const historyRef = useRef([value || ""]);
   const historyIndexRef = useRef(0);
@@ -465,7 +466,7 @@ export default function SimpleHtmlEditor({
       code: block?.tagName === "PRE",
       quote: block?.tagName === "BLOCKQUOTE",
       block: block?.tagName || "P",
-      align: getBlockAlignment(block),
+      align: block ? getBlockAlignment(block) : pendingAlignmentRef.current,
       language: block?.tagName === "PRE"
         ? getCodeLanguage(block.querySelector?.("code"))
         : "",
@@ -538,8 +539,23 @@ export default function SimpleHtmlEditor({
       }
     }
 
-    if (!blocks.length) return;
+    if (!blocks.length) {
+      // Keep alignment as an explicit typing preference while the editor is still
+      // completely empty. The first typed block will inherit this alignment.
+      const visibleText = (editor.textContent || "").replace(/\u200B/g, "").trim();
+      const hasVisualContent = Boolean(
+        visibleText ||
+        editor.querySelector("img, video, audio, iframe, table")
+      );
+      if (!hasVisualContent) {
+        pendingAlignmentRef.current = align;
+        setActiveFormats((current) => ({ ...current, align }));
+        return;
+      }
+      return;
+    }
 
+    pendingAlignmentRef.current = align;
     editingRef.current = true;
     blocks.forEach((block) => {
       setBlockAlignment(block, align);
@@ -1239,7 +1255,23 @@ export default function SimpleHtmlEditor({
           contentEditable={!disabled}
           dir="auto"
           suppressContentEditableWarning
-          onInput={() => { editingRef.current = true; emit(); saveSelection(); requestAnimationFrame(() => { editingRef.current = false; }); }}
+          onInput={() => {
+            editingRef.current = true;
+            const pendingAlignment = pendingAlignmentRef.current;
+            if (pendingAlignment !== "left") {
+              const block = findBlock() || ensureBlock();
+              if (block) {
+                setBlockAlignment(block, pendingAlignment);
+                pendingAlignmentRef.current = "left";
+              }
+            }
+            emit();
+            saveSelection();
+            requestAnimationFrame(() => {
+              editingRef.current = false;
+              updateActiveFormats();
+            });
+          }}
           onFocus={saveSelection}
           onBlur={() => { saveSelection(); emit(); }}
           onKeyUp={() => {

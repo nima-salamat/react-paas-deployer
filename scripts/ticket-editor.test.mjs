@@ -393,3 +393,16 @@ test("code blocks stay horizontally scrollable without pushing message content o
   assert.match(source, /overflowX: "auto"/);
   assert.match(source, /maxWidth: "100%"/);
 });
+
+
+test("alignment can be chosen before any text exists and is inherited by the first typed block", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const pendingAlignmentRef = useRef\("left"\)/);
+  assert.match(source, /pendingAlignmentRef\.current = align/);
+  assert.match(source, /Keep alignment as an explicit typing preference/);
+  assert.match(source, /const pendingAlignment = pendingAlignmentRef\.current/);
+  assert.match(source, /const block = findBlock\(\) \|\| ensureBlock\(\)/);
+  assert.match(source, /setBlockAlignment\(block, pendingAlignment\)/);
+  assert.match(source, /align: block \? getBlockAlignment\(block\) : pendingAlignmentRef\.current/);
+});
