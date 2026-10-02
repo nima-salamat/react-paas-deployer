@@ -2510,6 +2510,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       try { flushDraftToServer(activeId, ""); } catch { /* */ }
       setReplyTo(null);
       setScheduledFor(null);
+      let lastUploadProgressAt = 0;
       try {
         const res = await apiRequest({
           method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`, data: form,
@@ -2518,6 +2519,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             const total = event.total || filesToSend.reduce((sum, f) => sum + Number(f.size || 0), 0);
             const loaded = event.loaded || 0;
             const progress = total ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+            const now = Date.now();
+            // Large uploads can emit many progress events per second. Limit
+            // state updates so the whole Messenger tree does not rerender for
+            // every network progress callback.
+            if (progress < 99 && now - lastUploadProgressAt < 100) return;
+            lastUploadProgressAt = now;
             setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, loaded, total, progress } : u));
           },
         });
@@ -2616,6 +2623,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       form.append("files", file);
       if (mediaSpoiler) form.append("is_spoiler", "1");
       if (mediaViewOnce) form.append("is_view_once", "1");
+      let lastUploadProgressAt = 0;
       try {
         const sendResponse = await apiRequest({
           method: "POST", url: `${MSG_API}/conversations/${activeId}/messages/`, data: form,
@@ -2623,6 +2631,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             const total = event.total || Number(file.size || 0);
             const loaded = event.loaded || 0;
             const progress = total ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+            const now = Date.now();
+            if (progress < 99 && now - lastUploadProgressAt < 100) return;
+            lastUploadProgressAt = now;
             setPendingUploads((prev) => prev.map((u) => u.id === pendingId ? { ...u, loaded, total, progress } : u));
           },
         });
