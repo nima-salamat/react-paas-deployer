@@ -57,3 +57,12 @@ test("agent detail exposes permanent delete action for revoked Agents too", () =
   assert.match(source, /A revoked Agent can still be deleted/);
   assert.match(source, /navigate\("\/dashboard\/agents", \{ replace: true \}\)/);
 });
+
+test("agent create dialog provides All and Reset scope presets", () => {
+  const source = read("src/components/agents/Agents.jsx");
+
+  assert.match(source, />All<\/Button>/);
+  assert.match(source, />Reset<\/Button>/);
+  assert.match(source, /scopes: \(scopeCatalog\.scopes \|\| \[\]\)\.map\(\(scope\) => scope\.name\)/);
+  assert.match(source, /scopes: \[\.\.\.\(scopeCatalog\.defaults \|\| \[\]\)\]/);
+});
