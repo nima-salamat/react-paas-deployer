@@ -59,7 +59,7 @@ import { getApiErrorMessage, getApiErrorMeta } from "./errorUtils";
 import ServiceErrorAlert from "./components/ServiceErrorAlert";
 
 export default function ServiceDetail() {
-  const { id } = useParams();
+  const { id, section } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
@@ -75,6 +75,50 @@ export default function ServiceDetail() {
   }, [location.state, id]);
 
   const [activeTab, setActiveTab] = useState("overview");
+
+  const SERVICE_TAB_VALUES = useMemo(
+    () => ["overview", "create", "logs", "settings", "shell"],
+    []
+  );
+
+  const normalizeServiceTab = useCallback((value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    return SERVICE_TAB_VALUES.includes(normalized) ? normalized : null;
+  }, [SERVICE_TAB_VALUES]);
+
+  const navigateToServiceTab = useCallback((tab, hash = "", options = {}) => {
+    if (!id) return;
+    const normalizedTab = normalizeServiceTab(tab) || "overview";
+    const normalizedHash = String(hash || "").trim().replace(/^#/, "");
+    const target = {
+      pathname: `/dashboard/services/${id}/${normalizedTab}`,
+      hash: normalizedHash ? `#${encodeURIComponent(normalizedHash)}` : "",
+    };
+    const sameLocation =
+      location.pathname === target.pathname &&
+      location.hash === target.hash;
+
+    if (!sameLocation) {
+      navigate(target, {
+        replace: Boolean(options.replace),
+        state: location.state,
+      });
+    }
+  }, [id, location.hash, location.pathname, location.state, navigate, normalizeServiceTab]);
+
+  const handleServiceTabChange = useCallback((tab, hash = "") => {
+    const normalizedTab = normalizeServiceTab(tab);
+    if (!normalizedTab) return;
+    setActiveTab(normalizedTab);
+    navigateToServiceTab(normalizedTab, hash);
+  }, [navigateToServiceTab, normalizeServiceTab]);
+
+  const handleSettingsSectionChange = useCallback((hash) => {
+    if (activeTab !== "settings") return;
+    const normalizedHash = String(hash || "").trim().replace(/^#/, "");
+    if (!normalizedHash) return;
+    navigateToServiceTab("settings", normalizedHash, { replace: true });
+  }, [activeTab, navigateToServiceTab]);
   const [shareAccess, setShareAccess] = useState({ loading: true, is_owner: true, permissions: null });
   const meId = useMemo(() => {
     try {
@@ -270,11 +314,67 @@ export default function ServiceDetail() {
     return tabs;
   }, [shareAccess, effectiveIsOwner]);
 
+  const urlTab = normalizeServiceTab(section);
+
   useEffect(() => {
-    if (!allowedTabs.includes(activeTab)) {
-      setActiveTab(allowedTabs[0] || "overview");
+    if (shareAccess.loading) return;
+
+    const targetTab =
+      urlTab && allowedTabs.includes(urlTab)
+        ? urlTab
+        : allowedTabs[0] || "overview";
+
+    if (activeTab !== targetTab) {
+      setActiveTab(targetTab);
     }
-  }, [allowedTabs, activeTab]);
+
+    const canonicalPath = `/dashboard/services/${id}/${targetTab}`;
+    const hasValidSection = Boolean(urlTab && allowedTabs.includes(urlTab));
+    const targetHash = hasValidSection ? location.hash : "";
+
+    if (
+      location.pathname !== canonicalPath ||
+      (!hasValidSection && location.hash)
+    ) {
+      navigateToServiceTab(targetTab, targetHash, { replace: true });
+    }
+  }, [
+    activeTab,
+    allowedTabs,
+    id,
+    location.hash,
+    location.pathname,
+    navigateToServiceTab,
+    normalizeServiceTab,
+    section,
+    shareAccess.loading,
+    urlTab,
+  ]);
+
+  useEffect(() => {
+    if (section !== "settings" || activeTab !== "settings" || !location.hash) return;
+    const rawHash = location.hash.slice(1);
+    let hashId = rawHash;
+    try {
+      hashId = decodeURIComponent(rawHash);
+    } catch {
+      /* keep raw hash */
+    }
+    if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(hashId)) return;
+
+    const scrollToHash = () => {
+      const target = document.getElementById(hashId);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    const first = window.requestAnimationFrame(scrollToHash);
+    const second = window.setTimeout(scrollToHash, 120);
+    return () => {
+      window.cancelAnimationFrame(first);
+      window.clearTimeout(second);
+    };
+  }, [activeTab, location.hash, section]);
 
 
 
@@ -748,7 +848,7 @@ export default function ServiceDetail() {
     setEditOriginalName(deploy.name || "");
     setEditZipFile(null);
     setError(null);
-    setActiveTab("create");
+    handleServiceTabChange("create");
     document.querySelector(".create-deploy-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
     // For DB-platform deploys, fetch the real (unmasked) credentials so
@@ -1576,7 +1676,7 @@ export default function ServiceDetail() {
           <Box sx={{ width: 240, flexShrink: 0 }}>
             <TabSidebar
               activeTab={activeTab}
-              setActiveTab={setActiveTab}
+              setActiveTab={handleServiceTabChange}
               allowedTabs={allowedTabs}
               service={service}
               selectedDeploy={selectedDeploy}
@@ -1728,6 +1828,7 @@ export default function ServiceDetail() {
 
           {activeTab === "settings" && (
             <SettingsPanel
+              onSectionChange={handleSettingsSectionChange}
               service={service}
               planDetail={planDetail}
               networkName={networkName}
@@ -1786,7 +1887,7 @@ export default function ServiceDetail() {
           <MobileNavFab
             allowedTabs={allowedTabs}
             activeTab={activeTab}
-            setActiveTab={setActiveTab}
+            setActiveTab={handleServiceTabChange}
             service={service}
             selectedDeploy={selectedDeploy}
             deployCount={deployCount}
