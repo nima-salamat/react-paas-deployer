@@ -202,7 +202,7 @@ export default function ReadyAppInstallation() {
                       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
                         <Box>
                           <Typography sx={{ fontWeight: 850 }}>
-                            {String(service.key || "Managed service").replace(/[-_]/g, " ")}
+                            {service.service_name || String(service.key || "Managed service").replace(/[-_]/g, " ")}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             {service.service_name}
