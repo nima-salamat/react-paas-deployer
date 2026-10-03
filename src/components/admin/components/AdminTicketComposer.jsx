@@ -5,18 +5,6 @@ import AttachFileIcon from "@mui/icons-material/AttachFile";
 import CloseIcon from "@mui/icons-material/Close";
 import SimpleHtmlEditor, { htmlToPlain } from "../../tickets/SimpleHtmlEditor";
 
-function wrapSelection(textarea, before, after = before, placeholder = "text") {
-  if (!textarea) return null;
-  const start = textarea.selectionStart ?? 0;
-  const end = textarea.selectionEnd ?? 0;
-  const value = textarea.value || "";
-  const selected = value.slice(start, end) || placeholder;
-  const next = value.slice(0, start) + before + selected + after + value.slice(end);
-  const cursorStart = start + before.length;
-  const cursorEnd = cursorStart + selected.length;
-  return { next, cursorStart, cursorEnd };
-}
-
 /**
  * AdminTicketComposer — formatter collapsed by default (toggle button).
  */
