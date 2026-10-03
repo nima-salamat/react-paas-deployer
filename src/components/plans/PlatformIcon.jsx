@@ -153,7 +153,7 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
             ? "inset 0 1px 0 rgba(255,255,255,.24), inset 0 -1px 0 rgba(15,23,42,.35), 0 2px 8px rgba(0,0,0,.18)"
             : "inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(71,85,105,.22), 0 2px 8px rgba(15,23,42,.10)",
           "&::after": {
-            content: '\"\"',
+            content: """",
             position: "absolute",
             top: "-30%",
             left: "-35%",
@@ -219,7 +219,7 @@ const PlatformIcon = memo(function PlatformIcon({ platformKey, label, size = 22 
           ? "inset 0 1px 0 rgba(255,255,255,.24), inset 0 -1px 0 rgba(15,23,42,.35), 0 2px 8px rgba(0,0,0,.18)"
           : "inset 0 1px 0 rgba(255,255,255,.98), inset 0 -1px 0 rgba(71,85,105,.22), 0 2px 8px rgba(15,23,42,.10)",
         "&::after": {
-          content: '\"\"',
+          content: """",
           position: "absolute",
           top: "-30%",
           left: "-35%",
