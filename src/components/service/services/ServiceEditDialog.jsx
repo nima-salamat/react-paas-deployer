@@ -15,6 +15,8 @@ import {
   LinearProgress,
   MenuItem,
   Paper,
+  Radio,
+  Collapse,
   Stack,
   TextField,
   Typography,
@@ -29,6 +31,10 @@ import SpeedIcon from "@mui/icons-material/Speed";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import MemoryIcon from "@mui/icons-material/Memory";
+import SdStorageIcon from "@mui/icons-material/SdStorage";
 import apiRequest from "../../customHooks/apiRequest";
 import { VOLUME_API_ROOT } from "./helpers";
 
@@ -131,6 +137,7 @@ function EditBody({
     default_mode: "rw",
   });
   const loadedPlatformRef = useRef(null);
+  const [showAllNetworks, setShowAllNetworks] = useState(false);
 
   const serviceId = String(svc.id ?? svc.pk ?? "");
 
@@ -298,12 +305,13 @@ function EditBody({
           <SectionHead
             icon={<HubIcon fontSize="small" />}
             title="Network"
-            subtitle="Private network for this service"
+            subtitle="One private network can be attached to this service."
           />
+
           {networksFetchError && (
             <Alert
               severity="error"
-              sx={{ mb: 1.5, borderRadius: 1.5 }}
+              sx={{ mb: 1.5, borderRadius: 2 }}
               action={
                 <Button size="small" onClick={retryNetworks} sx={{ textTransform: "none" }}>
                   Retry
@@ -313,80 +321,142 @@ function EditBody({
               {networksFetchError}
             </Alert>
           )}
-          {networksLoading && networks.length === 0 ? (
-            <CircularProgress size={22} />
-          ) : (
-            <Stack spacing={1}>
-              {networks.map((n) => {
-                const nid = String(n.id ?? n.pk);
-                const isSelected = String(draft.selectedNetwork ?? "") === nid;
-                const isCurrent = nid === currentNetworkId;
-                return (
-                  <Paper
-                    key={nid}
-                    elevation={0}
-                    onClick={() => setDraft((d) => ({ ...d, selectedNetwork: nid }))}
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      border: "2px solid",
-                      borderColor: isSelected
-                        ? "primary.main"
-                        : isCurrent
-                        ? "success.main"
-                        : "divider",
-                      cursor: "pointer",
-                      bgcolor: (t) =>
-                        isSelected
-                          ? t.palette.mode === "dark"
-                            ? "rgba(59,130,246,0.1)"
-                            : "rgba(59,130,246,0.05)"
-                          : isCurrent
-                          ? t.palette.mode === "dark"
-                            ? "rgba(34,197,94,0.08)"
-                            : "rgba(34,197,94,0.05)"
-                          : "transparent",
-                    }}
-                  >
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="body2" fontWeight={800}>
-                          {n.name}
-                        </Typography>
-                        {n.description && (
-                          <Typography variant="caption" color="text.secondary">
-                            {n.description}
-                          </Typography>
-                        )}
-                      </Box>
-                      {isCurrent && (
-                        <Chip
-                          icon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
-                          label="Current"
-                          color="success"
-                          size="small"
-                          sx={{ height: 22, fontWeight: 800 }}
-                        />
-                      )}
-                      {isSelected && !isCurrent && (
-                        <Chip
-                          label="Selected"
-                          color="primary"
-                          size="small"
-                          sx={{ height: 22, fontWeight: 800 }}
-                        />
-                      )}
-                    </Stack>
-                  </Paper>
-                );
-              })}
-              {networks.length === 0 && (
-                <Typography variant="body2" color="text.secondary">
-                  No networks yet.
+
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5,
+              mb: 1.5,
+              borderRadius: 2,
+              borderColor:
+                currentNetworkId === String(draft.selectedNetwork || "")
+                  ? "info.main"
+                  : "divider",
+              bgcolor: (t) =>
+                currentNetworkId &&
+                currentNetworkId === String(draft.selectedNetwork || "")
+                  ? t.palette.mode === "dark"
+                    ? "rgba(6,182,212,0.08)"
+                    : "rgba(6,182,212,0.05)"
+                  : t.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.02)"
+                  : "grey.50",
+            }}
+          >
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+              spacing={1}
+            >
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 650 }}>
+                  Currently attached
                 </Typography>
-              )}
+                <Typography variant="body1" sx={{ fontWeight: 800 }}>
+                  {networks.find(
+                    (n) => String(n.id ?? n.pk) === currentNetworkId
+                  )?.name || "No network"}
+                </Typography>
+              </Box>
+              {currentNetworkId &&
+                String(draft.selectedNetwork || "") !== currentNetworkId && (
+                  <Chip
+                    label="Change pending"
+                    size="small"
+                    color="warning"
+                    sx={{ fontWeight: 750 }}
+                  />
+                )}
             </Stack>
-          )}
+          </Paper>
+
+          <Button
+            size="small"
+            endIcon={showAllNetworks ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            onClick={() => setShowAllNetworks((value) => !value)}
+            sx={{ mb: 1, textTransform: "none", fontWeight: 650, px: 0.5 }}
+          >
+            {showAllNetworks
+              ? "Hide networks"
+              : `Choose another network (${networks.length})`}
+          </Button>
+
+          <Collapse in={showAllNetworks}>
+            {networksLoading && networks.length === 0 ? (
+              <Box sx={{ py: 2, textAlign: "center" }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <Stack spacing={1}>
+                {networks.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No networks yet. Create one below.
+                  </Typography>
+                ) : (
+                  networks.map((n) => {
+                    const nid = String(n.id ?? n.pk);
+                    const selected = nid === String(draft.selectedNetwork ?? "");
+                    const current = nid === currentNetworkId;
+                    return (
+                      <Paper
+                        key={nid}
+                        variant="outlined"
+                        onClick={() =>
+                          setDraft((d) => ({ ...d, selectedNetwork: nid }))
+                        }
+                        sx={{
+                          p: 1.5,
+                          borderRadius: 2,
+                          cursor: "pointer",
+                          borderColor: current
+                            ? "info.main"
+                            : selected
+                            ? "primary.main"
+                            : "divider",
+                          bgcolor: (t) =>
+                            current
+                              ? t.palette.mode === "dark"
+                                ? "rgba(6,182,212,0.08)"
+                                : "rgba(6,182,212,0.05)"
+                              : selected
+                              ? t.palette.mode === "dark"
+                                ? "rgba(59,130,246,0.10)"
+                                : "rgba(59,130,246,0.05)"
+                              : "transparent",
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Radio checked={selected} size="small" sx={{ p: 0 }} />
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography variant="body2" fontWeight={800}>
+                              {n.name}
+                            </Typography>
+                            {n.description && (
+                              <Typography variant="caption" color="text.secondary">
+                                {n.description}
+                              </Typography>
+                            )}
+                          </Box>
+                          {current && (
+                            <Chip
+                              label="Current"
+                              size="small"
+                              color="info"
+                              sx={{ height: 22, fontSize: 11, fontWeight: 750 }}
+                            />
+                          )}
+                        </Stack>
+                      </Paper>
+                    );
+                  })
+                )}
+              </Stack>
+            )}
+          </Collapse>
+
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
             <TextField
               size="small"
@@ -415,6 +485,7 @@ function EditBody({
                       selectedNetwork: created.id ?? created.pk,
                     }));
                     setNewNetName("");
+                    setShowAllNetworks(true);
                   }
                 } finally {
                   setCreatingNet(false);
@@ -433,8 +504,9 @@ function EditBody({
           <SectionHead
             icon={<SpeedIcon fontSize="small" />}
             title={platform ? `Plan · ${platform}` : "Plan"}
-            subtitle="Switch plan on Save. Same platform only."
+            subtitle="Choose a plan for the same platform. Applied when you save."
           />
+
           {plansLoading ? (
             <Box sx={{ py: 3, textAlign: "center" }}>
               <CircularProgress size={28} />
@@ -442,96 +514,160 @@ function EditBody({
           ) : plansForPlatformErrors[platform] ? (
             <Alert
               severity="error"
-              sx={{ borderRadius: 1.5 }}
+              sx={{ borderRadius: 2 }}
               action={
-                <Button size="small" onClick={() => fetchPlansForPlatform(platform)}>
+                <Button
+                  size="small"
+                  onClick={() => fetchPlansForPlatform(platform)}
+                  sx={{ textTransform: "none" }}
+                >
                   Retry
                 </Button>
               }
             >
               {plansForPlatformErrors[platform]}
             </Alert>
+          ) : availablePlans.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                No plans available for this platform.
+              </Typography>
+            </Paper>
           ) : (
-            <Grid container spacing={1.5}>
-              {availablePlans.length === 0 ? (
-                <Grid item xs={12}>
-                  <Typography color="text.secondary">No plans for this platform.</Typography>
-                </Grid>
-              ) : (
-                availablePlans.map((p) => {
-                  const pid = String(p.id ?? p.pk);
-                  const isSelected = String(draft.selectedPlanId ?? "") === pid;
-                  const isCurrent = pid === currentPlanId;
-                  return (
-                    <Grid item xs={12} sm={6} key={pid}>
-                      <Paper
-                        elevation={0}
-                        onClick={() => setDraft((d) => ({ ...d, selectedPlanId: pid }))}
-                        sx={{
-                          p: 1.75,
-                          borderRadius: 2,
-                          cursor: "pointer",
-                          border: "2px solid",
-                          borderColor: isCurrent
-                            ? "success.main"
-                            : isSelected
-                            ? "primary.main"
-                            : "divider",
-                          height: "100%",
-                          bgcolor: (t) =>
-                            isCurrent
-                              ? t.palette.mode === "dark"
-                                ? "rgba(34,197,94,0.08)"
-                                : "rgba(34,197,94,0.06)"
-                              : isSelected
-                              ? t.palette.mode === "dark"
-                                ? "rgba(59,130,246,0.1)"
-                                : "rgba(59,130,246,0.05)"
-                              : "transparent",
-                        }}
-                      >
-                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                          <Typography fontWeight={800}>{p.name}</Typography>
-                          {isCurrent ? (
-                            <Chip
-                              icon={<CheckCircleIcon sx={{ fontSize: 14 }} />}
-                              label="Current"
-                              color="success"
-                              size="small"
-                              sx={{ height: 22, fontWeight: 800 }}
-                            />
-                          ) : isSelected ? (
-                            <Chip
-                              label="Selected"
-                              color="primary"
-                              size="small"
-                              sx={{ height: 22, fontWeight: 800 }}
-                            />
-                          ) : null}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
-                          {[
-                            p.max_cpu != null && `${p.max_cpu} CPU`,
-                            p.max_ram != null && `${p.max_ram} MB`,
-                            p.max_storage != null && `${p.max_storage} GB`,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                gap: 1.5,
+              }}
+            >
+              {availablePlans.map((p) => {
+                const pid = String(p.id ?? p.pk);
+                const isSelected = pid === String(draft.selectedPlanId ?? "");
+                const isCurrent = pid === currentPlanId;
+                return (
+                  <Paper
+                    key={pid}
+                    elevation={0}
+                    onClick={() =>
+                      setDraft((d) => ({
+                        ...d,
+                        selectedPlanId: isCurrent ? currentPlanId : pid,
+                      }))
+                    }
+                    sx={{
+                      p: 2,
+                      borderRadius: 2,
+                      border: "2px solid",
+                      borderColor: isCurrent
+                        ? "success.main"
+                        : isSelected
+                        ? "primary.main"
+                        : "divider",
+                      cursor: "pointer",
+                      bgcolor: (t) =>
+                        isCurrent
+                          ? t.palette.mode === "dark"
+                            ? "rgba(34,197,94,0.08)"
+                            : "rgba(34,197,94,0.06)"
+                          : isSelected
+                          ? t.palette.mode === "dark"
+                            ? "rgba(59,130,246,0.10)"
+                            : "rgba(59,130,246,0.05)"
+                          : "transparent",
+                      transition: "border-color .15s, box-shadow .15s",
+                      "&:hover": {
+                        borderColor: isCurrent
+                          ? "success.main"
+                          : isSelected
+                          ? "primary.main"
+                          : "primary.light",
+                        boxShadow: "0 4px 14px rgba(0,0,0,.08)",
+                      },
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      gap={1}
+                      sx={{ mb: 1 }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                          {p.name || "Plan"}
                         </Typography>
-                        {p.price_per_hour != null && (
-                          <Typography
-                            variant="body2"
-                            sx={{ mt: 0.75, fontWeight: 800, color: "success.main" }}
-                          >
-                            {p.price_per_hour}/hr
-                          </Typography>
-                        )}
-                      </Paper>
-                    </Grid>
-                  );
-                })
-              )}
-            </Grid>
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          flexWrap="wrap"
+                          useFlexGap
+                          sx={{ mt: 0.75 }}
+                        >
+                          {p.platform && (
+                            <Chip
+                              label={p.platform}
+                              size="small"
+                              variant="outlined"
+                              sx={{ height: 21, fontSize: 11 }}
+                            />
+                          )}
+                          {p.plan_type && (
+                            <Chip
+                              label={p.plan_type}
+                              size="small"
+                              variant="outlined"
+                              sx={{ height: 21, fontSize: 11 }}
+                            />
+                          )}
+                        </Stack>
+                      </Box>
+                      {isCurrent ? (
+                        <Chip
+                          icon={<CheckCircleIcon sx={{ fontSize: 15 }} />}
+                          label="Current"
+                          color="success"
+                          size="small"
+                          sx={{ height: 23, fontWeight: 750 }}
+                        />
+                      ) : (
+                        <Radio checked={isSelected} size="small" sx={{ p: 0.25 }} />
+                      )}
+                    </Stack>
+
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" spacing={0.75} alignItems="center">
+                        <MemoryIcon sx={{ fontSize: 16 }} color="action" />
+                        <Typography variant="body2" color="text.secondary">
+                          CPU <strong>{p.max_cpu ?? "—"}</strong>
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" spacing={0.75} alignItems="center">
+                        <MemoryIcon sx={{ fontSize: 16 }} color="action" />
+                        <Typography variant="body2" color="text.secondary">
+                          RAM <strong>{p.max_ram ?? "—"}</strong>
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" spacing={0.75} alignItems="center">
+                        <SdStorageIcon sx={{ fontSize: 16 }} color="action" />
+                        <Typography variant="body2" color="text.secondary">
+                          Storage <strong>{p.max_storage ?? "—"} GB</strong>
+                        </Typography>
+                      </Stack>
+                    </Stack>
+
+                    {p.price_per_hour != null && (
+                      <Typography
+                        variant="body2"
+                        sx={{ mt: 1.25, fontWeight: 800, color: "primary.main" }}
+                      >
+                        {p.price_per_hour} / hour
+                      </Typography>
+                    )}
+                  </Paper>
+                );
+              })}
+            </Box>
           )}
         </Box>
 
