@@ -702,29 +702,51 @@ const PYTHON_WORKER_PLATFORMS = new Set([
 
 export function buildDjangoConfigSuggestion(inspection) {
   if (!inspection || typeof inspection !== "object") return "";
+
   const platform = String(
-    inspection.platform || inspection.suggested_config?.platform || "django"
+    inspection.platform || inspection.suggested_config?.platform || "docker"
   )
     .toLowerCase()
     .trim();
-  const cfg = { platform };
-  const isPythonFamily = PYTHON_WORKER_PLATFORMS.has(platform);
 
-  // server_type / celery / worker_count only for Django/Flask/Python/FastAPI
-  if (isPythonFamily) {
-    const st = inspection.server_type || inspection.suggested_config?.server_type;
-    if (st) cfg.server_type = st;
-    cfg.celery = Boolean(inspection.suggested_config?.celery);
-    cfg.celery_beat = Boolean(inspection.suggested_config?.celery_beat);
-    cfg.worker_count =
-      Number(inspection.suggested_config?.worker_count) ||
-      Number(inspection.worker_count) ||
-      1;
+  const suggested = inspection.suggested_config || {};
+  const cfg = { platform };
+  const pythonFamily = PYTHON_WORKER_PLATFORMS.has(platform);
+
+  // Keep this helper name for compatibility with existing callers. It now
+  // builds a generic platform-aware suggestion, including the runtime
+  // settings required by FastAPI.
+  const copyKeys = [
+    "python_version",
+    "install_command",
+    "package_manager",
+    "working_directory",
+    "port",
+    "healthcheck_path",
+    "start_command",
+  ];
+
+  if (pythonFamily) {
+    const serverType =
+      inspection.server_type || suggested.server_type || null;
+    if (serverType) cfg.server_type = String(serverType).toLowerCase();
+
+    for (const key of copyKeys) {
+      const value = inspection[key] ?? suggested[key];
+      if (value !== undefined && value !== null && value !== "") {
+        cfg[key] = value;
+      }
+    }
   }
 
-  // entry_point: include only if detected
-  const ep = inspection.entrypoint || inspection.suggested_config?.entry_point;
-  if (ep) cfg.entry_point = ep;
+  const entryPoint =
+    inspection.entrypoint || suggested.entry_point || null;
+  if (entryPoint) cfg.entry_point = entryPoint;
+
+  // worker_count is derived from the service plan and must never be persisted
+  // from the client.
+  delete cfg.worker_count;
+
   return JSON.stringify(cfg, null, 2);
 }
 
