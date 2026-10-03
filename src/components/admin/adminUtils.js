@@ -167,6 +167,7 @@ export const PLAN_PLATFORM_CHOICES = [
   { value: "nextjs", label: "Next.js" },
   { value: "nodejs", label: "Node.js" },
   { value: "flask", label: "Flask" },
+  { value: "fastapi", label: "FastAPI" },
   { value: "docker", label: "Docker" },
   { value: "go", label: "Go" },
   { value: "statichtmlcss", label: "Static HTML/CSS" },
