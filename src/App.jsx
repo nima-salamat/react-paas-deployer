@@ -26,6 +26,9 @@ const Agents = lazy(() => import("./components/agents/Agents.jsx"));
 const AgentDetail = lazy(() => import("./components/agents/AgentDetail.jsx"));
 const Dashboard = lazy(() => import("./components/dashboard/Dashboard.jsx"));
 const DashboardOverview = lazy(() => import("./components/dashboard/DashboardOverview.jsx"));
+const ReadyApps = lazy(() => import("./components/ready_apps/ReadyApps.jsx"));
+const ReadyAppDetail = lazy(() => import("./components/ready_apps/ReadyAppDetail.jsx"));
+const ReadyAppInstallation = lazy(() => import("./components/ready_apps/ReadyAppInstallation.jsx"));
 import SigninOrSignup from "./components/signin_or_signup/signin_or_signup.jsx";
 import Plans from "./components/plans/plans.jsx";
 import Footer from "./components/layout/Footer.jsx";
@@ -410,6 +413,9 @@ export function App({ prerender = false }) {
 
               <Route path="dashboard" element={<Dashboard themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}>
                 <Route index element={<DashboardOverview />} />
+                <Route path="ready-apps" element={<ReadyApps />} />
+                <Route path="ready-apps/installations/:id" element={<ReadyAppInstallation />} />
+                <Route path="ready-apps/:id" element={<ReadyAppDetail />} />
                 <Route path="services" element={<Services />} />
                 <Route path="agents" element={<Agents />} />
                 <Route path="agents/:id" element={<AgentDetail />} />
