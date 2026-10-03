@@ -336,6 +336,12 @@ export function canSeeNav(tabId) {
       _session.rules.includes("users.create")
     );
   }
+  if (tabId === "plans") {
+    return (
+      _session.rules.includes("plans.view") ||
+      _session.rules.includes("plans.manage")
+    );
+  }
   if (tabId === "invites") {
     // invites.manage is the only meaningful rule; for clarity only superuser + invites.manage
     return _session.rules.includes("invites.manage");
