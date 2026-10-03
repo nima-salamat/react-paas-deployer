@@ -636,7 +636,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               <Box key={service.service_id} sx={{ p: 1.4, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
                 <Stack direction="row" justifyContent="space-between" spacing={1}>
                   <Typography sx={{ fontWeight: 800 }}>
-                    {String(service.key || "Managed service").replace(/[-_]/g, " ")}
+                    {service.service_name || String(service.key || "Managed service").replace(/[-_]/g, " ")}
                   </Typography>
                   <Chip
                     size="small"
