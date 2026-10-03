@@ -121,7 +121,7 @@ export default function CreateDeployPanel({
     }, 150);
   }, [editingDeployId, editData.platform, planPlatform, createPlatform, effectivePlatform, setEditDbFields, setCreateDbFields]);
 
-  // --- Inspect & suggest config (Django JSON config helper) ---
+  // --- Inspect & suggest config ---
   // Uploads the selected zip to /deploy/inspect_zip/ which reuses the
   // existing platform_bridge.enrich_config_from_project() to auto-detect
   // platform, server_type (WSGI/ASGI), entry_point, etc.  The returned
@@ -594,6 +594,29 @@ export default function CreateDeployPanel({
                       <Chip label={inspectResult.django_settings_module} size="small" variant="outlined" />
                     )}
                   </Box>
+                  {inspectResult.platform === "fastapi" && (
+                    <Box sx={{ mt: 0.75 }}>
+                      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                        {inspectResult.python_version && (
+                          <Chip label={`Python ${inspectResult.python_version}`} size="small" variant="outlined" />
+                        )}
+                        {inspectResult.package_manager && (
+                          <Chip label={inspectResult.package_manager} size="small" variant="outlined" />
+                        )}
+                        {inspectResult.entrypoint && (
+                          <Chip label={`Entry: ${inspectResult.entrypoint}`} size="small" variant="outlined" />
+                        )}
+                        {inspectResult.start_command && (
+                          <Chip label="ASGI start command detected" size="small" variant="outlined" />
+                        )}
+                      </Stack>
+                      {!inspectResult.entrypoint && (
+                        <Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.75 }}>
+                          FastAPI was detected, but no ASGI app object was found. Set an explicit entry point or start command before deploying.
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
                   {inspectResult.markers && inspectResult.markers.length > 0 && (
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
                       Markers: {inspectResult.markers.join(", ")}
