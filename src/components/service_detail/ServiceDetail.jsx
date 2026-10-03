@@ -150,6 +150,10 @@ export default function ServiceDetail() {
   const [volumeCapabilities, setVolumeCapabilities] = useState(null);
   const [availableNetworks, setAvailableNetworks] = useState([]);
   const [availableVolumes, setAvailableVolumes] = useState([]);
+  const [databaseBindings, setDatabaseBindings] = useState([]);
+  const [databaseResources, setDatabaseResources] = useState([]);
+  const [databaseLoading, setDatabaseLoading] = useState(false);
+  const [databaseActionLoading, setDatabaseActionLoading] = useState(false);
   const [selectedNetworkId, setSelectedNetworkId] = useState("");
   const [selectedVolumeId, setSelectedVolumeId] = useState("");
   const [volumeFiles, setVolumeFiles] = useState([]);
@@ -614,6 +618,72 @@ export default function ServiceDetail() {
     }
   }, [setError]);
 
+  const fetchDatabaseConfiguration = useCallback(async () => {
+    if (!id) return;
+    setDatabaseLoading(true);
+    try {
+      const [bindingsResp, resourcesResp] = await Promise.all([
+        apiRequest({ method: "GET", url: `${SERVICE_BASE}${id}/databases/` }),
+        apiRequest({ method: "GET", url: `${SERVICE_BASE}${id}/database-resources/` }),
+      ]);
+      const bindings = Array.isArray(bindingsResp?.data)
+        ? bindingsResp.data
+        : bindingsResp?.data?.results || [];
+      const resources = Array.isArray(resourcesResp?.data)
+        ? resourcesResp.data
+        : resourcesResp?.data?.results || [];
+      if (mountedRef.current) {
+        setDatabaseBindings(bindings);
+        setDatabaseResources(resources);
+      }
+    } catch (err) {
+      if (mountedRef.current) setError(err, "Could not load database configuration.");
+    } finally {
+      if (mountedRef.current) setDatabaseLoading(false);
+    }
+  }, [id, setError]);
+
+  const handleBindDatabase = useCallback(async ({ database, alias, env_prefix, access_mode }) => {
+    if (!id || !database) return;
+    setDatabaseActionLoading(true);
+    setError(null);
+    try {
+      await apiRequest({
+        method: "POST",
+        url: `${SERVICE_BASE}${id}/databases/`,
+        data: { database, alias: alias || "default", env_prefix: env_prefix || "DB", access_mode: access_mode || "rw" },
+      });
+      safeSetSnackbar("success", "Database connected.");
+      setSettingsSuccess("Database connected. Its connection variables will be materialized at runtime.");
+      await fetchDatabaseConfiguration();
+    } catch (err) {
+      setError(err, "Could not connect the database.");
+      throw err;
+    } finally {
+      if (mountedRef.current) setDatabaseActionLoading(false);
+    }
+  }, [fetchDatabaseConfiguration, id, safeSetSnackbar, setError]);
+
+  const handleUnbindDatabase = useCallback(async (alias) => {
+    if (!id) return;
+    setDatabaseActionLoading(true);
+    setError(null);
+    try {
+      await apiRequest({
+        method: "DELETE",
+        url: `${SERVICE_BASE}${id}/databases/`,
+        params: { alias: alias || "default" },
+      });
+      safeSetSnackbar("success", "Database disconnected.");
+      setSettingsSuccess("Database disconnected.");
+      await fetchDatabaseConfiguration();
+    } catch (err) {
+      setError(err, "Could not disconnect the database.");
+      throw err;
+    } finally {
+      if (mountedRef.current) setDatabaseActionLoading(false);
+    }
+  }, [fetchDatabaseConfiguration, id, safeSetSnackbar, setError]);
   const fetchVolumeCapabilities = useCallback(async () => {
     if (!id) return;
     try {
@@ -770,6 +840,7 @@ export default function ServiceDetail() {
         fetchAvailableVolumes(),
         fetchAttachedVolumes(),
         fetchVolumeCapabilities(),
+        fetchDatabaseConfiguration(),
         fetchPlans(),
       ]);
     };
@@ -1739,6 +1810,12 @@ export default function ServiceDetail() {
               networkName={networkName}
               networkDetail={networkDetail}
               attachedVolumes={attachedVolumes}
+              databaseBindings={databaseBindings}
+              databaseResources={databaseResources}
+              databaseLoading={databaseLoading}
+              databaseActionLoading={databaseActionLoading}
+              onBindDatabase={handleBindDatabase}
+              onUnbindDatabase={handleUnbindDatabase}
               hideServiceIdentity={!isDesktop}
             />
           )}
