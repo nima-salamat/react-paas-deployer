@@ -626,7 +626,10 @@ export default function ConfigBuilder({
   };
 
   const addEnv = () => commitEnvRows([...envRows, { key: "", value: "" }]);
-  const removeEnv = (index) =>
+  const addEnvironmentPreset = (key) => {
+    if (envRows.some((row) => String(row.key || "").trim() === key)) return;
+    commitEnvRows([...envRows, { key, value: "" }]);
+  };  const removeEnv = (index) =>
     commitEnvRows(envRows.filter((_, i) => i !== index));
   const patchEnv = (index, patch) =>
     commitEnvRows(
@@ -741,6 +744,20 @@ export default function ConfigBuilder({
         </AccordionSummary>
         <AccordionDetails>
           <Stack spacing={1.25}>
+            {platform === "fastapi" ? (
+              <Paper variant="outlined" sx={{ p: 1.25, borderRadius: 2, bgcolor: "background.default" }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                  Common app integrations. Adding these creates empty variables only; secret values remain your responsibility. Managed DB bindings are safer for service-to-database credentials.
+                </Typography>
+                <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                  {["DATABASE_URL", "REDIS_URL", "CORS_ORIGINS", "SECRET_KEY", "SENTRY_DSN"].map((key) => (
+                    <Button key={key} size="small" variant="outlined" onClick={() => addEnvironmentPreset(key)} disabled={disabled || envRows.some((row) => String(row.key || "").trim() === key)} sx={{ borderRadius: 1.5, textTransform: "none" }}>
+                      + {key}
+                    </Button>
+                  ))}
+                </Stack>
+              </Paper>
+            ) : null}
             {envRows.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 No environment variables yet.
