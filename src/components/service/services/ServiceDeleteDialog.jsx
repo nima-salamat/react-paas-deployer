@@ -19,12 +19,6 @@ import HubIcon from "@mui/icons-material/Hub";
 import StorageIcon from "@mui/icons-material/Storage";
 import PlatformIcon from "../../plans/PlatformIcon.jsx";
 
-function getId(value) {
-  if (value == null) return "";
-  if (typeof value === "object") return value.id ?? value.pk ?? "";
-  return value;
-}
-
 export default function ServiceDeleteDialog({
   open,
   service,
