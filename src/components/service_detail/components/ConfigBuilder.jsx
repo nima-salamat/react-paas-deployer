@@ -113,6 +113,8 @@ const PLATFORM_META = {
       ["working_directory", "Working directory", "/app"],
       ["port", "Port", "8000"],
       ["healthcheck_path", "Health check path", ""],
+      ["healthcheck_expected_status", "Healthy status codes", "200,204"],
+      ["healthcheck_timeout", "Health request timeout (s)", "5"],
     ],
   },
   react: {
@@ -447,6 +449,8 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
             <Grid item xs={12} md={6}><TextField fullWidth size="small" label="App directory" value={profile.app_dir ?? ""} placeholder={detectedAppDir || "src"} onChange={(e) => patch("app_dir", e.target.value)} disabled={disabled} helperText={detectedAppDir ? `Auto-detected: ${detectedAppDir}` : "Relative to deployment root; leave empty for automatic detection."} /></Grid>
             <Grid item xs={12} md={6}><TextField select fullWidth size="small" label="Log level" value={profile.log_level ?? "info"} onChange={(e) => patch("log_level", e.target.value)} disabled={disabled}>{['critical','error','warning','info','debug','trace'].map((value) => <MenuItem value={value} key={value}>{value}</MenuItem>)}</TextField></Grid>
             <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Forwarded allow IPs" value={profile.forwarded_allow_ips ?? ""} placeholder="10.0.0.0/24" onChange={(e) => patch("forwarded_allow_ips", e.target.value)} disabled={disabled} helperText="Only relevant when proxy headers are trusted." /></Grid>
+            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Healthy status codes" value={config.healthcheck_expected_status ?? ""} placeholder="200,204" onChange={(e) => updateConfig((next) => ({ ...next, healthcheck_expected_status: e.target.value.split(",").map((v) => Number(v.trim())).filter(Number.isFinite) }))} disabled={disabled} helperText="Comma-separated HTTP statuses accepted by readiness, for example 200,204." /></Grid>
+            <Grid item xs={12} md={6}><TextField fullWidth size="small" type="number" label="Health request timeout (s)" value={config.healthcheck_timeout ?? ""} placeholder="5" onChange={(e) => updateConfig((next) => ({ ...next, healthcheck_timeout: e.target.value }))} disabled={disabled} helperText="Per-request readiness probe timeout." /></Grid>
             <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Root path" value={profile.root_path ?? ""} placeholder="/api" onChange={(e) => patch("root_path", e.target.value)} disabled={disabled} helperText="Set this only when the app is mounted below a URL prefix." /></Grid>
             <Grid item xs={12} md={6}><TextField fullWidth size="small" type="number" label="Keep-alive (seconds)" value={profile.timeout_keep_alive ?? ""} onChange={(e) => patch("timeout_keep_alive", e.target.value)} disabled={disabled} /></Grid>
             <Grid item xs={12} md={6}><TextField fullWidth size="small" type="number" label="Graceful shutdown (seconds)" value={profile.timeout_graceful_shutdown ?? ""} onChange={(e) => patch("timeout_graceful_shutdown", e.target.value)} disabled={disabled} /></Grid>
