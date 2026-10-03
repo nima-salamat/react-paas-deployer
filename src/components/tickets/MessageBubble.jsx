@@ -921,6 +921,8 @@ function MessageBubble({
               },
               "& code": {
                 overflowWrap: "anywhere",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: "0.9em",
               },
               "& img, & video, & audio": {
                 maxWidth: "100%",
@@ -984,7 +986,6 @@ function MessageBubble({
               "& .ticket-code-shell code": {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               },
-              "& ul, & ol": { pl: 2.25, my: 0.4, display: "block" },
               "& blockquote": {
                 m: "0.65rem 0",
                 pl: 1.5,
@@ -1008,10 +1009,6 @@ function MessageBubble({
                 lineHeight: 1,
                 color: mine ? "rgba(255,255,255,0.78)" : "text.secondary",
                 opacity: 0.9,
-              },
-              "& code": {
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: "0.9em",
               },
               "& img": { maxWidth: "100%", borderRadius: 1 },
               userSelect: "text",
