@@ -196,7 +196,8 @@ test("FastAPI deploy UI keeps runtime profile and inspection output connected", 
   assert.match(builder, /REDIS_URL/);
   assert.match(utils, /const PYTHON_WORKER_PLATFORMS = new Set\([\s\S]*"fastapi"/);
   assert.match(utils, /cfg\.fastapi = fastapi/);
-  assert.doesNotMatch(utils, /cfg\.entry_point = entryPoint/);
+  assert.match(utils, /if \(platform === "fastapi"\)/);
+  assert.match(utils, /const detectedProfile = inspection\.fastapi_profile \|\| suggested\.fastapi/);
   assert.match(create, /fastapi_profile/);
   assert.match(create, /App dir:/);
   assert.match(icon, /SiFastapi/);
