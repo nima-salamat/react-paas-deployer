@@ -1408,7 +1408,7 @@ export default function SettingsPanel({
                     size="small"
                     color="warning"
                     variant="outlined"
-                    disabled={databaseActionLoading}
+                    disabled={databaseActionLoading || statusBusy}
                     startIcon={<LinkOffIcon />}
                     onClick={() => onUnbindDatabase?.(binding.alias)}
                     sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, flexShrink: 0 }}
@@ -1429,7 +1429,7 @@ export default function SettingsPanel({
                     select fullWidth size="small" label="Database resource"
                     value={selectedDatabaseId}
                     onChange={(e) => setSelectedDatabaseId(e.target.value)}
-                    disabled={databaseActionLoading}
+                    disabled={databaseActionLoading || statusBusy}
                   >
                     {(databaseResources || []).map((resource) => (
                       <MenuItem value={String(resource.id ?? resource.pk)} key={String(resource.id ?? resource.pk)}>
