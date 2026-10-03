@@ -193,6 +193,8 @@ export default function ReadyApps() {
                     Deploy
                   </Button>
                 </Box>
+              </Card>
+            </Grid>
           ))}
         </Grid>
       )}
