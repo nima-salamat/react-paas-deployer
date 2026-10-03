@@ -14,7 +14,8 @@
     "test:service-detail": "node --test scripts/service-detail.test.mjs",
     "test:agents": "node --test scripts/agents.test.mjs",
     "test:ticket-editor": "node scripts/ticket-editor.test.mjs",
-    "test:ready-apps": "node --test scripts/ready-apps.test.mjs"
+    "test:ready-apps": "node --test scripts/ready-apps.test.mjs",
+    "test:plans-admin": "node --test scripts/plans-admin.test.mjs"
   },
   "dependencies": {
     "@babel/core": "^8.0.1",
