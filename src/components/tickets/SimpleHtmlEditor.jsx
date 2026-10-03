@@ -135,11 +135,9 @@ function normalizeEditorDirection(editor) {
 export default function SimpleHtmlEditor({
   value = "",
   onChange,
-  onSubmit,
   placeholder = "Message…",
   minHeight = 40,
   maxHeight = 192,
-  enterSends = false,
   disabled = false,
   compact = true,
   showToolbarToggle = true,
@@ -471,6 +469,10 @@ export default function SimpleHtmlEditor({
   }, []);
 
   const recordHistory = useCallback((html) => {
+    if (historyInputTimerRef.current != null) {
+      window.clearTimeout(historyInputTimerRef.current);
+      historyInputTimerRef.current = null;
+    }
     const history = historyRef.current;
     const index = historyIndexRef.current;
     if (history[index] === html) return;
@@ -493,10 +495,9 @@ export default function SimpleHtmlEditor({
     if (historyInputTimerRef.current != null) {
       window.clearTimeout(historyInputTimerRef.current);
     }
-    const html = readHtml();
     historyInputTimerRef.current = window.setTimeout(() => {
       historyInputTimerRef.current = null;
-      recordHistory(html);
+      recordHistory(readHtml());
     }, 350);
   }, [readHtml, recordHistory]);
 
@@ -1310,20 +1311,8 @@ export default function SimpleHtmlEditor({
       }
     }
 
-    // Default: Enter inserts a new line (do not send).
-    // Only send on Enter when enterSends=true and Shift is NOT held.
-    if (enterSends && !e.shiftKey && onSubmit) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (ref.current) {
-        const html = ref.current.innerHTML;
-        lastHtml.current = html;
-        onChange?.(html);
-        onSubmit(html);
-      } else {
-        onSubmit();
-      }
-    }
+    // Enter remains an editing command. Sending is owned by the parent
+    // composer, so typing can never accidentally submit the surrounding form.
   };
 
   return (
@@ -1456,6 +1445,9 @@ type="button"
         <Box
           ref={ref}
           contentEditable={!disabled}
+          role="textbox"
+          aria-multiline="true"
+          aria-label={placeholder}
           dir="auto"
           suppressContentEditableWarning
           onInput={() => {
