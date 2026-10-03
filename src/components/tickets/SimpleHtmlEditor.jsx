@@ -129,8 +129,8 @@ function normalizeEditorDirection(editor) {
 }
 
 /**
- * Compact HTML editor. Toolbar hidden by default; expand with button.
- * Enter → new line (send only via toolbar/send button from parent).
+ * Compact ticket editor. Toolbar is optional; Enter always creates a new line.
+ * Message submission is owned by the parent composer or form.
  */
 export default function SimpleHtmlEditor({
   value = "",
@@ -1290,7 +1290,7 @@ export default function SimpleHtmlEditor({
 
     // Normal content blocks get an explicit next paragraph so the browser
     // cannot silently change the selected alignment when creating a new line.
-    if (!e.shiftKey && !enterSends && selection?.rangeCount) {
+    if (!e.shiftKey && selection?.rangeCount) {
       const range = selection.getRangeAt(0).cloneRange();
       const currentBlock = findBlock();
       if (
