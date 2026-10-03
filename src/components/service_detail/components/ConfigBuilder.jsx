@@ -429,10 +429,15 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
           {(detected.database_drivers || []).map((x) => <Chip key={`db-${x}`} size="small" label={`DB: ${x}`} variant="outlined" />)}
           {(detected.cache_drivers || []).map((x) => <Chip key={`cache-${x}`} size="small" label={`Cache: ${x}`} variant="outlined" />)}
           {(detected.task_queues || []).map((x) => <Chip key={`queue-${x}`} size="small" label={`Jobs: ${x}`} variant="outlined" />)}
+          {(detected.migration_tools || []).map((x) => <Chip key={`migration-${x}`} size="small" label={`Migrations: ${x}`} variant="outlined" />)}
+          {(detected.auth_libraries || []).map((x) => <Chip key={`auth-${x}`} size="small" label={`Auth: ${x}`} variant="outlined" />)}
+          {(detected.http_clients || []).map((x) => <Chip key={`http-${x}`} size="small" label={`HTTP: ${x}`} variant="outlined" />)}
+          {(detected.observability || []).map((x) => <Chip key={`obs-${x}`} size="small" label={`Obs: ${x}`} variant="outlined" />)}
+          {(detected.storage_libraries || []).map((x) => <Chip key={`storage-${x}`} size="small" label={`Storage: ${x}`} variant="outlined" />)}
           {(detected.middleware || []).map((x) => <Chip key={`mw-${x}`} size="small" label={x} variant="outlined" />)}
           {detected.websockets ? <Chip size="small" label="WebSockets" variant="outlined" /> : null}
           {detected.lifespan ? <Chip size="small" label="Lifespan" variant="outlined" /> : null}
-          {!detected.database_drivers?.length && !detected.cache_drivers?.length && !detected.task_queues?.length && !detected.middleware?.length && !detected.websockets && !detected.lifespan ? (
+          {!detected.database_drivers?.length && !detected.cache_drivers?.length && !detected.task_queues?.length && !detected.migration_tools?.length && !detected.auth_libraries?.length && !detected.http_clients?.length && !detected.observability?.length && !detected.storage_libraries?.length && !detected.middleware?.length && !detected.websockets && !detected.lifespan ? (
             <Typography variant="caption" color="text.secondary">No extra infrastructure signals detected.</Typography>
           ) : null}
         </Stack>
@@ -750,7 +755,7 @@ export default function ConfigBuilder({
                   Common app integrations. Adding these creates empty variables only; secret values remain your responsibility. Managed DB bindings are safer for service-to-database credentials.
                 </Typography>
                 <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                  {["DATABASE_URL", "REDIS_URL", "CORS_ORIGINS", "SECRET_KEY", "SENTRY_DSN"].map((key) => (
+                  {["DATABASE_URL", "REDIS_URL", "CELERY_BROKER_URL", "CORS_ORIGINS", "SECRET_KEY", "JWT_SECRET_KEY", "SENTRY_DSN"].map((key) => (
                     <Button key={key} size="small" variant="outlined" onClick={() => addEnvironmentPreset(key)} disabled={disabled || envRows.some((row) => String(row.key || "").trim() === key)} sx={{ borderRadius: 1.5, textTransform: "none" }}>
                       + {key}
                     </Button>
