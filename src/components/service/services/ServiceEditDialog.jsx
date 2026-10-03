@@ -138,6 +138,7 @@ function EditBody({
   });
   const loadedPlatformRef = useRef(null);
   const [showAllNetworks, setShowAllNetworks] = useState(false);
+  const [showAvailableVolumes, setShowAvailableVolumes] = useState(true);
 
   const serviceId = String(svc.id ?? svc.pk ?? "");
 
@@ -151,6 +152,15 @@ function EditBody({
   }, [svc]);
 
   const selectedVols = draft.selectedVolumeIds || [];
+
+  // Attachable = owned by this service OR unused.
+  const attachableVolumes = useMemo(() => {
+    return (volumes || []).filter((v) => {
+      const owner = v.service?.id ?? v.service?.pk ?? v.service ?? null;
+      if (owner == null || v.is_unused) return true;
+      return String(owner) === serviceId;
+    });
+  }, [volumes, serviceId]);
 
   const selectedVolumeItems = useMemo(
     () =>
@@ -167,15 +177,6 @@ function EditBody({
       ),
     [attachableVolumes, selectedVols]
   );
-
-  // Attachable = owned by this service OR unused
-  const attachableVolumes = useMemo(() => {
-    return (volumes || []).filter((v) => {
-      const owner = v.service?.id ?? v.service?.pk ?? v.service ?? null;
-      if (owner == null || v.is_unused) return true;
-      return String(owner) === serviceId;
-    });
-  }, [volumes, serviceId]);
 
   const usedBySelection = useMemo(() => {
     let total = 0;
