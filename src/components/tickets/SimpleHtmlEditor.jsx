@@ -824,26 +824,6 @@ export default function SimpleHtmlEditor({
     return paragraph;
   }, []);
 
-  const exitCodeBlockAtEnd = useCallback((pre) => {
-    const code = pre?.querySelector?.("code") || pre;
-    if (!pre || !code) return null;
-
-    const text = readCodeText(code).replace(/\r\n?/g, "\n");
-    const remaining = text.endsWith("\n") ? text.slice(0, -1) : text;
-    const parent = pre.parentNode;
-    if (!parent) return null;
-
-    const paragraph = createParagraphFromText("", pre);
-    if (remaining) {
-      code.textContent = remaining;
-      parent.insertBefore(paragraph, pre.nextSibling);
-    } else {
-      parent.replaceChild(paragraph, pre);
-    }
-
-    return paragraph;
-  }, [createParagraphFromText, readCodeText]);
-
   const insertCodeNewline = useCallback((range, selection) => {
     insertSoftBreak(range, selection);
   }, [insertSoftBreak]);
