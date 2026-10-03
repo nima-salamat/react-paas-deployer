@@ -142,8 +142,6 @@ export default function SimpleHtmlEditor({
   compact = true,
   showToolbarToggle = true,
   defaultExpanded = false,
-  expanded: expandedProp,
-  onExpandedChange,
 }) {
   const ref = useRef(null);
   const lastHtml = useRef(value || "");
@@ -171,12 +169,7 @@ export default function SimpleHtmlEditor({
   const [codeMenuAnchor, setCodeMenuAnchor] = useState(null);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkText, setLinkText] = useState("");
-  const [internalExpanded, setInternalExpanded] = useState(Boolean(expandedProp ?? defaultExpanded));
-  const expanded = expandedProp ?? internalExpanded;
-  const setExpanded = (v) => {
-    setInternalExpanded(v);
-    onExpandedChange?.(v);
-  };
+  const [expanded, setExpanded] = useState(Boolean(defaultExpanded));
 
   React.useEffect(() => {
     const editor = ref.current;
