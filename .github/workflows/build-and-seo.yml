@@ -38,6 +38,9 @@ jobs:
       - name: Ready App component import regression tests
         run: npm run test:ready-apps
 
+      - name: Resource Plans admin regression tests
+        run: npm run test:plans-admin
+
       - name: Lint
         run: npm run lint
 
