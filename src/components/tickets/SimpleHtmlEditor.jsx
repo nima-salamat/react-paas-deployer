@@ -1347,11 +1347,11 @@ export default function SimpleHtmlEditor({
               variant="text"
               sx={{ minWidth: "max-content", flexWrap: "nowrap" }}
             >
-              <Tooltip title="Bold"><span><IconButton type="button" size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Italic"><span><IconButton type="button" size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Underline"><span><IconButton type="button" size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
-<Tooltip title="Bullets"><span><IconButton type="button" size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Numbered"><span><IconButton type="button" size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Bold"><span><IconButton type="button" size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Italic"><span><IconButton type="button" size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Underline"><span><IconButton type="button" size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
+<Tooltip title="Bullets"><span><IconButton type="button" size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onPointerDown={saveSelection} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Numbered"><span><IconButton type="button" size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onPointerDown={saveSelection} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
               <Box sx={{ display: "inline-flex", alignItems: "center", mx: 0.25 }}>
                 <Button
 type="button"
@@ -1359,7 +1359,7 @@ type="button"
                   aria-label="Code block"
                   aria-pressed={activeFormats.code}
                   startIcon={<CodeIcon fontSize="small" />}
-                  onPointerDown={(e) => { e.preventDefault(); saveSelection(); }}
+                  onPointerDown={saveSelection}
                   onClick={toggleCode}
                   disabled={disabled}
                   sx={{
@@ -1380,7 +1380,7 @@ type="button"
                   aria-label="Choose code language"
                   aria-haspopup="menu"
                   aria-expanded={Boolean(codeMenuAnchor)}
-                  onPointerDown={(e) => { e.preventDefault(); saveSelection(); }}
+                  onPointerDown={saveSelection}
                   onClick={openCodeLanguageMenu}
                   disabled={disabled}
                   sx={{
@@ -1394,17 +1394,17 @@ type="button"
                   <ArrowDropDownIcon fontSize="small" />
                 </IconButton>
               </Box>
-              <Tooltip title="Quote"><span><IconButton type="button" size="small" aria-label="Quote" aria-pressed={activeFormats.quote} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={toggleQuote} disabled={disabled} sx={{ bgcolor: activeFormats.quote ? "action.selected" : undefined, color: activeFormats.quote ? "primary.main" : undefined }}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Link"><span><IconButton type="button" size="small" aria-label="Link" onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Align left"><span><IconButton type="button" size="small" aria-label="Align left" aria-pressed={activeFormats.align === "left"} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("left")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "left" ? "action.selected" : undefined, color: activeFormats.align === "left" ? "primary.main" : undefined }}><FormatAlignLeftIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Align center"><span><IconButton type="button" size="small" aria-label="Align center" aria-pressed={activeFormats.align === "center"} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("center")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "center" ? "action.selected" : undefined, color: activeFormats.align === "center" ? "primary.main" : undefined }}><FormatAlignCenterIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Align right"><span><IconButton type="button" size="small" aria-label="Align right" aria-pressed={activeFormats.align === "right"} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("right")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "right" ? "action.selected" : undefined, color: activeFormats.align === "right" ? "primary.main" : undefined }}><FormatAlignRightIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Quote"><span><IconButton type="button" size="small" aria-label="Quote" aria-pressed={activeFormats.quote} onPointerDown={saveSelection} onClick={toggleQuote} disabled={disabled} sx={{ bgcolor: activeFormats.quote ? "action.selected" : undefined, color: activeFormats.quote ? "primary.main" : undefined }}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Link"><span><IconButton type="button" size="small" aria-label="Link" onPointerDown={saveSelection} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Align left"><span><IconButton type="button" size="small" aria-label="Align left" aria-pressed={activeFormats.align === "left"} onPointerDown={saveSelection} onClick={() => applyAlignment("left")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "left" ? "action.selected" : undefined, color: activeFormats.align === "left" ? "primary.main" : undefined }}><FormatAlignLeftIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Align center"><span><IconButton type="button" size="small" aria-label="Align center" aria-pressed={activeFormats.align === "center"} onPointerDown={saveSelection} onClick={() => applyAlignment("center")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "center" ? "action.selected" : undefined, color: activeFormats.align === "center" ? "primary.main" : undefined }}><FormatAlignCenterIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Align right"><span><IconButton type="button" size="small" aria-label="Align right" aria-pressed={activeFormats.align === "right"} onPointerDown={saveSelection} onClick={() => applyAlignment("right")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "right" ? "action.selected" : undefined, color: activeFormats.align === "right" ? "primary.main" : undefined }}><FormatAlignRightIcon fontSize="small" /></IconButton></span></Tooltip>
               <FormControl size="small" sx={{ minWidth: 112, mx: 0.25 }}>
                 <Select
                   aria-label="Block style"
                   value={["P", "H1", "H2", "H3", "H4"].includes(activeFormats.block) ? activeFormats.block : "P"}
                   onChange={(e) => applyBlockFormat(e.target.value)}
-                  onPointerDown={(e) => { e.preventDefault(); saveSelection(); }}
+                  onPointerDown={saveSelection}
                   IconComponent={FormatSizeIcon}
                   sx={{ height: 30, minWidth: { xs: 96, sm: 112 }, fontSize: 12, fontWeight: 700 }}
                   disabled={disabled}
@@ -1416,8 +1416,8 @@ type="button"
                   <MenuItem value="H4">Heading 4</MenuItem>
                 </Select>
               </FormControl>
-              <Tooltip title="Undo"><span><IconButton type="button" size="small" aria-label="Undo" onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={undo} disabled={disabled || historyIndexRef.current <= 0} sx={{ opacity: historyIndexRef.current <= 0 ? 0.45 : 1 }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Redo"><span><IconButton type="button" size="small" aria-label="Redo" onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={redo} disabled={disabled || historyIndexRef.current >= historyRef.current.length - 1} sx={{ opacity: historyIndexRef.current >= historyRef.current.length - 1 ? 0.45 : 1 }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Undo"><span><IconButton type="button" size="small" aria-label="Undo" onPointerDown={saveSelection} onClick={undo} disabled={disabled || historyIndexRef.current <= 0} sx={{ opacity: historyIndexRef.current <= 0 ? 0.45 : 1 }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Redo"><span><IconButton type="button" size="small" aria-label="Redo" onPointerDown={saveSelection} onClick={redo} disabled={disabled || historyIndexRef.current >= historyRef.current.length - 1} sx={{ opacity: historyIndexRef.current >= historyRef.current.length - 1 ? 0.45 : 1 }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
             </ButtonGroup>
           </Box>
         </Collapse>
