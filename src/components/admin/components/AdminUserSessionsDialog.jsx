@@ -23,6 +23,7 @@ import RefreshOutlinedIcon from "@mui/icons-material/Refresh";
 import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
 import PhoneAndroidOutlinedIcon from "@mui/icons-material/PhoneAndroidOutlined";
 import TabletMacOutlinedIcon from "@mui/icons-material/TabletMacOutlined";
+import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import {
   fetchAdminUserSessions,
   logoutAllAdminUserSessions,
