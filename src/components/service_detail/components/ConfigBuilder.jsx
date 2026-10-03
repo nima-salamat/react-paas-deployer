@@ -615,6 +615,7 @@ export default function ConfigBuilder({
                   updateField={updateField}
                   removeField={removeField}
                   disabled={disabled}
+                  platform={platform}
                 />
               );
             })}
