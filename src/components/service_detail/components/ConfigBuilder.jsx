@@ -113,8 +113,6 @@ const PLATFORM_META = {
       ["working_directory", "Working directory", "/app"],
       ["port", "Port", "8000"],
       ["healthcheck_path", "Health check path", ""],
-      ["healthcheck_expected_status", "Healthy status codes", "200,204"],
-      ["healthcheck_timeout", "Health request timeout (s)", "5"],
     ],
   },
   react: {
