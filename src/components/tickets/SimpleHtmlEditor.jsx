@@ -156,6 +156,7 @@ export default function SimpleHtmlEditor({
   const historyRef = useRef([value || ""]);
   const historyIndexRef = useRef(0);
   const historyRevisionFrameRef = useRef(null);
+  const historyInputTimerRef = useRef(null);
   const [, setHistoryRevision] = useState(0);
   const [activeFormats, setActiveFormats] = useState({
     bold: false,
@@ -194,6 +195,10 @@ export default function SimpleHtmlEditor({
         language ? getCodeLanguageLabel(language) : "Code"
       );
     });
+    if (historyInputTimerRef.current != null) {
+      window.clearTimeout(historyInputTimerRef.current);
+      historyInputTimerRef.current = null;
+    }
     lastHtml.current = incoming;
     historyRef.current = [incoming];
     historyIndexRef.current = 0;
@@ -253,17 +258,6 @@ export default function SimpleHtmlEditor({
       node = node.parentElement;
     }
     return null;
-  }, []);
-
-  const placeCaretAtBoundary = useCallback((parent, index) => {
-    const selection = window.getSelection?.();
-    if (!selection || !parent) return;
-
-    const range = document.createRange();
-    range.setStart(parent, Math.max(0, Math.min(index, parent.childNodes.length)));
-    range.collapse(true);
-    selection.removeAllRanges();
-    selection.addRange(range);
   }, []);
 
   const toggleInlineFormat = (command) => {
@@ -494,6 +488,26 @@ export default function SimpleHtmlEditor({
     }
   }, []);
 
+  const scheduleHistory = useCallback(() => {
+    if (!ref.current) return;
+    if (historyInputTimerRef.current != null) {
+      window.clearTimeout(historyInputTimerRef.current);
+    }
+    const html = readHtml();
+    historyInputTimerRef.current = window.setTimeout(() => {
+      historyInputTimerRef.current = null;
+      recordHistory(html);
+    }, 350);
+  }, [readHtml, recordHistory]);
+
+  const commitHistory = useCallback(() => {
+    if (historyInputTimerRef.current != null) {
+      window.clearTimeout(historyInputTimerRef.current);
+      historyInputTimerRef.current = null;
+    }
+    recordHistory(readHtml());
+  }, [readHtml, recordHistory]);
+
   const emit = useCallback((record = true) => {
     if (!ref.current) return;
     const html = readHtml();
@@ -501,6 +515,15 @@ export default function SimpleHtmlEditor({
     onChange?.(html);
     if (record) recordHistory(html);
   }, [onChange, readHtml, recordHistory]);
+
+  React.useEffect(() => () => {
+    if (historyInputTimerRef.current != null) {
+      window.clearTimeout(historyInputTimerRef.current);
+    }
+    if (historyRevisionFrameRef.current != null) {
+      cancelAnimationFrame(historyRevisionFrameRef.current);
+    }
+  }, []);
 
   const updateActiveFormats = useCallback(() => {
     const editor = ref.current;
@@ -1316,20 +1339,38 @@ export default function SimpleHtmlEditor({
     >
       {showToolbarToggle && (
         <Collapse in={expanded}>
-          <Box sx={{ px: 0.75, py: 0.1, borderBottom: 1, borderColor: "divider", bgcolor: "action.hover" }}>
-            <ButtonGroup size="small" variant="text">
-              <Tooltip title="Bold"><span><IconButton size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Italic"><span><IconButton size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Underline"><span><IconButton size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
-<Tooltip title="Bullets"><span><IconButton size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Numbered"><span><IconButton size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
+          <Box
+            sx={{
+              px: 0.5,
+              py: 0.1,
+              borderBottom: 1,
+              borderColor: "divider",
+              bgcolor: "action.hover",
+              overflowX: "auto",
+              overflowY: "hidden",
+              WebkitOverflowScrolling: "touch",
+              scrollbarWidth: "thin",
+              overscrollBehaviorX: "contain",
+            }}
+          >
+            <ButtonGroup
+              size="small"
+              variant="text"
+              sx={{ minWidth: "max-content", flexWrap: "nowrap" }}
+            >
+              <Tooltip title="Bold"><span><IconButton type="button" size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Italic"><span><IconButton type="button" size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Underline"><span><IconButton type="button" size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleInlineFormat("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
+<Tooltip title="Bullets"><span><IconButton type="button" size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Numbered"><span><IconButton type="button" size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
               <Box sx={{ display: "inline-flex", alignItems: "center", mx: 0.25 }}>
                 <Button
+type="button"
                   size="small"
                   aria-label="Code block"
                   aria-pressed={activeFormats.code}
                   startIcon={<CodeIcon fontSize="small" />}
-                  onMouseDown={(e) => { e.preventDefault(); saveSelection(); }}
+                  onPointerDown={(e) => { e.preventDefault(); saveSelection(); }}
                   onClick={toggleCode}
                   disabled={disabled}
                   sx={{
@@ -1350,7 +1391,7 @@ export default function SimpleHtmlEditor({
                   aria-label="Choose code language"
                   aria-haspopup="menu"
                   aria-expanded={Boolean(codeMenuAnchor)}
-                  onMouseDown={(e) => { e.preventDefault(); saveSelection(); }}
+                  onPointerDown={(e) => { e.preventDefault(); saveSelection(); }}
                   onClick={openCodeLanguageMenu}
                   disabled={disabled}
                   sx={{
@@ -1364,19 +1405,19 @@ export default function SimpleHtmlEditor({
                   <ArrowDropDownIcon fontSize="small" />
                 </IconButton>
               </Box>
-              <Tooltip title="Quote"><span><IconButton size="small" aria-label="Quote" aria-pressed={activeFormats.quote} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={toggleQuote} disabled={disabled} sx={{ bgcolor: activeFormats.quote ? "action.selected" : undefined, color: activeFormats.quote ? "primary.main" : undefined }}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Link"><span><IconButton size="small" aria-label="Link" onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Align left"><span><IconButton size="small" aria-label="Align left" aria-pressed={activeFormats.align === "left"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("left")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "left" ? "action.selected" : undefined, color: activeFormats.align === "left" ? "primary.main" : undefined }}><FormatAlignLeftIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Align center"><span><IconButton size="small" aria-label="Align center" aria-pressed={activeFormats.align === "center"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("center")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "center" ? "action.selected" : undefined, color: activeFormats.align === "center" ? "primary.main" : undefined }}><FormatAlignCenterIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Align right"><span><IconButton size="small" aria-label="Align right" aria-pressed={activeFormats.align === "right"} onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("right")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "right" ? "action.selected" : undefined, color: activeFormats.align === "right" ? "primary.main" : undefined }}><FormatAlignRightIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Quote"><span><IconButton type="button" size="small" aria-label="Quote" aria-pressed={activeFormats.quote} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={toggleQuote} disabled={disabled} sx={{ bgcolor: activeFormats.quote ? "action.selected" : undefined, color: activeFormats.quote ? "primary.main" : undefined }}><FormatQuoteIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Link"><span><IconButton type="button" size="small" aria-label="Link" onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={openLink} disabled={disabled}><LinkIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Align left"><span><IconButton type="button" size="small" aria-label="Align left" aria-pressed={activeFormats.align === "left"} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("left")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "left" ? "action.selected" : undefined, color: activeFormats.align === "left" ? "primary.main" : undefined }}><FormatAlignLeftIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Align center"><span><IconButton type="button" size="small" aria-label="Align center" aria-pressed={activeFormats.align === "center"} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("center")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "center" ? "action.selected" : undefined, color: activeFormats.align === "center" ? "primary.main" : undefined }}><FormatAlignCenterIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Align right"><span><IconButton type="button" size="small" aria-label="Align right" aria-pressed={activeFormats.align === "right"} onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={() => applyAlignment("right")} disabled={disabled} sx={{ bgcolor: activeFormats.align === "right" ? "action.selected" : undefined, color: activeFormats.align === "right" ? "primary.main" : undefined }}><FormatAlignRightIcon fontSize="small" /></IconButton></span></Tooltip>
               <FormControl size="small" sx={{ minWidth: 112, mx: 0.25 }}>
                 <Select
                   aria-label="Block style"
                   value={["P", "H1", "H2", "H3", "H4"].includes(activeFormats.block) ? activeFormats.block : "P"}
                   onChange={(e) => applyBlockFormat(e.target.value)}
-                  onMouseDown={() => saveSelection()}
+                  onPointerDown={(e) => { e.preventDefault(); saveSelection(); }}
                   IconComponent={FormatSizeIcon}
-                  sx={{ height: 30, fontSize: 12, fontWeight: 700 }}
+                  sx={{ height: 30, minWidth: { xs: 96, sm: 112 }, fontSize: 12, fontWeight: 700 }}
                   disabled={disabled}
                 >
                   <MenuItem value="P">Paragraph</MenuItem>
@@ -1386,8 +1427,8 @@ export default function SimpleHtmlEditor({
                   <MenuItem value="H4">Heading 4</MenuItem>
                 </Select>
               </FormControl>
-              <Tooltip title="Undo"><span><IconButton size="small" aria-label="Undo" onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={undo} disabled={disabled || historyIndexRef.current <= 0} sx={{ opacity: historyIndexRef.current <= 0 ? 0.45 : 1 }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Redo"><span><IconButton size="small" aria-label="Redo" onMouseDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={redo} disabled={disabled || historyIndexRef.current >= historyRef.current.length - 1} sx={{ opacity: historyIndexRef.current >= historyRef.current.length - 1 ? 0.45 : 1 }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Undo"><span><IconButton type="button" size="small" aria-label="Undo" onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={undo} disabled={disabled || historyIndexRef.current <= 0} sx={{ opacity: historyIndexRef.current <= 0 ? 0.45 : 1 }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
+              <Tooltip title="Redo"><span><IconButton type="button" size="small" aria-label="Redo" onPointerDown={(e) => { e.preventDefault(); saveSelection(); }} onClick={redo} disabled={disabled || historyIndexRef.current >= historyRef.current.length - 1} sx={{ opacity: historyIndexRef.current >= historyRef.current.length - 1 ? 0.45 : 1 }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
             </ButtonGroup>
           </Box>
         </Collapse>
@@ -1432,7 +1473,8 @@ export default function SimpleHtmlEditor({
             }
 
             pendingAlignmentRef.current = "left";
-            emit();
+            emit(false);
+            scheduleHistory();
             saveSelection();
             requestAnimationFrame(() => {
               editingRef.current = false;
@@ -1440,19 +1482,8 @@ export default function SimpleHtmlEditor({
             });
           }}
           onFocus={saveSelection}
-          onBlur={() => { saveSelection(); emit(); }}
-          onKeyUp={() => {
-            saveSelection();
-            const selection = window.getSelection?.();
-            const anchor = selection?.anchorNode?.nodeType === Node.ELEMENT_NODE
-              ? selection.anchorNode
-              : selection?.anchorNode?.parentElement;
-            const code = anchor?.closest?.("code");
-            const language = getCodeLanguage(code);
-            if (code && language && language !== "plaintext") {
-              requestAnimationFrame(() => highlightEditorCode(code, language));
-            }
-          }}
+          onBlur={() => { saveSelection(); commitHistory(); emit(false); }}
+          onKeyUp={saveSelection}
           onMouseUp={saveSelection}
           onKeyDown={onKeyDown}
           onPaste={(e) => { const text = e.clipboardData?.getData("text/plain"); if (text == null) return; e.preventDefault(); const selection = window.getSelection?.(); if (!selection?.rangeCount) return; const range = selection.getRangeAt(0); range.deleteContents(); const parts = text.replace(/\r\n?/g, "\n").split("\n"); parts.forEach((part, i) => { if (i) range.insertNode(document.createElement("br")); if (part) range.insertNode(document.createTextNode(part)); range.collapse(false); }); saveSelection(); emit(); }}
@@ -1465,6 +1496,8 @@ export default function SimpleHtmlEditor({
             px: 1.5,
             py: compact ? 1 : 1.25,
             outline: "none",
+            overflowWrap: "anywhere",
+            wordBreak: "break-word",
             fontSize: "14px",
             lineHeight: 1.45,
             textAlign: "left",
@@ -1547,7 +1580,7 @@ export default function SimpleHtmlEditor({
         />
         {showToolbarToggle && (
           <Tooltip title={expanded ? "Hide formatting" : "Formatting"}>
-            <IconButton size="small" onClick={() => setExpanded(!expanded)} sx={{ mb: 0.5, mr: 0.5 }}>
+            <IconButton type="button" size="small" onClick={() => setExpanded(!expanded)} sx={{ mb: 0.5, mr: 0.5 }}>
               {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
             </IconButton>
           </Tooltip>
