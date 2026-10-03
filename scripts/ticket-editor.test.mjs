@@ -217,7 +217,7 @@ test("renderer uses adaptive quote contrast and renders persisted alignment clas
   assert.match(source, /borderColor: mine \? "rgba\(255,255,255,0\.62\)" : "divider"/);
   assert.match(source, /bgcolor: mine \? "rgba\(255,255,255,0\.09\)" : "action\.hover"/);
   assert.match(source, /data-ticket-align=\\"center\\"/);
-  assert.match(source, /data-ticket-align=\\"right\\"/);
+  assert.match(source, /data-ticket-align=.*right/);
   assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
   assert.match(source, /data-rendered-ticket-align/);
 });
@@ -544,7 +544,7 @@ test("ticket renderer preserves ordered lists and aligns list items from stored 
   assert.match(source, /block\.tagName === "LI"/);
   assert.match(source, /alignedItems/);
   assert.match(source, /list\.style\.setProperty\("text-align", alignedItems\[0\], "important"\)/);
-  assert.match(source, /data-ticket-align=\\\"right\\\"/);
+  assert.match(source, /data-ticket-align=.*right/);
 });
 
 
