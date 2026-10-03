@@ -596,23 +596,34 @@ export default function CreateDeployPanel({
                   </Box>
                   {inspectResult.platform === "fastapi" && (
                     <Box sx={{ mt: 0.75 }}>
-                      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-                        {inspectResult.python_version && (
-                          <Chip label={`Python ${inspectResult.python_version}`} size="small" variant="outlined" />
-                        )}
-                        {inspectResult.package_manager && (
-                          <Chip label={inspectResult.package_manager} size="small" variant="outlined" />
-                        )}
-                        {inspectResult.entrypoint && (
-                          <Chip label={`Entry: ${inspectResult.entrypoint}`} size="small" variant="outlined" />
-                        )}
-                        {inspectResult.start_command && (
-                          <Chip label="ASGI start command detected" size="small" variant="outlined" />
-                        )}
-                      </Stack>
-                      {!inspectResult.entrypoint && (
+                      {(() => {
+                        const profile = inspectResult.fastapi_profile || inspectResult.suggested_config?.fastapi || {};
+                        return (
+                          <>
+                            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                              {inspectResult.python_version && <Chip label={`Python ${inspectResult.python_version}`} size="small" variant="outlined" />}
+                              {inspectResult.package_manager && <Chip label={inspectResult.package_manager} size="small" variant="outlined" />}
+                              {profile.entrypoint && <Chip label={`Entry: ${profile.entrypoint}`} size="small" color="success" variant="outlined" />}
+                              {profile.runtime_working_directory && <Chip label={`App dir: ${profile.runtime_working_directory}`} size="small" variant="outlined" />}
+                              {profile.healthcheck_path && <Chip label={`Health: ${profile.healthcheck_path}`} size="small" variant="outlined" />}
+                              {(profile.database_drivers || []).map((x) => <Chip key={`inspect-db-${x}`} label={`DB: ${x}`} size="small" variant="outlined" />)}
+                              {(profile.cache_drivers || []).map((x) => <Chip key={`inspect-cache-${x}`} label={`Cache: ${x}`} size="small" variant="outlined" />)}
+                              {(profile.task_queues || []).map((x) => <Chip key={`inspect-queue-${x}`} label={`Jobs: ${x}`} size="small" variant="outlined" />)}
+                              {(profile.middleware || []).map((x) => <Chip key={`inspect-mw-${x}`} label={x} size="small" variant="outlined" />)}
+                              {profile.websockets && <Chip label="WebSockets" size="small" variant="outlined" />}
+                              {profile.lifespan && <Chip label="Lifespan" size="small" variant="outlined" />}
+                            </Stack>
+                            {profile.entrypoint ? (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+                                PassDeployer will run the detected application with the resolved source root; no manual `start_command` is needed unless you intentionally override the runtime.
+                              </Typography>
+                            ) : null}
+                          </>
+                        );
+                      })()}
+                      {!inspectResult.entrypoint && !(inspectResult.suggested_config?.fastapi?.entrypoint) && (
                         <Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 0.75 }}>
-                          FastAPI was detected, but no ASGI app object was found. Set an explicit entry point or start command before deploying.
+                          FastAPI was detected, but no ASGI app object or configured entrypoint was found. Add `app = FastAPI()` or configure `[tool.fastapi] entrypoint` in pyproject.toml.
                         </Typography>
                       )}
                     </Box>
