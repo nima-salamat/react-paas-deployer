@@ -367,7 +367,7 @@ export function getAllPermissionCodes() {
         "plans.view", "plans.manage",
         "login_settings.view", "login_settings.manage",
         "auth_sessions.view", "auth_sessions.manage",
-        "tables.view", "tables.manage", "docs.manage",
+        "tables.view", "tables.manage", "docs.view", "docs.manage",
       ];
 }
 
@@ -388,7 +388,7 @@ export function getGroupedPermissions() {
     "tickets", "users", "invites", "auth_codes", "emails", "departments",
     "services", "deploys", "volumes", "networks", "plans", "login_settings",
     "tables",
-    "auth_sessions",
+    "auth_sessions", "docs",
   ];
   const seen = new Set();
   const out = [];
@@ -422,6 +422,7 @@ function prettifyDomain(d) {
     login_settings: "Login system",
     tables: "Database tables",
     auth_sessions: "Authentication sessions",
+    docs: "Documentation",
   };
   return map[d] || d.charAt(0).toUpperCase() + d.slice(1);
 }
