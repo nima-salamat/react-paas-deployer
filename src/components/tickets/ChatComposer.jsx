@@ -60,18 +60,6 @@ export default function ChatComposer({
     onSend?.(html);
   }, [sending, disabled, onSend]);
 
-  const handleSubmitFromEditor = useCallback((html) => {
-    if (sending || disabled) return;
-    if (html != null) {
-      valueRef.current = html;
-      onChange?.(html);
-    }
-    const body = html ?? valueRef.current;
-    const fl = filesRef.current || [];
-    if (!htmlToPlain(body) && !fl.length) return;
-    onSend?.(body);
-  }, [sending, disabled, onChange, onSend]);
-
   return (
     <Box sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", px: 0.75, py: 0.6 }}>
       <PendingFilesBar
@@ -94,10 +82,8 @@ export default function ChatComposer({
         </Tooltip>
 
         <SimpleHtmlEditor
-          enterSends={false}
           value={value}
           onChange={scheduleChange}
-          onSubmit={handleSubmitFromEditor}
           placeholder={placeholder}
           minHeight={40}
           maxHeight={120}
