@@ -152,6 +152,22 @@ function EditBody({
 
   const selectedVols = draft.selectedVolumeIds || [];
 
+  const selectedVolumeItems = useMemo(
+    () =>
+      attachableVolumes.filter((v) =>
+        selectedVols.includes(String(v.id ?? v.pk))
+      ),
+    [attachableVolumes, selectedVols]
+  );
+
+  const availableVolumeItems = useMemo(
+    () =>
+      attachableVolumes.filter(
+        (v) => !selectedVols.includes(String(v.id ?? v.pk))
+      ),
+    [attachableVolumes, selectedVols]
+  );
+
   // Attachable = owned by this service OR unused
   const attachableVolumes = useMemo(() => {
     return (volumes || []).filter((v) => {
@@ -723,97 +739,241 @@ function EditBody({
           )}
 
           {volumesLoading && attachableVolumes.length === 0 ? (
-            <CircularProgress size={22} />
+            <Box sx={{ py: 2, textAlign: "center" }}>
+              <CircularProgress size={24} />
+            </Box>
           ) : attachableVolumes.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              No volumes yet. Create one below.
-            </Typography>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography variant="body2" color="text.secondary">
+                No volumes available for this service yet.
+              </Typography>
+            </Paper>
           ) : (
-            <Stack spacing={1} sx={{ mb: 2 }}>
-              {attachableVolumes.map((v) => {
-                const vid = String(v.id ?? v.pk);
-                const isAttached = selectedVols.includes(vid);
-                const size = Number(v.size_mb) || 0;
-                const wouldExceed =
-                  !isAttached && quotaMb != null && usedBySelection + size > quotaMb;
-                return (
-                  <Paper
-                    key={vid}
-                    elevation={0}
-                    sx={{
-                      p: 1.5,
-                      borderRadius: 2,
-                      border: "1px solid",
-                      borderColor: isAttached
-                        ? "success.main"
-                        : wouldExceed
-                        ? "error.light"
-                        : "divider",
-                      bgcolor: (t) =>
-                        isAttached
-                          ? t.palette.mode === "dark"
-                            ? "rgba(34,197,94,0.08)"
-                            : "rgba(34,197,94,0.05)"
-                          : "transparent",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 1,
-                      flexWrap: "wrap",
-                      opacity: wouldExceed ? 0.65 : 1,
-                    }}
-                  >
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-                        <Typography variant="body2" fontWeight={800}>
-                          {v.name}
-                        </Typography>
-                        <Chip
-                          label={isAttached ? "Attached" : "Available"}
-                          size="small"
-                          color={isAttached ? "success" : "default"}
-                          variant={isAttached ? "filled" : "outlined"}
-                          sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
-                        />
-                        {wouldExceed && (
-                          <Chip
-                            label="Exceeds quota"
-                            size="small"
-                            color="error"
-                            sx={{ height: 20, fontSize: 11 }}
-                          />
-                        )}
-                      </Stack>
-                      <Typography variant="caption" color="text.secondary" fontFamily="monospace">
-                        {v.default_bind || v.bind || "—"}
-                        {v.size_mb != null ? ` · ${v.size_mb} MB` : ""}
-                      </Typography>
-                    </Box>
-                    {isAttached ? (
-                      <Button
-                        size="small"
-                        color="warning"
-                        startIcon={<LinkOffIcon />}
-                        onClick={() => toggleVolume(vid, size)}
-                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
-                      >
-                        Detach
-                      </Button>
-                    ) : (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        startIcon={<LinkIcon />}
-                        disabled={wouldExceed || !canMutateVolumes}
-                        onClick={() => toggleVolume(vid, size)}
-                        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}
-                      >
-                        Attach
-                      </Button>
-                    )}
-                  </Paper>
-                );
-              })}
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 750, mb: 1 }}>
+                  Selected for this service ({selectedVolumeItems.length})
+                </Typography>
+                {selectedVolumeItems.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No volumes selected.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1}>
+                    {selectedVolumeItems.map((v) => {
+                      const vid = String(v.id ?? v.pk);
+                      const size = Number(v.size_mb) || 0;
+                      return (
+                        <Paper
+                          key={vid}
+                          variant="outlined"
+                          sx={{
+                            p: 1.75,
+                            borderRadius: 2,
+                            borderColor: "success.main",
+                            bgcolor: (t) =>
+                              t.palette.mode === "dark"
+                                ? "rgba(34,197,94,0.08)"
+                                : "rgba(34,197,94,0.05)",
+                          }}
+                        >
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            justifyContent="space-between"
+                            alignItems={{ xs: "stretch", sm: "center" }}
+                            spacing={1.25}
+                          >
+                            <Box sx={{ minWidth: 0 }}>
+                              <Stack
+                                direction="row"
+                                spacing={0.75}
+                                alignItems="center"
+                                flexWrap="wrap"
+                                useFlexGap
+                              >
+                                <Typography variant="body2" fontWeight={800}>
+                                  {v.name}
+                                </Typography>
+                                <Chip
+                                  label="Selected"
+                                  size="small"
+                                  color="success"
+                                  sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
+                                />
+                              </Stack>
+                              <Stack
+                                direction="row"
+                                spacing={1.5}
+                                flexWrap="wrap"
+                                useFlexGap
+                                sx={{ mt: 0.75 }}
+                              >
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ fontFamily: "monospace" }}
+                                >
+                                  {v.default_bind || v.bind || "—"}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {size} MB
+                                </Typography>
+                                <Chip
+                                  label={v.default_mode || v.mode || "rw"}
+                                  size="small"
+                                  variant="outlined"
+                                  sx={{ height: 18, fontSize: 10 }}
+                                />
+                              </Stack>
+                            </Box>
+                            <Button
+                              size="small"
+                              color="warning"
+                              variant="outlined"
+                              startIcon={<LinkOffIcon />}
+                              disabled={!canMutateVolumes}
+                              onClick={() => toggleVolume(vid, size)}
+                              sx={{
+                                textTransform: "none",
+                                fontWeight: 700,
+                                borderRadius: 1.5,
+                                flexShrink: 0,
+                              }}
+                            >
+                              Detach
+                            </Button>
+                          </Stack>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                )}
+              </Box>
+
+              <Box>
+                <Button
+                  size="small"
+                  endIcon={
+                    showAvailableVolumes ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                  }
+                  onClick={() => setShowAvailableVolumes((value) => !value)}
+                  sx={{
+                    px: 0.5,
+                    textTransform: "none",
+                    fontWeight: 650,
+                    mb: 1,
+                  }}
+                >
+                  {showAvailableVolumes
+                    ? "Hide available volumes"
+                    : `Show available volumes (${availableVolumeItems.length})`}
+                </Button>
+
+                <Collapse in={showAvailableVolumes}>
+                  {availableVolumeItems.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      No unused volumes available.
+                    </Typography>
+                  ) : (
+                    <Stack spacing={1}>
+                      {availableVolumeItems.map((v) => {
+                        const vid = String(v.id ?? v.pk);
+                        const size = Number(v.size_mb) || 0;
+                        const wouldExceed =
+                          quotaMb != null && usedBySelection + size > quotaMb;
+                        return (
+                          <Paper
+                            key={vid}
+                            variant="outlined"
+                            sx={{
+                              p: 1.75,
+                              borderRadius: 2,
+                              borderColor: wouldExceed
+                                ? "error.light"
+                                : "divider",
+                              opacity: wouldExceed ? 0.65 : 1,
+                            }}
+                          >
+                            <Stack
+                              direction={{ xs: "column", sm: "row" }}
+                              justifyContent="space-between"
+                              alignItems={{ xs: "stretch", sm: "center" }}
+                              spacing={1.25}
+                            >
+                              <Box sx={{ minWidth: 0 }}>
+                                <Stack
+                                  direction="row"
+                                  spacing={0.75}
+                                  alignItems="center"
+                                  flexWrap="wrap"
+                                  useFlexGap
+                                >
+                                  <Typography variant="body2" fontWeight={750}>
+                                    {v.name}
+                                  </Typography>
+                                  <Chip
+                                    label="Available"
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ height: 20, fontSize: 11, fontWeight: 700 }}
+                                  />
+                                  {wouldExceed && (
+                                    <Chip
+                                      label="Exceeds quota"
+                                      color="error"
+                                      size="small"
+                                      sx={{ height: 20, fontSize: 11 }}
+                                    />
+                                  )}
+                                </Stack>
+                                <Stack
+                                  direction="row"
+                                  spacing={1.5}
+                                  flexWrap="wrap"
+                                  useFlexGap
+                                  sx={{ mt: 0.75 }}
+                                >
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ fontFamily: "monospace" }}
+                                  >
+                                    {v.default_bind || v.bind || "—"}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {size} MB
+                                  </Typography>
+                                  <Chip
+                                    label={v.default_mode || v.mode || "rw"}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ height: 18, fontSize: 10 }}
+                                  />
+                                </Stack>
+                              </Box>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                startIcon={<LinkIcon />}
+                                disabled={wouldExceed || !canMutateVolumes}
+                                onClick={() => toggleVolume(vid, size)}
+                                sx={{
+                                  textTransform: "none",
+                                  fontWeight: 700,
+                                  borderRadius: 1.5,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                Attach
+                              </Button>
+                            </Stack>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                </Collapse>
+              </Box>
             </Stack>
           )}
 
