@@ -603,28 +603,7 @@ export default function ServicesListMui({
     [fetchNetworks, handleAuthError, showAlert]
   );
 
-  const updateService = async (serviceId, payload) => {
-    setActionLoading(true);
-    try {
-      await apiRequest({
-        method: "PATCH",
-        url: `${SERVICE_API}${serviceId}/`,
-        data: payload,
-      });
-      setServices((prev) =>
-        prev.map((s) =>
-          String(s.id ?? s.pk) === String(serviceId) ? { ...s, ...payload } : s
-        )
-      );
-      return true;
-    } catch (e) {
-      if (handleAuthError(e)) return false;
-      showAlert("error", friendlyError(e, "Failed to save."));
-      return false;
-    } finally {
-      setActionLoading(false);
-    }
-  };
+
 
   const toggleServiceStatus = useCallback(
     async (service, currentStatus) => {
