@@ -705,48 +705,45 @@ export function buildDjangoConfigSuggestion(inspection) {
 
   const platform = String(
     inspection.platform || inspection.suggested_config?.platform || "docker"
-  )
-    .toLowerCase()
-    .trim();
+  ).toLowerCase().trim();
 
   const suggested = inspection.suggested_config || {};
   const cfg = { platform };
   const pythonFamily = PYTHON_WORKER_PLATFORMS.has(platform);
 
-  // Keep this helper name for compatibility with existing callers. It now
-  // builds a generic platform-aware suggestion, including the runtime
-  // settings required by FastAPI.
   const copyKeys = [
-    "python_version",
-    "install_command",
-    "package_manager",
-    "working_directory",
-    "port",
-    "healthcheck_path",
-    "start_command",
+    "python_version", "install_command", "package_manager",
+    "working_directory", "port", "healthcheck_path",
   ];
 
   if (pythonFamily) {
-    const serverType =
-      inspection.server_type || suggested.server_type || null;
+    const serverType = inspection.server_type || suggested.server_type || null;
     if (serverType) cfg.server_type = String(serverType).toLowerCase();
-
     for (const key of copyKeys) {
       const value = inspection[key] ?? suggested[key];
-      if (value !== undefined && value !== null && value !== "") {
-        cfg[key] = value;
-      }
+      if (value !== undefined && value !== null && value !== "") cfg[key] = value;
     }
   }
 
-  const entryPoint =
-    inspection.entrypoint || suggested.entry_point || null;
-  if (entryPoint) cfg.entry_point = entryPoint;
+  if (platform === "fastapi") {
+    const detectedProfile = inspection.fastapi_profile || suggested.fastapi || {};
+    const fastapi = { ...(detectedProfile || {}) };
+    delete fastapi.source;
+    delete fastapi.entry_point;
+    if (fastapi.entrypoint || fastapi.app_dir || fastapi.proxy_headers != null || fastapi.root_path || fastapi.log_level || fastapi.access_log != null || fastapi.factory != null) {
+      cfg.fastapi = fastapi;
+    }
+    if (inspection.healthcheck_path && !cfg.healthcheck_path) {
+      cfg.healthcheck_path = inspection.healthcheck_path;
+    }
+  } else {
+    const entryPoint = inspection.entrypoint || suggested.entry_point || null;
+    if (entryPoint) cfg.entry_point = entryPoint;
+    const startCommand = inspection.start_command || suggested.start_command || null;
+    if (startCommand) cfg.start_command = startCommand;
+  }
 
-  // worker_count is derived from the service plan and must never be persisted
-  // from the client.
   delete cfg.worker_count;
-
   return JSON.stringify(cfg, null, 2);
 }
 
