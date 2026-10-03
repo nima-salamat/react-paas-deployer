@@ -31,6 +31,7 @@ import {
   Divider,
 } from "@mui/material";
 import HubIcon from "@mui/icons-material/Hub";
+import DnsIcon from "@mui/icons-material/Dns";
 import StorageIcon from "@mui/icons-material/Storage";
 import SpeedIcon from "@mui/icons-material/Speed";
 import AddIcon from "@mui/icons-material/Add";
@@ -819,6 +820,12 @@ export default function SettingsPanel({
   onCreateNetwork,
   attachedVolumes,
   availableVolumes,
+  databaseBindings = [],
+  databaseResources = [],
+  databaseLoading = false,
+  databaseActionLoading = false,
+  onBindDatabase,
+  onUnbindDatabase,
   selectedVolumeId,
   setSelectedVolumeId,
   volumeActionLoading,
@@ -888,6 +895,11 @@ export default function SettingsPanel({
   const [deleteServiceConfirmOpen, setDeleteServiceConfirmOpen] = useState(false);
   const [deleteServiceError, setDeleteServiceError] = useState(null);
   const [volumeActionError, setVolumeActionError] = useState(null);
+  const [selectedDatabaseId, setSelectedDatabaseId] = useState("");
+  const [databaseAlias, setDatabaseAlias] = useState("default");
+  const [databasePrefix, setDatabasePrefix] = useState("DB");
+  const [databaseAccessMode, setDatabaseAccessMode] = useState("rw");
+  const [databaseFormError, setDatabaseFormError] = useState(null);
 
   // Local mount overrides so Detach/Attach UI updates even if parent
   // keeps listing volumes only by service_id (soft-detach keeps ownership).
@@ -1240,7 +1252,7 @@ export default function SettingsPanel({
   );
 
   // ─────────────────────────────────────────────────────────────────────
-  const SETTINGS_SECTION_IDS = ["network", "volume", "plan", "danger-zone"];
+  const SETTINGS_SECTION_IDS = ["network", "database", "volume", "plan", "danger-zone"];
 
   useEffect(() => {
     if (!onSectionChange || typeof IntersectionObserver === "undefined") return undefined;
@@ -1363,6 +1375,101 @@ export default function SettingsPanel({
         </Collapse>
       </Paper>
 
+      {/* ═══════════════ DATABASES ═══════════════ */}
+      <Paper id="database" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
+        <SectionHeader
+          icon={<DnsIcon fontSize="small" />}
+          title="Databases"
+          subtitle="Connect a managed database resource to this service. Credentials stay in the backend secret store."
+        />
+        {databaseFormError ? <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{databaseFormError}</Alert> : null}
+        {databaseLoading ? (
+          <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}><CircularProgress size={28} /></Box>
+        ) : (
+          <Stack spacing={1.25}>
+            {databaseBindings.length === 0 ? (
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                No database is connected. A managed binding will inject its host, port, database name and credential-backed password into the runtime under the selected prefix.
+              </Alert>
+            ) : databaseBindings.map((binding) => (
+              <Paper key={binding.id || `${binding.database}-${binding.alias}`} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>{binding.database_name || binding.database}</Typography>
+                      {binding.engine ? <Chip size="small" label={binding.engine} color="primary" variant="outlined" sx={{ height: 22 }} /> : null}
+                      {binding.status ? <Chip size="small" label={binding.status} variant="outlined" sx={{ height: 22 }} /> : null}
+                    </Stack>
+                    <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                      {binding.host || "managed"}{binding.port ? `:${binding.port}` : ""} · alias {binding.alias || "default"} · env prefix {binding.env_prefix || "DB"} · {String(binding.access_mode || "rw").toUpperCase()}
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    disabled={databaseActionLoading}
+                    startIcon={<LinkOffIcon />}
+                    onClick={() => onUnbindDatabase?.(binding.alias)}
+                    sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, flexShrink: 0 }}
+                  >
+                    Disconnect
+                  </Button>
+                </Stack>
+              </Paper>
+            ))}
+
+            <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, bgcolor: "background.default" }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Connect a database resource</Typography>
+              {(databaseResources || []).length === 0 ? (
+                <Typography variant="body2" color="text.secondary">No database resources are available yet. Create/provision a database service first.</Typography>
+              ) : (
+                <Stack spacing={1.25}>
+                  <TextField
+                    select fullWidth size="small" label="Database resource"
+                    value={selectedDatabaseId}
+                    onChange={(e) => setSelectedDatabaseId(e.target.value)}
+                    disabled={databaseActionLoading}
+                  >
+                    {(databaseResources || []).map((resource) => (
+                      <MenuItem value={String(resource.id ?? resource.pk)} key={String(resource.id ?? resource.pk)}>
+                        {resource.name} · {resource.engine} {resource.status ? `· ${resource.status}` : ""}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                    <TextField size="small" fullWidth label="Alias" value={databaseAlias} onChange={(e) => setDatabaseAlias(e.target.value)} disabled={databaseActionLoading} />
+                    <TextField size="small" fullWidth label="Environment prefix" value={databasePrefix} onChange={(e) => setDatabasePrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))} disabled={databaseActionLoading} />
+                    <TextField select size="small" fullWidth label="Access" value={databaseAccessMode} onChange={(e) => setDatabaseAccessMode(e.target.value)} disabled={databaseActionLoading}>
+                      <MenuItem value="rw">Read / write</MenuItem>
+                      <MenuItem value="ro">Read only</MenuItem>
+                    </TextField>
+                  </Stack>
+                  <Button
+                    variant="contained" size="small" startIcon={<LinkIcon />}
+                    disabled={!selectedDatabaseId || databaseActionLoading}
+                    onClick={async () => {
+                      setDatabaseFormError(null);
+                      try {
+                        await onBindDatabase?.({ database: selectedDatabaseId, alias: databaseAlias.trim() || "default", env_prefix: databasePrefix.trim() || "DB", access_mode: databaseAccessMode });
+                        setSelectedDatabaseId("");
+                      } catch (err) {
+                        setDatabaseFormError(getApiErrorMessage(err, "Could not connect the database."));
+                      }
+                    }}
+                    sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, alignSelf: "flex-start" }}
+                  >
+                    {databaseActionLoading ? "Connecting…" : "Connect database"}
+                  </Button>
+                </Stack>
+              )}
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                Passwords are never shown here. When a database credential exists, revision compilation stores it as a service secret and injects it only at runtime.
+              </Typography>
+            </Paper>
+          </Stack>
+        )}
+      </Paper>
       {/* ═══════════════ VOLUMES ═══════════════ */}
       <Paper id="volume" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
