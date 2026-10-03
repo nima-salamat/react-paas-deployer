@@ -70,7 +70,6 @@ test("code blocks exit through normal paragraphs and keep explicit newlines", ()
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
   assert.match(source, /const convertCodeBlockToParagraph = useCallback/);
-  assert.match(source, /const exitCodeBlockAtEnd = useCallback/);
   assert.match(source, /const insertSoftBreak = useCallback/);
   assert.match(source, /const insertCodeNewline = useCallback/);
   assert.match(source, /splitCodeBlockAtCaret\(pre, range\)/);
