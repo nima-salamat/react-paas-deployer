@@ -620,12 +620,15 @@ test("moving to an unaligned block resets the typing alignment to explicit left"
 });
 
 
-test("toolbar preserves the editor selection on touch and avoids form submission", () => {
+test("toolbar preserves the editor selection on touch and remains scroll-safe", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
-  assert.match(source, /onPointerDown=\{\(e\) => \{ e\.preventDefault\(\); saveSelection\(\); \}\}/);
+  assert.match(source, /onPointerDown=\{saveSelection\}/);
   assert.match(source, /<IconButton type="button"/);
   assert.match(source, /<Button\ntype="button"/);
+  assert.match(source, /overflowX: "auto"/);
+  assert.match(source, /WebkitOverflowScrolling: "touch"/);
+  assert.match(source, /minWidth: "max-content"/);
 });
 
 test("typing history is coalesced instead of creating one undo snapshot per keystroke", () => {
