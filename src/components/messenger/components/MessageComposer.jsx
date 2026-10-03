@@ -1543,6 +1543,51 @@ function MessageComposer({
     e.target.value = "";
   };
 
+  // Browsers expose clipboard images/files through DataTransfer.files and,
+  // on some platforms, only through DataTransfer.items. Handle both paths.
+  const handleTextPaste = (e) => {
+    const clipboard = e.clipboardData;
+    if (!clipboard) return;
+
+    const files = [];
+    const seen = new Set();
+
+    const addClipboardFile = (file) => {
+      if (!file) return;
+      const key = [
+        file.name || "",
+        file.type || "",
+        Number(file.size || 0),
+        Number(file.lastModified || 0),
+      ].join(":");
+      if (seen.has(key)) return;
+      seen.add(key);
+      files.push(file);
+    };
+
+    Array.from(clipboard.files || []).forEach(addClipboardFile);
+
+    if (!files.length) {
+      Array.from(clipboard.items || [])
+        .filter((item) => item?.kind === "file")
+        .forEach((item) => {
+          try {
+            addClipboardFile(item.getAsFile());
+          } catch {
+            // Ignore clipboard items that cannot be materialized as files.
+          }
+        });
+    }
+
+    if (!files.length) return;
+
+    // Let normal text paste behave exactly as before when the clipboard has no
+    // file. When it does contain a file, prevent the browser from injecting an
+    // image/data URL into the textarea and attach the actual File instead.
+    e.preventDefault();
+    addPickedFiles(files);
+  };
+
   const thumbUrl = (f) => {
     try {
       if (f?.type?.startsWith("image/") || f?.type?.startsWith("video/")) {
@@ -2496,6 +2541,7 @@ function MessageComposer({
             onTextChange(e);
             rememberSelection(e.target);
           }}
+          onPaste={handleTextPaste}
           onKeyDown={handleComposerKeyDown}
           onKeyUp={(e) => rememberSelection(e.target)}
           onSelect={(e) => {
