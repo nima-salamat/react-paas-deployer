@@ -1396,7 +1396,7 @@ export default function SettingsPanel({
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-                      <Typography variant="body2" sx={{ fontWeight: 800 }}>{binding.database_name || binding.database}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 800 }}>{binding.database_name_runtime || binding.database_name || binding.database}</Typography>
                       {binding.engine ? <Chip size="small" label={binding.engine} color="primary" variant="outlined" sx={{ height: 22 }} /> : null}
                       {binding.status ? <Chip size="small" label={binding.status} variant="outlined" sx={{ height: 22 }} /> : null}
                     </Stack>
