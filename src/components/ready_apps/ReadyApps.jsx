@@ -13,6 +13,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import RocketLaunchOutlinedIcon from "@mui/icons-material/RocketLaunchOutlined";
@@ -147,8 +148,12 @@ export default function ReadyApps() {
                   },
                 }}
               >
-                <CardActionArea href={"/dashboard/ready-apps/" + encodeURIComponent(app.id)} sx={{ height: "100%" }}>
-                  <CardContent sx={{ p: 2.25, height: "100%", display: "flex", flexDirection: "column" }}>
+                <CardActionArea
+                  component={RouterLink}
+                  to={"/dashboard/ready-apps/" + encodeURIComponent(app.id)}
+                  sx={{ height: "auto" }}
+                >
+                  <CardContent sx={{ p: 2.25, display: "flex", flexDirection: "column" }}>
                     <Stack direction="row" spacing={1.5} alignItems="flex-start">
                       <AppLogo app={app} />
                       <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -175,13 +180,19 @@ export default function ReadyApps() {
                     </Stack>
 
                     <Box sx={{ flex: 1 }} />
-                    <Button
-                      sx={{ mt: 2, alignSelf: "flex-start", borderRadius: 1.7, fontWeight: 800 }}
-                      endIcon={<ArrowForwardRoundedIcon />}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      Deploy
-                    </Button>
+                  </CardContent>
+                </CardActionArea>
+                <Box sx={{ px: 2.25, pb: 2.25 }}>
+                  <Button
+                    fullWidth
+                    component={RouterLink}
+                    to={"/dashboard/ready-apps/" + encodeURIComponent(app.id)}
+                    sx={{ borderRadius: 1.7, fontWeight: 800 }}
+                    endIcon={<ArrowForwardRoundedIcon />}
+                  >
+                    Deploy
+                  </Button>
+                </Box>
                   </CardContent>
                 </CardActionArea>
               </Card>
