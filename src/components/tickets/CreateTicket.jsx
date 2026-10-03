@@ -181,7 +181,6 @@ export default function CreateTicket() {
               defaultExpanded
               minHeight={140}
               maxHeight={320}
-              enterSends={false}
               compact={false}
               showToolbarToggle
             />
