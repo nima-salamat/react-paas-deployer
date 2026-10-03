@@ -218,8 +218,8 @@ test("renderer uses adaptive quote contrast and renders persisted alignment clas
   assert.match(source, /bgcolor: mine \? "rgba\(255,255,255,0\.09\)" : "action\.hover"/);
   assert.match(source, /data-ticket-align=\\"center\\"/);
   assert.match(source, /data-ticket-align=\\"right\\"/);
-  assert.match(source, /text-align\", "center"/);
-  assert.match(source, /text-align\", "right"/);
+  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
+  assert.match(source, /data-rendered-ticket-align/);
 });
 
 
@@ -247,7 +247,7 @@ test("Enter exits quote blocks while Shift+Enter remains inside the same quote",
   assert.match(source, /const splitQuoteAtCaret = useCallback/);
   assert.match(source, /const quote = anchor\?\.closest\?\.\("blockquote"\) \|\| rangeNode\?\.closest\?\.\("blockquote"\)/);
   assert.match(source, /insertSoftBreak\(range, selection\)/);
-  assert.match(source, /splitQuoteAtCaret\(quote, range\)/);
+  assert.match(source, /splitQuoteAtCaret\(quote, quoteRange\)/);
   assert.doesNotMatch(source, /quote\.after\(document\.createElement\("blockquote"\)\)/);
 });
 
@@ -311,7 +311,7 @@ test("quote formatting targets only the selected block range and preserves align
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
   assert.match(source, /function getSelectedEditorBlocks/);
-  assert.match(source, /const targets = range\.collapsed/);
+  assert.match(source, /let targets = range\.collapsed/);
   assert.match(source, /copyBlockAlignment\(block, quoteBlock\)/);
   assert.match(source, /quoteBlock\.setAttribute\("dir", getEditorDirection\(block\)\)/);
 });
@@ -408,9 +408,9 @@ test("alignment can be chosen before any text exists and is inherited by the fir
 
   assert.match(source, /const pendingAlignmentRef = useRef\("left"\)/);
   assert.match(source, /pendingAlignmentRef\.current = align/);
-  assert.match(source, /const pendingAlignment = pendingAlignmentRef\.current/);
+  assert.match(source, /pendingAlignmentRef\.current = align/);
   assert.match(source, /const block = findBlock\(\) \|\| ensureBlock\(\)/);
-  assert.match(source, /setBlockAlignment\(block, pendingAlignment\)/);
+  assert.match(source, /setBlockAlignment\(block, currentAlignmentRef\.current\)/);
   assert.match(source, /align: block \? getBlockAlignment\(block\) : pendingAlignmentRef\.current/);
 });
 
@@ -574,7 +574,7 @@ test("normal Enter creates a new block that preserves the current alignment", ()
   assert.match(source, /const splitStandardBlockAtCaret = useCallback/);
   assert.match(source, /copyBlockAlignment\(block, next\)/);
   assert.match(source, /copyBlockDirection\(block, next\)/);
-  assert.match(source, /!e\.shiftKey && !enterSends/);
+  assert.doesNotMatch(source, /enterSends/);
   assert.match(source, /const next = splitStandardBlockAtCaret\(currentBlock, range\)/);
   assert.match(source, /if \(next\) placeCaretAtStart\(next\)/);
 });
@@ -595,7 +595,7 @@ test("normal editor line breaks remain source-aligned rather than browser-auto-a
 
   assert.match(source, /const splitStandardBlockAtCaret = useCallback/);
   assert.match(source, /copyBlockAlignment\(block, next\)/);
-  assert.match(source, /!e\.shiftKey && !enterSends/);
+  assert.doesNotMatch(source, /enterSends/);
 });
 
 
