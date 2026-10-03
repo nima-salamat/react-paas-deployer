@@ -119,10 +119,14 @@ test("ticket message code renderer keeps explicit language selection visible", (
   assert.match(source, /label\.textContent = requestedLanguage/);
 });
 
-test("ticket editor keeps the first toolbar control clear of the rounded corner", () => {
+test("ticket editor toolbar is touch-scrollable without widening the page", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
 
-  assert.match(source, /px: 0\.75, py: 0\.1/);
+  assert.match(source, /overflowX: "auto"/);
+  assert.match(source, /overflowY: "hidden"/);
+  assert.match(source, /WebkitOverflowScrolling: "touch"/);
+  assert.match(source, /overscrollBehaviorX: "contain"/);
+  assert.match(source, /minWidth: "max-content"/);
 });
 
 
