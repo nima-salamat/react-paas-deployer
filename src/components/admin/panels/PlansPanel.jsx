@@ -19,6 +19,17 @@ import { useToast } from "../components/ToastContext";
 
 const PAGE_SIZE = 20;
 
+function toNullableNumber(value) {
+  if (value === "" || value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function toNullableBoolean(value) {
+  if (value === "inherit" || value == null) return null;
+  return value === "enabled";
+}
+
 const EMPTY_FORM = {
   name: "Bronze",
   platform: "python",
@@ -28,6 +39,12 @@ const EMPTY_FORM = {
   max_storage: 10,
   price_per_hour: 0,
   storage_type: "HDD",
+  log_retention_days: "",
+  log_storage_mb: "",
+  log_ingest_bytes_per_sec: "",
+  persistent_logging: "inherit",
+  realtime_logging: "inherit",
+  log_quota_behavior: "inherit",
 };
 
 export default function PlansPanel() {
@@ -87,6 +104,14 @@ export default function PlansPanel() {
       max_storage: p.max_storage ?? 10,
       price_per_hour: p.price_per_hour ?? 0,
       storage_type: p.storage_type || "HDD",
+      log_retention_days: p.log_retention_days ?? "",
+      log_storage_mb: p.log_storage_mb ?? "",
+      log_ingest_bytes_per_sec: p.log_ingest_bytes_per_sec ?? "",
+      persistent_logging:
+        p.persistent_logging == null ? "inherit" : p.persistent_logging ? "enabled" : "disabled",
+      realtime_logging:
+        p.realtime_logging == null ? "inherit" : p.realtime_logging ? "enabled" : "disabled",
+      log_quota_behavior: p.log_quota_behavior || "inherit",
     });
     setEdit(p);
   };
@@ -112,6 +137,13 @@ export default function PlansPanel() {
         max_storage: Number(form.max_storage),
         price_per_hour: Number(form.price_per_hour),
         storage_type: form.storage_type,
+        log_retention_days: toNullableNumber(form.log_retention_days),
+        log_storage_mb: toNullableNumber(form.log_storage_mb),
+        log_ingest_bytes_per_sec: toNullableNumber(form.log_ingest_bytes_per_sec),
+        persistent_logging: toNullableBoolean(form.persistent_logging),
+        realtime_logging: toNullableBoolean(form.realtime_logging),
+        log_quota_behavior:
+          form.log_quota_behavior === "inherit" ? "" : form.log_quota_behavior,
       };
       if (edit?.id) {
         await apiRequest({ method: "PATCH", url: `${API}/${edit.id}/`, data: payload });
@@ -153,9 +185,9 @@ export default function PlansPanel() {
     <PermissionGate anyOf={["plans.view", "plans.manage"]}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} gap={1.5} mb={2}>
         <Box>
-          <Typography variant="h5" fontWeight={800}>Plans</Typography>
+          <Typography variant="h5" fontWeight={800}>Resource Plans</Typography>
           <Typography variant="body2" color="text.secondary">
-            Resource tiers offered to services. {canManage ? "Full CRUD enabled." : "Read-only — you need plans.manage to edit."}
+            Resource and logging policy tiers offered to services. {canManage ? "Full CRUD enabled." : "Read-only — you need plans.manage to edit."}
           </Typography>
         </Box>
         <Stack direction="row" gap={1}>
@@ -219,7 +251,7 @@ export default function PlansPanel() {
 
       {/* Create / Edit dialog */}
       <Dialog open={Boolean(edit)} onClose={closeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{edit?.id ? "Edit plan" : "Create plan"}</DialogTitle>
+        <DialogTitle>{edit?.id ? "Edit resource plan" : "Create resource plan"}</DialogTitle>
         <DialogContent>
           <Stack gap={2} mt={1}>
             <FormControl size="small" fullWidth>
@@ -272,6 +304,50 @@ export default function PlansPanel() {
               <TextField size="small" type="number" label="Price / hour (Toman)" value={form.price_per_hour}
                 onChange={(e) => setForm((s) => ({ ...s, price_per_hour: e.target.value }))} fullWidth />
             </Stack>
+            <Stack spacing={1}>
+              <Typography variant="subtitle2" fontWeight={700}>Logging policy</Typography>
+              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                <TextField size="small" type="number" label="Log retention (days)"
+                  placeholder="Inherit platform default" value={form.log_retention_days}
+                  onChange={(e) => setForm((state) => ({ ...state, log_retention_days: e.target.value }))} fullWidth />
+                <TextField size="small" type="number" label="Log storage (MB)"
+                  placeholder="Inherit platform default" value={form.log_storage_mb}
+                  onChange={(e) => setForm((state) => ({ ...state, log_storage_mb: e.target.value }))} fullWidth />
+                <TextField size="small" type="number" label="Log ingest (bytes/sec)"
+                  placeholder="Inherit platform default" value={form.log_ingest_bytes_per_sec}
+                  onChange={(e) => setForm((state) => ({ ...state, log_ingest_bytes_per_sec: e.target.value }))} fullWidth />
+              </Stack>
+              <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Persistent logging</InputLabel>
+                  <Select label="Persistent logging" value={form.persistent_logging}
+                    onChange={(e) => setForm((state) => ({ ...state, persistent_logging: e.target.value }))}>
+                    <MenuItem value="inherit">Inherit platform default</MenuItem>
+                    <MenuItem value="enabled">Enabled</MenuItem>
+                    <MenuItem value="disabled">Disabled</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Realtime logging</InputLabel>
+                  <Select label="Realtime logging" value={form.realtime_logging}
+                    onChange={(e) => setForm((state) => ({ ...state, realtime_logging: e.target.value }))}>
+                    <MenuItem value="inherit">Inherit platform default</MenuItem>
+                    <MenuItem value="enabled">Enabled</MenuItem>
+                    <MenuItem value="disabled">Disabled</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" fullWidth>
+                  <InputLabel>Quota behavior</InputLabel>
+                  <Select label="Quota behavior" value={form.log_quota_behavior}
+                    onChange={(e) => setForm((state) => ({ ...state, log_quota_behavior: e.target.value }))}>
+                    <MenuItem value="inherit">Inherit platform default</MenuItem>
+                    <MenuItem value="fifo_delete">FIFO delete</MenuItem>
+                    <MenuItem value="drop_new">Drop new logs</MenuItem>
+                    <MenuItem value="realtime_only">Realtime only</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
+            </Stack>
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -320,7 +396,7 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
   }
   return (
     <Box sx={{ border: 1, borderColor: "divider", overflow: "auto" }}>
-      <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 820 }}>
+      <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 1120 }}>
         <Box component="thead" sx={{ bgcolor: "action.hover" }}>
           <tr>
             <Th>Name</Th>
@@ -332,6 +408,7 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
             <Th align="right">Storage type</Th>
             <Th align="right">Price/h</Th>
             <Th align="right">Price/day</Th>
+            <Th align="right">Logging</Th>
             <Th align="right">Actions</Th>
           </tr>
         </Box>
@@ -362,6 +439,9 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
                 <Td align="right">{Number(r.price_per_hour).toLocaleString()}</Td>
                 <Td align="right">{priceDay.toLocaleString()}</Td>
                 <Td align="right">
+                  <LoggingSummary plan={r} />
+                </Td>
+                <Td align="right">
                   {canManage ? (
                     <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                       <Button size="small" startIcon={<EditIcon />} onClick={() => onEdit(r)}>Edit</Button>
@@ -375,6 +455,22 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
         </tbody>
       </Box>
     </Box>
+  );
+}
+
+function LoggingSummary({ plan }) {
+  const retention = plan.log_retention_days == null ? "inherit" : String(plan.log_retention_days) + "d";
+  const storage = plan.log_storage_mb == null ? "inherit" : Number(plan.log_storage_mb).toLocaleString() + "MB";
+  const ingest = plan.log_ingest_bytes_per_sec == null ? "inherit" : Number(plan.log_ingest_bytes_per_sec).toLocaleString() + "B/s";
+  const persistent = plan.persistent_logging == null ? "inherit" : plan.persistent_logging ? "persist" : "no persist";
+  const realtime = plan.realtime_logging == null ? "inherit" : plan.realtime_logging ? "realtime" : "no realtime";
+
+  return (
+    <Typography variant="caption" color="text.secondary" component="span">
+      {retention} · {storage} · {ingest}
+      <br />
+      {persistent} · {realtime} · {plan.log_quota_behavior || "inherit"}
+    </Typography>
   );
 }
 
