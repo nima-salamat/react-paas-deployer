@@ -406,7 +406,10 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
             <TextField
               label="Application name"
               value={name}
-              onChange={(event) => updateField("__name", event.target.value) || setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setError("");
+              }}
               autoFocus
               fullWidth
               helperText="This name becomes part of the platform-managed hostname."
