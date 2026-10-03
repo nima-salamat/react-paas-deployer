@@ -179,23 +179,43 @@ test("service detail declares shell context-menu callback before consumers", () 
   assert.ok(closeIndex < downloadIndex);
 });
 
-test("FastAPI deploy UI keeps ASGI configuration and inspection output connected", async () => {
+test("FastAPI deploy UI keeps runtime profile and inspection output connected", async () => {
   const builder = read("src/components/service_detail/components/ConfigBuilder.jsx");
   const utils = read("src/components/service_detail/utils.js");
+  const create = read("src/components/service_detail/components/CreateDeployPanel.jsx");
   const icon = read("src/components/plans/PlatformIcon.jsx");
   const admin = read("src/components/admin/adminUtils.js");
 
   assert.match(builder, /fastapi:\s*\{/);
-  assert.match(builder, /\["server_type", "Server mode", "asgi"\]/);
-  assert.match(builder, /\["healthcheck_path", "Health check path", "\/"\]/);
-  assert.match(builder, /pythonPlatform/);
+  assert.match(builder, /FastApiRuntimePanel/);
+  assert.match(builder, /proxy_headers/);
+  assert.match(builder, /forwarded_allow_ips/);
+  assert.match(builder, /limit_concurrency/);
+  assert.match(builder, /timeout_graceful_shutdown/);
+  assert.match(builder, /DATABASE_URL/);
+  assert.match(builder, /REDIS_URL/);
   assert.match(utils, /const PYTHON_WORKER_PLATFORMS = new Set\([\s\S]*"fastapi"/);
-  assert.match(utils, /"python_version"/);
-  assert.match(utils, /"start_command"/);
-  assert.doesNotMatch(utils, /cfg\.worker_count\s*=/);
+  assert.match(utils, /cfg\.fastapi = fastapi/);
+  assert.doesNotMatch(utils, /cfg\.entry_point = entryPoint/);
+  assert.match(create, /fastapi_profile/);
+  assert.match(create, /App dir:/);
   assert.match(icon, /SiFastapi/);
   assert.match(icon, /fastapi:\s*SiFastapi/);
   assert.match(admin, /value: "fastapi", label: "FastAPI"/);
+});
+
+test("service settings exposes managed database bindings", () => {
+  const service = read("src/components/service_detail/ServiceDetail.jsx");
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+
+  assert.match(service, /fetchDatabaseConfiguration/);
+  assert.match(service, /database-resources/);
+  assert.match(service, /databases/);
+  assert.match(service, /onBindDatabase=\{handleBindDatabase\}/);
+  assert.match(settings, /id="database"/);
+  assert.match(settings, /Connect a database resource/);
+  assert.match(settings, /Environment prefix/);
+  assert.match(settings, /onUnbindDatabase/);
 });
 
 test("service detail keeps the backend route contract", () => {
@@ -211,6 +231,8 @@ test("service detail keeps the backend route contract", () => {
   assert.match(constants, /SERVICE_ACTION_ROOT = .*\/services\//);
   assert.match(constants, /NETWORK_API_ROOT = .*\/api\/networks\//);
   assert.match(constants, /VOLUME_API_ROOT = .*\/api\/volumes\//);
+  assert.match(service, /database-resources/);
+  assert.match(service, /databases/);
 
   for (const endpoint of [
     "start_service/",
