@@ -584,6 +584,29 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                     <Typography variant="caption" color="text.secondary">
                       Allocation reflects plan limits for the managed child services; it is not a live consumption meter.
                     </Typography>
+                    <Stack spacing={0.8} sx={{ mt: 1.2 }}>
+                      {(resolved.resource_summary.services || []).map((service) => (
+                        <Box
+                          key={service.name}
+                          sx={{
+                            p: 1.2,
+                            borderRadius: 1.8,
+                            border: "1px solid",
+                            borderColor: "divider",
+                            bgcolor: "background.paper",
+                          }}
+                        >
+                          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={0.6}>
+                            <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                              {service.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {service.plan?.name || "Plan"} · {service.cpu_vcpu} vCPU · {service.ram_mb} MB RAM · {service.storage_mb} MB storage
+                            </Typography>
+                          </Stack>
+                        </Box>
+                      ))}
+                    </Stack>
                   </Stack>
                 </Box>
 
