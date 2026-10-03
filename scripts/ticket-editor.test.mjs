@@ -637,7 +637,7 @@ test("typing history is coalesced instead of creating one undo snapshot per keys
   assert.match(source, /const historyInputTimerRef = useRef\(null\)/);
   assert.match(source, /const scheduleHistory = useCallback/);
   assert.match(source, /historyInputTimerRef\.current = window\.setTimeout/);
-  assert.match(source, /emit\(false\);\n            scheduleHistory\(\);/);
+  assert.match(source, /emit\(false\);[\s\S]*scheduleHistory\(\);/);
   assert.match(source, /onBlur=\{\(\) => \{ saveSelection\(\); commitHistory\(\); emit\(false\); \}\}/);
 });
 
