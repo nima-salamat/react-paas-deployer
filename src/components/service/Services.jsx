@@ -25,6 +25,7 @@ import apiRequest from "../customHooks/apiRequest";
 
 import ServiceItem from "./services/ServiceItem";
 import ServiceEditDialog from "./services/ServiceEditDialog";
+import ServiceDeleteDialog from "./services/ServiceDeleteDialog";
 import ServicesToolbar from "./services/ServicesToolbar";
 import ShareServiceDialog from "./services/ShareServiceDialog";
 import {
@@ -125,6 +126,9 @@ export default function ServicesListMui({
 
   const [actionLoading, setActionLoading] = useState(false);
   const [editingDraft, setEditingDraft] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteServiceLoading, setDeleteServiceLoading] = useState(false);
+  const [deleteServiceError, setDeleteServiceError] = useState(null);
   const [plansForPlatform, setPlansForPlatform] = useState({});
   const [plansForPlatformErrors, setPlansForPlatformErrors] = useState({});
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
@@ -671,28 +675,43 @@ export default function ServicesListMui({
     [handleAuthError, showAlert, fetchServices, fetchStatusBatch]
   );
 
-  const deleteService = useCallback(
-    async (serviceId) => {
-      if (!window.confirm("Delete this service?")) return;
-      setActionLoading(true);
-      try {
-        await apiRequest({
-          method: "DELETE",
-          url: `${SERVICE_API}${serviceId}/`,
-        });
-        setServices((prev) =>
-          prev.filter((s) => String(s.id ?? s.pk) !== String(serviceId))
-        );
-        showAlert("success", "Service deleted.");
-      } catch (e) {
-        if (handleAuthError(e)) return;
-        showAlert("error", friendlyError(e, "Failed to delete."));
-      } finally {
-        setActionLoading(false);
-      }
-    },
-    [handleAuthError, showAlert]
-  );
+  const deleteService = useCallback((serviceOrId) => {
+    const target =
+      serviceOrId && typeof serviceOrId === "object"
+        ? serviceOrId
+        : servicesRef.current.find(
+            (s) => String(s.id ?? s.pk) === String(serviceOrId)
+          ) || null;
+
+    if (!target) return;
+    setDeleteServiceError(null);
+    setDeleteTarget(target);
+  }, []);
+
+  const confirmDeleteService = useCallback(async () => {
+    const serviceId = deleteTarget?.id ?? deleteTarget?.pk;
+    if (!serviceId) return;
+
+    setDeleteServiceLoading(true);
+    setDeleteServiceError(null);
+    try {
+      await apiRequest({
+        method: "DELETE",
+        url: `${SERVICE_API}${serviceId}/`,
+      });
+      setServices((prev) =>
+        prev.filter((s) => String(s.id ?? s.pk) !== String(serviceId))
+      );
+      setDeleteTarget(null);
+      showAlert("success", "Service deleted.");
+    } catch (e) {
+      if (handleAuthError(e)) return;
+      setDeleteServiceError(friendlyError(e, "Failed to delete."));
+    } finally {
+      setDeleteServiceLoading(false);
+    }
+  }, [deleteTarget, handleAuthError, showAlert]);
+
 
   const handleOpen = useCallback(
     (s) => {
@@ -738,31 +757,17 @@ export default function ServicesListMui({
 
   const saveEdit = async () => {
     if (!editingDraft) return;
+
     const svc = editingDraft.service;
     const serviceId = svc.id ?? svc.pk;
-    const payload = {};
-
-    const originalNet = svc.network
-      ? svc.network.id ?? svc.network.pk ?? svc.network
+    const originalNetworkId =
+      svc.network?.id ?? svc.network?.pk ?? svc.network ?? null;
+    const originalPlanId =
+      svc.plan?.id ?? svc.plan?.pk ?? svc.plan ?? null;
+    const nextNetworkId = editingDraft.selectedNetwork ?? null;
+    const nextPlanId = editingDraft.selectedPlanId
+      ? String(editingDraft.selectedPlanId)
       : null;
-    if ((editingDraft.selectedNetwork ?? null) !== (originalNet ?? null)) {
-      payload.network = editingDraft.selectedNetwork ?? null;
-    }
-
-    const originalPlan = svc.plan
-      ? svc.plan.id ?? svc.plan.pk ?? svc.plan
-      : null;
-    if (
-      editingDraft.selectedPlanId &&
-      String(editingDraft.selectedPlanId) !== String(originalPlan)
-    ) {
-      payload.plan = editingDraft.selectedPlanId;
-    }
-
-    let ok = true;
-    if (Object.keys(payload).length > 0) {
-      ok = await updateService(serviceId, payload);
-    }
 
     const desired = new Set(
       (editingDraft.selectedVolumeIds || []).map(String)
@@ -771,53 +776,158 @@ export default function ServicesListMui({
       (editingDraft.initialVolumeIds || []).map(String)
     );
 
-    // Attach newly selected volumes (exclusive ownership via PATCH)
-    for (const vid of desired) {
-      if (!initial.has(vid)) {
-        try {
-          await apiRequest({
-            method: "PATCH",
-            url: `${VOLUME_API_ROOT}${vid}/`,
-            data: { service: serviceId },
-          });
-        } catch (e) {
-          const msg =
-            e?.response?.data?.errors?.size_mb ||
-            e?.response?.data?.error ||
-            e?.response?.data?.detail ||
-            "Failed to attach volume (quota or ownership).";
-          showAlert(
-            "error",
-            typeof msg === "object" ? JSON.stringify(msg) : String(msg)
+    const networkChanged =
+      String(nextNetworkId ?? "") !== String(originalNetworkId ?? "");
+    const planChanged =
+      Boolean(nextPlanId) &&
+      String(nextPlanId) !== String(originalPlanId ?? "");
+
+    setActionLoading(true);
+    let changed = false;
+
+    try {
+      if (networkChanged) {
+        await apiRequest({
+          method: "PATCH",
+          url: `${SERVICE_API}${serviceId}/`,
+          data: { network: nextNetworkId },
+        });
+        changed = true;
+
+        const selectedNetwork = networks.find(
+          (n) => String(n.id ?? n.pk) === String(nextNetworkId)
+        );
+        setEditingDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                service: {
+                  ...prev.service,
+                  network:
+                    nextNetworkId == null
+                      ? null
+                      : selectedNetwork || nextNetworkId,
+                },
+              }
+            : prev
+        );
+      }
+
+      if (planChanged) {
+        const currentPlan =
+          svc.plan && typeof svc.plan === "object" ? svc.plan : null;
+        const currentPlatform = String(
+          currentPlan?.platform || svc.platform || ""
+        ).toLowerCase();
+        const availablePlans =
+          plansForPlatformRef.current[currentPlatform] || [];
+        const appliedPlan = availablePlans.find(
+          (p) => String(p.id ?? p.pk) === String(nextPlanId)
+        );
+
+        const response = await apiRequest({
+          method: "POST",
+          url: `${PLANS_API}plans/${nextPlanId}/apply/`,
+          data: {
+            target_type: "service",
+            target_id: serviceId,
+            applyImmediately: false,
+          },
+        });
+
+        if (
+          response.status < 200 ||
+          response.status >= 300 ||
+          response.data?.result === "error"
+        ) {
+          throw new Error(
+            response.data?.detail ||
+              response.data?.error ||
+              "Unable to apply plan."
           );
-          ok = false;
         }
-      }
-    }
 
-    // Detach removed volumes
-    for (const vid of initial) {
-      if (!desired.has(vid)) {
-        try {
-          await apiRequest({
-            method: "PATCH",
-            url: `${VOLUME_API_ROOT}${vid}/`,
-            data: { service: null },
-          });
-        } catch (e) {
-          showAlert("error", "Failed to detach volume.");
-          ok = false;
-        }
+        changed = true;
+        setEditingDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                service: {
+                  ...prev.service,
+                  plan: appliedPlan || nextPlanId,
+                },
+              }
+            : prev
+        );
       }
-    }
 
-    setEditingDraft(null);
-    await fetchVolumes({ silent: false });
-    if (ok) {
-      showAlert("success", "Changes saved.");
-      fetchServices(true);
+      for (const vid of desired) {
+        if (initial.has(vid)) continue;
+
+        await apiRequest({
+          method: "PATCH",
+          url: `${VOLUME_API_ROOT}${vid}/`,
+          data: { service: serviceId },
+        });
+        changed = true;
+        setEditingDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                initialVolumeIds: Array.from(
+                  new Set([
+                    ...(prev.initialVolumeIds || []).map(String),
+                    vid,
+                  ])
+                ),
+              }
+            : prev
+        );
+      }
+
+      for (const vid of initial) {
+        if (desired.has(vid)) continue;
+
+        await apiRequest({
+          method: "PATCH",
+          url: `${VOLUME_API_ROOT}${vid}/`,
+          data: { service: null },
+        });
+        changed = true;
+        setEditingDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                initialVolumeIds: (prev.initialVolumeIds || []).filter(
+                  (id) => String(id) !== vid
+                ),
+              }
+            : prev
+        );
+      }
+
+      await Promise.all([
+        fetchVolumes({ silent: false }),
+        fetchServices(true),
+      ]);
+
+      setEditingDraft(null);
+      if (changed) showAlert("success", "Changes saved.");
+    } catch (e) {
+      if (!handleAuthError(e)) {
+        showAlert(
+          "error",
+          friendlyError(
+            e,
+            "Some changes could not be saved. Review the selections and try again."
+          )
+        );
+      }
+    } finally {
+      setActionLoading(false);
     }
   };
+
 
   // Map share rows → display services + meta for shared tabs
   const displayEntries = useMemo(() => {
@@ -1184,6 +1294,19 @@ export default function ServicesListMui({
           fetchShares();
           showAlert("success", "Share updated.");
         }}
+      />
+      <ServiceDeleteDialog
+        open={Boolean(deleteTarget)}
+        service={deleteTarget}
+        loading={deleteServiceLoading}
+        error={deleteServiceError}
+        onClose={() => {
+          if (!deleteServiceLoading) {
+            setDeleteTarget(null);
+            setDeleteServiceError(null);
+          }
+        }}
+        onConfirm={confirmDeleteService}
       />
       <ServiceEditDialog
         open={Boolean(editingDraft)}
