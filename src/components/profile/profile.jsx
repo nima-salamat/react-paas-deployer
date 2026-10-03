@@ -672,6 +672,11 @@ const Profile = ({ embedded = false }) => {
       setEmailChangeCode("");
       setEmailChangeDestination("");
       setSuccess("Email address updated and verified.");
+      try {
+        window.dispatchEvent(new Event("auth-changed"));
+      } catch {
+        /* ignore */
+      }
       await fetchUserData();
     } catch (err) {
       setEmailChangeError(friendlyErr(err, "The verification code is incorrect or expired."));
