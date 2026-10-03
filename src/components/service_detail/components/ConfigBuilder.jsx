@@ -413,11 +413,6 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
   const detectedAppDir = detected.runtime_working_directory
     ? String(detected.runtime_working_directory).replace(/^\/app\/?/, "")
     : "";
-  const setIfEmpty = (key, value) => {
-    if (value == null || value === "" || profile[key] != null) return;
-    patch(key, value);
-  };
-
   return (
     <Stack spacing={1.5}>
       <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
