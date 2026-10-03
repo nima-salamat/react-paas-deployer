@@ -47,6 +47,8 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import LockIcon from "@mui/icons-material/Lock";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
 import PersonIcon from "@mui/icons-material/Person";
+import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import StarIcon from "@mui/icons-material/Star";
 import BrokenImageIcon from "@mui/icons-material/BrokenImage";
@@ -425,6 +427,16 @@ const Profile = ({ embedded = false }) => {
   const [deletePasswordDialogOpen, setDeletePasswordDialogOpen] = useState(false);
   const [previewImageSrc, setPreviewImageSrc] = useState(null);
 
+  // Email changes are handled by the verified contact-change flow.
+  const [emailChangeOpen, setEmailChangeOpen] = useState(false);
+  const [emailChangeStep, setEmailChangeStep] = useState("request");
+  const [emailChangeValue, setEmailChangeValue] = useState("");
+  const [emailChangeCode, setEmailChangeCode] = useState("");
+  const [emailChangeId, setEmailChangeId] = useState("");
+  const [emailChangeDestination, setEmailChangeDestination] = useState("");
+  const [emailChangeLoading, setEmailChangeLoading] = useState(false);
+  const [emailChangeError, setEmailChangeError] = useState("");
+
   const [passwordData, setPasswordData] = useState({
     password: "",
     confirm_password: "",
@@ -559,10 +571,9 @@ const Profile = ({ embedded = false }) => {
   };
 
   const handleUpdateUser = async () => {
+    // Email and phone changes use the verified contact-change endpoint.
     const dataToSend = {
       username: userData.username,
-      email: userData.email,
-      phone_number: userData.phone_number,
       theme: userData.theme,
       color: userData.color,
       birthdate: userData.birthdate
@@ -571,7 +582,7 @@ const Profile = ({ embedded = false }) => {
     };
     try {
       await apiRequest({
-        url: `${API_BASE}user/`,
+        url: API_BASE + "user/",
         method: "PUT",
         data: dataToSend,
       });
@@ -580,6 +591,92 @@ const Profile = ({ embedded = false }) => {
       fetchUserData();
     } catch (err) {
       setError(friendlyErr(err, "Failed to update user"));
+    }
+  };
+
+  const openEmailChangeDialog = () => {
+    setEmailChangeValue(userData.email || "");
+    setEmailChangeCode("");
+    setEmailChangeId("");
+    setEmailChangeDestination("");
+    setEmailChangeError("");
+    setEmailChangeStep("request");
+    setEmailChangeOpen(true);
+  };
+
+  const closeEmailChangeDialog = () => {
+    if (emailChangeLoading) return;
+    setEmailChangeOpen(false);
+    setEmailChangeError("");
+  };
+
+  const requestEmailChange = async () => {
+    const nextEmail = String(emailChangeValue || "").trim().toLowerCase();
+    if (!nextEmail) {
+      setEmailChangeError("Enter the new email address.");
+      return;
+    }
+    if (nextEmail === String(userData.email || "").trim().toLowerCase()) {
+      setEmailChangeError("Enter a different email address.");
+      return;
+    }
+
+    setEmailChangeLoading(true);
+    setEmailChangeError("");
+    try {
+      const response = await apiRequest({
+        url: API_BASE + "user/contact-change/",
+        method: "POST",
+        data: { email: nextEmail },
+      });
+      setEmailChangeId(String(response.data?.change_id || ""));
+      setEmailChangeDestination(String(response.data?.destination || nextEmail));
+      setEmailChangeCode("");
+      setEmailChangeStep("verify");
+    } catch (err) {
+      setEmailChangeError(friendlyErr(err, "Could not send the verification code."));
+    } finally {
+      setEmailChangeLoading(false);
+    }
+  };
+
+  const confirmEmailChange = async () => {
+    const code = String(emailChangeCode || "").trim();
+    if (!emailChangeId) {
+      setEmailChangeError("The email-change request is no longer available. Start again.");
+      setEmailChangeStep("request");
+      return;
+    }
+    if (!code) {
+      setEmailChangeError("Enter the verification code.");
+      return;
+    }
+
+    setEmailChangeLoading(true);
+    setEmailChangeError("");
+    try {
+      await apiRequest({
+        url: API_BASE + "user/contact-change/" + emailChangeId + "/confirm/",
+        method: "POST",
+        data: { code },
+      });
+      const confirmedEmail = String(emailChangeValue || "").trim().toLowerCase();
+      setUserData((prev) => ({
+        ...prev,
+        email: confirmedEmail,
+        email_verified: true,
+      }));
+      setEmailChangeOpen(false);
+      setEmailChangeStep("request");
+      setEmailChangeId("");
+      setEmailChangeCode("");
+      setEmailChangeDestination("");
+      setSuccess("Email address updated and verified.");
+      await fetchUserData();
+    } catch (err) {
+      setEmailChangeError(friendlyErr(err, "The verification code is incorrect or expired."));
+    } finally {
+      setEmailChangeLoading(false);
     }
   };
 
@@ -1159,11 +1256,38 @@ const Profile = ({ embedded = false }) => {
                 label="Email"
                 name="email"
                 value={userData.email}
-                onChange={handleInputChange}
                 fullWidth
-                disabled={!editMode || userData.email_verified}
-                helperText={userData.email_verified ? "Verified — contact support to change" : ""}
+                disabled
                 size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <EmailOutlinedIcon fontSize="small" color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        {userData.email_verified && (
+                          <VerifiedRoundedIcon sx={{ fontSize: 18 }} color="success" />
+                        )}
+                        <Button
+                          size="small"
+                          onClick={openEmailChangeDialog}
+                          disabled={emailChangeLoading}
+                          sx={{ textTransform: "none", minWidth: 0, px: 0.5 }}
+                        >
+                          {userData.email_verified ? "Change" : "Verify / change"}
+                        </Button>
+                      </Stack>
+                    </InputAdornment>
+                  ),
+                }}
+                helperText={
+                  userData.email_verified
+                    ? "Verified. Changing it requires a code sent to the new address."
+                    : "This address is not verified yet. Verify it with a code."
+                }
               />
             </Grid>
             <Grid item xs={12} sm={6}>
@@ -1171,10 +1295,13 @@ const Profile = ({ embedded = false }) => {
                 label="Phone number"
                 name="phone_number"
                 value={userData.phone_number}
-                onChange={handleInputChange}
                 fullWidth
-                disabled={!editMode || userData.phone_number_verified}
-                helperText={userData.phone_number_verified ? "Verified" : ""}
+                disabled
+                helperText={
+                  userData.phone_number_verified
+                    ? "Verified. Contact changes use verification."
+                    : "Contact changes use the verification flow."
+                }
                 size="small"
               />
             </Grid>
@@ -1813,6 +1940,112 @@ const Profile = ({ embedded = false }) => {
           </DialogActions>
         </Dialog>
 
+        {/* Change Email Dialog */}
+        <Dialog
+          open={emailChangeOpen}
+          onClose={closeEmailChangeDialog}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 3 } }}
+        >
+          <DialogTitle sx={{ fontWeight: 800 }}>
+            {emailChangeStep === "request" ? "Change email address" : "Verify new email"}
+          </DialogTitle>
+          <DialogContent>
+            {emailChangeStep === "request" ? (
+              <Stack spacing={1.5} sx={{ mt: 1 }}>
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  Your current email stays unchanged until the new address is verified.
+                </Alert>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  type="email"
+                  label="New email address"
+                  value={emailChangeValue}
+                  onChange={(e) => setEmailChangeValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !emailChangeLoading) {
+                      e.preventDefault();
+                      requestEmailChange();
+                    }
+                  }}
+                  error={Boolean(emailChangeError)}
+                />
+                {emailChangeError && (
+                  <Alert severity="error" sx={{ borderRadius: 2 }}>
+                    {emailChangeError}
+                  </Alert>
+                )}
+              </Stack>
+            ) : (
+              <Stack spacing={1.5} sx={{ mt: 1 }}>
+                <Alert severity="success" icon={<EmailOutlinedIcon />} sx={{ borderRadius: 2 }}>
+                  We sent a verification code to <strong>{emailChangeDestination}</strong>.
+                </Alert>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  label="Verification code"
+                  value={emailChangeCode}
+                  onChange={(e) => setEmailChangeCode(e.target.value.replace(/\s/g, ""))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !emailChangeLoading) {
+                      e.preventDefault();
+                      confirmEmailChange();
+                    }
+                  }}
+                  inputProps={{ inputMode: "numeric", maxLength: 32 }}
+                  error={Boolean(emailChangeError)}
+                  helperText="Enter the code sent to the new email address."
+                />
+                {emailChangeError && (
+                  <Alert severity="error" sx={{ borderRadius: 2 }}>
+                    {emailChangeError}
+                  </Alert>
+                )}
+              </Stack>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+            {emailChangeStep === "verify" && (
+              <Button
+                onClick={() => {
+                  if (!emailChangeLoading) {
+                    setEmailChangeStep("request");
+                    setEmailChangeCode("");
+                    setEmailChangeError("");
+                  }
+                }}
+                disabled={emailChangeLoading}
+                sx={{ textTransform: "none", mr: "auto" }}
+              >
+                Change address
+              </Button>
+            )}
+            <Button
+              onClick={closeEmailChangeDialog}
+              disabled={emailChangeLoading}
+              sx={{ textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              onClick={emailChangeStep === "request" ? requestEmailChange : confirmEmailChange}
+              disabled={emailChangeLoading}
+              sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+            >
+              {emailChangeLoading
+                ? "Working…"
+                : emailChangeStep === "request"
+                ? "Send verification code"
+                : "Verify & update email"}
+            </Button>
+          </DialogActions>
+        </Dialog>
         {/* Set / Change Password Dialog */}
         <Dialog
           open={passwordDialogOpen}
