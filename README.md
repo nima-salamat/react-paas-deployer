@@ -1,7 +1,7 @@
 # React PaaS Deployer
 
 Web dashboard for the self-hosted **PaaS Deployer** platform.  
-Manage services, deploys, volumes, networks, and plans against the Django control plane.
+Manage services, deploys, volumes, networks, plans, and curated Ready Apps against the Django control plane.
 
 Backend:  
 [django-paas-deployer](https://github.com/nima-salamat/django-paas-deployer)
@@ -12,11 +12,12 @@ Backend:
 
 This app is the operator UI for a Docker-based PaaS:
 
-- Sign in (JWT, optional OTP / invite flows from the API)  
-- Browse **plans** and create **services**  
-- Upload **deploys** (ZIP), select a version, start / stop / rebuild  
-- Watch **live logs** and deployment progress over WebSockets  
-- Manage **private networks** and **exclusive volumes** with plan storage quotas  
+- Sign in (JWT, optional OTP / invite flows from the API)
+- Browse **plans** and create **services**
+- Upload **deploys** (ZIP), select a version, start / stop / rebuild
+- Watch **live logs** and deployment progress over WebSockets
+- Manage **private networks** and **exclusive volumes** with plan storage quotas
+- Deploy curated **Ready Apps** through a schema-driven wizard
 - Profile and theme (light / dark / system)
 
 It is built as a responsive SPA so the same workflows work on desktop and mobile.
@@ -33,43 +34,45 @@ Browser (this app)
 Django API  →  Celery  →  Docker
 ```
 
-1. User authenticates; session-bound access/refresh tokens are stored in `localStorage`, and legacy sessionless credentials are cleared.  
-2. API helper refreshes access tokens through the backend session endpoint and retries the original request once after `401`.  
-3. Service list and detail pages poll status and open WS streams when needed.  
-5. Creating a service attaches a network and optional volumes, then deploys run through the backend orchestrator.  
-6. Settings UI enforces the same volume rules as the API (no unsafe edits while a container is running).
+1. User authenticates; session-bound access/refresh tokens are stored in `localStorage`, and legacy sessionless credentials are cleared.
+2. API helper refreshes access tokens through the backend session endpoint and retries the original request once after `401`.
+3. Service list and detail pages poll status and open WS streams when needed.
+4. Creating a service attaches a network and optional volumes, then deploys run through the backend orchestrator.
+5. Ready Apps use the existing catalog/deployment pipeline; the browser never becomes a Docker/Compose execution layer.
+6. Settings UI enforces the same volume rules as the API.
 
 ---
 
 ## Features
 
-- **Home** – product overview and entry points  
-- **Services** – card/list views, filters (app vs database), start/stop, edit dialog  
-- **Service detail** – overview, create/select deploys, live logs, settings (network, volumes, plan)  
-- **Volumes & networks** – dedicated management pages  
-- **Plans** – choose resource plans before creating a service  
-- **Auth** – sign-in / sign-up flow aligned with backend login settings  
-- **Floating navigation** – quick links; mobile service FAB for section switching  
-- **Theming** – light, dark, or system preference  
+- **Home** – product overview and entry points
+- **Services** – card/list views, filters (app vs database), start/stop, edit dialog
+- **Service detail** – overview, create/select deploys, live logs, settings (network, volumes, plan)
+- **Ready Apps** – curated application catalog, schema-driven configuration wizard, resource review and installation workspace
+- **Volumes & networks** – dedicated management pages
+- **Plans** – choose resource plans before creating a service
+- **Auth** – sign-in / sign-up flow aligned with backend login settings
+- **Floating navigation** – quick links; mobile service FAB for section switching
+- **Theming** – light, dark, or system preference
 
 ---
 
 ## Stack
 
-- React 19  
-- Vite 7  
-- React Router 7  
-- MUI 7 (+ icons, date pickers)  
-- Axios  
-- Framer Motion  
-- Emotion  
+- React 19
+- Vite 7
+- React Router 7
+- MUI 7 (+ icons, date pickers)
+- Axios
+- Framer Motion
+- Emotion
 
 ---
 
 ## Requirements
 
-- Node.js 20.19+  
-- A running [django-paas-deployer](https://github.com/nima-salamat/django-paas-deployer) API  
+- Node.js 20.19+
+- A running [django-paas-deployer](https://github.com/nima-salamat/django-paas-deployer) API
 
 ---
 
@@ -114,7 +117,7 @@ From `.env.example`:
 | `VITE_APP_URL` | Canonical frontend URL |
 | `VITE_APP_PREVIEW` | Open Graph / preview image URL |
 
-The client talks to the backend over HTTPS using `VITE_API_BASE` (auth, services, volumes, networks, plans, WebSockets).
+The client talks to the backend over HTTPS using `VITE_API_BASE` (auth, services, volumes, networks, plans, WebSockets and Ready Apps).
 
 ---
 
@@ -132,14 +135,65 @@ The client talks to the backend over HTTPS using `VITE_API_BASE` (auth, services
 | `/profile` | User profile |
 | `/aboutUs` | About |
 
+Dashboard routes include:
+
+| Path | Screen |
+|------|--------|
+| `/dashboard` | Dashboard overview |
+| `/dashboard/ready-apps` | Ready Apps catalog |
+| `/dashboard/ready-apps/:id` | Ready App detail |
+| `/dashboard/ready-apps/installations/:id` | Ready App installation workspace |
+| `/dashboard/services` | Services workspace |
+| `/dashboard/networks` | Networks workspace |
+| `/dashboard/volumes` | Volumes workspace |
+| `/dashboard/plans` | Plans |
+| `/dashboard/tickets` | Tickets |
+| `/dashboard/profile` | Profile |
+
+---
+
+## Ready Apps
+
+Ready Apps are curated, platform-approved application recipes backed by the Django `app_catalog` subsystem.
+
+The frontend flow is:
+
+```
+Ready Apps
+  → Product detail
+  → Configure
+  → Resources
+  → Review
+  → Deploy
+  → Installation workspace
+```
+
+The wizard is generic and schema-driven. Backend field types map to reusable controls, while resource calculations, database plan selection, public hostname policy, validation and installation lifecycle remain server-authoritative.
+
+The frontend does not accept arbitrary Compose files through this workflow and does not contain per-application wizard implementations.
+
+See the full frontend guide in [documentation/ready-apps.md](documentation/ready-apps.md).  
+The backend contract is documented in [django-paas-deployer/documentation/apps/app_catalog/ready-apps.md](https://github.com/nima-salamat/django-paas-deployer/blob/master/documentation/apps/app_catalog/ready-apps.md).
+
 ---
 
 ## UX notes
 
-- **Desktop:** sidebar / full panels for service sections.  
-- **Mobile:** compact header + bottom sheet via a service FAB (mirrored to the global floating nav).  
-- **Volumes:** create, attach, detach, delete; metadata edit only when the backend allows (Docker volume not provisioned / container not running).  
+- **Desktop:** sidebar / full panels for service sections.
+- **Mobile:** compact header + bottom sheet via a service FAB (mirrored to the global floating nav).
+- **Volumes:** create, attach, detach, delete; metadata edit only when the backend allows (Docker volume not provisioned / container not running).
 - **Logs:** service stream + deploy event history with mobile-friendly layout.
+- **Ready Apps:** installation progress belongs to the application workspace; detailed service operations continue in the normal Service Detail screen.
+
+---
+
+## Documentation
+
+Engineering documentation is maintained under [documentation/](documentation/README.md).
+
+The frontend documentation covers routes, component responsibilities, API integration and UI extension rules.
+
+The Django repository is authoritative for backend Ready Apps semantics, including catalog publication, secrets, resources, hostnames, installation state and runtime behavior.
 
 ---
 
@@ -187,4 +241,3 @@ The service-detail regression suite includes source-level contracts for the cent
 For production, the edge proxy should canonicalize the public host (HTTPS and the preferred hostname) before requests reach Node. Keep application routing and SEO redirects at the same canonical URL policy.
 
 Do not add hidden keyword blocks or crawler-only content. The prerendered HTML is the same React UI that users receive, followed by normal client-side bootstrapping.
-
