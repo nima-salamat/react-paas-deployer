@@ -4686,12 +4686,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const selectingRef = useRef(false);
 
   const toggleSelectMessage = (message, forceEnter = false, event = null) => {
-    if (!message?.id || message?.type === "day") return;
+    if (!message?.id || message?.type === "day" || message?.is_system) return;
 
     const id = String(message.id);
 
     if (forceEnter) {
-      // Long-press: select only the pressed message, exactly as Telegram does.
+      // Enter selection mode with exactly one concrete user message.
       setSelectionMode(true);
       selectingRef.current = false;
       selectionAnchorRef.current = id;
@@ -4706,27 +4706,27 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       return;
     }
 
-    // Ctrl/Cmd-click toggles one message; ordinary click in selection mode does
-    // the same. This keeps the selection predictable on desktop and touch.
-    if (!selectionMode) setSelectionMode(true);
+    // Compute the next Set synchronously. Updating selectionMode from inside a
+    // setState updater made the selection transition fragile under React's
+    // batched/concurrent updates, especially when toggling the last selected row.
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
 
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+    if (next.size === 0) {
+      clearSelection();
+      return;
+    }
 
-      if (next.size === 0) {
-        setSelectionMode(false);
-        selectionAnchorRef.current = null;
-      }
-      return next;
-    });
-
+    setSelectionMode(true);
+    setSelectedIds(next);
     selectionAnchorRef.current = id;
   };
 
   const selectRangeByIds = (fromId, toId) => {
-    const ids = messages.filter((m) => m?.id).map((m) => String(m.id));
+    const ids = messages
+      .filter((m) => m?.id && !m?.is_system)
+      .map((m) => String(m.id));
     const a = ids.indexOf(String(fromId));
     const b = ids.indexOf(String(toId));
     if (a < 0 || b < 0) return;
@@ -4743,6 +4743,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     if (!bubble) return;
     const msgId = bubble.getAttribute("data-msg-id");
     if (!msgId) return;
+
+    const target = e.target;
+    if (target?.closest?.("[data-msg-system='1']")) return;
+
     if (selectionMode) {
       selectionAnchorRef.current = msgId;
       selectingRef.current = false;
@@ -4787,6 +4791,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     if (!bubble) return;
     const msgId = bubble.getAttribute("data-msg-id");
     if (!msgId) return;
+    const hitMessage = messages.find((m) => String(m?.id) === String(msgId));
+    if (!hitMessage || hitMessage.is_system) return;
     if (!selectionAnchorRef.current) selectionAnchorRef.current = msgId;
     selectRangeByIds(selectionAnchorRef.current, msgId);
   };
