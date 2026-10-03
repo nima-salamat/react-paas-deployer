@@ -40,8 +40,11 @@ test("toolbar reflects the active block and inline formatting", () => {
   assert.match(source, /Choose code language/);
   assert.match(source, /applyCodeLanguage/);
   assert.match(source, /highlightEditorCode/);
-  assert.match(source, /requestAnimationFrame\(\(\) => highlightEditorCode/);
-  assert.match(source, /px: 0\.75/);
+  assert.match(source, /onKeyUp=\{saveSelection\}/);
+  assert.doesNotMatch(source, /requestAnimationFrame\(\(\) => highlightEditorCode/);
+  assert.match(source, /overflowX: "auto"/);
+  assert.match(source, /WebkitOverflowScrolling: "touch"/);
+  assert.match(source, /minWidth: "max-content"/);
   assert.match(source, /fontSize: "14px"/);
 });
 
@@ -611,3 +614,32 @@ test("moving to an unaligned block resets the typing alignment to explicit left"
   assert.match(source, /if \(block\) \{[\s\S]*currentAlignmentRef\.current = getBlockAlignment\(block\)/);
   assert.match(source, /An unaligned block is[\s\S]*explicitly treated as left/);
 });
+
+
+test("toolbar preserves the editor selection on touch and avoids form submission", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /onPointerDown=\{\(e\) => \{ e\.preventDefault\(\); saveSelection\(\); \}\}/);
+  assert.match(source, /<IconButton type="button"/);
+  assert.match(source, /<Button\ntype="button"/);
+});
+
+test("typing history is coalesced instead of creating one undo snapshot per keystroke", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /const historyInputTimerRef = useRef\(null\)/);
+  assert.match(source, /const scheduleHistory = useCallback/);
+  assert.match(source, /historyInputTimerRef\.current = window\.setTimeout/);
+  assert.match(source, /emit\(false\);\n            scheduleHistory\(\);/);
+  assert.match(source, /onBlur=\{\(\) => \{ saveSelection\(\); commitHistory\(\); emit\(false\); \}\}/);
+});
+
+test("syntax highlighting is not recomputed on every keyup while editing a code block", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  assert.match(source, /onKeyUp=\{saveSelection\}/);
+  assert.match(source, /const highlightEditorCode = useCallback/);
+  assert.match(source, /highlightEditorCode\(code, language\)/);
+  assert.doesNotMatch(source, /onKeyUp=\{\(\) => \{[\s\S]*highlightEditorCode/);
+});
+
