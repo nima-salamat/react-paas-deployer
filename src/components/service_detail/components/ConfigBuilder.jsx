@@ -619,7 +619,8 @@ export default function ConfigBuilder({
   const addEnvironmentPreset = (key) => {
     if (envRows.some((row) => String(row.key || "").trim() === key)) return;
     commitEnvRows([...envRows, { key, value: "" }]);
-  };\n  const removeEnv = (index) =>
+  };
+  const removeEnv = (index) =>
     commitEnvRows(envRows.filter((_, i) => i !== index));
   const patchEnv = (index, patch) =>
     commitEnvRows(
