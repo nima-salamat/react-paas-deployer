@@ -17,7 +17,6 @@ import {
   MenuItem,
   Radio,
   RadioGroup,
-  Select,
   Stack,
   Step,
   StepLabel,
