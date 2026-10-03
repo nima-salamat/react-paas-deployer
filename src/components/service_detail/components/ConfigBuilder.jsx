@@ -108,12 +108,13 @@ const PLATFORM_META = {
     title: "FastAPI runtime",
     fields: [
       ["python_version", "Python version", "3.11"],
-      ["entry_point", "Entry point", "main:app"],
-      ["server_type", "Server type", "uvicorn"],
+      ["entry_point", "Entry point override", "main:app"],
+      ["server_type", "Server mode", "asgi"],
       ["install_command", "Install command", "pip install -r requirements.txt"],
       ["working_directory", "Working directory", "/app"],
       ["port", "Port", "8000"],
-      ["start_command", "Start command override", ""],
+      ["healthcheck_path", "Health check path", "/"],
+      ["start_command", "Start command override", "uvicorn main:app --host 0.0.0.0 --port 8000"],
     ],
   },
   react: {
@@ -315,7 +316,7 @@ function detectInitialFields(config, metaFields = []) {
   return rows;
 }
 
-function ConfigField({ field, config, updateField, removeField, disabled = false }) {
+function ConfigField({ field, config, updateField, removeField, disabled = false, platform = "" }) {
   const [key, label, placeholder] = field;
   const value = config[key];
   const isSelect = [
@@ -326,13 +327,20 @@ function ConfigField({ field, config, updateField, removeField, disabled = false
     "db_connection",
   ].includes(key);
 
+  const pythonPlatform = ["python", "django", "flask", "fastapi"].includes(
+    String(platform || "").toLowerCase()
+  );
   const options =
     key === "public_url_mode"
       ? ["auto", "disabled", "custom"]
       : key === "server_type"
-        ? ["gunicorn", "uvicorn", "uwsgi", "daphne", "asgi", "wsgi"]
+        ? pythonPlatform
+          ? ["asgi", "wsgi"]
+          : ["gunicorn", "uvicorn", "uwsgi", "daphne", "asgi", "wsgi"]
         : key === "package_manager"
-          ? ["npm", "yarn", "pnpm", "bun"]
+          ? pythonPlatform
+            ? ["pip", "poetry", "pipenv"]
+            : ["npm", "yarn", "pnpm", "bun"]
           : key === "front_build_platform"
             ? ["vite", "react", "mix", "nextjs", "nuxt", "node"]
             : key === "db_connection"
