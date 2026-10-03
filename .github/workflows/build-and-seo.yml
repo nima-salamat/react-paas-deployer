@@ -35,6 +35,9 @@ jobs:
       - name: Ticket editor regression tests
         run: npm run test:ticket-editor
 
+      - name: Ready App component import regression tests
+        run: npm run test:ready-apps
+
       - name: Lint
         run: npm run lint
 
