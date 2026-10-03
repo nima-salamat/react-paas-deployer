@@ -444,6 +444,15 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
+  const selectedHasViewOnce = useMemo(
+    () =>
+      Array.from(selectedIds).some((id) =>
+        (messages.find((m) => String(m.id) === String(id))?.attachments || [])
+          .some((att) => att?.is_view_once)
+      ),
+    [messages, selectedIds],
+  );
+
   const [joinCode, setJoinCode] = useState("");
   const [joinOpen, setJoinOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
@@ -5799,15 +5808,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const ctxMsg = ctx?.message;
   const ctxMine = ctxMsg && String(ctxMsg.sender?.id) === String(meId);
-  const selectedHasViewOnce = useMemo(
-    () =>
-      Array.from(selectedIds).some((id) =>
-        (messages.find((m) => String(m.id) === String(id))?.attachments || [])
-          .some((att) => att?.is_view_once)
-      ),
-    [messages, selectedIds],
-  );
-
   // Right panel content (rendered inside the centered modal Dialog below)
   const panelIsOpen = Boolean(rightPanel) && rightPanel !== "my-profile";
 
