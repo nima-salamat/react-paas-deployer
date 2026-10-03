@@ -396,32 +396,29 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
   const detected = inspectResult?.fastapi_profile || {};
   const profile = config.fastapi && typeof config.fastapi === "object" ? config.fastapi : {};
   const patch = (key, value) => {
-    updateConfig((next) => ({ ...next, fastapi: { ...(next.fastapi || {}), [key]: value } }));
+    updateConfig((next) => ({
+      ...next,
+      fastapi: { ...(next.fastapi || {}), [key]: value },
+    }));
   };
-  const remove = (key) => {
-    updateConfig((next) => {
-      const fastapi = { ...(next.fastapi || {}) };
-      delete fastapi[key];
-      const out = { ...next };
-      if (Object.keys(fastapi).length) out.fastapi = fastapi;
-      else delete out.fastapi;
-      return out;
-    });
-  };
-
   const detectedEntry = detected.entrypoint || "";
   const detectedAppDir = detected.runtime_working_directory
     ? String(detected.runtime_working_directory).replace(/^\/app\/?/, "")
     : "";
+  const hasSignals = Boolean(
+    detected.database_drivers?.length || detected.cache_drivers?.length ||
+    detected.task_queues?.length || detected.migration_tools?.length ||
+    detected.auth_libraries?.length || detected.http_clients?.length ||
+    detected.observability?.length || detected.storage_libraries?.length ||
+    detected.middleware?.length || detected.websockets || detected.lifespan
+  );
   return (
     <Stack spacing={1.5}>
       <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} justifyContent="space-between">
+        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }}>
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Detected FastAPI stack</Typography>
-            <Typography variant="caption" color="text.secondary">
-              Runtime-specific settings are optional. PassDeployer owns 0.0.0.0 binding and worker count.
-            </Typography>
+            <Typography variant="caption" color="text.secondary">PassDeployer handles network binding and worker count; these settings tune Uvicorn.</Typography>
           </Box>
           {detectedEntry ? <Chip size="small" color="success" variant="outlined" label={`Detected: ${detectedEntry}`} /> : null}
         </Stack>
@@ -437,32 +434,20 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
           {(detected.middleware || []).map((x) => <Chip key={`mw-${x}`} size="small" label={x} variant="outlined" />)}
           {detected.websockets ? <Chip size="small" label="WebSockets" variant="outlined" /> : null}
           {detected.lifespan ? <Chip size="small" label="Lifespan" variant="outlined" /> : null}
-          {!detected.database_drivers?.length && !detected.cache_drivers?.length && !detected.task_queues?.length && !detected.migration_tools?.length && !detected.auth_libraries?.length && !detected.http_clients?.length && !detected.observability?.length && !detected.storage_libraries?.length && !detected.middleware?.length && !detected.websockets && !detected.lifespan ? (
-            <Typography variant="caption" color="text.secondary">No extra infrastructure signals detected.</Typography>
-          ) : null}
+          {!hasSignals ? <Typography variant="caption" color="text.secondary">No extra infrastructure signals detected.</Typography> : null}
         </Stack>
       </Paper>
-
-      {platform === "fastapi" ? (
-        <FastApiRuntimePanel
-          config={config}
-          updateConfig={updateConfig}
-          disabled={disabled}
-          inspectResult={inspectResult}
-        />
-      ) : null}
-
       <Accordion defaultExpanded disableGutters>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Box><Typography sx={{ fontWeight: 750 }}>FastAPI / Uvicorn</Typography><Typography variant="caption" color="text.secondary">Routing, proxy trust, logging, lifecycle and request limits</Typography></Box>
+          <Box><Typography sx={{ fontWeight: 750 }}>FastAPI / Uvicorn</Typography><Typography variant="caption" color="text.secondary">Entrypoint, proxy trust, routing, logging and graceful shutdown</Typography></Box>
         </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={1.5}>
-            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Entrypoint" value={profile.entrypoint ?? ""} placeholder={detectedEntry || "app.main:app"} onChange={(e) => patch("entrypoint", e.target.value)} disabled={disabled} helperText={detectedEntry ? `Detected ${detectedEntry}; change only for a real application target.` : "Python import target, e.g. app.main:app"} /></Grid>
-            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="App directory" value={profile.app_dir ?? ""} placeholder={detectedAppDir || "src"} onChange={(e) => patch("app_dir", e.target.value)} disabled={disabled} helperText={detectedAppDir ? `Auto-detected source root: ${detectedAppDir}` : "Relative to the deployment root; leave empty for automatic detection."} /></Grid>
-            <Grid item xs={12} md={6}><TextField select fullWidth size="small" label="Log level" value={profile.log_level ?? "info"} onChange={(e) => patch("log_level", e.target.value)} disabled={disabled}><MenuItem value="critical">critical</MenuItem><MenuItem value="error">error</MenuItem><MenuItem value="warning">warning</MenuItem><MenuItem value="info">info</MenuItem><MenuItem value="debug">debug</MenuItem><MenuItem value="trace">trace</MenuItem></TextField></Grid>
-            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Forwarded allow IPs" value={profile.forwarded_allow_ips ?? ""} placeholder="127.0.0.1 or proxy CIDR" onChange={(e) => patch("forwarded_allow_ips", e.target.value)} disabled={disabled} helperText="Used with proxy headers. Avoid * unless every intermediary is trusted." /></Grid>
-            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Root path" value={profile.root_path ?? ""} placeholder="/api" onChange={(e) => patch("root_path", e.target.value)} disabled={disabled} helperText="Only set when the app is mounted below a URL prefix." /></Grid>
+            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Entrypoint" value={profile.entrypoint ?? ""} placeholder={detectedEntry || "app.main:app"} onChange={(e) => patch("entrypoint", e.target.value)} disabled={disabled} helperText={detectedEntry ? `Detected ${detectedEntry}.` : "Python import target, e.g. app.main:app"} /></Grid>
+            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="App directory" value={profile.app_dir ?? ""} placeholder={detectedAppDir || "src"} onChange={(e) => patch("app_dir", e.target.value)} disabled={disabled} helperText={detectedAppDir ? `Auto-detected: ${detectedAppDir}` : "Relative to deployment root; leave empty for automatic detection."} /></Grid>
+            <Grid item xs={12} md={6}><TextField select fullWidth size="small" label="Log level" value={profile.log_level ?? "info"} onChange={(e) => patch("log_level", e.target.value)} disabled={disabled}>{['critical','error','warning','info','debug','trace'].map((value) => <MenuItem value={value} key={value}>{value}</MenuItem>)}</TextField></Grid>
+            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Forwarded allow IPs" value={profile.forwarded_allow_ips ?? ""} placeholder="10.0.0.0/24" onChange={(e) => patch("forwarded_allow_ips", e.target.value)} disabled={disabled} helperText="Only relevant when proxy headers are trusted." /></Grid>
+            <Grid item xs={12} md={6}><TextField fullWidth size="small" label="Root path" value={profile.root_path ?? ""} placeholder="/api" onChange={(e) => patch("root_path", e.target.value)} disabled={disabled} helperText="Set this only when the app is mounted below a URL prefix." /></Grid>
             <Grid item xs={12} md={6}><TextField fullWidth size="small" type="number" label="Keep-alive (seconds)" value={profile.timeout_keep_alive ?? ""} onChange={(e) => patch("timeout_keep_alive", e.target.value)} disabled={disabled} /></Grid>
             <Grid item xs={12} md={6}><TextField fullWidth size="small" type="number" label="Graceful shutdown (seconds)" value={profile.timeout_graceful_shutdown ?? ""} onChange={(e) => patch("timeout_graceful_shutdown", e.target.value)} disabled={disabled} /></Grid>
             <Grid item xs={12} md={6}><TextField fullWidth size="small" type="number" label="Worker healthcheck timeout" value={profile.timeout_worker_healthcheck ?? ""} onChange={(e) => patch("timeout_worker_healthcheck", e.target.value)} disabled={disabled} /></Grid>
@@ -471,13 +456,14 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 1.5 }}>
             <FormControlLabel control={<Checkbox checked={Boolean(profile.proxy_headers)} onChange={(e) => patch("proxy_headers", e.target.checked)} disabled={disabled} />} label="Trust proxy headers" />
             <FormControlLabel control={<Checkbox checked={profile.access_log !== false} onChange={(e) => patch("access_log", e.target.checked)} disabled={disabled} />} label="Access log" />
-            <FormControlLabel control={<Checkbox checked={Boolean(profile.factory)} onChange={(e) => patch("factory", e.target.checked)} disabled={disabled} />} label="Entrypoint is an app factory" />
+            <FormControlLabel control={<Checkbox checked={Boolean(profile.factory)} onChange={(e) => patch("factory", e.target.checked)} disabled={disabled} />} label="Entrypoint is a factory" />
           </Stack>
         </AccordionDetails>
       </Accordion>
-
       <Accordion disableGutters>
-        <AccordionSummary expandIcon={<ExpandMoreIcon />}><Box><Typography sx={{ fontWeight: 750 }}>Traffic limits</Typography><Typography variant="caption" color="text.secondary">Protect the process from unbounded concurrency or request churn</Typography></Box></AccordionSummary>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Box><Typography sx={{ fontWeight: 750 }}>Traffic limits</Typography><Typography variant="caption" color="text.secondary">Optional application-level protection</Typography></Box>
+        </AccordionSummary>
         <AccordionDetails>
           <Grid container spacing={1.5}>
             <Grid item xs={12} md={4}><TextField fullWidth size="small" type="number" label="Concurrency limit" value={profile.limit_concurrency ?? ""} onChange={(e) => patch("limit_concurrency", e.target.value)} disabled={disabled} /></Grid>
@@ -486,10 +472,9 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
           </Grid>
         </AccordionDetails>
       </Accordion>
-
       <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: "background.default" }}>
         <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.55, display: "block" }}>
-          Workers are derived from the selected plan. Hot reload and arbitrary host binding are disabled for production safety. For PostgreSQL, MySQL, MongoDB or Redis, connect a managed database from Service Settings or add the matching application environment variables.
+          Host binding, worker count and hot reload are controlled by PassDeployer for production safety.
         </Typography>
       </Paper>
     </Stack>
@@ -634,7 +619,7 @@ export default function ConfigBuilder({
   const addEnvironmentPreset = (key) => {
     if (envRows.some((row) => String(row.key || "").trim() === key)) return;
     commitEnvRows([...envRows, { key, value: "" }]);
-  };  const removeEnv = (index) =>
+  };\n  const removeEnv = (index) =>
     commitEnvRows(envRows.filter((_, i) => i !== index));
   const patchEnv = (index, patch) =>
     commitEnvRows(
@@ -734,6 +719,15 @@ export default function ConfigBuilder({
           </Grid>
         </AccordionDetails>
       </Accordion>
+
+      {platform === "fastapi" ? (
+        <FastApiRuntimePanel
+          config={config}
+          updateConfig={updateConfig}
+          disabled={disabled}
+          inspectResult={inspectResult}
+        />
+      ) : null}
 
       <Accordion defaultExpanded disableGutters>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
