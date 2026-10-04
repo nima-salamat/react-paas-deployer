@@ -35,6 +35,7 @@ import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import apiRequest from "../customHooks/apiRequest";
 
 const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
