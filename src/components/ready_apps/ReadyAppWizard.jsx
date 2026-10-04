@@ -301,7 +301,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
       });
       const data = response.data || {};
       setInstallation(data);
-      setActiveStep(3);
+      setActiveStep(2);
       setPolling(true);
     } catch (err) {
       const data = err?.response?.data;
@@ -780,7 +780,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           </Button>
         )}
 
-        {activeStep === 3 && !isTerminal && installation?.id && (
+        {activeStep === 2 && installation?.id && !isTerminal && (
           <Button color="warning" variant="outlined" onClick={cancelInstallation}>
             Cancel deployment
           </Button>
