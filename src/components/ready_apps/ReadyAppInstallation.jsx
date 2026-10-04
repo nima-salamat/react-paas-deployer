@@ -234,9 +234,6 @@ export default function ReadyAppInstallation() {
                   <MiscellaneousServicesRoundedIcon color="primary" />
                   <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Managed services</Typography>
                 </Stack>
-                  <MiscellaneousServicesRoundedIcon color="primary" />
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Managed services</Typography>
-                </Stack>
                 <Stack spacing={1}>
                   {(installation.services || []).map((service) => (
                     <Box key={service.service_id} sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
