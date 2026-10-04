@@ -17,6 +17,7 @@ import { Link as RouterLink } from "react-router-dom";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import RocketLaunchOutlinedIcon from "@mui/icons-material/RocketLaunchOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import apiRequest from "../customHooks/apiRequest";
 
 const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
@@ -110,6 +111,17 @@ export default function ReadyApps() {
         <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
           Deploy curated applications with platform-managed services, storage, networking, and health checks.
         </Typography>
+      </Stack>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1} sx={{ mb: 2.5 }}>
+        <Button
+          component={RouterLink}
+          to="/dashboard/ready-apps/installations"
+          variant="outlined"
+          startIcon={<Inventory2OutlinedIcon />}
+          sx={{ borderRadius: 1.8, fontWeight: 800 }}
+        >
+          My Ready Apps
+        </Button>
       </Stack>
 
       {loading ? (
