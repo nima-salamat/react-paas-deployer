@@ -144,8 +144,10 @@ test("Ready Apps use the catalog and deployment workflow instead of a browser-si
   assert.match(wizard, /\/install/);
 });
 
-test("Service workspace keeps central API access, deployment controls, logs and shell isolated by active tab", () => {
+test("Service workspace keeps API, deployment, logs, shell and session-aware transports wired", () => {
   const service = read("src/components/service_detail/ServiceDetail.jsx");
+  const serviceLogs = read("src/components/service_detail/hooks/useServiceLogs.js");
+  const deployLogs = read("src/components/service_detail/hooks/useDeployLogs.js");
 
   assert.match(service, /apiRequest/);
   assert.match(service, /CreateDeployPanel/);
@@ -154,5 +156,7 @@ test("Service workspace keeps central API access, deployment controls, logs and 
   assert.match(service, /SettingsPanel/);
   assert.match(service, /activeTab/);
   assert.match(service, /ServiceErrorAlert/);
-  assert.match(service, /refreshAccessToken|isSessionBoundToken/);
+  for (const transport of [serviceLogs, deployLogs]) {
+    assert.match(transport, /refreshAccessToken|isSessionBoundToken/);
+  }
 });
