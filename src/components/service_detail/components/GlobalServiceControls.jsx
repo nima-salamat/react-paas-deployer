@@ -156,7 +156,6 @@ export default function GlobalServiceControls({
   onCopyFeedback,
   compact = false,
   managedByApplication = false,
-  managedApplicationUrl = "",
   onOpenManagedApplication,
 }) {
   const theme = useTheme();
@@ -278,17 +277,6 @@ export default function GlobalServiceControls({
             >
               {serviceStatusLoadingManual ? "Checking…" : "Refresh status"}
             </Button>
-            {managedApplicationUrl && (
-              <Button
-                component="a"
-                href={managedApplicationUrl}
-                sx={{ display: "none" }}
-                aria-hidden="true"
-                tabIndex={-1}
-              >
-                Application
-              </Button>
-            )}
           </Stack>
         </Stack>
       </Paper>
