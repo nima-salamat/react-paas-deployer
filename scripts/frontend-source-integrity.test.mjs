@@ -69,6 +69,33 @@ test("every local JS/JSX import resolves to a real source file", () => {
   );
 });
 
+test("startup and React runtime recovery boundaries are wired", () => {
+  const index = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const main = fs.readFileSync(path.join(srcRoot, "main.jsx"), "utf8");
+  const rootComponent = fs.readFileSync(path.join(srcRoot, "Root.jsx"), "utf8");
+  const boundaryPath = path.join(srcRoot, "components", "error", "AppErrorBoundary.jsx");
+  const boundary = fs.readFileSync(boundaryPath, "utf8");
+
+  assert.match(index, /__PASSDEPLOYER_BOOT__/);
+  assert.match(index, /unhandledrejection/);
+  assert.match(index, /BOOT_TIMEOUT_MS/);
+  assert.match(index, /app-boot-failed/);
+
+  assert.match(main, /AppErrorBoundary/);
+  assert.match(main, /createRoot\(rootElement\)\.render\(app\)/);
+  assert.match(main, /showError/);
+
+  assert.match(rootComponent, /useBootReady/);
+  assert.match(rootComponent, /<BootReadyMarker \/>/);
+
+  assert.match(boundary, /getDerivedStateFromError/);
+  assert.match(boundary, /componentDidCatch/);
+  assert.match(boundary, /unhandledrejection/);
+  assert.match(boundary, /window\.history\.back/);
+  assert.match(boundary, /window\.location\.assign\(["']\/["']\)/);
+  assert.match(boundary, /Error message/);
+});
+
 test("application route modules referenced by App.jsx are backed by real files", () => {
   const source = fs.readFileSync(path.join(srcRoot, "App.jsx"), "utf8");
   const failures = [];
