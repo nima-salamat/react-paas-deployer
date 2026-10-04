@@ -21,6 +21,7 @@ import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 
 export const SIDEBAR_WIDTH = 232;
 
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
     items: [
       { id: "overview", label: "Overview", path: "/dashboard", icon: DashboardOutlinedIcon },
       { id: "ready-apps", label: "Ready Apps", path: "/dashboard/ready-apps", icon: AppsOutlinedIcon },
+      { id: "my-ready-apps", label: "My Ready Apps", path: "/dashboard/ready-apps/installations", icon: Inventory2OutlinedIcon },
     ],
   },
   {
@@ -58,6 +60,7 @@ const NAV_ITEMS = [
 
 function resolveActiveId(pathname) {
   if (pathname === "/dashboard") return "overview";
+  if (pathname.startsWith("/dashboard/ready-apps/installations")) return "my-ready-apps";
   if (pathname.startsWith("/dashboard/ready-apps")) return "ready-apps";
   if (pathname.startsWith("/dashboard/services")) return "services";
   if (pathname.startsWith("/dashboard/networks")) return "networks";
