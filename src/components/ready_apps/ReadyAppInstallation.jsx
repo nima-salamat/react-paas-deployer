@@ -113,76 +113,60 @@ export default function ReadyAppInstallation() {
     if (!cleanupDeletePending || !id) return undefined;
     let active = true;
 
-    const tryFinishDelete = async () => {
+    const refreshDeleteStatus = async () => {
       try {
         const response = await apiRequest({
           method: "GET",
           url: ROOT + "/installations/" + encodeURIComponent(id) + "/",
         });
         if (!active) return;
+
         const current = response.data;
         setInstallation(current);
 
-        const status = String(current?.status || "").toLowerCase();
-        const services = Array.isArray(current?.services) ? current.services : [];
+        // Deletion is a durable backend intent. Do not issue another DELETE
+        // request on every poll; that used to refresh updated_at continuously
+        // and could prevent the backend reconciliation fallback from detecting
+        // a genuinely stuck deletion.
         const stage = String(current?.stage || "").toLowerCase();
         const deletionPending =
           stage === "deletion_pending" ||
           current?.error_code === "APPLICATION_DELETION_PENDING";
 
-        // A 202 deletion is a durable request, not a terminal response. Keep
-        // retrying the DELETE endpoint until the backend confirms 204/absent.
-        // This also covers FAILED installations; the previous UI only retried
-        // cancelled installations.
-        if (deletionPending || (status === "cancelled" && services.length === 0)) {
-          setDeleting(true);
-          try {
-            const retryResponse = await apiRequest({
-              method: "DELETE",
-              url: ROOT + "/installations/" + encodeURIComponent(id) + "/",
-            });
-            if (active && retryResponse.status !== 202) {
-              setCleanupDeletePending(false);
-              navigate("/dashboard/ready-apps/installations");
-            }
-          } catch (err) {
-            if (active) {
-              // Keep polling for durable cleanup failures instead of turning a
-              // transient resource cleanup error into a dead-end UI state.
-              setError(
-                String(
-                  err?.response?.data?.detail ||
-                    err?.response?.data?.error ||
-                    "Cleanup is still in progress."
-                )
-              );
-              setDeleting(false);
-            }
-          } finally {
-            if (active) setDeleting(false);
+        if (!deletionPending) {
+          const status = String(current?.status || "").toLowerCase();
+          const services = Array.isArray(current?.services) ? current.services : [];
+          if (status === "cancelled" && services.length === 0) {
+            setCleanupDeletePending(false);
+            navigate("/dashboard/ready-apps/installations");
           }
         }
       } catch (err) {
         if (!active) return;
         const statusCode = err?.response?.status;
-        // Once the durable backend cleanup removes the installation, its next
-        // status poll is a normal 404 completion signal rather than an error.
         if (statusCode === 404) {
           setCleanupDeletePending(false);
           navigate("/dashboard/ready-apps/installations");
           return;
         }
-        setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Cleanup status could not be refreshed."));
+        setError(
+          String(
+            err?.response?.data?.detail ||
+              err?.response?.data?.error ||
+              "Cleanup status could not be refreshed."
+          )
+        );
       }
     };
 
-    tryFinishDelete();
-    const timer = window.setInterval(tryFinishDelete, 2000);
+    refreshDeleteStatus();
+    const timer = window.setInterval(refreshDeleteStatus, 2000);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
   }, [cleanupDeletePending, id, navigate]);
+
 
   useEffect(() => {
     if (!polling || !id) return undefined;
