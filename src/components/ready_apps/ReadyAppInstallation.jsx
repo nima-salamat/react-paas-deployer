@@ -324,7 +324,7 @@ export default function ReadyAppInstallation() {
               variant="outlined"
               startIcon={<DeleteOutlineRoundedIcon />}
               onClick={() => setActionDialog("delete")}
-              disabled={deleting || cancelling || (status === "cancelled" && (installation.services || []).length > 0)}
+              disabled={deleting || cancelling}
               sx={{ alignSelf: "flex-start", borderRadius: 1.7 }}
             >
               {deleting ? "Deleting…" : "Delete installation"}
@@ -332,7 +332,7 @@ export default function ReadyAppInstallation() {
           )}
           {status === "cancelled" && (installation.services || []).length > 0 && (
             <Typography variant="caption" color="text.secondary">
-              Cleaning managed services before the installation can be deleted…
+              Remaining managed resources will be cleaned up when the installation is deleted.
             </Typography>
           )}
         </Stack>
