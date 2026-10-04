@@ -125,29 +125,41 @@ export default function ReadyAppInstallation() {
 
         const status = String(current?.status || "").toLowerCase();
         const services = Array.isArray(current?.services) ? current.services : [];
-        if (status === "cancelled" && services.length === 0) {
+        const stage = String(current?.stage || "").toLowerCase();
+        const deletionPending =
+          stage === "deletion_pending" ||
+          current?.error_code === "APPLICATION_DELETION_PENDING";
+
+        // A 202 deletion is a durable request, not a terminal response. Keep
+        // retrying the DELETE endpoint until the backend confirms 204/absent.
+        // This also covers FAILED installations; the previous UI only retried
+        // cancelled installations.
+        if (deletionPending || (status === "cancelled" && services.length === 0)) {
           setDeleting(true);
           try {
-            await apiRequest({
+            const retryResponse = await apiRequest({
               method: "DELETE",
               url: ROOT + "/installations/" + encodeURIComponent(id) + "/",
             });
-            if (active) {
+            if (active && retryResponse.status !== 202) {
               setCleanupDeletePending(false);
               navigate("/dashboard/ready-apps/installations");
             }
           } catch (err) {
             if (active) {
-              setDeleting(false);
-              setCleanupDeletePending(false);
+              // Keep polling for durable cleanup failures instead of turning a
+              // transient resource cleanup error into a dead-end UI state.
               setError(
                 String(
                   err?.response?.data?.detail ||
                     err?.response?.data?.error ||
-                    "The cancelled app could not be removed."
+                    "Cleanup is still in progress."
                 )
               );
+              setDeleting(false);
             }
+          } finally {
+            if (active) setDeleting(false);
           }
         }
       } catch (err) {
