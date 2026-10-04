@@ -330,8 +330,14 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
         if (!active) return;
         const next = response.data;
         setInstallation(next);
-        const terminal = ["running", "failed", "cancelled"].includes(String(next?.status || "").toLowerCase());
-        if (terminal) setPolling(false);
+        const nextStatus = String(next?.status || "").toLowerCase();
+        const cleanupPending =
+          nextStatus === "cancelled" &&
+          Array.isArray(next?.services) &&
+          next.services.length > 0;
+        if (["running", "failed"].includes(nextStatus) || (nextStatus === "cancelled" && !cleanupPending)) {
+          setPolling(false);
+        }
       } catch (err) {
         if (active) setError(errorText(err, "Deployment status could not be refreshed."));
       }
@@ -558,11 +564,12 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                 {resolved.public_endpoints?.length > 0 && (
                   <Box sx={{ p: 1.7, borderRadius: 2.2, border: "1px solid", borderColor: "primary.main", bgcolor: "action.hover" }}>
                     <Typography variant="caption" color="text.secondary">Application address</Typography>
-                    {resolved.public_endpoints.map((endpoint) => (
-                      <Typography key={endpoint.name} sx={{ fontWeight: 850, wordBreak: "break-all" }}>
-                        {endpoint.url}
-                      </Typography>
-                    ))}
+                    <Typography sx={{ fontWeight: 850 }}>
+                      Available after deployment
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      PassDeployer will expose the platform-managed HTTPS address after the application reaches the ready state.
+                    </Typography>
                   </Box>
                 )}
 
