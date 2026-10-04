@@ -56,6 +56,9 @@ jobs:
       - name: Frontend API contract tests
         run: npm run test:api-contracts
 
+      - name: Frontend area contract tests
+        run: npm run test:areas
+
       - name: Lint
         run: npm run lint
 
