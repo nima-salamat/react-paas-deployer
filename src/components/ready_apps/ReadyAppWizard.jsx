@@ -72,8 +72,28 @@ function fieldVisible(field, config) {
 }
 
 function prettyStage(value) {
-  const raw = String(value || "pending").replace(/_/g, " ").trim();
-  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Pending";
+  const key = String(value || "pending").toLowerCase().trim();
+  const labels = {
+    pending: "Waiting to start",
+    dependency_resolution: "Preparing",
+    dispatching_services: "Starting services",
+    preparing: "Preparing",
+    build: "Building the app",
+    building: "Building the app",
+    database: "Setting up the database",
+    runtime: "Starting the app",
+    health: "Checking the app",
+    readiness: "Checking the app",
+    finished: "Finishing up",
+    application_ready: "Ready",
+    cancellation_requested: "Stopping safely",
+    cancellation_cleanup: "Cleaning up",
+    cancelled: "Cancelled",
+    failed: "Deployment failed",
+  };
+  if (labels[key]) return labels[key];
+  const raw = key.replace(/_/g, " ").trim();
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Waiting to start";
 }
 
 function ResourceRow({ icon, label, value }) {
@@ -233,6 +253,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
 
   const updateField = (id, value) => {
     setConfig((current) => ({ ...current, [id]: value }));
+    setResolved(null);
     setError("");
   };
 
@@ -415,6 +436,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               value={name}
               onChange={(event) => {
                 setName(event.target.value);
+                setResolved(null);
                 setError("");
               }}
               autoFocus
