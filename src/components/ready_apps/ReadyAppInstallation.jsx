@@ -172,10 +172,10 @@ export default function ReadyAppInstallation() {
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 } }}>
       <Button
         startIcon={<ArrowBackRoundedIcon />}
-        onClick={() => navigate("/dashboard/ready-apps")}
+        onClick={() => navigate("/dashboard/ready-apps/installations")}
         sx={{ mb: 2 }}
       >
-        Ready Apps
+        My Ready Apps
       </Button>
 
       <Stack spacing={2}>
@@ -183,7 +183,7 @@ export default function ReadyAppInstallation() {
           <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
             <Box>
               <Typography variant="overline" color="primary.main" sx={{ fontWeight: 900 }}>
-                Application installation
+                Ready App
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 900 }}>
                 {installation.name}
@@ -234,11 +234,11 @@ export default function ReadyAppInstallation() {
                   icon={<SecurityRoundedIcon />}
                   sx={{ mb: 1.8, borderRadius: 2 }}
                 >
-                  These services are managed as one application. Use this Ready App workspace for lifecycle actions; direct deletion from Services is intentionally blocked.
+                  This app is managed as one deployment. Changes to its services are handled here so nothing gets out of sync.
                 </Alert>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                   <MiscellaneousServicesRoundedIcon color="primary" />
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Managed services</Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Included services</Typography>
                 </Stack>
                 <Stack spacing={1}>
                   {(installation.services || []).map((service) => (
@@ -259,7 +259,7 @@ export default function ReadyAppInstallation() {
                             onClick={() => navigate("/dashboard/services/" + service.service_id)}
                             sx={{ borderRadius: 1.4 }}
                           >
-                            Open service
+                            View details
                           </Button>
                         </Stack>
                       </Stack>
@@ -283,7 +283,7 @@ export default function ReadyAppInstallation() {
           <Grid item xs={12} md={5}>
             <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
               <CardContent>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Resource allocation</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Resources</Typography>
                 <Stack spacing={1.2} sx={{ mt: 1.5 }}>
                   <Metric icon={<ComputerRoundedIcon />} label="CPU" value={(resources.cpu_vcpu ?? "—") + " vCPU"} />
                   <Metric icon={<MemoryRoundedIcon />} label="RAM" value={(resources.ram_mb ?? "—") + " MB"} />
@@ -291,7 +291,7 @@ export default function ReadyAppInstallation() {
                 </Stack>
                 <Divider sx={{ my: 1.7 }} />
                 <Typography variant="caption" color="text.secondary">
-                  These figures describe the selected plan allocation, not current runtime usage.
+                  These are the limits included with the selected plan. They are not a live usage meter.
                 </Typography>
               </CardContent>
             </Card>
