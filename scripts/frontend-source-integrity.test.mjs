@@ -95,7 +95,7 @@ test("direct axios usage is limited to the audited public-auth/public-plans modu
   for (const file of walk(srcRoot)) {
     const relative = path.relative(root, file);
     const source = fs.readFileSync(file, "utf8");
-    if (/\\baxios(?:\\.|\\s*\\()/.test(source) && !allowed.has(relative)) {
+    if (/\baxios(?:\.|\s*\()/.test(source) && !allowed.has(relative)) {
       failures.push(relative);
     }
   }
