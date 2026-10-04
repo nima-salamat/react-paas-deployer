@@ -16,7 +16,10 @@
     "test:ticket-editor": "node scripts/ticket-editor.test.mjs",
     "test:ready-apps": "node --test scripts/ready-apps.test.mjs",
     "test:plans-admin": "node --test scripts/plans-admin.test.mjs",
-    "test:runtime-bindings": "node --test scripts/react-runtime-bindings.test.mjs"
+    "test:runtime-bindings": "node --test scripts/react-runtime-bindings.test.mjs",
+    "test:source-integrity": "node --test scripts/frontend-source-integrity.test.mjs",
+    "test:domain-contracts": "node --test scripts/frontend-domain-contracts.test.mjs",
+    "test:admin-surface": "node --test scripts/frontend-admin-surface.test.mjs"
   },
   "dependencies": {
     "@babel/core": "^8.0.1",
