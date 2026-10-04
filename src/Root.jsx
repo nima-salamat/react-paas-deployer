@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { CacheProvider } from "@emotion/react";
 import { createEmotionCache } from "./emotionCache";
 
