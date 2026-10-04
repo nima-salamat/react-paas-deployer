@@ -20,7 +20,8 @@
     "test:source-integrity": "node --test scripts/frontend-source-integrity.test.mjs",
     "test:domain-contracts": "node --test scripts/frontend-domain-contracts.test.mjs",
     "test:admin-surface": "node --test scripts/frontend-admin-surface.test.mjs",
-    "test:api-contracts": "node --test scripts/frontend-api-contracts.test.mjs"
+    "test:api-contracts": "node --test scripts/frontend-api-contracts.test.mjs",
+    "test:areas": "node --test scripts/frontend-area-contracts.test.mjs"
   },
   "dependencies": {
     "@babel/core": "^8.0.1",
