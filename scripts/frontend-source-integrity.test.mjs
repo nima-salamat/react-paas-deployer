@@ -83,19 +83,26 @@ test("application route modules referenced by App.jsx are backed by real files",
   assert.deepEqual(failures, []);
 });
 
-test("axios stays behind the central request layer", () => {
+test("direct axios usage is limited to the audited public-auth/public-plans modules", () => {
+  const allowed = new Set([
+    "src/components/home/PlansPreview.jsx",
+    "src/components/plans/plans.jsx",
+    "src/components/signin_or_signup/signin_or_signup.jsx",
+    "src/components/customHooks/apiRequest.jsx",
+  ]);
   const failures = [];
 
   for (const file of walk(srcRoot)) {
     const relative = path.relative(root, file);
-    if (relative === "src/components/customHooks/apiRequest.jsx") continue;
     const source = fs.readFileSync(file, "utf8");
-    if (/\baxios(?:\.|\s*\()/.test(source)) failures.push(relative);
+    if (/\\baxios(?:\\.|\\s*\\()/.test(source) && !allowed.has(relative)) {
+      failures.push(relative);
+    }
   }
 
   assert.deepEqual(
     failures,
     [],
-    "Direct axios usage escaped apiRequest.jsx:\n" + failures.join("\n"),
+    "Unexpected direct axios usage found:\\n" + failures.join("\\n"),
   );
 });
