@@ -41,6 +41,9 @@ jobs:
       - name: Resource Plans admin regression tests
         run: npm run test:plans-admin
 
+      - name: React runtime binding regression tests
+        run: npm run test:runtime-bindings
+
       - name: Lint
         run: npm run lint
 
