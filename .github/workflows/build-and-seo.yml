@@ -44,6 +44,15 @@ jobs:
       - name: React runtime binding regression tests
         run: npm run test:runtime-bindings
 
+      - name: Frontend source integrity tests
+        run: npm run test:source-integrity
+
+      - name: Frontend domain contract tests
+        run: npm run test:domain-contracts
+
+      - name: Frontend admin surface tests
+        run: npm run test:admin-surface
+
       - name: Lint
         run: npm run lint
 
