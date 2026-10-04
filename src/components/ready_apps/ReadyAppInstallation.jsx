@@ -78,6 +78,7 @@ export default function ReadyAppInstallation() {
   const [polling, setPolling] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cleanupDeletePending, setCleanupDeletePending] = useState(false);
   const [actionDialog, setActionDialog] = useState(null);
 
   useEffect(() => {
@@ -107,6 +108,62 @@ export default function ReadyAppInstallation() {
       mounted = false;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!cleanupDeletePending || !id) return undefined;
+    let active = true;
+
+    const tryFinishDelete = async () => {
+      try {
+        const response = await apiRequest({
+          method: "GET",
+          url: ROOT + "/installations/" + encodeURIComponent(id) + "/",
+        });
+        if (!active) return;
+        const current = response.data;
+        setInstallation(current);
+
+        const status = String(current?.status || "").toLowerCase();
+        const services = Array.isArray(current?.services) ? current.services : [];
+        if (status === "cancelled" && services.length === 0) {
+          setDeleting(true);
+          try {
+            await apiRequest({
+              method: "DELETE",
+              url: ROOT + "/installations/" + encodeURIComponent(id) + "/",
+            });
+            if (active) {
+              setCleanupDeletePending(false);
+              navigate("/dashboard/ready-apps/installations");
+            }
+          } catch (err) {
+            if (active) {
+              setDeleting(false);
+              setCleanupDeletePending(false);
+              setError(
+                String(
+                  err?.response?.data?.detail ||
+                    err?.response?.data?.error ||
+                    "The cancelled app could not be removed."
+                )
+              );
+            }
+          }
+        }
+      } catch (err) {
+        if (active) {
+          setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Cleanup status could not be refreshed."));
+        }
+      }
+    };
+
+    tryFinishDelete();
+    const timer = window.setInterval(tryFinishDelete, 2000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [cleanupDeletePending, id, navigate]);
 
   useEffect(() => {
     if (!polling || !id) return undefined;
@@ -162,10 +219,16 @@ export default function ReadyAppInstallation() {
     setError("");
     setActionDialog(null);
     try {
-      await apiRequest({
+      const response = await apiRequest({
         method: "DELETE",
         url: ROOT + "/installations/" + encodeURIComponent(id) + "/",
       });
+      if (response.status === 202 || response.data?.code === "application_cleanup_pending") {
+        setCleanupDeletePending(true);
+        setDeleting(false);
+        setError("");
+        return;
+      }
       navigate("/dashboard/ready-apps/installations");
     } catch (err) {
       setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The Ready App could not be deleted."));
@@ -346,15 +409,15 @@ export default function ReadyAppInstallation() {
               variant="outlined"
               startIcon={<DeleteOutlineRoundedIcon />}
               onClick={() => setActionDialog("delete")}
-              disabled={deleting || cancelling}
+              disabled={deleting || cancelling || cleanupDeletePending}
               sx={{ alignSelf: "flex-start", borderRadius: 1.7 }}
             >
-              {deleting ? "Deleting…" : "Delete installation"}
+              {deleting ? "Deleting…" : cleanupDeletePending ? "Cleaning up…" : "Delete installation"}
             </Button>
           )}
-          {status === "cancelled" && (installation.services || []).length > 0 && (
+          {cleanupDeletePending && (
             <Typography variant="caption" color="text.secondary">
-              Any remaining resources can be cleaned up automatically when you delete this installation.
+              Cleaning up the cancelled app. It will be removed automatically when its resources are safe to delete.
             </Typography>
           )}
         </Stack>
