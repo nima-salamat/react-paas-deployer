@@ -367,6 +367,7 @@ export default function ServiceDetail() {
     section,
     shareAccess.loading,
     urlTab,
+    catalogManaged,
   ]);
 
   useEffect(() => {
@@ -1803,11 +1804,6 @@ export default function ServiceDetail() {
             actions={{ startService, stopService, rebuildService, forceCancelDeploy, checkServiceRunning, openServiceInNewTab }}
             forceCancelLoading={forceCancelLoading}
             managedByApplication={catalogManaged}
-            managedApplicationUrl={
-              service?.application_instance_id
-                ? "/dashboard/ready-apps/installations/" + service.application_instance_id
-                : ""
-            }
             onOpenManagedApplication={
               service?.application_instance_id
                 ? () => navigate("/dashboard/ready-apps/installations/" + service.application_instance_id)
