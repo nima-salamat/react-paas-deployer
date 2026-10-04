@@ -35,8 +35,30 @@ const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replac
 const ROOT = API_ROOT + "/api/application-catalog";
 
 function pretty(value) {
-  const raw = String(value || "pending").replace(/_/g, " ").trim();
-  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Pending";
+  const key = String(value || "pending").toLowerCase().trim();
+  const labels = {
+    pending: "Waiting to start",
+    dependency_resolution: "Preparing",
+    dispatching_services: "Starting services",
+    preparing: "Preparing",
+    build: "Building",
+    building: "Building",
+    database: "Setting up the database",
+    runtime: "Starting the app",
+    health: "Checking the app",
+    readiness: "Checking the app",
+    finished: "Finishing up",
+    application_ready: "Ready",
+    cancellation_requested: "Stopping safely",
+    cancellation_cleanup: "Cleaning up",
+    cancelled: "Cancelled",
+    failed: "Failed",
+    running: "Running",
+    succeeded: "Ready",
+  };
+  if (labels[key]) return labels[key];
+  const raw = key.replace(/_/g, " ").trim();
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Waiting to start";
 }
 
 function statusColor(status) {
@@ -227,7 +249,7 @@ export default function ReadyAppInstallation() {
               <CardContent>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                   <SecurityRoundedIcon color="primary" />
-                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Ready App ownership</Typography>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>About this app</Typography>
                 </Stack>
                 <Alert
                   severity="info"
@@ -332,7 +354,7 @@ export default function ReadyAppInstallation() {
           )}
           {status === "cancelled" && (installation.services || []).length > 0 && (
             <Typography variant="caption" color="text.secondary">
-              Remaining managed resources will be cleaned up when the installation is deleted.
+              Any remaining resources can be cleaned up automatically when you delete this installation.
             </Typography>
           )}
         </Stack>
@@ -346,7 +368,7 @@ export default function ReadyAppInstallation() {
           <DialogTitle sx={{ fontWeight: 900 }}>Cancel this Ready App?</DialogTitle>
           <DialogContent>
             <Typography color="text.secondary">
-              The deployment will stop as safely as possible. After active child deployments reach a terminal state, the platform removes the managed WordPress/database services, their application-owned volumes and network. The installation record remains as a cancelled history entry until you delete it.
+              The deployment will stop as safely as possible. Any app resources created for this installation are cleaned up by the platform, and the installation remains here as history until you delete it.
             </Typography>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
