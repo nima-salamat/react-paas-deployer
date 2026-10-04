@@ -311,20 +311,26 @@ export default function ServiceDetail() {
     return ownerId != null && String(ownerId) === String(meId);
   }, [shareAccess.is_owner, service, meId]);
 
+  const catalogManaged = Boolean(
+    service?.source_kind === "catalog" || service?.application_instance_id
+  );
+
   const allowedTabs = useMemo(() => {
+    if (catalogManaged) {
+      return ["overview", "logs"];
+    }
     if (shareAccess.loading && !effectiveIsOwner) return ["overview"];
     if (effectiveIsOwner || shareAccess.is_owner) {
       return ["overview", "create", "logs", "settings", "shell"];
     }
     const p = shareAccess.permissions || {};
     const tabs = ["overview"];
-    // Create deploy tab only when explicitly allowed to add deploys
     if (p.can_deploy_add) tabs.push("create");
     if (p.can_view_logs || p.can_view_deploy_logs) tabs.push("logs");
     if (p.can_change_config || p.can_network_change || p.can_volume_attach || p.can_volume_add) tabs.push("settings");
     if (p.can_shell) tabs.push("shell");
     return tabs;
-  }, [shareAccess, effectiveIsOwner]);
+  }, [catalogManaged, shareAccess, effectiveIsOwner]);
 
   const urlTab = normalizeServiceTab(section);
 
