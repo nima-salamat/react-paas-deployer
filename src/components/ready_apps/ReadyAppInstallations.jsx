@@ -63,7 +63,7 @@ function StatusSummary({ installation }) {
       <Stack direction="row" spacing={0.6} alignItems="center">
         <CheckCircleRoundedIcon sx={{ fontSize: 17, color: "success.main" }} />
         <Typography variant="caption" color="text.secondary">
-          {services.length} managed service{services.length === 1 ? "" : "s"} ready
+          {services.length} service{services.length === 1 ? "" : "s"} ready
         </Typography>
       </Stack>
     );
@@ -134,7 +134,7 @@ function InstallationCard({ installation, onOpen }) {
           </Stack>
 
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.4 }}>
-            v{installation.software_version || installation.definition_version || "unknown"} · {services.length} managed service{services.length === 1 ? "" : "s"}
+            v{installation.software_version || installation.definition_version || "unknown"} · {services.length} service{services.length === 1 ? "" : "s"}
           </Typography>
 
           <Box sx={{ mt: 1.5 }}>
@@ -164,7 +164,7 @@ function InstallationCard({ installation, onOpen }) {
           endIcon={<ArrowForwardRoundedIcon />}
           sx={{ borderRadius: 1.7, fontWeight: 800 }}
         >
-          Manage application
+          Open app
         </Button>
       </Box>
     </Card>
@@ -234,18 +234,10 @@ export default function ReadyAppInstallations() {
             </Typography>
           </Stack>
           <Typography color="text.secondary" sx={{ mt: 0.55, maxWidth: 760 }}>
-            Manage your curated application installations, their managed services, deployment state, and platform resources from one place.
+            Your deployed Ready Apps, their status, and everything you need to manage them from one place.
           </Typography>
         </Box>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-          <Button
-            component={RouterLink}
-            to="/dashboard/ready-apps"
-            variant="outlined"
-            sx={{ borderRadius: 1.8, fontWeight: 800 }}
-          >
-            Browse catalog
-          </Button>
           <Button
             component={RouterLink}
             to="/dashboard/ready-apps"
@@ -253,7 +245,7 @@ export default function ReadyAppInstallations() {
             startIcon={<AddRoundedIcon />}
             sx={{ borderRadius: 1.8, fontWeight: 850 }}
           >
-            Deploy Ready App
+            Deploy an app
           </Button>
         </Stack>
       </Stack>
@@ -285,10 +277,10 @@ export default function ReadyAppInstallations() {
           <CardContent sx={{ py: 8, textAlign: "center" }}>
             <AppsOutlinedIcon sx={{ fontSize: 42, color: "text.disabled" }} />
             <Typography variant="h6" sx={{ fontWeight: 850, mt: 1 }}>
-              No Ready Apps yet
+              No apps deployed yet
             </Typography>
             <Typography color="text.secondary" sx={{ mt: 0.7 }}>
-              Deploy a curated application and it will appear here as a managed installation.
+              Pick an app from the catalog and it will appear here once you start the deployment.
             </Typography>
             <Button
               component={RouterLink}
@@ -296,7 +288,7 @@ export default function ReadyAppInstallations() {
               variant="contained"
               sx={{ mt: 2, borderRadius: 1.8, fontWeight: 850 }}
             >
-              Browse Ready Apps
+              Browse app catalog
             </Button>
           </CardContent>
         </Card>
