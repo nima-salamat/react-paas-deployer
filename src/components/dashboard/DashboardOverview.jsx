@@ -6,6 +6,7 @@ import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
@@ -19,6 +20,8 @@ import { TICKETS_API, unwrapList } from "../tickets/api.js";
 
 const QUICK_LINKS = [
   ["Services", "/dashboard/services", MiscellaneousServicesOutlinedIcon],
+  ["Ready Apps", "/dashboard/ready-apps", AppsOutlinedIcon],
+  ["My Ready Apps", "/dashboard/ready-apps/installations", AppsOutlinedIcon],
   ["Networks", "/dashboard/networks", LanOutlinedIcon],
   ["Volumes", "/dashboard/volumes", StorageOutlinedIcon],
   ["Tickets", "/dashboard/tickets", ConfirmationNumberOutlinedIcon],
@@ -101,7 +104,7 @@ export default function DashboardOverview() {
     </Box>
     <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
       <Typography variant="h6" sx={{ fontWeight: 850 }}>Quick access</Typography><Typography variant="caption" color="text.secondary">Jump to a workspace area.</Typography>
-      <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: { xs: "repeat(2,minmax(0,1fr))", sm: "repeat(4,minmax(0,1fr))", lg: "repeat(7,minmax(0,1fr))" }, gap: 1 }}>
+      <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: { xs: "repeat(2,minmax(0,1fr))", sm: "repeat(4,minmax(0,1fr))", lg: "repeat(9,minmax(0,1fr))" }, gap: 1 }}>
         {QUICK_LINKS.map(([label,path,Icon]) => <Button key={path} component={RouterLink} to={path} sx={{ minHeight: 68, p: 1, flexDirection: "column", gap: 0.5, border: "1px solid", borderColor: "divider", borderRadius: 2, color: "text.primary" }}><Icon sx={{ color: "primary.main", fontSize: 21 }} /><Typography variant="caption" sx={{ fontWeight: 750 }}>{label}</Typography></Button>)}
       </Box>
     </Paper>
