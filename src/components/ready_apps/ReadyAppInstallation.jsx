@@ -163,9 +163,16 @@ export default function ReadyAppInstallation() {
           }
         }
       } catch (err) {
-        if (active) {
-          setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Cleanup status could not be refreshed."));
+        if (!active) return;
+        const statusCode = err?.response?.status;
+        // Once the durable backend cleanup removes the installation, its next
+        // status poll is a normal 404 completion signal rather than an error.
+        if (statusCode === 404) {
+          setCleanupDeletePending(false);
+          navigate("/dashboard/ready-apps/installations");
+          return;
         }
+        setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Cleanup status could not be refreshed."));
       }
     };
 
