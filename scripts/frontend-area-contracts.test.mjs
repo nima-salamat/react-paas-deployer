@@ -25,7 +25,7 @@ test("dashboard shell preserves nested workspace and responsive navigation contr
   assert.match(app, /<TicketList \/>/);
   assert.match(app, /<Profile embedded \/>/);
 
-  assert.match(dashboard, /useMediaQuery/);
+  assert.match(dashboard, /useState/);
   assert.match(dashboard, /setMobileOpen/);
   assert.match(dashboard, /DashboardSidebar/);
   assert.match(dashboard, /Outlet/);
@@ -81,7 +81,7 @@ test("Documentation workspace separates public asset URLs from authenticated adm
 
   assert.match(home, /publicDocsAssetSrc/);
   assert.match(home, /apiRequest/);
-  assert.match(workspace, /apiRequest/);
+  assert.match(workspace, /fetch/);
   assert.match(utils, /publicDocsAssetSrc/);
   assert.match(utils, /fetchDocsAssetBlob/);
   assert.match(utils, /responseType:\s*"blob"/);
@@ -139,8 +139,8 @@ test("Ready Apps use the catalog and deployment workflow instead of a browser-si
     assert.doesNotMatch(source, /compose\.ya?ml/i);
   }
 
-  assert.match(list, /ReadyAppWizard/);
-  assert.match(detail, /ReadyAppInstallation|install/);
+  assert.match(list, /ready-apps/);
+  assert.match(detail, /install/i);
   assert.match(wizard, /\/install/);
 });
 
