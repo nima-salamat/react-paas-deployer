@@ -53,6 +53,9 @@ jobs:
       - name: Frontend admin surface tests
         run: npm run test:admin-surface
 
+      - name: Frontend API contract tests
+        run: npm run test:api-contracts
+
       - name: Lint
         run: npm run lint
 
