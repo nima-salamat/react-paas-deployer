@@ -15,7 +15,8 @@
     "test:agents": "node --test scripts/agents.test.mjs",
     "test:ticket-editor": "node scripts/ticket-editor.test.mjs",
     "test:ready-apps": "node --test scripts/ready-apps.test.mjs",
-    "test:plans-admin": "node --test scripts/plans-admin.test.mjs"
+    "test:plans-admin": "node --test scripts/plans-admin.test.mjs",
+    "test:runtime-bindings": "node --test scripts/react-runtime-bindings.test.mjs"
   },
   "dependencies": {
     "@babel/core": "^8.0.1",
