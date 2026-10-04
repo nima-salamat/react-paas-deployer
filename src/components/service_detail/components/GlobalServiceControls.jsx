@@ -155,6 +155,9 @@ export default function GlobalServiceControls({
   actions,
   onCopyFeedback,
   compact = false,
+  managedByApplication = false,
+  managedApplicationUrl = "",
+  onOpenManagedApplication,
 }) {
   const theme = useTheme();
   const {
@@ -222,6 +225,75 @@ export default function GlobalServiceControls({
       : "default";
 
   const canOpen = Boolean(service?.service_host || service?.service_name) && !selectedIsDb;
+
+  if (managedByApplication) {
+    return (
+      <Paper
+        elevation={0}
+        sx={{
+          p: compact ? { xs: 1.5, sm: 2 } : { xs: 2, sm: 2.5 },
+          borderRadius: 2.5,
+          mb: compact ? 1.5 : 2.5,
+          border: "1px solid",
+          borderColor: "divider",
+          backgroundImage: (t) =>
+            t.palette.mode === "dark"
+              ? "linear-gradient(145deg, rgba(30,41,59,0.6), rgba(15,23,42,0.8))"
+              : "linear-gradient(145deg, #ffffff, #f8fafc)",
+        }}
+      >
+        <Stack spacing={1.2}>
+          <Stack direction="row" justifyContent="space-between" spacing={1.2} alignItems="flex-start">
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                variant={compact ? "subtitle2" : "h5"}
+                sx={{ fontWeight: 800, lineHeight: 1.25, letterSpacing: "-0.02em" }}
+              >
+                {service?.name || "Service"}
+              </Typography>
+              {!compact && <ServiceIdentity service={service} onCopied={onCopyFeedback} />}
+            </Box>
+            <Chip label={statusLabel} color={statusColor} size={compact ? "small" : "medium"} sx={{ fontWeight: 700, flexShrink: 0 }} />
+          </Stack>
+
+          <Alert severity="info" sx={{ borderRadius: 1.8 }}>
+            This service is part of a Ready App. Lifecycle and resource changes are managed from the application page.
+          </Alert>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            {onOpenManagedApplication && (
+              <Button
+                variant="contained"
+                onClick={onOpenManagedApplication}
+                sx={{ borderRadius: 1.5, fontWeight: 750 }}
+              >
+                Open Ready App
+              </Button>
+            )}
+            <Button
+              variant="outlined"
+              onClick={() => checkServiceRunning(false)}
+              disabled={!service || serviceStatusLoadingManual}
+              sx={{ borderRadius: 1.5, fontWeight: 650 }}
+            >
+              {serviceStatusLoadingManual ? "Checking…" : "Refresh status"}
+            </Button>
+            {managedApplicationUrl && (
+              <Button
+                component="a"
+                href={managedApplicationUrl}
+                sx={{ display: "none" }}
+                aria-hidden="true"
+                tabIndex={-1}
+              >
+                Application
+              </Button>
+            )}
+          </Stack>
+        </Stack>
+      </Paper>
+    );
+  }
 
   return (
     <Paper
