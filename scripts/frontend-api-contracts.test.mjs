@@ -34,7 +34,7 @@ test("Agent API wrapper exposes every lifecycle and credential operation", () =>
     generateManifest: "POST",
   };
 
-  for (const [name, method] of Object.entries(expected)) {
+  for (const name of Object.keys(expected)) {
     assert.ok(
       exportedFunctionNames(source).includes(name),
       "Missing Agent API function: " + name,
