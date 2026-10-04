@@ -280,7 +280,7 @@ export class AppErrorBoundary extends React.Component {
   handleWindowError(event) {
     if (event?.target && event.target !== window) {
       const target = event.target;
-      if (!(target instanceof HTMLScriptElement || target instanceof HTMLModuleScriptElement)) {
+      if (!(target instanceof HTMLScriptElement)) {
         return;
       }
     }
