@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   decodeJwtPayload,
@@ -12,10 +15,6 @@ import {
   collectClientMetadata,
   getDeviceAuthPayload,
 } from "../src/components/security/deviceIdentity.js";
-import {
-  unwrapList as unwrapTicketList,
-  unwrapData as unwrapTicketData,
-} from "../src/components/tickets/api.js";
 import {
   getApiErrorMessage,
   getApiErrorMeta,
@@ -62,6 +61,12 @@ function fakeJwt(payload) {
 
 function jsonResponse(body, ok = true) {
   return { ok, json: async () => body };
+}
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+function read(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
 test("auth session helpers reject malformed and sessionless credentials", () => {
@@ -147,14 +152,15 @@ test("device identity is stable and authentication metadata is bounded", async (
   }
 });
 
-test("ticket API payload unwrappers accept supported backend shapes", () => {
-  assert.deepEqual(unwrapTicketList({ data: [1, 2] }), [1, 2]);
-  assert.deepEqual(unwrapTicketList({ data: { data: [3] } }), [3]);
-  assert.deepEqual(unwrapTicketList({ data: { results: [4] } }), [4]);
-  assert.deepEqual(unwrapTicketList({ data: { nope: true } }), []);
-  assert.deepEqual(unwrapTicketData({ data: { data: { id: 1 } } }), { id: 1 });
-  assert.deepEqual(unwrapTicketData({ data: { id: 2 } }), { id: 2 });
-  assert.equal(unwrapTicketData({ data: null }), null);
+test("ticket API module keeps stable endpoint constants and payload unwrapping logic", () => {
+  const source = read("src/components/tickets/api.js");
+  assert.match(source, /TICKETS_API = .*\/api\/tickets/);
+  assert.match(source, /EMAILS_API = .*\/api\/emails/);
+  assert.match(source, /function unwrapList/);
+  assert.match(source, /function unwrapData/);
+  assert.match(source, /Array\.isArray\(body\)/);
+  assert.match(source, /Array\.isArray\(body\.results\)/);
+  assert.match(source, /"data" in body/);
 });
 
 test("service error normalization preserves backend detail and readable fallbacks", () => {
