@@ -68,10 +68,12 @@ export default function ReadyAppInstallation() {
         });
         if (!mounted) return;
         setInstallation(response.data);
-        const terminal = ["running", "failed", "cancelled"].includes(
-          String(response.data?.status || "").toLowerCase()
-        );
-        setPolling(!terminal);
+        const nextStatus = String(response.data?.status || "").toLowerCase();
+        const cleanupPending =
+          nextStatus === "cancelled" &&
+          Array.isArray(response.data?.services) &&
+          response.data.services.length > 0;
+        setPolling(!["running", "failed"].includes(nextStatus) && !(!cleanupPending && nextStatus === "cancelled"));
       } catch (err) {
         if (!mounted) return;
         setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Installation could not be loaded."));
@@ -95,10 +97,14 @@ export default function ReadyAppInstallation() {
         });
         if (!mounted) return;
         setInstallation(response.data);
-        const terminal = ["running", "failed", "cancelled"].includes(
-          String(response.data?.status || "").toLowerCase()
-        );
-        if (terminal) setPolling(false);
+        const nextStatus = String(response.data?.status || "").toLowerCase();
+        const cleanupPending =
+          nextStatus === "cancelled" &&
+          Array.isArray(response.data?.services) &&
+          response.data.services.length > 0;
+        if (["running", "failed"].includes(nextStatus) || (nextStatus === "cancelled" && !cleanupPending)) {
+          setPolling(false);
+        }
       } catch (err) {
         if (mounted) setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Status refresh failed."));
       }
