@@ -33,7 +33,6 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
 import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
-import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import apiRequest from "../customHooks/apiRequest";
@@ -441,7 +440,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               }}
               autoFocus
               fullWidth
-              helperText="Use a name you'll recognize later. The platform will generate the public address for you."
+              helperText="Use a name you'll recognize later. The public address is assigned automatically after deployment."
             />
 
             {variants.length > 1 && (
@@ -483,17 +482,6 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               />
             ))}
 
-            <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "action.hover", border: "1px solid", borderColor: "divider" }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <PublicRoundedIcon color="primary" />
-                <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>Public address</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    A secure HTTPS address will be generated automatically when the app is deployed.
-                  </Typography>
-                </Box>
-              </Stack>
-            </Box>
           </Stack>
         )}
 
@@ -634,14 +622,6 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                   </Typography>
                 </Box>
 
-                {resolved.public_endpoints?.length > 0 && (
-                  <Box sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
-                    <Typography variant="body2" sx={{ fontWeight: 800 }}>Application address</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Available after the deployment is ready.
-                    </Typography>
-                  </Box>
-                )}
               </>
             )}
           </Stack>
