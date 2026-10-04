@@ -139,10 +139,8 @@ test("Admin dashboard keeps titles, sidebar entries and panel renderers aligned"
 
 test("Admin permission strings used in admin UI belong to the fallback catalog", () => {
   const utils = read("src/components/admin/adminUtils.js");
-  const start = utils.indexOf('"tickets.view"');
-  const end = utils.indexOf('        "docs.manage"', start);
-  assert.ok(start >= 0 && end > start, "Could not locate permission catalog");
-  const catalogBlock = utils.slice(start, end + '"docs.manage"'.length);
+  const catalogBlock = utils.match(/Fallback mirror of backend KNOWN_PERMISSIONS[\s\S]*?\n\s*\];/)?.[0] || "";
+  assert.ok(catalogBlock, "Could not locate permission catalog");
   const catalog = new Set(
     catalogBlock.match(/"([a-z_]+\.[a-z_]+)"/g)?.map((value) => value.slice(1, -1)) || [],
   );
@@ -235,6 +233,7 @@ test("admin-specific security surfaces remain connected to logout and identity s
 test("admin table/profile/session tools have direct action handlers wired in their panels", () => {
   const users = read("src/components/admin/panels/UsersPanel.jsx");
   const tables = read("src/components/admin/panels/TablesPanel.jsx");
+  const fkPicker = read("src/components/admin/components/FKPicker.jsx");
   const sessions = read("src/components/admin/components/AdminUserSessionsDialog.jsx");
 
   for (const marker of [
@@ -250,13 +249,13 @@ test("admin table/profile/session tools have direct action handlers wired in the
 
   for (const marker of [
     "adminTablesApi",
-    "adminTableFKSearchUrl",
     "create",
     "update",
     "delete",
   ]) {
     assert.ok(tables.includes(marker), "Missing tables contract: " + marker);
   }
+  assert.ok(fkPicker.includes("adminTableFKSearchUrl"), "FK picker lost admin lookup helper");
 
   for (const marker of [
     "fetchAdminUserSessions",
