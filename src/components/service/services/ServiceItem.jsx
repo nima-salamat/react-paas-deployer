@@ -1,4 +1,5 @@
 import React, { memo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 import {
   Dialog,
@@ -76,6 +77,7 @@ function ServiceItem({
   );
   const isRunning = status === "running";
   const statusColor = isRunning ? "success" : isUpdating ? "warning" : "default";
+  const isCatalogManaged = String(s?.source_kind || "").toLowerCase() === "catalog" || Boolean(s?.application_instance_id);
 
   const usage = resolveUsage(
     statusEntry
@@ -178,7 +180,7 @@ function ServiceItem({
   const canStart = isReceived ? !!perms.can_start : true;
   const canStop = isReceived ? !!perms.can_stop : true;
   const canRestart = isReceived ? !!perms.can_restart : true;
-  const showStartStop = !isReceived || canStart || canStop;
+  const showStartStop = !isCatalogManaged && (!isReceived || canStart || canStop);
   const [myPermsOpen, setMyPermsOpen] = useState(false);
 
   const actionBtnSx = {
@@ -233,35 +235,54 @@ function ServiceItem({
       >
         Open
       </Button>
-      <Button
-        size="small"
-        variant="outlined"
-        startIcon={<EditIcon fontSize="small" />}
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit?.(s);
-        }}
-        sx={actionBtnSx}
-        disabled={Boolean(shareMeta?.isReceived)}
-      >
-        Edit
-      </Button>
-      <Button
-        size="small"
-        variant="outlined"
-        color="error"
-        startIcon={<DeleteIcon fontSize="small" />}
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete?.(s.id ?? s.pk);
-        }}
-        sx={actionBtnSx}
-        disabled={Boolean(shareMeta?.isReceived)}
-      >
-        Delete
-      </Button>
+      {isCatalogManaged ? (
+        <Button
+          size="small"
+          variant="outlined"
+          color="primary"
+          component={RouterLink}
+          to={s.application_instance_id
+            ? "/dashboard/ready-apps/installations/" + encodeURIComponent(s.application_instance_id)
+            : "/dashboard/ready-apps/installations"}
+          startIcon={<AppsIcon fontSize="small" />}
+          onClick={(e) => e.stopPropagation()}
+          sx={actionBtnSx}
+        >
+          Manage Ready App
+        </Button>
+      ) : (
+        <>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<EditIcon fontSize="small" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit?.(s);
+            }}
+            sx={actionBtnSx}
+            disabled={Boolean(shareMeta?.isReceived)}
+          >
+            Edit
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon fontSize="small" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete?.(s.id ?? s.pk);
+            }}
+            sx={actionBtnSx}
+            disabled={Boolean(shareMeta?.isReceived)}
+          >
+            Delete
+          </Button>
+        </>
+      )}
 
-      {(canRestart && onRestart) && (
+      {(canRestart && onRestart && !isCatalogManaged) && (
         <Button
           size="small"
           variant="outlined"
@@ -290,7 +311,7 @@ function ServiceItem({
           Leave share
         </Button>
       )}
-      {!shareMeta?.isReceived && (
+      {!shareMeta?.isReceived && !isCatalogManaged && (
         <Button
           size="small"
           variant="outlined"
