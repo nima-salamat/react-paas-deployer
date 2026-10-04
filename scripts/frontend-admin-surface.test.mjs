@@ -249,9 +249,10 @@ test("admin table/profile/session tools have direct action handlers wired in the
 
   for (const marker of [
     "adminTablesApi",
-    "create",
-    "update",
-    "delete",
+    "loadTables",
+    "loadRows",
+    "confirmDelete",
+    'method: "DELETE"',
   ]) {
     assert.ok(tables.includes(marker), "Missing tables contract: " + marker);
   }
