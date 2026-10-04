@@ -42,7 +42,7 @@ const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replac
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
 const PLANS_ROOT = API_ROOT + "/plans";
 
-const STEPS = ["Configure", "Resources", "Review", "Deploy"];
+const STEPS = ["Setup", "Resources & review", "Deploy"];
 
 function listFrom(data) {
   if (Array.isArray(data)) return data;
@@ -89,7 +89,7 @@ function ResourceRow({ icon, label, value }) {
 }
 
 function DynamicField({ field, value, onChange, config }) {
-  if (!fieldVisible(field, config)) return null;
+  if (!fieldVisible(field, config) || field?.user_editable === false) return null;
   const id = String(field.id);
   const type = String(field.type || "string");
   const label = String(field.label || id);
@@ -240,7 +240,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
     if (!name.trim()) return "Choose an application name.";
     if (name.trim().length > 50) return "Application name must be 50 characters or fewer.";
     for (const field of variant?.fields || []) {
-      if (!fieldVisible(field, config) || !field.required) continue;
+      if (field?.user_editable === false || !fieldVisible(field, config) || !field.required) continue;
       const value = config[field.id];
       if (value === undefined || value === null || String(value).trim() === "") {
         return field.label + " is required.";
@@ -419,7 +419,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               }}
               autoFocus
               fullWidth
-              helperText="This name becomes part of the platform-managed hostname."
+              helperText="Use a name you'll recognize later. The platform will generate the public address for you."
             />
 
             {variants.length > 1 && (
@@ -465,9 +465,9 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               <Stack direction="row" spacing={1} alignItems="center">
                 <PublicRoundedIcon color="primary" />
                 <Box>
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>Platform hostname</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800 }}>Public address</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Your app gets a managed HTTPS hostname. Custom domains are not part of this workflow yet.
+                    A secure HTTPS address will be generated automatically when the app is deployed.
                   </Typography>
                 </Box>
               </Stack>
@@ -476,161 +476,156 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
         )}
 
         {activeStep === 1 && (
-          <Stack spacing={2}>
+          <Stack spacing={2.2}>
             <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Choose a resource plan</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
+                {resolved ? "Ready to deploy" : "Choose your resources"}
+              </Typography>
               <Typography variant="body2" color="text.secondary">
-                This selection is validated against every managed application and database service.
+                {resolved
+                  ? "Everything below has been checked by the platform. Nothing will be created until you confirm."
+                  : "Pick the plan for this application. PassDeployer checks the whole stack before anything is created."}
               </Typography>
             </Box>
 
-            {plansLoading ? (
-              <Box sx={{ minHeight: 150, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
-            ) : plansError ? (
-              <Alert severity="error" sx={{ borderRadius: 2 }}>{plansError}</Alert>
-            ) : plans.length === 0 ? (
-              <Alert severity="warning" sx={{ borderRadius: 2 }}>
-                No Docker application plans are currently available.
-              </Alert>
-            ) : (
-              <RadioGroup value={String(planId)} onChange={(event) => setPlanId(event.target.value)}>
-                <Stack spacing={1}>
-                  {plans.map((plan) => {
-                    const id = String(plan.id ?? plan.pk ?? plan.uuid);
-                    const selected = id === String(planId);
-                    return (
-                      <Box
-                        key={id}
-                        sx={{
-                          p: 1.6,
-                          borderRadius: 2.2,
-                          border: "1px solid",
-                          borderColor: selected ? "primary.main" : "divider",
-                          bgcolor: selected ? "action.hover" : "transparent",
-                        }}
-                      >
-                        <FormControlLabel
-                          value={id}
-                          control={<Radio />}
-                          sx={{ m: 0, width: "100%", alignItems: "flex-start" }}
-                          label={
-                            <Box sx={{ width: "100%" }}>
-                              <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-                                <Box>
-                                  <Typography sx={{ fontWeight: 850 }}>{plan.name || plan.title || "Plan"}</Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {plan.storage_type || "Storage"} · {plan.plan_type || "APP"}
-                                  </Typography>
-                                </Box>
-                                <Typography variant="body2" color="text.secondary">
-                                  {plan.price_per_hour != null ? plan.price_per_hour + "/hr" : ""}
-                                </Typography>
-                              </Stack>
-                              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 1 }}>
-                                <ResourceRow icon={<ComputerRoundedIcon sx={{ fontSize: 18 }} />} label="CPU" value={plan.max_cpu} />
-                                <ResourceRow icon={<MemoryRoundedIcon sx={{ fontSize: 18 }} />} label="RAM" value={plan.max_ram + " MB"} />
-                                <ResourceRow icon={<StorageRoundedIcon sx={{ fontSize: 18 }} />} label="Storage" value={plan.max_storage + " GB"} />
-                              </Stack>
-                            </Box>
-                          }
-                        />
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              </RadioGroup>
-            )}
-          </Stack>
-        )}
-
-        {activeStep === 2 && (
-          <Stack spacing={2}>
-            {resolveLoading ? (
-              <Box sx={{ minHeight: 150, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
-            ) : !resolved ? (
-              <Alert severity="warning" sx={{ borderRadius: 2 }}>Review is not available yet.</Alert>
-            ) : (
+            {!resolved && (
               <>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <CheckCircleRoundedIcon color="success" />
-                  <Box>
-                    <Typography sx={{ fontWeight: 900 }}>Configuration validated</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      The following values come from the backend planner.
-                    </Typography>
-                  </Box>
-                </Stack>
-
-                {resolved.public_endpoints?.length > 0 && (
-                  <Box sx={{ p: 1.7, borderRadius: 2.2, border: "1px solid", borderColor: "primary.main", bgcolor: "action.hover" }}>
-                    <Typography variant="caption" color="text.secondary">Application address</Typography>
-                    <Typography sx={{ fontWeight: 850 }}>
-                      Available after deployment
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      PassDeployer will expose the platform-managed HTTPS address after the application reaches the ready state.
-                    </Typography>
-                  </Box>
+                {plansLoading ? (
+                  <Box sx={{ minHeight: 150, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
+                ) : plansError ? (
+                  <Alert severity="error" sx={{ borderRadius: 2 }}>{plansError}</Alert>
+                ) : plans.length === 0 ? (
+                  <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                    No application plans are currently available.
+                  </Alert>
+                ) : (
+                  <RadioGroup value={String(planId)} onChange={(event) => setPlanId(event.target.value)}>
+                    <Stack spacing={1}>
+                      {plans.map((plan) => {
+                        const id = String(plan.id ?? plan.pk ?? plan.uuid);
+                        const selected = id === String(planId);
+                        return (
+                          <Box
+                            key={id}
+                            sx={{
+                              p: 1.6,
+                              borderRadius: 2.2,
+                              border: "1px solid",
+                              borderColor: selected ? "primary.main" : "divider",
+                              bgcolor: selected ? "action.hover" : "transparent",
+                              transition: "border-color 140ms ease, background-color 140ms ease",
+                            }}
+                          >
+                            <FormControlLabel
+                              value={id}
+                              control={<Radio />}
+                              sx={{ m: 0, width: "100%", alignItems: "flex-start" }}
+                              label={
+                                <Box sx={{ width: "100%" }}>
+                                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
+                                    <Box>
+                                      <Typography sx={{ fontWeight: 850 }}>
+                                        {plan.name || plan.title || "Plan"}
+                                      </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        {plan.storage_type || "Storage"}
+                                      </Typography>
+                                    </Box>
+                                    {plan.price_per_hour != null && Number(plan.price_per_hour) > 0 && (
+                                      <Typography variant="body2" color="text.secondary">
+                                        {plan.price_per_hour}/hr
+                                      </Typography>
+                                    )}
+                                  </Stack>
+                                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 1 }}>
+                                    <ResourceRow icon={<ComputerRoundedIcon sx={{ fontSize: 18 }} />} label="CPU" value={plan.max_cpu} />
+                                    <ResourceRow icon={<MemoryRoundedIcon sx={{ fontSize: 18 }} />} label="RAM" value={plan.max_ram + " MB"} />
+                                    <ResourceRow icon={<StorageRoundedIcon sx={{ fontSize: 18 }} />} label="Storage" value={plan.max_storage + " GB"} />
+                                  </Stack>
+                                </Box>
+                              }
+                            />
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </RadioGroup>
                 )}
+              </>
+            )}
 
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>Managed components</Typography>
-                  <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
-                    {(resolved.managed_components || []).map((component) => (
-                      <Chip key={component.label} label={component.label} variant="outlined" />
-                    ))}
+            {resolved && (
+              <>
+                <Box
+                  sx={{
+                    p: 1.7,
+                    borderRadius: 2.2,
+                    border: "1px solid",
+                    borderColor: "primary.main",
+                    bgcolor: "action.hover",
+                  }}
+                >
+                  <Stack direction="row" spacing={1.1} alignItems="flex-start">
+                    <CheckCircleRoundedIcon color="success" />
+                    <Box>
+                      <Typography sx={{ fontWeight: 900 }}>Configuration checked</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {name.trim()} will be deployed with the selected plan.
+                      </Typography>
+                    </Box>
                   </Stack>
                 </Box>
+
+                {resolved.managed_components?.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>
+                      Included
+                    </Typography>
+                    <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
+                      {resolved.managed_components.map((component) => (
+                        <Chip key={component.label} label={component.label} variant="outlined" />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
 
                 <Divider />
 
                 <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>Resource allocation</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>
+                    Resources
+                  </Typography>
                   <Stack spacing={0.9}>
-                    <ResourceRow icon={<ComputerRoundedIcon sx={{ fontSize: 18 }} />} label="CPU allocation" value={resolved.resource_summary.cpu_vcpu + " vCPU"} />
-                    <ResourceRow icon={<MemoryRoundedIcon sx={{ fontSize: 18 }} />} label="RAM allocation" value={resolved.resource_summary.ram_mb + " MB"} />
-                    <ResourceRow icon={<StorageRoundedIcon sx={{ fontSize: 18 }} />} label="Persistent storage" value={resolved.resource_summary.storage_mb + " MB"} />
-                    <Typography variant="caption" color="text.secondary">
-                      Allocation reflects plan limits for the managed child services; it is not a live consumption meter.
-                    </Typography>
-                    <Stack spacing={0.8} sx={{ mt: 1.2 }}>
-                      {(resolved.resource_summary.services || []).map((service) => (
-                        <Box
-                          key={service.name}
-                          sx={{
-                            p: 1.2,
-                            borderRadius: 1.8,
-                            border: "1px solid",
-                            borderColor: "divider",
-                            bgcolor: "background.paper",
-                          }}
-                        >
-                          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={0.6}>
-                            <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                              {service.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {service.plan?.name || "Plan"} · {service.cpu_vcpu} vCPU · {service.ram_mb} MB RAM · {service.storage_mb} MB storage
-                            </Typography>
-                          </Stack>
-                        </Box>
-                      ))}
-                    </Stack>
+                    <ResourceRow icon={<ComputerRoundedIcon sx={{ fontSize: 18 }} />} label="CPU" value={resolved.resource_summary.cpu_vcpu + " vCPU"} />
+                    <ResourceRow icon={<MemoryRoundedIcon sx={{ fontSize: 18 }} />} label="RAM" value={resolved.resource_summary.ram_mb + " MB"} />
+                    <ResourceRow icon={<StorageRoundedIcon sx={{ fontSize: 18 }} />} label="Storage" value={resolved.resource_summary.storage_mb + " MB"} />
                   </Stack>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.8 }}>
+                    These are the reserved plan limits for the application, not live usage.
+                  </Typography>
                 </Box>
 
                 <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "action.hover" }}>
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>Sensitive values</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 800 }}>Platform-managed settings</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Database credentials are generated and stored by the platform. They are never included in this review.
+                    Networking, HTTPS, database credentials, and service wiring are configured automatically.
                   </Typography>
                 </Box>
+
+                {resolved.public_endpoints?.length > 0 && (
+                  <Box sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
+                    <Typography variant="body2" sx={{ fontWeight: 800 }}>Application address</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Available after the deployment is ready.
+                    </Typography>
+                  </Box>
+                )}
               </>
             )}
           </Stack>
         )}
 
-        {activeStep === 3 && (
+        {activeStep === 2 && (
           <Stack spacing={2}>
             <Box sx={{ textAlign: "center", py: 1 }}>
               {installation?.status === "running" ? (
@@ -740,7 +735,10 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
 
         {activeStep === 1 && (
           <>
-            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => setActiveStep(0)} disabled={resolveLoading}>
+            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => {
+              setResolved(null);
+              setActiveStep(0);
+            }} disabled={resolveLoading}>
               Back
             </Button>
             <Button
@@ -748,15 +746,15 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               endIcon={<ArrowForwardRoundedIcon />}
               disabled={!canAdvanceFromResources}
               onClick={async () => {
-                if (await resolvePlan()) setActiveStep(2);
+                if (resolved || await resolvePlan()) setActiveStep(2);
               }}
             >
-              Review
+              {resolved ? "Continue to deploy" : "Check & continue"}
             </Button>
           </>
         )}
 
-        {activeStep === 2 && (
+        {activeStep === 2 && !installation?.id && (
           <>
             <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => setActiveStep(1)} disabled={installing}>
               Back
@@ -772,7 +770,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           </>
         )}
 
-        {activeStep === 3 && isTerminal && installation?.id && (
+        {activeStep === 2 && installation?.id && isTerminal && (
           <Button
             variant="contained"
             onClick={() => onOpenInstallation(String(installation.id))}
