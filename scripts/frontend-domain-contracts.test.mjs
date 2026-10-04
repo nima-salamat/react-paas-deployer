@@ -102,35 +102,48 @@ test("device identity is stable and authentication metadata is bounded", async (
   assert.ok(first.length > 0);
   assert.equal(values.size, 1);
 
-  const originalNavigator = globalThis.navigator;
-  Object.defineProperty(globalThis, "navigator", {
-    configurable: true,
-    value: {
-      language: "x".repeat(200),
-      platform: "x".repeat(200),
-      hardwareConcurrency: 16,
-      maxTouchPoints: 2,
-      userAgentData: {
-        mobile: true,
-        platform: "Browser",
-        brands: [{ brand: "Test", version: "1" }],
+  const originalNavigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  let navigatorWasMocked = false;
+  try {
+    Object.defineProperty(globalThis, "navigator", {
+      configurable: true,
+      value: {
+        language: "x".repeat(200),
+        platform: "x".repeat(200),
+        hardwareConcurrency: 16,
+        maxTouchPoints: 2,
+        userAgentData: {
+          mobile: true,
+          platform: "Browser",
+          brands: [{ brand: "Test", version: "1" }],
+        },
       },
-    },
-  });
+    });
+    navigatorWasMocked = true;
+  } catch {
+    // Some Node runtimes expose a non-configurable navigator; use the real one.
+  }
 
   try {
     const metadata = collectClientMetadata();
-    assert.equal(metadata.locale.length, 64);
-    assert.equal(metadata.platform_hint.length, 64);
-    assert.equal(metadata.mobile, true);
+    if (navigatorWasMocked) {
+      assert.equal(metadata.locale.length, 64);
+      assert.equal(metadata.platform_hint.length, 64);
+      assert.equal(metadata.mobile, true);
+    }
 
     const payload = await getDeviceAuthPayload(storage);
     assert.equal(payload.device_id, first);
     assert.equal(typeof payload.client_signature, "string");
     assert.equal(typeof payload.client_metadata, "object");
   } finally {
-    if (originalNavigator === undefined) delete globalThis.navigator;
-    else Object.defineProperty(globalThis, "navigator", { configurable: true, value: originalNavigator });
+    if (navigatorWasMocked) {
+      if (originalNavigatorDescriptor) {
+        Object.defineProperty(globalThis, "navigator", originalNavigatorDescriptor);
+      } else {
+        delete globalThis.navigator;
+      }
+    }
   }
 });
 
