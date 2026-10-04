@@ -7,6 +7,10 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   LinearProgress,
   Container,
   Divider,
@@ -18,6 +22,8 @@ import {
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
 import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
@@ -49,6 +55,8 @@ export default function ReadyAppInstallation() {
   const [error, setError] = useState("");
   const [polling, setPolling] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [actionDialog, setActionDialog] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -105,6 +113,7 @@ export default function ReadyAppInstallation() {
   const cancel = async () => {
     setCancelling(true);
     setError("");
+    setActionDialog(null);
     try {
       const response = await apiRequest({
         method: "POST",
@@ -117,6 +126,23 @@ export default function ReadyAppInstallation() {
       setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Cancellation failed."));
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const deleteInstallation = async () => {
+    setDeleting(true);
+    setError("");
+    setActionDialog(null);
+    try {
+      await apiRequest({
+        method: "DELETE",
+        url: ROOT + "/installations/" + encodeURIComponent(id) + "/",
+      });
+      navigate("/dashboard/ready-apps/installations");
+    } catch (err) {
+      setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The Ready App could not be deleted."));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -194,6 +220,20 @@ export default function ReadyAppInstallation() {
             <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
               <CardContent>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                  <SecurityRoundedIcon color="primary" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Ready App ownership</Typography>
+                </Stack>
+                <Alert
+                  severity="info"
+                  icon={<SecurityRoundedIcon />}
+                  sx={{ mb: 1.8, borderRadius: 2 }}
+                >
+                  These services are managed as one application. Use this Ready App workspace for lifecycle actions; direct deletion from Services is intentionally blocked.
+                </Alert>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                  <MiscellaneousServicesRoundedIcon color="primary" />
+                  <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Managed services</Typography>
+                </Stack>
                   <MiscellaneousServicesRoundedIcon color="primary" />
                   <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Managed services</Typography>
                 </Stack>
@@ -261,18 +301,78 @@ export default function ReadyAppInstallation() {
           </Alert>
         )}
 
-        {!["running", "failed", "cancelled"].includes(status) && (
-          <Button
-            color="warning"
-            variant="outlined"
-            startIcon={<CancelOutlinedIcon />}
-            onClick={cancel}
-            disabled={cancelling}
-            sx={{ alignSelf: "flex-start", borderRadius: 1.7 }}
-          >
-            {cancelling ? "Cancelling…" : "Cancel deployment"}
-          </Button>
-        )}
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1} alignItems={{ xs: "stretch", sm: "center" }}>
+          {!["running", "failed", "cancelled"].includes(status) && (
+            <Button
+              color="warning"
+              variant="outlined"
+              startIcon={<CancelOutlinedIcon />}
+              onClick={() => setActionDialog("cancel")}
+              disabled={cancelling || deleting}
+              sx={{ alignSelf: "flex-start", borderRadius: 1.7 }}
+            >
+              {cancelling ? "Cancelling…" : "Cancel deployment"}
+            </Button>
+          )}
+
+          {["running", "failed", "cancelled"].includes(status) && (
+            <Button
+              color="error"
+              variant="outlined"
+              startIcon={<DeleteOutlineRoundedIcon />}
+              onClick={() => setActionDialog("delete")}
+              disabled={deleting || cancelling || (status === "cancelled" && (installation.services || []).length > 0)}
+              sx={{ alignSelf: "flex-start", borderRadius: 1.7 }}
+            >
+              {deleting ? "Deleting…" : "Delete installation"}
+            </Button>
+          )}
+          {status === "cancelled" && (installation.services || []).length > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              Cleaning managed services before the installation can be deleted…
+            </Typography>
+          )}
+        </Stack>
+
+        <Dialog
+          open={actionDialog === "cancel"}
+          onClose={() => !cancelling && setActionDialog(null)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 900 }}>Cancel this Ready App?</DialogTitle>
+          <DialogContent>
+            <Typography color="text.secondary">
+              The deployment will stop as safely as possible. After active child deployments reach a terminal state, the platform removes the managed WordPress/database services, their application-owned volumes and network. The installation record remains as a cancelled history entry until you delete it.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setActionDialog(null)} disabled={cancelling}>Keep deployment</Button>
+            <Button color="warning" variant="contained" onClick={cancel} disabled={cancelling}>
+              Cancel and clean up
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={actionDialog === "delete"}
+          onClose={() => !deleting && setActionDialog(null)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ fontWeight: 900 }}>Delete this Ready App installation?</DialogTitle>
+          <DialogContent>
+            <Typography color="text.secondary">
+              This removes the installation record and any remaining managed resources. This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 2 }}>
+            <Button onClick={() => setActionDialog(null)} disabled={deleting}>Keep installation</Button>
+            <Button color="error" variant="contained" onClick={deleteInstallation} disabled={deleting}>
+              Delete installation
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Stack>
     </Container>
   );
