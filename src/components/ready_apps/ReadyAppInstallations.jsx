@@ -48,7 +48,15 @@ function statusColor(status) {
   if (value === "running") return "success";
   if (value === "failed") return "error";
   if (value === "cancelled") return "warning";
+  if (value === "deletion_pending") return "warning";
   return "default";
+}
+
+function isDeletionPending(installation) {
+  return (
+    String(installation?.stage || "").toLowerCase() === "deletion_pending" ||
+    installation?.error_code === "APPLICATION_DELETION_PENDING"
+  );
 }
 
 function StatusSummary({ installation }) {
@@ -90,6 +98,7 @@ function StatusSummary({ installation }) {
 
 function InstallationCard({ installation, onOpen }) {
   const status = String(installation?.status || "pending").toLowerCase();
+  const deleting = isDeletionPending(installation);
   const services = installation?.services || [];
   const url = installation?.application_url || "";
 
@@ -127,8 +136,8 @@ function InstallationCard({ installation, onOpen }) {
             </Box>
             <Chip
               size="small"
-              label={pretty(status)}
-              color={statusColor(status)}
+              label={deleting ? "Cleaning up" : pretty(status)}
+              color={deleting ? "warning" : statusColor(status)}
               sx={{ fontWeight: 800, flexShrink: 0 }}
             />
           </Stack>
@@ -141,7 +150,7 @@ function InstallationCard({ installation, onOpen }) {
             <StatusSummary installation={installation} />
           </Box>
 
-          {url && status === "running" && (
+          {url && status === "running" && !deleting && (
             <Stack direction="row" spacing={0.6} alignItems="center" sx={{ mt: 1.3, minWidth: 0 }}>
               <LaunchRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
               <Typography
@@ -207,7 +216,12 @@ export default function ReadyAppInstallations() {
   }, [load]);
 
   const activeInstallations = useMemo(
-    () => installations.filter((item) => !TERMINAL.has(String(item?.status || "").toLowerCase())),
+    () =>
+      installations.filter(
+        (item) =>
+          !TERMINAL.has(String(item?.status || "").toLowerCase()) ||
+          isDeletionPending(item)
+      ),
     [installations]
   );
 
