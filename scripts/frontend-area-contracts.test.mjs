@@ -172,11 +172,14 @@ test("Ready App deletion uses durable backend state without repeat DELETE pollin
   assert.match(detail, /setInterval\(refreshDeleteStatus, 2000\)/);
   assert.match(detail, /statusCode === 404/);
 
-  const cleanupPoll = detail.match(
-    /const refreshDeleteStatus = async \(\) =>[\s\S]*?const timer = window\.setInterval\(refreshDeleteStatus, 2000\)/
+  const pollerStart = detail.indexOf("const refreshDeleteStatus = async () =>");
+  const pollerEnd = detail.indexOf("const timer = window.setInterval(refreshDeleteStatus, 2000)");
+  assert.ok(pollerStart >= 0, "Ready App cleanup poller must remain present");
+  assert.ok(pollerEnd > pollerStart, "Ready App cleanup poller must have a stable interval");
+  assert.doesNotMatch(
+    detail.slice(pollerStart, pollerEnd),
+    /method:\s*"DELETE"/
   );
-  assert.ok(cleanupPoll, "Ready App cleanup poller must remain present");
-  assert.doesNotMatch(cleanupPoll[0], /method:\s*"DELETE"/);
 
   assert.match(list, /function isDeletionPending/);
   assert.match(list, /Cleaning up/);
