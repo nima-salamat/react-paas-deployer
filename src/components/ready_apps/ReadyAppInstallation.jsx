@@ -101,7 +101,7 @@ export default function ReadyAppInstallation() {
             response.data.services.length > 0);
         setCleanupDeletePending(cleanupPending);
         setPolling(
-          cleanupPending ||
+          !cleanupPending &&
           (!["running", "failed"].includes(nextStatus) &&
             !(nextStatus === "cancelled" && !cleanupPending))
         );
@@ -198,7 +198,7 @@ export default function ReadyAppInstallation() {
             Array.isArray(response.data?.services) &&
             response.data.services.length > 0);
         setCleanupDeletePending(cleanupPending);
-        if (["running", "failed"].includes(nextStatus) && !cleanupPending) {
+        if (cleanupPending || ["running", "failed"].includes(nextStatus)) {
           setPolling(false);
         }
       } catch (err) {
