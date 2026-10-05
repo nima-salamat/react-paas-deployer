@@ -92,11 +92,19 @@ export default function ReadyAppInstallation() {
         if (!mounted) return;
         setInstallation(response.data);
         const nextStatus = String(response.data?.status || "").toLowerCase();
+        const nextStage = String(response.data?.stage || "").toLowerCase();
         const cleanupPending =
-          nextStatus === "cancelled" &&
-          Array.isArray(response.data?.services) &&
-          response.data.services.length > 0;
-        setPolling(!["running", "failed"].includes(nextStatus) && !(!cleanupPending && nextStatus === "cancelled"));
+          nextStage === "deletion_pending" ||
+          response.data?.error_code === "APPLICATION_DELETION_PENDING" ||
+          (nextStatus === "cancelled" &&
+            Array.isArray(response.data?.services) &&
+            response.data.services.length > 0);
+        setCleanupDeletePending(cleanupPending);
+        setPolling(
+          cleanupPending ||
+          (!["running", "failed"].includes(nextStatus) &&
+            !(nextStatus === "cancelled" && !cleanupPending))
+        );
       } catch (err) {
         if (!mounted) return;
         setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Installation could not be loaded."));
@@ -180,11 +188,17 @@ export default function ReadyAppInstallation() {
         if (!mounted) return;
         setInstallation(response.data);
         const nextStatus = String(response.data?.status || "").toLowerCase();
+        const nextStage = String(response.data?.stage || "").toLowerCase();
+        const deletionPending =
+          nextStage === "deletion_pending" ||
+          response.data?.error_code === "APPLICATION_DELETION_PENDING";
         const cleanupPending =
-          nextStatus === "cancelled" &&
-          Array.isArray(response.data?.services) &&
-          response.data.services.length > 0;
-        if (["running", "failed"].includes(nextStatus) || (nextStatus === "cancelled" && !cleanupPending)) {
+          deletionPending ||
+          (nextStatus === "cancelled" &&
+            Array.isArray(response.data?.services) &&
+            response.data.services.length > 0);
+        setCleanupDeletePending(cleanupPending);
+        if (["running", "failed"].includes(nextStatus) && !cleanupPending) {
           setPolling(false);
         }
       } catch (err) {
@@ -234,6 +248,10 @@ export default function ReadyAppInstallation() {
       }
       navigate("/dashboard/ready-apps/installations");
     } catch (err) {
+      if (err?.response?.status === 404) {
+        navigate("/dashboard/ready-apps/installations");
+        return;
+      }
       setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The Ready App could not be deleted."));
     } finally {
       setDeleting(false);
@@ -254,6 +272,11 @@ export default function ReadyAppInstallation() {
   }
 
   const status = String(installation.status || "pending").toLowerCase();
+  const stage = String(installation.stage || "").toLowerCase();
+  const deletionPending =
+    cleanupDeletePending ||
+    stage === "deletion_pending" ||
+    installation.error_code === "APPLICATION_DELETION_PENDING";
   const resources = installation.resource_summary || {};
 
   return (
@@ -283,7 +306,7 @@ export default function ReadyAppInstallation() {
               </Stack>
             </Box>
 
-            {installation.application_url && status === "running" && (
+            {installation.application_url && status === "running" && !deletionPending && (
               <Button
                 variant="contained"
                 startIcon={<OpenInNewRoundedIcon />}
@@ -297,11 +320,17 @@ export default function ReadyAppInstallation() {
             )}
           </Stack>
 
-          {!["running", "failed", "cancelled"].includes(status) && (
+          {!deletionPending && !["running", "failed", "cancelled"].includes(status) && (
             <Box sx={{ mt: 2 }}>
               <LinearDeploymentState stage={installation.stage} />
             </Box>
           )}
+
+          {deletionPending ? (
+            <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>
+              This installation is being cleaned up and will disappear from My Ready Apps when all managed resources are safely removed.
+            </Alert>
+          ) : null}
 
           {installation.error_message && (
             <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>{installation.error_message}</Alert>
