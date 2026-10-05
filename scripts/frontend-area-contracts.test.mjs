@@ -160,3 +160,24 @@ test("Service workspace keeps API, deployment, logs, shell and session-aware tra
     assert.match(transport, /refreshAccessToken|isSessionBoundToken/);
   }
 });
+
+
+test("Ready App deletion uses durable backend state without repeat DELETE polling", () => {
+  const detail = read("src/components/ready_apps/ReadyAppInstallation.jsx");
+  const list = read("src/components/ready_apps/ReadyAppInstallations.jsx");
+
+  assert.match(detail, /deletion_pending/);
+  assert.match(detail, /APPLICATION_DELETION_PENDING/);
+  assert.match(detail, /cleanupDeletePending/);
+  assert.match(detail, /setInterval\(refreshDeleteStatus, 2000\)/);
+  assert.match(detail, /statusCode === 404/);
+
+  const cleanupPoller = detail.split("const refreshDeleteStatus = async () =>", 1)[1].split(
+    "const timer = window.setInterval(refreshDeleteStatus, 2000)",
+    1
+  )[0];
+  assert.doesNotMatch(cleanupPoller, /method:\s*"DELETE"/);
+
+  assert.match(list, /function isDeletionPending/);
+  assert.match(list, /Cleaning up/);
+});
