@@ -21,3 +21,21 @@ testFn("Ready App detail has no undeclared IconButton reference", () => {
 
   assert.doesNotMatch(source, /<IconButton\b/);
 });
+
+
+testFn("Ready Apps catalog remains backend-driven and does not hard-code a WordPress allowlist", () => {
+  const source = read("src/components/ready_apps/ReadyApps.jsx");
+
+  assert.match(source, /\/api\/application-catalog/);
+  assert.match(source, /\/apps\//);
+  assert.match(source, /setApps\(normalizeList\(response\.data\)\)/);
+  assert.doesNotMatch(source, /(?:if|filter|find).*wordpress/i);
+});
+
+testFn("Ready Apps catalog accepts both plain arrays and paginated results", () => {
+  const source = read("src/components/ready_apps/ReadyApps.jsx");
+
+  assert.match(source, /function normalizeList\(data\)/);
+  assert.match(source, /if \(Array\.isArray\(data\)\) return data/);
+  assert.match(source, /Array\.isArray\(data\?\.results\)/);
+});
