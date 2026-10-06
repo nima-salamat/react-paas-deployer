@@ -283,7 +283,7 @@ export default function ReadyAppInstallation() {
       validRows.map(async (item) => {
         const response = await apiRequest({
           method: "POST",
-          url: API_ROOT + "/services/service_status/",
+          url: API_ROOT + "/api/services/service_status/",
           data: { service_id: item.service_id },
         });
         return {
