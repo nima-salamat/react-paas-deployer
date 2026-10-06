@@ -121,3 +121,20 @@ test("agent create dialog provides All and Reset scope presets", () => {
   assert.match(source, /scopes: \(scopeCatalog\.scopes \|\| \[\]\)\.map\(\(scope\) => scope\.name\)/);
   assert.match(source, /scopes: \[\.\.\.\(scopeCatalog\.defaults \|\| \[\]\)\]/);
 });
+
+
+test("agent detail requires acknowledgement before newly granting high-risk scopes", () => {
+  const source = read("src/components/agents/AgentDetail.jsx");
+
+  assert.match(source, /newlyGrantedHighRisk/);
+  assert.match(source, /You are granting high-risk Agent permissions/);
+  assert.match(source, /window\.confirm\(/);
+});
+
+test("agent create All-scope preset warns before granting every high-risk capability", () => {
+  const source = read("src/components/agents/Agents.jsx");
+
+  assert.match(source, /highRiskCount/);
+  assert.match(source, /Select all Agent scopes\?/);
+  assert.match(source, /elevated shell and destructive operations/);
+});
