@@ -281,3 +281,16 @@ test("service detail prefers backend active revision over legacy selected deploy
   assert.match(source, /d\.revision\?\.id \?\? d\.revision/);
   assert.match(source, /service\?\.selected_deploy/);
 });
+
+test("service status polling uses the canonical API route", () => {
+  for (const file of [
+    "src/components/service/Services.jsx",
+    "src/components/service_detail/ServiceDetail.jsx",
+    "src/components/ready_apps/ReadyAppInstallation.jsx",
+  ]) {
+    const source = read(file);
+    assert.match(source, /api\/services\/service_status\//);
+    assert.doesNotMatch(source, /SERVICE_ACTION_ROOT[^\n]*service_status\//);
+  }
+});
+
