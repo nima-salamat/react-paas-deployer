@@ -691,7 +691,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     } finally {
       setSessionLoading(false);
     }
-  }, [apiRoot, appendHistory, enabled, focusTerminal, handleError, platform, service?.name, serviceId, session, sessionLoading]);
+  }, [apiRoot, appendHistory, enabled, focusTerminal, handleError, platform, service?.name, serviceId, session, sessionLoading, shellMode]);
 
   const replaceActiveSession = useCallback(async () => {
     if (!replaceDialog.canReplace || replaceDialog.loading) return;
@@ -1810,7 +1810,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   </>
                 ) : (
                   <>
-                    <Button size="small" variant="text"
+                    <Button
+                      size="small"
+                      variant="text"
                       onClick={(e) => { e.stopPropagation(); setShellModeAnchorEl(e.currentTarget); }}
                       disabled={sessionLoading}
                       sx={{ minWidth: 0, px: 0.7, color: shellMode === "developer" ? "#e9bd69" : "#8fa0b0", textTransform: "none", fontSize: 10.5 }}
@@ -1825,8 +1827,17 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                         <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>Developer</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>{shellAdvanced ? "Real /bin/sh inside the hardened container" : "Requires advanced shell permission"}</Typography></Stack>
                       </MenuItem>
                     </Menu>
-                    Open Shell
-                  </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={sessionLoading ? <CircularProgress size={14} color="inherit" /> : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />}
+                      onClick={(e) => { e.stopPropagation(); createSession(); }}
+                      disabled={sessionLoading}
+                      sx={{ borderColor: "rgba(96,165,250,.3)", color: "#9ac2ed", textTransform: "none", fontSize: 11.5, minWidth: 0, whiteSpace: "nowrap", px: { xs: 1, sm: 1.2 } }}
+                    >
+                      Open Shell
+                    </Button>
+                  </>
                 )}
               </Box>
 
