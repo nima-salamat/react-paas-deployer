@@ -89,16 +89,45 @@ const SHELL_SNIPPETS = {
     { label: "Working directory", command: "pwd" },
     { label: "List files", command: "ls -la" },
     { label: "Disk usage", command: "df -h" },
+  ],  wordpress: [
+    { label: "WordPress core version", command: "wp core version" },
+    { label: "List themes", command: "wp theme list" },
+    { label: "List plugins", command: "wp plugin list" },
+    { label: "List users", command: "wp user list" },
+  ],
+  mysql: [
+    { label: "MySQL client", command: "mysql -uroot" },
+  ],
+  mariadb: [
+    { label: "MariaDB client", command: "mariadb -uroot" },
+  ],
+  postgresql: [
+    { label: "PostgreSQL client", command: "psql" },
+  ],
+  mongodb: [
+    { label: "MongoDB shell", command: "mongosh" },
+  ],
+  redis: [
+    { label: "Redis CLI", command: "redis-cli" },
+  ],
+  oracle: [
+    { label: "Oracle SQL*Plus", command: "sqlplus /nolog" },
   ],
 };
 
 
 function normalizePlatform(platform) {
-  const raw = String(platform || "generic").toLowerCase();
+  const raw = String(platform || "generic").toLowerCase().trim();
+  if (raw.includes("wordpress")) return "wordpress";
   if (raw.includes("laravel")) return "laravel";
   if (raw === "php") return "php";
   if (["django", "python", "flask", "fastapi"].includes(raw)) return raw === "django" ? "django" : "python";
   if (["node", "react", "vue", "angular", "nextjs", "nuxt"].includes(raw)) return "node";
+  if (["mysql", "mariadb", "postgres", "postgresql", "mongodb", "mongo", "redis", "oracle"].includes(raw)) {
+    if (raw === "postgres") return "postgresql";
+    if (raw === "mongo") return "mongodb";
+    return raw;
+  }
   return "generic";
 }
 
