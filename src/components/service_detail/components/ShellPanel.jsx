@@ -89,11 +89,15 @@ const SHELL_SNIPPETS = {
     { label: "Working directory", command: "pwd" },
     { label: "List files", command: "ls -la" },
     { label: "Disk usage", command: "df -h" },
-  ],  wordpress: [
+  ],
+  wordpress: [
+    { label: "WP-CLI version", command: "wp --version" },
     { label: "WordPress core version", command: "wp core version" },
     { label: "List themes", command: "wp theme list" },
     { label: "List plugins", command: "wp plugin list" },
     { label: "List users", command: "wp user list" },
+    { label: "Site URL", command: "wp option get home" },
+    { label: "Database size", command: "wp db size" },
   ],
   mysql: [
     { label: "MySQL client", command: "mysql -uroot" },
