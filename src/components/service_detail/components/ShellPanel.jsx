@@ -132,11 +132,29 @@ function normalizePlatform(platform) {
 }
 function getShellSnippets(platform, session) {
   const snippets = SHELL_SNIPPETS[platform] || SHELL_SNIPPETS.generic || [];
-  if (platform !== "mysql" && platform !== "mariadb") return snippets;
-  const username = String(session?.workspace?.database?.username || "").trim();
-  const safeUsername = /^[A-Za-z0-9_.$-]{1,128}$/.test(username) ? username : "root";
-  const executable = platform === "mariadb" ? "mariadb" : "mysql";
-  return [{ label: `${platform === "mariadb" ? "MariaDB" : "MySQL"} client`, command: `${executable} -u${safeUsername}` }];
+  if (platform === "mysql" || platform === "mariadb") {
+    const username = String(session?.workspace?.database?.username || "").trim();
+    const safeUsername = /^[A-Za-z0-9_.$-]{1,128}$/.test(username) ? username : "root";
+    const executable = platform === "mariadb" ? "mariadb" : "mysql";
+    const adminExecutable = platform === "mariadb" ? "mariadb-admin" : "mysqladmin";
+    return [
+      { label: `${platform === "mariadb" ? "MariaDB" : "MySQL"} client`, command: `${executable} -u${safeUsername}` },
+      { label: `Check ${platform === "mariadb" ? "MariaDB" : "MySQL"} readiness`, command: `${adminExecutable} ping -u${safeUsername}` },
+    ];
+  }
+  if (platform === "postgresql") {
+    return [
+      { label: "PostgreSQL client", command: "psql" },
+      { label: "Check PostgreSQL readiness", command: "pg_isready" },
+    ];
+  }
+  if (platform === "mongodb") {
+    const username = String(session?.workspace?.database?.username || "").trim();
+    if (/^[A-Za-z0-9_.$-]{1,128}$/.test(username)) {
+      return [{ label: "MongoDB authenticated shell", command: `mongosh --host 127.0.0.1 --username ${username} --authenticationDatabase admin` }];
+    }
+  }
+  return snippets;
 }
 
 function stripAnsi(text) {
