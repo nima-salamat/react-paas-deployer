@@ -260,6 +260,9 @@ const TerminalHistory = React.memo(function TerminalHistory({ history }) {
 export default function ShellPanel({ service, enabled = true, onError }) {
   const [session, setSession] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
+  const [shellMode, setShellMode] = useState("restricted");
+  const [shellAdvanced, setShellAdvanced] = useState(false);
+  const [shellModeAnchorEl, setShellModeAnchorEl] = useState(null);
   const [command, setCommand] = useState("");
   const [history, setHistory] = useState([]);
   const [commandHistory, setCommandHistory] = useState([]);
@@ -516,15 +519,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, [apiRoot, handleError, session?.token]);
 
   const loadCommandCatalog = useCallback(async () => {
-    if (!session?.token) return;
+    if (!serviceId || !enabled) return;
     try {
       const response = await apiRequest({ method: "GET", url: `${apiRoot}/catalog/` });
       const data = response?.data || {};
-      if (data.result === "success") setCommandCatalog(Array.isArray(data.commands) ? data.commands : []);
+      if (data.result === "success") {
+        setCommandCatalog(Array.isArray(data.commands) ? data.commands : []);
+        setShellAdvanced(Boolean(data.advanced_interactive));
+      }
     } catch {
       // Backend remains authoritative; catalog is only a UX helper.
     }
-  }, [apiRoot, session?.token]);
+  }, [apiRoot, enabled, serviceId]);
 
   useEffect(() => {
     const onAuthChanged = () => setAuthGeneration((value) => value + 1);
@@ -533,9 +539,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, []);
 
   useEffect(() => {
-    if (!session?.token) return;
-    refreshDirectory();
     loadCommandCatalog();
+    if (session?.token) refreshDirectory();
   }, [loadCommandCatalog, refreshDirectory, session?.token]);
 
   useEffect(() => {
@@ -652,10 +657,11 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     if (!serviceId || !enabled || sessionLoading || session) return;
     setSessionLoading(true);
     try {
-      const response = await apiRequest({ method: "POST", url: `${apiRoot}/session/`, data: {} });
+      const response = await apiRequest({ method: "POST", url: `${apiRoot}/session/`, data: { mode: shellMode } });
       const data = response?.data || {};
       if (data.result !== "success" || !data.token) throw new Error(data.detail || "Unable to create shell session.");
       setSession(data);
+      setShellMode(data.mode || shellMode);
       setHistory([]);
       setCommandHistory([]);
       setCommandHistoryIndex(null);
@@ -691,10 +697,11 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     if (!replaceDialog.canReplace || replaceDialog.loading) return;
     setReplaceDialog((prev) => ({ ...prev, loading: true }));
     try {
-      const response = await apiRequest({ method: "POST", url: `${apiRoot}/session/replace/`, data: { confirm: true } });
+      const response = await apiRequest({ method: "POST", url: `${apiRoot}/session/replace/`, data: { confirm: true, mode: shellMode } });
       const data = response?.data || {};
       if (data.result !== "success" || !data.token) throw new Error(data.detail || "Unable to replace active shell session.");
       setSession(data);
+      setShellMode(data.mode || shellMode);
       setHistory([]);
       setCommand("");
       setCommandHistoryIndex(null);
@@ -1802,7 +1809,22 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     </Tooltip>
                   </>
                 ) : (
-                  <Button size="small" variant="outlined" startIcon={sessionLoading ? <CircularProgress size={14} color="inherit" /> : <PlayArrowRoundedIcon sx={{ fontSize: 16 }} />} onClick={(e) => { e.stopPropagation(); createSession(); }} disabled={sessionLoading} sx={{ borderColor: "rgba(96,165,250,.3)", color: "#9ac2ed", textTransform: "none", fontSize: 11.5, minWidth: 0, whiteSpace: "nowrap", px: { xs: 1, sm: 1.2 } }}>
+                  <>
+                    <Button size="small" variant="text"
+                      onClick={(e) => { e.stopPropagation(); setShellModeAnchorEl(e.currentTarget); }}
+                      disabled={sessionLoading}
+                      sx={{ minWidth: 0, px: 0.7, color: shellMode === "developer" ? "#e9bd69" : "#8fa0b0", textTransform: "none", fontSize: 10.5 }}
+                    >
+                      {shellMode === "developer" ? "Developer" : "Restricted"}
+                    </Button>
+                    <Menu anchorEl={shellModeAnchorEl} open={Boolean(shellModeAnchorEl)} onClose={() => setShellModeAnchorEl(null)} slotProps={{ paper: { sx: { minWidth: 230 } } }}>
+                      <MenuItem onClick={() => { setShellMode("restricted"); setShellModeAnchorEl(null); }}>
+                        <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>Restricted</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>Policy-enforced workspace shell</Typography></Stack>
+                      </MenuItem>
+                      <MenuItem disabled={!shellAdvanced} onClick={() => { setShellMode("developer"); setShellModeAnchorEl(null); }}>
+                        <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>Developer</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>{shellAdvanced ? "Real /bin/sh inside the hardened container" : "Requires advanced shell permission"}</Typography></Stack>
+                      </MenuItem>
+                    </Menu>
                     Open Shell
                   </Button>
                 )}
