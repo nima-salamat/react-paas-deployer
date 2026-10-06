@@ -265,27 +265,26 @@ export default function ReadyAppInstallation() {
     return <Box sx={{ minHeight: "55vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
   }
 
-  if (!installation) {
-    return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/ready-apps")}>Ready Apps</Button>
-        <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>{error || "Installation not found."}</Alert>
-      </Container>
-    );
-  }
-
-  const status = String(installation.status || "pending").toLowerCase();
+  const stage = String(installation?.stage || "").toLowerCase();
+  const deletionPending =
+    cleanupDeletePending ||
+    stage === "deletion_pending" ||
+    installation?.error_code === "APPLICATION_DELETION_PENDING";
+  const status = String(installation?.status || "pending").toLowerCase();
   const publicHost = String(
-    installation.application_host ||
-      installation.application_url?.replace(/^https?:\/\//i, "").replace(/\/.*$/, "") ||
+    installation?.application_host ||
+      installation?.application_url?.replace(/^https?:\/\//i, "").replace(/\/.*$/, "") ||
       ""
   ).trim();
+  const resources = installation?.resource_summary || {};
+  const serviceRows = installation?.services || [];
+  const serviceMetricsKey = serviceRows.map((item) => String(item?.service_id || "")).filter(Boolean).join(",");
 
-  const refreshServiceMetrics = useCallback(async (serviceRows) => {
-    const rows = Array.isArray(serviceRows) ? serviceRows.filter((item) => item?.service_id) : [];
-    if (!rows.length) return;
+  const refreshServiceMetrics = useCallback(async (rows) => {
+    const validRows = Array.isArray(rows) ? rows.filter((item) => item?.service_id) : [];
+    if (!validRows.length) return;
     const results = await Promise.allSettled(
-      rows.map(async (item) => {
+      validRows.map(async (item) => {
         const response = await apiRequest({
           method: "POST",
           url: API_ROOT + "/services/service_status/",
@@ -300,23 +299,19 @@ export default function ReadyAppInstallation() {
     setServiceMetrics((previous) => {
       const next = { ...previous };
       for (const result of results) {
-        if (result.status === "fulfilled") {
-          next[result.value.id] = result.value;
-        }
+        if (result.status === "fulfilled") next[result.value.id] = result.value;
       }
       return next;
     });
   }, []);
 
   useEffect(() => {
-    const rows = installation?.services || [];
-    if (!rows.length) return undefined;
-    refreshServiceMetrics(rows);
-    const shouldPoll = status === "running" && !deletionPending;
-    if (!shouldPoll) return undefined;
-    const timer = window.setInterval(() => refreshServiceMetrics(rows), 3000);
+    if (!serviceRows.length) return undefined;
+    refreshServiceMetrics(serviceRows);
+    if (status !== "running" || deletionPending) return undefined;
+    const timer = window.setInterval(() => refreshServiceMetrics(serviceRows), 3000);
     return () => window.clearInterval(timer);
-  }, [installation?.services, status, deletionPending, refreshServiceMetrics]);
+  }, [serviceMetricsKey, status, deletionPending, refreshServiceMetrics]);
 
   const copyPublicHost = async () => {
     if (!publicHost) return;
@@ -329,12 +324,14 @@ export default function ReadyAppInstallation() {
     }
   };
 
-    const stage = String(installation.stage || "").toLowerCase();
-  const deletionPending =
-    cleanupDeletePending ||
-    stage === "deletion_pending" ||
-    installation.error_code === "APPLICATION_DELETION_PENDING";
-  const resources = installation.resource_summary || {};
+  if (!installation) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/ready-apps")}>Ready Apps</Button>
+        <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>{error || "Installation not found."}</Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 } }}>
