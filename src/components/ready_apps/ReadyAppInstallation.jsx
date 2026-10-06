@@ -261,10 +261,6 @@ export default function ReadyAppInstallation() {
     }
   };
 
-  if (loading) {
-    return <Box sx={{ minHeight: "55vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
-  }
-
   const stage = String(installation?.stage || "").toLowerCase();
   const deletionPending =
     cleanupDeletePending ||
@@ -323,6 +319,10 @@ export default function ReadyAppInstallation() {
       setCopiedHost(false);
     }
   };
+
+  if (loading) {
+    return <Box sx={{ minHeight: "55vh", display: "grid", placeItems: "center" }}><CircularProgress /></Box>;
+  }
 
   if (!installation) {
     return (
