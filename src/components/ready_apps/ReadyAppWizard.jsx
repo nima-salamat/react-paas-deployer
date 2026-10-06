@@ -129,6 +129,7 @@ function DynamicField({ field, value, onChange, config }) {
   }
 
   if (type === "choice") {
+    const optionLabels = field.option_labels || {};
     return (
       <TextField
         select
@@ -137,9 +138,12 @@ function DynamicField({ field, value, onChange, config }) {
         value={value ?? ""}
         onChange={(event) => onChange(id, event.target.value)}
         required={required}
+        helperText={field.ui?.helper_text || undefined}
       >
         {(field.options || []).map((option) => (
-          <MenuItem key={option} value={option}>{option}</MenuItem>
+          <MenuItem key={option} value={option}>
+            {optionLabels[String(option)] || option}
+          </MenuItem>
         ))}
       </TextField>
     );
@@ -165,9 +169,11 @@ function DynamicField({ field, value, onChange, config }) {
       helperText={
         type === "secret"
           ? "Stored securely and never shown in deployment review."
-          : field.type === "domain"
-            ? "The platform will use its managed hostname."
-            : undefined
+          : field.ui?.helper_text
+            ? field.ui.helper_text
+            : field.type === "domain"
+              ? "The platform will use its managed hostname."
+              : undefined
       }
     />
   );
