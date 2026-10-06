@@ -268,10 +268,23 @@ export default function Agents() {
                   <Button
                     size="small"
                     variant="outlined"
-                    onClick={() => setDraft((prev) => ({
-                      ...prev,
-                      scopes: (scopeCatalog.scopes || []).map((scope) => scope.name),
-                    }))}
+                    onClick={() => {
+                      const highRiskCount = (scopeCatalog.scopes || []).filter(
+                        (scope) => scope.destructive || scope.high_risk,
+                      ).length;
+                      if (
+                        highRiskCount > 0 &&
+                        !window.confirm(
+                          "Select all Agent scopes? This grants every available high-risk capability, including elevated shell and destructive operations.",
+                        )
+                      ) {
+                        return;
+                      }
+                      setDraft((prev) => ({
+                        ...prev,
+                        scopes: (scopeCatalog.scopes || []).map((scope) => scope.name),
+                      }));
+                    }}
                     disabled={saving || catalogLoading || !(scopeCatalog.scopes || []).length}
                     sx={{ borderRadius: 1.25, fontWeight: 750 }}
                   >
