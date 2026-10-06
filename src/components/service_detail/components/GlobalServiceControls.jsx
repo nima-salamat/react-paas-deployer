@@ -225,7 +225,7 @@ export default function GlobalServiceControls({
 
   const canOpen = Boolean(service?.service_host || service?.service_name) && !selectedIsDb;
 
-    return (
+  return (
     <Paper
       elevation={0}
       sx={{
@@ -277,26 +277,6 @@ export default function GlobalServiceControls({
           Controls
         </Typography>
       )}
-
-      {managedByApplication ? (
-        <Alert
-          severity="info"
-          sx={{ mb: compact ? 1.5 : 2, borderRadius: 1.8 }}
-          action={
-            onOpenManagedApplication ? (
-              <Button
-                size="small"
-                onClick={onOpenManagedApplication}
-                sx={{ fontWeight: 750, whiteSpace: "nowrap" }}
-              >
-                Open Ready App
-              </Button>
-            ) : null
-          }
-        >
-          This service belongs to a Ready App. Service-level actions are available here and are subject to the same backend permissions and lifecycle safety checks.
-        </Alert>
-      ) : null}
 
       {managedByApplication ? (
         <Alert
