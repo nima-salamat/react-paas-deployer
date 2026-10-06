@@ -712,7 +712,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       setReplaceDialog((prev) => ({ ...prev, loading: false }));
       handleError(err?.response?.data?.detail || err?.message || "Unable to replace active shell session.");
     }
-  }, [apiRoot, appendHistory, focusTerminal, handleError, replaceDialog.canReplace, replaceDialog.loading]);
+  }, [apiRoot, appendHistory, focusTerminal, handleError, replaceDialog.canReplace, replaceDialog.loading, shellMode]);
 
   const closeSession = useCallback(async () => {
     const token = session?.token;
