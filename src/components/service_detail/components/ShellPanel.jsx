@@ -309,7 +309,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const editorInputRef = useRef(null);
 
   const serviceId = service?.id ?? service?.pk;
-  const platform = normalizePlatform(service?.platform || service?.framework || service?.selected_platform);
+  const platform = normalizePlatform(session?.platform || service?.platform || service?.framework || service?.selected_platform);
   const apiRoot = `${SERVICE_ACTION_ROOT}services/${serviceId}/shell`;
   const currentCwd = session?.cwd || "/";
   useEffect(() => {
