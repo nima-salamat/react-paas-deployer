@@ -316,9 +316,6 @@ export default function ServiceDetail() {
   );
 
   const allowedTabs = useMemo(() => {
-    if (catalogManaged) {
-      return ["overview", "logs"];
-    }
     if (shareAccess.loading && !effectiveIsOwner) return ["overview"];
     if (effectiveIsOwner || shareAccess.is_owner) {
       return ["overview", "create", "logs", "settings", "shell"];
