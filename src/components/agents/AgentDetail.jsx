@@ -89,7 +89,31 @@ export default function AgentDetail() {
   const toggleScope = (name) => setDraft((prev) => ({ ...prev, scopes: prev.scopes.includes(name) ? prev.scopes.filter((x) => x !== name) : [...prev.scopes, name] }));
 
   const saveProfile = async () => {
-    const data = await mutate(() => updateAgent(id, { name: draft.name.trim(), description: draft.description, scopes: draft.scopes }), null);
+    const oldScopes = new Set(agent?.scopes || []);
+    const highRiskNames = new Set(
+      (scopeCatalog.scopes || [])
+        .filter((scope) => scope.destructive || scope.high_risk)
+        .map((scope) => scope.name),
+    );
+    const newlyGrantedHighRisk = draft.scopes.filter(
+      (scope) => highRiskNames.has(scope) && !oldScopes.has(scope),
+    );
+    if (
+      newlyGrantedHighRisk.length > 0 &&
+      !window.confirm(
+        "You are granting high-risk Agent permissions. These capabilities can change or delete runtime state, access sensitive data, or execute elevated operations. Continue?",
+      )
+    ) {
+      return;
+    }
+    const data = await mutate(
+      () => updateAgent(id, {
+        name: draft.name.trim(),
+        description: draft.description,
+        scopes: draft.scopes,
+      }),
+      null,
+    );
     if (data) setEditing(false);
   };
 
