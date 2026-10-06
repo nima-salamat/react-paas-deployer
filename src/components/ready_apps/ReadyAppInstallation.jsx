@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Box,
@@ -27,6 +27,7 @@ import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
 import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import MiscellaneousServicesRoundedIcon from "@mui/icons-material/MiscellaneousServicesRounded";
 import apiRequest from "../customHooks/apiRequest";
 import { useNavigate, useParams } from "react-router-dom";
@@ -80,6 +81,8 @@ export default function ReadyAppInstallation() {
   const [deleting, setDeleting] = useState(false);
   const [cleanupDeletePending, setCleanupDeletePending] = useState(false);
   const [actionDialog, setActionDialog] = useState(null);
+  const [serviceMetrics, setServiceMetrics] = useState({});
+  const [copiedHost, setCopiedHost] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -272,7 +275,61 @@ export default function ReadyAppInstallation() {
   }
 
   const status = String(installation.status || "pending").toLowerCase();
-  const stage = String(installation.stage || "").toLowerCase();
+  const publicHost = String(
+    installation.application_host ||
+      installation.application_url?.replace(/^https?:\/\//i, "").replace(/\/.*$/, "") ||
+      ""
+  ).trim();
+
+  const refreshServiceMetrics = useCallback(async (serviceRows) => {
+    const rows = Array.isArray(serviceRows) ? serviceRows.filter((item) => item?.service_id) : [];
+    if (!rows.length) return;
+    const results = await Promise.allSettled(
+      rows.map(async (item) => {
+        const response = await apiRequest({
+          method: "POST",
+          url: API_ROOT + "/services/service_status/",
+          data: { service_id: item.service_id },
+        });
+        return {
+          id: String(item.service_id),
+          ...(response?.data || {}),
+        };
+      })
+    );
+    setServiceMetrics((previous) => {
+      const next = { ...previous };
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          next[result.value.id] = result.value;
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const rows = installation?.services || [];
+    if (!rows.length) return undefined;
+    refreshServiceMetrics(rows);
+    const shouldPoll = status === "running" && !deletionPending;
+    if (!shouldPoll) return undefined;
+    const timer = window.setInterval(() => refreshServiceMetrics(rows), 3000);
+    return () => window.clearInterval(timer);
+  }, [installation?.services, status, deletionPending, refreshServiceMetrics]);
+
+  const copyPublicHost = async () => {
+    if (!publicHost) return;
+    try {
+      await navigator.clipboard.writeText(publicHost);
+      setCopiedHost(true);
+      window.setTimeout(() => setCopiedHost(false), 1600);
+    } catch {
+      setCopiedHost(false);
+    }
+  };
+
+    const stage = String(installation.stage || "").toLowerCase();
   const deletionPending =
     cleanupDeletePending ||
     stage === "deletion_pending" ||
@@ -305,6 +362,42 @@ export default function ReadyAppInstallation() {
                 <Chip size="small" variant="outlined" label={"v" + installation.software_version} />
               </Stack>
             </Box>
+
+            {status === "running" && !deletionPending && publicHost && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.2,
+                  minWidth: { md: 360 },
+                  borderRadius: 2,
+                  bgcolor: "action.hover",
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.35 }}>
+                  Application domain
+                </Typography>
+                <Stack direction="row" spacing={0.6} alignItems="center">
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                      fontWeight: 700,
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {publicHost}
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={copyPublicHost}
+                    startIcon={<ContentCopyRoundedIcon />}
+                    sx={{ minWidth: 0, flexShrink: 0 }}
+                  >
+                    {copiedHost ? "Copied" : "Copy"}
+                  </Button>
+                </Stack>
+              </Paper>
+            )}
 
             {installation.application_url && status === "running" && !deletionPending && (
               <Button
@@ -380,6 +473,66 @@ export default function ReadyAppInstallation() {
                           </Button>
                         </Stack>
                       </Stack>
+                      {service.service_host ? (
+                        <Stack direction="row" spacing={0.7} alignItems="center" sx={{ mt: 0.75, minWidth: 0 }}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ fontFamily: "ui-monospace, monospace", overflowWrap: "anywhere" }}
+                          >
+                            {service.service_host}
+                          </Typography>
+                          {service.public_endpoints?.[0]?.url ? (
+                            <Button
+                              size="small"
+                              href={service.public_endpoints[0].url}
+                              target="_blank"
+                              rel="noreferrer"
+                              startIcon={<OpenInNewRoundedIcon sx={{ fontSize: 15 }} />}
+                              sx={{ minWidth: 0, px: 0.6 }}
+                            >
+                              Open
+                            </Button>
+                          ) : null}
+                        </Stack>
+                      ) : null}
+                      {(() => {
+                        const metrics = serviceMetrics[String(service.service_id)] || {};
+                        const limits = service.resource_limits || {};
+                        const liveCpu = metrics.cpu == null ? null : Number(metrics.cpu);
+                        const liveRam = metrics.ram == null ? null : Number(metrics.ram);
+                        return (
+                          <Box sx={{ mt: 1.1 }}>
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+                              <Metric
+                                icon={<ComputerRoundedIcon sx={{ fontSize: 17 }} />}
+                                label="Limit"
+                                value={limits.cpu_vcpu == null ? "—" : limits.cpu_vcpu + " vCPU"}
+                              />
+                              <Metric
+                                icon={<MemoryRoundedIcon sx={{ fontSize: 17 }} />}
+                                label="RAM limit"
+                                value={limits.ram_mb == null ? "—" : limits.ram_mb + " MB"}
+                              />
+                              <Metric
+                                icon={<StorageRoundedIcon sx={{ fontSize: 17 }} />}
+                                label="Storage"
+                                value={limits.storage_mb == null ? "—" : limits.storage_mb + " MB"}
+                              />
+                            </Stack>
+                            {metrics.metrics_available !== false && (liveCpu != null || liveRam != null) ? (
+                              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 0.9 }}>
+                                {liveCpu != null ? <LiveUsage label="CPU" value={liveCpu} /> : null}
+                                {liveRam != null ? <LiveUsage label="RAM" value={liveRam} /> : null}
+                              </Stack>
+                            ) : status === "running" ? (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.8 }}>
+                                Live resource metrics are temporarily unavailable.
+                              </Typography>
+                            ) : null}
+                          </Box>
+                        );
+                      })()}
                       {service.status_message && (
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.6 }}>
                           {service.status_message}
@@ -408,7 +561,7 @@ export default function ReadyAppInstallation() {
                 </Stack>
                 <Divider sx={{ my: 1.7 }} />
                 <Typography variant="caption" color="text.secondary">
-                  These are the limits included with the selected plan. They are not a live usage meter.
+                  Limits are plan allocations. Live CPU/RAM usage is shown separately for each included service above.
                 </Typography>
               </CardContent>
             </Card>
@@ -495,6 +648,27 @@ export default function ReadyAppInstallation() {
         </Dialog>
       </Stack>
     </Container>
+  );
+}
+
+function LiveUsage({ label, value }) {
+  const percent = Math.max(0, Math.min(100, Number(value) || 0));
+  return (
+    <Box sx={{ minWidth: { sm: 180 }, flex: 1 }}>
+      <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mb: 0.35 }}>
+        <Typography variant="caption" sx={{ fontWeight: 700 }}>
+          Live {label}
+        </Typography>
+        <Typography variant="caption" sx={{ fontWeight: 800 }}>
+          {percent.toFixed(1)}%
+        </Typography>
+      </Stack>
+      <LinearProgress
+        variant="determinate"
+        value={percent}
+        sx={{ height: 6, borderRadius: 3 }}
+      />
+    </Box>
   );
 }
 
