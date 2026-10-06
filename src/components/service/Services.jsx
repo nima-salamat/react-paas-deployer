@@ -365,7 +365,7 @@ export default function ServicesListMui({
           try {
             const res = await apiRequest({
               method: "POST",
-              url: `${SERVICE_ACTION_ROOT}service_status/`,
+              url: `${API_BASE}/api/services/service_status/`,
               data: { service_id: sid },
             });
             if (res.status === 200 && res.data) {
