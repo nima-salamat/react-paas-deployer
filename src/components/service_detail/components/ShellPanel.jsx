@@ -130,6 +130,14 @@ function normalizePlatform(platform) {
   }
   return "generic";
 }
+function getShellSnippets(platform, session) {
+  const snippets = SHELL_SNIPPETS[platform] || SHELL_SNIPPETS.generic || [];
+  if (platform !== "mysql" && platform !== "mariadb") return snippets;
+  const username = String(session?.workspace?.database?.username || "").trim();
+  const safeUsername = /^[A-Za-z0-9_.$-]{1,128}$/.test(username) ? username : "root";
+  const executable = platform === "mariadb" ? "mariadb" : "mysql";
+  return [{ label: `${platform === "mariadb" ? "MariaDB" : "MySQL"} client`, command: `${executable} -u${safeUsername}` }];
+}
 
 function stripAnsi(text) {
   // Remove CSI / OSC / charset / private-mode sequences so PsySH and other
@@ -2243,12 +2251,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         <DialogTitle>Command snippets</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={.5}>
-            {(SHELL_SNIPPETS[platform] || SHELL_SNIPPETS.generic || []).map((s) => (
+            {getShellSnippets(platform, session).map((s) => (
               <Button key={s.command} fullWidth sx={{ justifyContent: "flex-start", textTransform: "none", fontFamily: MONO, fontSize: 12 }} onClick={() => { setSnippetsOpen(false); runCommand(s.command); }}>
                 {s.label}
               </Button>
             ))}
-            {(SHELL_SNIPPETS.generic || []).filter((s) => !(SHELL_SNIPPETS[platform] || []).some((x) => x.command === s.command)).map((s) => (
+            {(SHELL_SNIPPETS.generic || []).filter((s) => !getShellSnippets(platform, session).some((x) => x.command === s.command)).map((s) => (
               <Button key={`g-${s.command}`} fullWidth sx={{ justifyContent: "flex-start", textTransform: "none", fontFamily: MONO, fontSize: 12, color: "#8fa0b0" }} onClick={() => { setSnippetsOpen(false); runCommand(s.command); }}>
                 {s.label}
               </Button>
