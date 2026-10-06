@@ -726,7 +726,7 @@ export default function ServiceDetail() {
       try {
         const resp = await apiRequest({
           method: "POST",
-          url: `${SERVICE_ACTION_ROOT}service_status/`,
+          url: `${API_BASE}/api/services/service_status/`,
           data: { service_id: id },
         });
 
