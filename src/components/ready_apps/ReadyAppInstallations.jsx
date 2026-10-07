@@ -30,6 +30,13 @@ const API_ROOT =
 const ROOT = API_ROOT + "/api/application-catalog";
 const TERMINAL = new Set(["running", "failed", "cancelled"]);
 
+function isDeletionPending(installation) {
+  return (
+    String(installation?.stage || "").toLowerCase() === "deletion_pending" ||
+    installation?.error_code === "APPLICATION_DELETION_PENDING"
+  );
+}
+
 function listFrom(data) {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.results)) return data.results;
