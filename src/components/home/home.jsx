@@ -116,6 +116,79 @@ const STACK_HIGHLIGHTS = [
 
 const TECH_LABELS = ["React", "Node.js", "Django", "Flask", "Docker"];
 
+const FEATURED_READY_APPS = [
+  { id: "wordpress", name: "WordPress", category: "CMS", description: "Managed WordPress with database setup, WP-CLI and runtime controls." },
+  { id: "n8n-with-postgres-and-worker", name: "n8n", category: "Automation", description: "Workflow automation with PostgreSQL and a dedicated worker." },
+  { id: "mattermost", name: "Mattermost", category: "Collaboration", description: "Team chat packaged with its supporting database stack." },
+  { id: "uptime-kuma", name: "Uptime Kuma", category: "Monitoring", description: "Self-hosted uptime monitoring with persistent data and HTTPS routing." },
+];
+
+function FeaturedReadyAppCard({ app, index }) {
+  const theme = useTheme();
+  const tones = [theme.palette.primary.main, theme.palette.secondary.main || theme.palette.info.main, theme.palette.info.main, theme.palette.success.main];
+  const accent = tones[index % tones.length];
+
+  return (
+    <Paper
+      component={RouterLink}
+      to="/dashboard/ready-apps"
+      elevation={0}
+      sx={{
+        p: { xs: 1.7, md: 2 },
+        height: "100%",
+        boxSizing: "border-box",
+        borderRadius: { xs: 2.5, md: 3 },
+        border: "1px solid",
+        borderColor: alpha(accent, 0.16),
+        color: "inherit",
+        textDecoration: "none",
+        background: "linear-gradient(145deg, rgba(255,255,255,.04), rgba(255,255,255,0))",
+        transition: "transform .2s ease, border-color .2s ease, box-shadow .2s ease",
+        "&:hover": {
+          transform: "translateY(-4px)",
+          borderColor: alpha(accent, 0.34),
+          boxShadow: "0 20px 46px " + alpha(accent, 0.12),
+        },
+        "&:focus-visible": { outline: "2px solid " + accent, outlineOffset: 2 },
+      }}
+    >
+      <Stack direction="row" spacing={1.35} alignItems="flex-start">
+        <Box
+          sx={{
+            width: 46,
+            height: 46,
+            flexShrink: 0,
+            borderRadius: 2,
+            display: "grid",
+            placeItems: "center",
+            fontWeight: 950,
+            fontSize: "1.05rem",
+            color: accent,
+            border: "1px solid",
+            borderColor: alpha(accent, 0.18),
+            bgcolor: alpha(accent, theme.palette.mode === "dark" ? 0.12 : 0.06),
+          }}
+        >
+          {app.name.charAt(0)}
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={0.8} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Typography sx={{ fontWeight: 900 }}>{app.name}</Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 750 }}>{app.category}</Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.55, lineHeight: 1.55 }}>
+            {app.description}
+          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1.1, color: accent }}>
+            <Typography variant="caption" sx={{ fontWeight: 850 }}>Ready to deploy</Typography>
+            <ArrowForwardRoundedIcon sx={{ fontSize: 15 }} />
+          </Stack>
+        </Box>
+      </Stack>
+    </Paper>
+  );
+}
+
 /* Animation timing constants */
 const ANIM = {
   duration: 0.48,
@@ -1100,6 +1173,37 @@ export default function Home() {
 
       {/* ───────────────── PLANS ───────────────── */}
       <PlansPreview />
+
+      {/* ───────────────── READY APPS ───────────────── */}
+      <ScrollScene page>
+        <Container maxWidth="lg">
+          <Reveal>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1.5, md: 3 }} alignItems={{ xs: "flex-start", md: "flex-end" }} justifyContent="space-between">
+              <Box sx={{ maxWidth: 760 }}>
+                <Typography variant="overline" component="p" sx={{ fontWeight: 900, letterSpacing: ".16em", color: "primary.main" }}>
+                  Ready Apps
+                </Typography>
+                <Typography component="h2" sx={{ mt: 1, fontWeight: 950, fontSize: { xs: "clamp(1.7rem, 6vw, 2.4rem)", md: "3.6rem" }, letterSpacing: "-.05em", lineHeight: 1.02 }}>
+                  Skip the setup. Start with a working stack.
+                </Typography>
+                <Typography sx={{ mt: 1.6, maxWidth: 700, lineHeight: 1.75, fontSize: { xs: "0.95rem", md: "1.05rem" } }} color="text.secondary">
+                  Popular self-hosted software comes with its dependencies, configuration and runtime behavior already understood by the platform.
+                </Typography>
+              </Box>
+              <Button component={RouterLink} to="/dashboard/ready-apps" variant="outlined" endIcon={<ArrowForwardRoundedIcon />} sx={{ minHeight: 44, px: 2, borderRadius: 2, fontWeight: 850, flexShrink: 0 }}>
+                Explore App Library
+              </Button>
+            </Stack>
+          </Reveal>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" }, gap: { xs: 1.4, md: 1.8 }, mt: { xs: 3, md: 4 } }}>
+            {FEATURED_READY_APPS.map((app, index) => (
+              <Reveal key={app.id} delay={index * 0.045} variant="card">
+                <FeaturedReadyAppCard app={app} index={index} />
+              </Reveal>
+            ))}
+          </Box>
+        </Container>
+      </ScrollScene>
 
       {/* ───────────────── FEATURES ───────────────── */}
       <ScrollScene page>
