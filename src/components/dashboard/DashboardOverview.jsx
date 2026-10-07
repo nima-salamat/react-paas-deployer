@@ -20,8 +20,8 @@ import { TICKETS_API, unwrapList } from "../tickets/api.js";
 
 const QUICK_LINKS = [
   ["Services", "/dashboard/services", MiscellaneousServicesOutlinedIcon],
-  ["Ready Apps", "/dashboard/ready-apps", AppsOutlinedIcon],
-  ["My Ready Apps", "/dashboard/ready-apps/installations", AppsOutlinedIcon],
+  ["App Library", "/dashboard/ready-apps", AppsOutlinedIcon],
+  ["Deployed Apps", "/dashboard/ready-apps/installations", AppsOutlinedIcon],
   ["Networks", "/dashboard/networks", LanOutlinedIcon],
   ["Volumes", "/dashboard/volumes", StorageOutlinedIcon],
   ["Tickets", "/dashboard/tickets", ConfirmationNumberOutlinedIcon],
