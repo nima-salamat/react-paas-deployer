@@ -215,9 +215,9 @@ const PUBLIC_SHELLS = {
       'Deploy faster. Manage more. Worry less.',
 
     paragraphs: [
-      'PaaSDeployer is an application deployment and infrastructure management platform for teams that want a simpler path from configured service to running application. Create services, choose CPU and memory resources, connect networks, keep persistent storage, and manage operational tasks from one focused control panel. The public experience explains the product clearly while the authenticated workspace remains focused on practical service operations.',
+      'PaaSDeployer is an application deployment and infrastructure management platform for teams that want a simpler path from configured workload to running application. Create services, choose CPU and memory resources, connect networks, keep persistent storage, or start with a Ready App when the stack is already known.',
 
-      'Instead of stitching together separate deployment utilities for every workload, PaaSDeployer brings the most common application operations into a consistent workflow. It is designed for developers and operators who need practical service controls without adding unnecessary infrastructure ceremony.',
+      'Ready Apps package popular self-hosted software with the supporting services, configuration and runtime behavior described by the platform. For custom workloads, the same control plane exposes the lower-level service workflow without forcing every application through a preset template.',
     ],
 
     sections: [
@@ -338,36 +338,46 @@ const PUBLIC_SHELLS = {
     eyebrow: 'About PaaSDeployer',
 
     heading:
-      'A simpler way to run applications.',
+      'Infrastructure should feel like a product.',
 
     paragraphs: [
-      'PaaSDeployer brings <strong>application deployment</strong> and day-to-day infrastructure management into one focused control plane. The project is designed for developers and operators who want practical service controls without having to navigate a collection of unrelated interfaces for every deployment task.',
+      'PaaSDeployer is a self-hosted application deployment platform built to make the path from configured workload to running service easier to understand, operate and automate.',
 
-      'The platform combines a Django API with a React frontend so that orchestration logic and the operator experience can evolve independently, with <strong>service management</strong> kept close to the resources an application actually uses.',
+      'The platform combines a Django control plane, a React operator workspace and Docker-based runtime management. Ready Apps provide a faster path for common self-hosted software, while regular Services remain available when you need full control over the workload.',
     ],
 
     sections: [
       {
         heading:
-          'Focused service management',
+          'One control plane for deployment and operations',
 
         paragraphs: [
-          'The platform centers on services, resources, networks, and persistent volumes. Those building blocks cover the common operational actions around deploying an application, keeping its configuration consistent, connecting supporting resources, and managing the service lifecycle after deployment.',
+          'PaaSDeployer keeps deployments, service lifecycle actions, resource choices, networks and persistent storage close together. The goal is not to hide infrastructure, but to make the important operational decisions visible in the same place.',
         ],
       },
 
       {
         heading:
-          'Open-source architecture',
+          'Ready Apps when you do not want to assemble everything',
 
         paragraphs: [
-          'PaaSDeployer is built as an open-source stack, giving developers a way to inspect the implementation and understand how the deployment workflow works. The public product pages explain the platform, while authenticated routes are reserved for private operational information.',
+          'The Ready Apps catalog describes complete application stacks, including supporting services, configuration and runtime behavior. This gives users a shorter path to popular self-hosted applications while preserving the underlying service model for day-to-day management.',
+        ],
+      },
+
+      {
+        heading:
+          'Open-source and automation-ready',
+
+        paragraphs: [
+          'The frontend and backend are maintained as separate open-source projects. The Agent API extends the same control plane to scoped automation clients, so deployment and runtime workflows can be driven programmatically without creating a second operational model.',
         ],
       },
     ],
 
     links: [
       ['/', 'Home'],
+      ['/dashboard/ready-apps', 'Explore Ready Apps'],
       ['/plans', 'Plans & Pricing'],
     ],
   },
