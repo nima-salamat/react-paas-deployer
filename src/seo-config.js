@@ -7,7 +7,7 @@ export const PUBLIC_PAGES = {
   "/": {
     title: "PaaSDeployer | Application Deployment & Management",
     description:
-      "Deploy applications, manage services, and choose the resources you need. Start small, use hourly plans when they fit, and scale as your workload grows.",
+      "Deploy applications, manage services, and launch ready-made self-hosted apps. Use one control plane for deployments, resources, networking and runtime operations."
   },
   "/plans": {
     title: "Plans & Pricing | PaaSDeployer",
@@ -15,9 +15,9 @@ export const PUBLIC_PAGES = {
       "Compare PaaSDeployer plans for CPU, memory and storage. Choose the right capacity for your application and scale when your workload changes.",
   },
   "/aboutUs": {
-    title: "About PaaSDeployer | Application Deployment Platform",
+    title: "About PaaSDeployer | Self-Hosted Application Deployment Platform",
     description:
-      "Learn how PaaSDeployer brings application deployment and day-to-day service management into one focused developer platform.",
+      "Learn how PaaSDeployer combines application deployment, service management, infrastructure resources, Ready Apps and automation in one self-hosted control plane.",
   },
   "/docs": {
     title: "Documentation | PaaSDeployer",
@@ -156,7 +156,8 @@ export function buildSchema(page, pathname, siteConfig, { docs = null } = {}) {
 export const SEO_FALLBACK_CONTENT = {
   "/": {
     heading: "Deploy faster. Manage everything in one place.",
-    intro: DEFAULT_DESCRIPTION,
+    intro:
+      "Deploy applications or start with ready-made self-hosted software, then manage services, resources and runtime operations from one focused control plane.",
   },
   "/plans": {
     heading: "Choose resources that fit your application.",
@@ -164,9 +165,9 @@ export const SEO_FALLBACK_CONTENT = {
       "Compare CPU, memory and storage options, then adjust resources as your workload changes.",
   },
   "/aboutUs": {
-    heading: "A simpler way to run applications.",
+    heading: "Infrastructure should feel like a product.",
     intro:
-      "PaaSDeployer brings application deployment and day-to-day infrastructure management into one focused control plane.",
+      "PaaSDeployer is a self-hosted application deployment platform for teams that want a clearer path from configured workload to running service, with Ready Apps and automation built into the same control plane.",
   },
   "/docs": {
     heading: "Documentation for deploying and managing applications.",
