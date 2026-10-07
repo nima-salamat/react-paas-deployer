@@ -17,7 +17,7 @@ const ROUTES = [
   {
     path: "aboutUs/index.html",
     url: "https://echonode.website/aboutUs",
-    title: "About PaaSDeployer | Application Deployment Platform",
+    title: "About PaaSDeployer | Self-Hosted Application Deployment Platform",
   },
 ];
 
