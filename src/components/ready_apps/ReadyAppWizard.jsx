@@ -26,10 +26,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
 import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
