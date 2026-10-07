@@ -30,8 +30,8 @@ const NAV_ITEMS = [
     group: "Workspace",
     items: [
       { id: "overview", label: "Overview", path: "/dashboard", icon: DashboardOutlinedIcon },
-      { id: "ready-apps", label: "Ready Apps", path: "/dashboard/ready-apps", icon: AppsOutlinedIcon },
-      { id: "my-ready-apps", label: "My Ready Apps", path: "/dashboard/ready-apps/installations", icon: Inventory2OutlinedIcon },
+      { id: "ready-apps", label: "App Library", path: "/dashboard/ready-apps", icon: AppsOutlinedIcon },
+      { id: "my-ready-apps", label: "Deployed Apps", path: "/dashboard/ready-apps/installations", icon: Inventory2OutlinedIcon },
     ],
   },
   {
