@@ -6,21 +6,26 @@ import {
   Card,
   CardActionArea,
   CardContent,
-  Chip,
-  CircularProgress,
   Container,
-  Grid,
+  InputAdornment,
+  Skeleton,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { Link as RouterLink } from "react-router-dom";
-import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import RocketLaunchOutlinedIcon from "@mui/icons-material/RocketLaunchOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
 import apiRequest from "../customHooks/apiRequest";
 
-const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+const API_ROOT =
+  "https://" +
+  String(import.meta.env.VITE_API_BASE || "")
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "");
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
 
 function normalizeList(data) {
@@ -29,45 +34,139 @@ function normalizeList(data) {
   return [];
 }
 
-function AppLogo({ app, size = 52 }) {
+function AppLogo({ app, size = 58 }) {
+  const [failed, setFailed] = useState(false);
   const logo = String(app?.logo || "");
-  if (/^https?:\/\//i.test(logo) || /^\//.test(logo)) {
-    return (
-      <Box
-        component="img"
-        src={logo}
-        alt=""
-        sx={{ width: size, height: size, objectFit: "contain", borderRadius: 2.5 }}
-        onError={(event) => {
-          event.currentTarget.style.display = "none";
-        }}
-      />
-    );
-  }
-  const initial = String(app?.name || "?").trim().charAt(0).toUpperCase();
+  const label = String(app?.name || "?").trim().charAt(0).toUpperCase() || "A";
+
   return (
     <Box
-      sx={{
+      sx={(theme) => ({
         width: size,
         height: size,
-        borderRadius: 2.5,
+        flexShrink: 0,
+        borderRadius: 3.2,
         display: "grid",
         placeItems: "center",
-        bgcolor: "action.hover",
+        position: "relative",
+        overflow: "hidden",
+        background:
+          theme.palette.mode === "dark"
+            ? "linear-gradient(145deg, rgba(81,129,255,.28), rgba(126,87,255,.12))"
+            : "linear-gradient(145deg, rgba(81,129,255,.12), rgba(126,87,255,.08))",
         border: "1px solid",
-        borderColor: "divider",
-        color: "primary.main",
-        fontSize: Math.round(size * 0.42),
-        fontWeight: 900,
-      }}
+        borderColor: alpha(theme.palette.primary.main, 0.18),
+        boxShadow: "0 10px 30px rgba(0,0,0,.08)",
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(120deg, rgba(255,255,255,.14), transparent 48%)",
+          pointerEvents: "none",
+        },
+      })}
     >
-      {initial || <AppsOutlinedIcon />}
+      {!failed && (/^https?:\/\//i.test(logo) || /^\//.test(logo)) ? (
+        <Box
+          component="img"
+          src={logo}
+          alt=""
+          onError={() => setFailed(true)}
+          sx={{
+            width: "68%",
+            height: "68%",
+            objectFit: "contain",
+            position: "relative",
+            zIndex: 1,
+          }}
+        />
+      ) : (
+        <AppsRoundedIcon sx={{ fontSize: size * 0.47, color: "primary.main", position: "relative", zIndex: 1 }} />
+      )}
     </Box>
+  );
+}
+
+function AppCard({ app }) {
+  return (
+    <Card
+      variant="outlined"
+      sx={(theme) => ({
+        height: "100%",
+        borderRadius: 4,
+        borderColor: alpha(theme.palette.divider, theme.palette.mode === "dark" ? 0.75 : 0.9),
+        backgroundColor: theme.palette.background.paper,
+        overflow: "hidden",
+        transition: "transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease",
+        "&:hover": {
+          transform: "translateY(-4px)",
+          borderColor: alpha(theme.palette.primary.main, 0.34),
+          boxShadow:
+            theme.palette.mode === "dark"
+              ? "0 18px 50px rgba(0,0,0,.24)"
+              : "0 18px 50px rgba(26,39,73,.10)",
+        },
+      })}
+    >
+      <CardActionArea
+        component={RouterLink}
+        to={"/dashboard/ready-apps/" + encodeURIComponent(app.id)}
+        sx={{ height: "100%" }}
+      >
+        <CardContent sx={{ p: { xs: 2.25, md: 2.6 }, minHeight: 235, display: "flex", flexDirection: "column" }}>
+          <Stack direction="row" spacing={1.6} alignItems="center">
+            <AppLogo app={app} />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}
+              >
+                {app.category || "Application"}
+              </Typography>
+              <Typography
+                component="h2"
+                variant="h6"
+                sx={{ fontWeight: 900, letterSpacing: "-.02em", mt: .15 }}
+                noWrap
+              >
+                {app.name}
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Typography
+            color="text.secondary"
+            sx={{
+              mt: 2,
+              lineHeight: 1.6,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {app.description || "A curated application, ready to deploy."}
+          </Typography>
+
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: "auto", pt: 2.6 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
+              {app.software_version ? "v" + app.software_version : "Managed runtime"}
+            </Typography>
+            <Stack direction="row" spacing={.55} alignItems="center" sx={{ color: "primary.main", fontWeight: 850 }}>
+              <Typography variant="body2" sx={{ fontWeight: 850 }}>Install</Typography>
+              <ArrowForwardRoundedIcon sx={{ fontSize: 17 }} />
+            </Stack>
+          </Stack>
+        </CardContent>
+      </CardActionArea>
+    </Card>
   );
 }
 
 export default function ReadyApps() {
   const [apps, setApps] = useState([]);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -80,7 +179,7 @@ export default function ReadyApps() {
         setApps(normalizeList(response.data));
       } catch (err) {
         if (!mounted) return;
-        setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Ready Apps could not be loaded."));
+        setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Couldn't load the app library."));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -90,137 +189,133 @@ export default function ReadyApps() {
     };
   }, []);
 
-  const visibleApps = useMemo(
-    () =>
-      [...apps].sort((a, b) => {
+  const visibleApps = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return [...apps]
+      .filter((app) => {
+        if (!needle) return true;
+        const haystack = [
+          app?.name,
+          app?.description,
+          app?.category,
+          ...(app?.tags || []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(needle);
+      })
+      .sort((a, b) => {
         if (Boolean(a.featured) !== Boolean(b.featured)) return a.featured ? -1 : 1;
         return String(a.name || "").localeCompare(String(b.name || ""));
-      }),
-    [apps]
-  );
+      });
+  }, [apps, query]);
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 } }}>
-      <Stack spacing={0.7} sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1.1} alignItems="center">
-          <AppsOutlinedIcon color="primary" />
-          <Typography component="h1" variant="h5" sx={{ fontWeight: 900 }}>
-            Ready Apps
-          </Typography>
-        </Stack>
-        <Typography color="text.secondary" sx={{ maxWidth: 760 }}>
-          Deploy curated applications with platform-managed services, storage, networking, and health checks.
-        </Typography>
-      </Stack>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1} sx={{ mb: 2.5 }}>
-        <Button
-          component={RouterLink}
-          to="/dashboard/ready-apps/installations"
-          variant="outlined"
-          startIcon={<Inventory2OutlinedIcon />}
-          sx={{ borderRadius: 1.8, fontWeight: 800 }}
+    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
+      <Stack spacing={3.25}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", md: "flex-end" }}
         >
-          My Ready Apps
-        </Button>
-      </Stack>
-
-      {loading ? (
-        <Box sx={{ minHeight: 260, display: "grid", placeItems: "center" }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert severity="error" sx={{ borderRadius: 2 }}>
-          {error}
-        </Alert>
-      ) : visibleApps.length === 0 ? (
-        <Card variant="outlined" sx={{ borderRadius: 3 }}>
-          <CardContent sx={{ py: 6, textAlign: "center" }}>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              No Ready Apps are available
+          <Box>
+            <Typography
+              component="h1"
+              sx={{ fontSize: { xs: 30, md: 42 }, lineHeight: 1.05, fontWeight: 950, letterSpacing: "-.045em" }}
+            >
+              App Library
             </Typography>
-            <Typography color="text.secondary" sx={{ mt: 0.75 }}>
-              The platform catalog currently has no applications published for deployment.
+            <Typography color="text.secondary" sx={{ mt: 1, maxWidth: 520 }}>
+              Pick an app. Configure it. Ship it.
             </Typography>
-          </CardContent>
-        </Card>
-      ) : (
-        <Grid container spacing={2}>
-          {visibleApps.map((app) => (
-            <Grid item key={app.id} xs={12} sm={6} lg={4}>
-              <Card
-                variant="outlined"
-                sx={{
-                  height: "100%",
-                  borderRadius: 3,
-                  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
-                  "&:hover": {
-                    transform: "translateY(-2px)",
-                    boxShadow: 4,
-                    borderColor: "primary.main",
-                  },
-                }}
-              >
-                <CardActionArea
-                  component={RouterLink}
-                  to={"/dashboard/ready-apps/" + encodeURIComponent(app.id)}
-                  sx={{ height: "auto" }}
-                >
-                  <CardContent sx={{ p: 2.25, display: "flex", flexDirection: "column" }}>
-                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                      <AppLogo app={app} />
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Stack direction="row" spacing={0.7} alignItems="center" flexWrap="wrap">
-                          <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 900 }}>
-                            {app.name}
-                          </Typography>
-                          {app.featured && <Chip size="small" color="primary" label="Featured" />}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary">
-                          {app.category} · {app.software_version}
-                        </Typography>
-                      </Box>
-                    </Stack>
+          </Box>
 
-                    <Typography color="text.secondary" sx={{ mt: 1.7, lineHeight: 1.55 }}>
-                      {app.description}
-                    </Typography>
+          <Button
+            component={RouterLink}
+            to="/dashboard/ready-apps/installations"
+            variant="outlined"
+            startIcon={<Inventory2OutlinedIcon />}
+            sx={{
+              borderRadius: 2.2,
+              px: 1.7,
+              py: 1,
+              fontWeight: 850,
+              alignSelf: { xs: "stretch", md: "auto" },
+            }}
+          >
+            Deployed Apps
+          </Button>
+        </Stack>
 
-                    <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
-                      {(app.features || []).slice(0, 3).map((feature) => (
-                        <Chip key={feature} size="small" variant="outlined" label={feature} />
-                      ))}
-                    </Stack>
+        <TextField
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search apps"
+          fullWidth
+          size="small"
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchRoundedIcon sx={{ color: "text.secondary" }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            maxWidth: 560,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: "background.paper",
+            },
+          }}
+        />
 
-                    <Box sx={{ flex: 1 }} />
-                  </CardContent>
-                </CardActionArea>
-                <Box sx={{ px: 2.25, pb: 2.25 }}>
-                  <Button
-                    fullWidth
-                    component={RouterLink}
-                    to={"/dashboard/ready-apps/" + encodeURIComponent(app.id)}
-                    sx={{ borderRadius: 1.7, fontWeight: 800 }}
-                    endIcon={<ArrowForwardRoundedIcon />}
-                  >
-                    Deploy
-                  </Button>
-                </Box>
+        {error && (
+          <Alert severity="error" sx={{ borderRadius: 2.5 }}>
+            {error}
+          </Alert>
+        )}
+
+        {loading ? (
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))", lg: "repeat(3,minmax(0,1fr))" }, gap: 2 }}>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Card key={index} variant="outlined" sx={{ borderRadius: 4, p: 2.5 }}>
+                <Stack spacing={1.5}>
+                  <Skeleton variant="rounded" width={58} height={58} />
+                  <Skeleton variant="rounded" width="52%" height={28} />
+                  <Skeleton variant="rounded" width="90%" height={18} />
+                  <Skeleton variant="rounded" width="76%" height={18} />
+                </Stack>
               </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-
-      {!loading && !error && visibleApps.length > 0 && (
-        <Box sx={{ mt: 3, p: 2, borderRadius: 2.5, bgcolor: "action.hover", border: "1px solid", borderColor: "divider" }}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems={{ xs: "flex-start", sm: "center" }}>
-            <RocketLaunchOutlinedIcon color="primary" />
-            <Typography variant="body2" color="text.secondary">
-              Ready Apps are curated by the platform. Arbitrary Docker Compose files are not exposed through this workflow.
+            ))}
+          </Box>
+        ) : visibleApps.length === 0 ? (
+          <Card
+            variant="outlined"
+            sx={{ borderRadius: 4, p: { xs: 3.5, md: 5.5 }, textAlign: "center" }}
+          >
+            <AppsRoundedIcon sx={{ fontSize: 42, color: "text.disabled" }} />
+            <Typography sx={{ mt: 1.4, fontWeight: 900 }}>
+              {query ? "No matching apps" : "No apps available"}
             </Typography>
-          </Stack>
-        </Box>
-      )}
+            <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>
+              {query ? "Try a different search." : "The library is empty right now."}
+            </Typography>
+          </Card>
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))", lg: "repeat(3,minmax(0,1fr))" },
+              gap: 2,
+            }}
+          >
+            {visibleApps.map((app) => (
+              <AppCard key={app.id} app={app} />
+            ))}
+          </Box>
+        )}
+      </Stack>
     </Container>
   );
 }
