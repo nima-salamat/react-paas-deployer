@@ -314,6 +314,12 @@ export default function ServiceDetail() {
   const catalogManaged = Boolean(
     service?.source_kind === "catalog" || service?.application_instance_id
   );
+  const managedAppLabel = String(
+    service?.source_config?.catalog_id ||
+    service?.catalog_id ||
+    service?.application_instance?.catalog_id ||
+    "Ready App"
+  ).replace(/-with-(postgres|postgresql|mariadb|mysql|worker|redis)/gi, "").replace(/[-_]+/g, " ").trim();
 
   const allowedTabs = useMemo(() => {
     if (shareAccess.loading && !effectiveIsOwner) return ["overview"];
@@ -1801,6 +1807,7 @@ export default function ServiceDetail() {
             actions={{ startService, stopService, rebuildService, forceCancelDeploy, checkServiceRunning, openServiceInNewTab }}
             forceCancelLoading={forceCancelLoading}
             managedByApplication={catalogManaged}
+            managedAppLabel={managedAppLabel}
             onOpenManagedApplication={
               service?.application_instance_id
                 ? () => navigate("/dashboard/ready-apps/installations/" + service.application_instance_id)
