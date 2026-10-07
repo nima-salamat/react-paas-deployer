@@ -5,22 +5,21 @@ import {
   Button,
   Card,
   CardActionArea,
-  CardContent,
-  Chip,
-  CircularProgress,
   Container,
-  Grid,
+  Skeleton,
   Stack,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
-import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
-import { Link as RouterLink, useNavigate } from "react-router-dom";
+import HourglassTopRoundedIcon from "@mui/icons-material/HourglassTopRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
+import { Link as RouterLink } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 
 const API_ROOT =
@@ -29,7 +28,6 @@ const API_ROOT =
     .replace(/^https?:\/\//, "")
     .replace(/\/+$/, "");
 const ROOT = API_ROOT + "/api/application-catalog";
-
 const TERMINAL = new Set(["running", "failed", "cancelled"]);
 
 function listFrom(data) {
@@ -38,142 +36,152 @@ function listFrom(data) {
   return [];
 }
 
-function pretty(value) {
-  const raw = String(value || "pending").replace(/_/g, " ").trim();
-  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : "Pending";
+function statusLabel(status, deletionPending) {
+  if (deletionPending) return "Cleaning up";
+  const value = String(status || "pending").toLowerCase();
+  if (value === "running") return "Running";
+  if (value === "failed") return "Failed";
+  if (value === "cancelled") return "Cancelled";
+  return "Deploying";
 }
 
-function statusColor(status) {
+function statusTone(status, deletionPending) {
+  if (deletionPending) return "warning";
   const value = String(status || "").toLowerCase();
   if (value === "running") return "success";
   if (value === "failed") return "error";
-  if (value === "cancelled") return "warning";
-  if (value === "deletion_pending") return "warning";
-  return "default";
+  return "primary";
 }
 
-function isDeletionPending(installation) {
+function StatusIcon({ status, deleting }) {
+  if (deleting) return <HourglassTopRoundedIcon sx={{ fontSize: 15 }} />;
+  if (status === "running") return <CheckCircleRoundedIcon sx={{ fontSize: 15 }} />;
+  if (status === "failed") return <ErrorOutlineRoundedIcon sx={{ fontSize: 15 }} />;
+  return <HourglassTopRoundedIcon sx={{ fontSize: 15 }} />;
+}
+
+function AppMark() {
   return (
-    String(installation?.stage || "").toLowerCase() === "deletion_pending" ||
-    installation?.error_code === "APPLICATION_DELETION_PENDING"
+    <Box
+      sx={(theme) => ({
+        width: 54,
+        height: 54,
+        borderRadius: 3,
+        display: "grid",
+        placeItems: "center",
+        flexShrink: 0,
+        color: "primary.main",
+        bgcolor:
+          theme.palette.mode === "dark"
+            ? alpha(theme.palette.primary.main, .13)
+            : alpha(theme.palette.primary.main, .07),
+        border: "1px solid",
+        borderColor: alpha(theme.palette.primary.main, .18),
+      })}
+    >
+      <AppsRoundedIcon sx={{ fontSize: 25 }} />
+    </Box>
   );
 }
 
-function StatusSummary({ installation }) {
-  const status = String(installation?.status || "").toLowerCase();
-  const services = installation?.services || [];
-  const failed = services.filter((item) => ["failed", "rolled_back"].includes(String(item.status || "").toLowerCase())).length;
-  const succeeded = services.filter((item) => String(item.status || "").toLowerCase() === "succeeded").length;
-  const running = services.filter((item) => ["running", "pending"].includes(String(item.status || "").toLowerCase())).length;
-
-  if (status === "running") {
-    return (
-      <Stack direction="row" spacing={0.6} alignItems="center">
-        <CheckCircleRoundedIcon sx={{ fontSize: 17, color: "success.main" }} />
-        <Typography variant="caption" color="text.secondary">
-          {services.length} service{services.length === 1 ? "" : "s"} ready
-        </Typography>
-      </Stack>
-    );
-  }
-  if (failed) {
-    return (
-      <Stack direction="row" spacing={0.6} alignItems="center">
-        <ErrorOutlineRoundedIcon sx={{ fontSize: 17, color: "error.main" }} />
-        <Typography variant="caption" color="text.secondary">
-          {failed} service{failed === 1 ? "" : "s"} failed
-        </Typography>
-      </Stack>
-    );
-  }
-  return (
-    <Stack direction="row" spacing={0.6} alignItems="center">
-      <AccessTimeRoundedIcon sx={{ fontSize: 17, color: "text.secondary" }} />
-      <Typography variant="caption" color="text.secondary">
-        {succeeded ? succeeded + " completed" : running + " pending"} · status refreshes automatically
-      </Typography>
-    </Stack>
-  );
-}
-
-function InstallationCard({ installation, onOpen }) {
+function InstallationCard({ installation }) {
   const status = String(installation?.status || "pending").toLowerCase();
-  const deleting = isDeletionPending(installation);
-  const services = installation?.services || [];
-  const url = installation?.application_url || "";
+  const deleting =
+    String(installation?.stage || "").toLowerCase() === "deletion_pending" ||
+    installation?.error_code === "APPLICATION_DELETION_PENDING";
+  const host =
+    installation?.application_url
+      ?.replace(/^https?:\/\//i, "")
+      .replace(/\/$/, "") || "";
+
+  const tone = statusTone(status, deleting);
 
   return (
     <Card
       variant="outlined"
-      sx={{
-        height: "100%",
-        borderRadius: 3,
-        transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
+      sx={(theme) => ({
+        borderRadius: 4,
+        overflow: "hidden",
+        borderColor: alpha(theme.palette.divider, .86),
+        transition: "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
         "&:hover": {
-          transform: "translateY(-2px)",
-          boxShadow: 4,
-          borderColor: "primary.main",
+          transform: "translateY(-3px)",
+          borderColor: alpha(theme.palette.primary.main, .35),
+          boxShadow:
+            theme.palette.mode === "dark"
+              ? "0 18px 50px rgba(0,0,0,.22)"
+              : "0 18px 50px rgba(26,39,73,.09)",
         },
-      }}
+      })}
     >
       <CardActionArea
         component={RouterLink}
         to={"/dashboard/ready-apps/installations/" + encodeURIComponent(installation.id)}
       >
-        <CardContent sx={{ p: 2.25 }}>
-          <Stack direction="row" justifyContent="space-between" spacing={1.5}>
-            <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ p: { xs: 2.1, md: 2.4 } }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <AppMark />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
-                variant="overline"
-                color="primary.main"
-                sx={{ fontWeight: 900, letterSpacing: "0.06em" }}
+                variant="caption"
+                color="text.secondary"
+                sx={{ textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}
               >
-                {installation.catalog_id || "Ready App"}
+                {installation.catalog_id || "App"}
               </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 900, mt: -0.3 }} noWrap>
+              <Typography sx={{ mt: .25, fontWeight: 900, fontSize: 18 }} noWrap>
                 {installation.name}
               </Typography>
             </Box>
-            <Chip
-              size="small"
-              label={deleting ? "Cleaning up" : pretty(status)}
-              color={deleting ? "warning" : statusColor(status)}
-              sx={{ fontWeight: 800, flexShrink: 0 }}
-            />
+
+            <Box
+              sx={(theme) => ({
+                display: "inline-flex",
+                alignItems: "center",
+                gap: .45,
+                px: 1,
+                py: .55,
+                borderRadius: 999,
+                color: theme.palette[tone]?.main || theme.palette.primary.main,
+                bgcolor: alpha(theme.palette[tone]?.main || theme.palette.primary.main, .1),
+                fontSize: 11,
+                fontWeight: 850,
+                flexShrink: 0,
+              })}
+            >
+              <StatusIcon status={status} deleting={deleting} />
+              {statusLabel(status, deleting)}
+            </Box>
           </Stack>
 
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.4 }}>
-            v{installation.software_version || installation.definition_version || "unknown"} · {services.length} service{services.length === 1 ? "" : "s"}
-          </Typography>
-
-          <Box sx={{ mt: 1.5 }}>
-            <StatusSummary installation={installation} />
-          </Box>
-
-          {url && status === "running" && !deleting && (
-            <Stack direction="row" spacing={0.6} alignItems="center" sx={{ mt: 1.3, minWidth: 0 }}>
-              <LaunchRoundedIcon sx={{ fontSize: 16, color: "primary.main" }} />
+          {host && status === "running" && !deleting ? (
+            <Stack direction="row" spacing={.6} alignItems="center" sx={{ mt: 2, minWidth: 0 }}>
+              <OpenInNewRoundedIcon sx={{ fontSize: 16, color: "primary.main", flexShrink: 0 }} />
               <Typography
-                variant="caption"
-                color="primary.main"
-                sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                variant="body2"
+                color="text.secondary"
+                noWrap
+                sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
               >
-                {url.replace(/^https?:\/\//, "")}
+                {host}
               </Typography>
             </Stack>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              {installation.software_version ? \`v\${installation.software_version}\` : "Managed app"}
+            </Typography>
           )}
-        </CardContent>
+        </Box>
       </CardActionArea>
 
-      <Box sx={{ px: 2.25, pb: 2 }}>
+      <Box sx={{ px: 2.1, pb: 1.8 }}>
         <Button
-          fullWidth
           component={RouterLink}
           to={"/dashboard/ready-apps/installations/" + encodeURIComponent(installation.id)}
           endIcon={<ArrowForwardRoundedIcon />}
-          sx={{ borderRadius: 1.7, fontWeight: 800 }}
+          sx={{ fontWeight: 850, borderRadius: 2, px: .7 }}
         >
-          Open app
+          Open
         </Button>
       </Box>
     </Card>
@@ -181,7 +189,6 @@ function InstallationCard({ installation, onOpen }) {
 }
 
 export default function ReadyAppInstallations() {
-  const navigate = useNavigate();
   const [installations, setInstallations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -192,17 +199,14 @@ export default function ReadyAppInstallations() {
     else setLoading(true);
     setError("");
     try {
-      const response = await apiRequest({
-        method: "GET",
-        url: ROOT + "/installations/",
-      });
+      const response = await apiRequest({ method: "GET", url: ROOT + "/installations/" });
       setInstallations(listFrom(response.data));
     } catch (err) {
       setError(
         String(
           err?.response?.data?.detail ||
             err?.response?.data?.error ||
-            "Ready App installations could not be loaded."
+            "Couldn't load deployed apps."
         )
       );
     } finally {
@@ -215,106 +219,122 @@ export default function ReadyAppInstallations() {
     load();
   }, [load]);
 
-  const activeInstallations = useMemo(
+  const active = useMemo(
     () =>
-      installations.filter(
-        (item) =>
-          !TERMINAL.has(String(item?.status || "").toLowerCase()) ||
-          isDeletionPending(item)
-      ),
+      installations.some((item) => {
+        const status = String(item?.status || "").toLowerCase();
+        return !TERMINAL.has(status) || String(item?.stage || "").toLowerCase() === "deletion_pending";
+      }),
     [installations]
   );
 
   useEffect(() => {
-    if (!activeInstallations.length) return undefined;
+    if (!active) return undefined;
     const timer = window.setInterval(() => load(true), 4000);
     return () => window.clearInterval(timer);
-  }, [activeInstallations.length, load]);
+  }, [active, load]);
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 } }}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", md: "flex-start" }}
-        spacing={2}
-        sx={{ mb: 3 }}
-      >
-        <Box>
-          <Stack direction="row" spacing={1.1} alignItems="center">
-            <AppsOutlinedIcon color="primary" />
-            <Typography component="h1" variant="h5" sx={{ fontWeight: 900 }}>
-              My Ready Apps
+    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
+      <Stack spacing={3}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "stretch", sm: "flex-end" }}
+          spacing={2}
+        >
+          <Box>
+            <Button
+              component={RouterLink}
+              to="/dashboard/ready-apps"
+              startIcon={<ArrowBackRoundedIcon />}
+              sx={{ px: 0, mb: 1, fontWeight: 800 }}
+            >
+              App Library
+            </Button>
+            <Typography
+              component="h1"
+              sx={{ fontSize: { xs: 30, md: 42 }, fontWeight: 950, lineHeight: 1.05, letterSpacing: "-.045em" }}
+            >
+              Deployed Apps
             </Typography>
-          </Stack>
-          <Typography color="text.secondary" sx={{ mt: 0.55, maxWidth: 760 }}>
-            Your deployed Ready Apps, their status, and everything you need to manage them from one place.
-          </Typography>
-        </Box>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            {refreshing && (
+              <Typography variant="caption" color="text.secondary">
+                Updating…
+              </Typography>
+            )}
+          </Box>
+
           <Button
             component={RouterLink}
             to="/dashboard/ready-apps"
             variant="contained"
             startIcon={<AddRoundedIcon />}
-            sx={{ borderRadius: 1.8, fontWeight: 850 }}
+            sx={{ borderRadius: 2.2, px: 1.7, py: 1, fontWeight: 850 }}
           >
-            Deploy an app
+            Install app
           </Button>
         </Stack>
-      </Stack>
 
-      {refreshing && (
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.2 }}>
-          Updating installation status…
-        </Typography>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ borderRadius: 2.5 }}>
+            {error}
+          </Alert>
+        )}
 
-      {loading ? (
-        <Box sx={{ minHeight: 300, display: "grid", placeItems: "center" }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Alert
-          severity="error"
-          sx={{ borderRadius: 2 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => load()}>
-              Retry
-            </Button>
-          }
-        >
-          {error}
-        </Alert>
-      ) : installations.length === 0 ? (
-        <Card variant="outlined" sx={{ borderRadius: 3 }}>
-          <CardContent sx={{ py: 8, textAlign: "center" }}>
-            <AppsOutlinedIcon sx={{ fontSize: 42, color: "text.disabled" }} />
-            <Typography variant="h6" sx={{ fontWeight: 850, mt: 1 }}>
-              No apps deployed yet
+        {loading ? (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))", lg: "repeat(3,minmax(0,1fr))" },
+              gap: 2,
+            }}
+          >
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Card key={index} variant="outlined" sx={{ borderRadius: 4, p: 2.4 }}>
+                <Stack spacing={1.5}>
+                  <Skeleton variant="rounded" width={54} height={54} />
+                  <Skeleton variant="rounded" width="60%" height={26} />
+                  <Skeleton variant="rounded" width="72%" height={18} />
+                </Stack>
+              </Card>
+            ))}
+          </Box>
+        ) : installations.length === 0 ? (
+          <Card
+            variant="outlined"
+            sx={{ borderRadius: 4, p: { xs: 4, md: 6 }, textAlign: "center" }}
+          >
+            <AppsRoundedIcon sx={{ fontSize: 44, color: "text.disabled" }} />
+            <Typography sx={{ mt: 1.5, fontWeight: 900, fontSize: 19 }}>
+              Nothing deployed yet
             </Typography>
-            <Typography color="text.secondary" sx={{ mt: 0.7 }}>
-              Pick an app from the catalog and it will appear here once you start the deployment.
+            <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>
+              Choose an app from the library to get started.
             </Typography>
             <Button
               component={RouterLink}
               to="/dashboard/ready-apps"
               variant="contained"
-              sx={{ mt: 2, borderRadius: 1.8, fontWeight: 850 }}
+              sx={{ mt: 2, borderRadius: 2, fontWeight: 850 }}
             >
-              Browse app catalog
+              Browse apps
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Grid container spacing={2}>
-          {installations.map((installation) => (
-            <Grid item key={installation.id} xs={12} sm={6} lg={4}>
-              <InstallationCard installation={installation} onOpen={navigate} />
-            </Grid>
-          ))}
-        </Grid>
-      )}
+          </Card>
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))", lg: "repeat(3,minmax(0,1fr))" },
+              gap: 2,
+            }}
+          >
+            {installations.map((installation) => (
+              <InstallationCard key={installation.id} installation={installation} />
+            ))}
+          </Box>
+        )}
+      </Stack>
     </Container>
   );
 }
