@@ -1265,7 +1265,7 @@ export default function Home() {
                   WordPress · n8n · Mattermost · Matrix · Uptime Kuma · Forgejo
                 </Typography>
                 <Typography variant="body2" sx={{ opacity: 0.62 }}>
-                  and more in the App Library
+                  Plus more apps in the App Library
                 </Typography>
               </Stack>
             </Reveal>
