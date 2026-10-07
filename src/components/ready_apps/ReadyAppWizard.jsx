@@ -549,7 +549,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                 .map((field) => (
                   <Box
                     key={field.id}
-                    sx={{ gridColumn: { xs: "span 1", sm: field.type === "string" && field.id === "wordpress_site_title" ? "span 2" : "span 1" } }}
+                    sx={{ gridColumn: { xs: "span 1", sm: field.ui?.full_width ? "span 2" : "span 1" } }}
                   >
                     <DynamicField
                       field={field}
