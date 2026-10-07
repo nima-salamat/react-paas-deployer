@@ -1,4 +1,5 @@
 import React from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
   Button,
@@ -58,18 +59,37 @@ export default function ServicesToolbar({
           gap: 1.5,
         }}
       >
-        <Typography
-          variant="h5"
-          fontWeight={800}
-          sx={{ letterSpacing: "-0.02em" }}
-        >
-          {shareScope === "shared_with_me"
-            ? "Shared with me"
-            : shareScope === "shared_by_me"
-            ? "Shared by me"
-            : "My Services"}
-        </Typography>
-        <Stack direction="row" spacing={0.5}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            variant="h5"
+            fontWeight={850}
+            sx={{ letterSpacing: "-0.025em", lineHeight: 1.15 }}
+          >
+            {shareScope === "shared_with_me"
+              ? "Shared with me"
+              : shareScope === "shared_by_me"
+              ? "Shared by me"
+              : "My Services"}
+          </Typography>
+          {shareScope === "mine" && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
+              Build from scratch or start with a managed app.
+            </Typography>
+          )}
+        </Box>
+        <Stack direction="row" spacing={0.6} alignItems="center">
+          {shareScope === "mine" && (
+            <Button
+              component={RouterLink}
+              to="/dashboard/ready-apps"
+              size="small"
+              variant="outlined"
+              startIcon={<AppsIcon sx={{ fontSize: 17 }} />}
+              sx={{ borderRadius: 1.8, fontWeight: 800, textTransform: "none", minHeight: 36 }}
+            >
+              App Library
+            </Button>
+          )}
           <Tooltip title="Refresh">
             <IconButton
               onClick={onRefresh}
