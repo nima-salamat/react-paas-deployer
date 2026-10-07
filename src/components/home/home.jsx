@@ -43,6 +43,13 @@ import heroNetwork from "../../assets/home/hero-network.svg";
 import deployFlow from "../../assets/home/deploy-flow.svg";
 import deployPipeline from "../../assets/home/deploy-pipeline.svg";
 import productionNetwork from "../../assets/home/production-network.svg";
+import readyAppsMesh from "../../assets/home/ready-apps-mesh.svg";
+import wordpressReadyAppIcon from "../../assets/home/ready-app-wordpress.svg";
+import n8nReadyAppIcon from "../../assets/home/ready-app-n8n.svg";
+import mattermostReadyAppIcon from "../../assets/home/ready-app-mattermost.svg";
+import synapseReadyAppIcon from "../../assets/home/ready-app-synapse.svg";
+import uptimeKumaReadyAppIcon from "../../assets/home/ready-app-uptime-kuma.svg";
+import forgejoReadyAppIcon from "../../assets/home/ready-app-forgejo.svg";
 import PlansPreview from "./PlansPreview.jsx";
 
 /* ───────────────── Constants ───────────────── */
@@ -117,78 +124,109 @@ const STACK_HIGHLIGHTS = [
 const TECH_LABELS = ["React", "Node.js", "Django", "Flask", "Docker"];
 
 const FEATURED_READY_APPS = [
-  { id: "wordpress", name: "WordPress", category: "CMS", description: "Managed WordPress with database setup, WP-CLI and runtime controls." },
-  { id: "n8n-with-postgres-and-worker", name: "n8n", category: "Automation", description: "Workflow automation with PostgreSQL and a dedicated worker." },
-  { id: "mattermost", name: "Mattermost", category: "Collaboration", description: "Team chat packaged with its supporting database stack." },
-  { id: "uptime-kuma", name: "Uptime Kuma", category: "Monitoring", description: "Self-hosted uptime monitoring with persistent data and HTTPS routing." },
+  { id: "wordpress", name: "WordPress", category: "CMS", description: "Managed WordPress with database setup, WP-CLI and runtime controls.", icon: wordpressReadyAppIcon, accent: "#60A5FA" },
+  { id: "n8n-with-postgres-and-worker", name: "n8n", category: "Automation", description: "Workflow automation with PostgreSQL and a dedicated worker.", icon: n8nReadyAppIcon, accent: "#F59E0B" },
+  { id: "mattermost", name: "Mattermost", category: "Collaboration", description: "Team chat packaged with its supporting database stack.", icon: mattermostReadyAppIcon, accent: "#818CF8" },
+  { id: "synapse", name: "Matrix / Synapse", category: "Communication", description: "Self-hosted Matrix homeserver with a deployment-ready runtime.", icon: synapseReadyAppIcon, accent: "#22D3EE" },
+  { id: "uptime-kuma", name: "Uptime Kuma", category: "Monitoring", description: "Self-hosted uptime monitoring with persistent data and HTTPS routing.", icon: uptimeKumaReadyAppIcon, accent: "#34D399" },
+  { id: "forgejo-with-postgresql", name: "Forgejo", category: "Git hosting", description: "Self-hosted Git collaboration with PostgreSQL and persistent storage.", icon: forgejoReadyAppIcon, accent: "#FB923C" },
 ];
 
-function FeaturedReadyAppCard({ app, index }) {
+function FeaturedReadyAppCard({ app }) {
   const theme = useTheme();
-  const tones = [theme.palette.primary.main, theme.palette.secondary.main || theme.palette.info.main, theme.palette.info.main, theme.palette.success.main];
-  const accent = tones[index % tones.length];
-
   return (
     <Paper
-      component={RouterLink}
-      to="/dashboard/ready-apps"
+      component="article"
       elevation={0}
       sx={{
-        p: { xs: 1.7, md: 2 },
+        position: "relative",
+        p: { xs: 1.65, sm: 1.9, md: 2 },
+        minHeight: { xs: 168, sm: 182, md: 194 },
         height: "100%",
         boxSizing: "border-box",
         borderRadius: { xs: 2.5, md: 3 },
         border: "1px solid",
-        borderColor: alpha(accent, 0.16),
-        color: "inherit",
-        textDecoration: "none",
-        background: "linear-gradient(145deg, rgba(255,255,255,.04), rgba(255,255,255,0))",
-        transition: "transform .2s ease, border-color .2s ease, box-shadow .2s ease",
+        borderColor: alpha(app.accent, theme.palette.mode === "dark" ? 0.16 : 0.12),
+        overflow: "hidden",
+        background: theme.palette.mode === "dark"
+          ? "linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.012))"
+          : "linear-gradient(145deg, rgba(255,255,255,.98), rgba(248,250,252,.9))",
+        transition: "transform .22s ease, border-color .22s ease, box-shadow .22s ease",
         "&:hover": {
           transform: "translateY(-4px)",
-          borderColor: alpha(accent, 0.34),
-          boxShadow: "0 20px 46px " + alpha(accent, 0.12),
+          borderColor: alpha(app.accent, 0.38),
+          boxShadow: "0 20px 50px " + alpha(app.accent, theme.palette.mode === "dark" ? 0.12 : 0.08),
+          "& .ready-app-arrow": { transform: "translateX(3px)" },
         },
-        "&:focus-visible": { outline: "2px solid " + accent, outlineOffset: 2 },
+        "&:focus-within": {
+          borderColor: alpha(app.accent, 0.42),
+          boxShadow: "0 0 0 3px " + alpha(app.accent, 0.1),
+        },
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          width: 160,
+          height: 160,
+          borderRadius: "50%",
+          top: -105,
+          right: -70,
+          background: "radial-gradient(circle, rgba(125,211,252,.12) 0%, transparent 68%)",
+          pointerEvents: "none",
+        },
       }}
     >
-      <Stack direction="row" spacing={1.35} alignItems="flex-start">
-        <Box
-          sx={{
-            width: 46,
-            height: 46,
-            flexShrink: 0,
-            borderRadius: 2,
-            display: "grid",
-            placeItems: "center",
-            fontWeight: 950,
-            fontSize: "1.05rem",
-            color: accent,
-            border: "1px solid",
-            borderColor: alpha(accent, 0.18),
-            bgcolor: alpha(accent, theme.palette.mode === "dark" ? 0.12 : 0.06),
-          }}
-        >
-          {app.name.charAt(0)}
-        </Box>
-        <Box sx={{ minWidth: 0 }}>
-          <Stack direction="row" spacing={0.8} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Typography sx={{ fontWeight: 900 }}>{app.name}</Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 750 }}>{app.category}</Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.55, lineHeight: 1.55 }}>
-            {app.description}
-          </Typography>
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 1.1, color: accent }}>
-            <Typography variant="caption" sx={{ fontWeight: 850 }}>Ready to deploy</Typography>
-            <ArrowForwardRoundedIcon sx={{ fontSize: 15 }} />
-          </Stack>
+      <Stack sx={{ height: "100%", position: "relative", zIndex: 1 }} spacing={1.35}>
+        <Stack direction="row" spacing={1.35} alignItems="flex-start">
+          <Box sx={{
+            width: { xs: 52, md: 58 }, height: { xs: 52, md: 58 }, flexShrink: 0,
+            borderRadius: 2.1, display: "grid", placeItems: "center",
+            border: "1px solid", borderColor: alpha(app.accent, 0.18),
+            bgcolor: alpha(app.accent, theme.palette.mode === "dark" ? 0.085 : 0.055),
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,.06)",
+          }}>
+            <Box component="img" src={app.icon} alt="" sx={{ width: { xs: 31, md: 35 }, height: { xs: 31, md: 35 }, display: "block" }} />
+          </Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography sx={{ fontSize: { xs: "1rem", md: "1.06rem" }, fontWeight: 900, letterSpacing: "-.02em" }}>
+              {app.name}
+            </Typography>
+            <Typography sx={{ mt: 0.35, color: app.accent, fontSize: "0.69rem", fontWeight: 850, letterSpacing: ".095em", textTransform: "uppercase" }}>
+              {app.category}
+            </Typography>
+          </Box>
+          <Box className="ready-app-arrow" aria-hidden="true" sx={{
+            width: 30, height: 30, flexShrink: 0, display: "grid", placeItems: "center",
+            borderRadius: "50%", border: "1px solid", borderColor: alpha(app.accent, 0.15),
+            color: app.accent, transition: "transform .22s ease",
+          }}>
+            <ArrowForwardRoundedIcon sx={{ fontSize: 16 }} />
+          </Box>
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{
+          lineHeight: 1.62, fontSize: { xs: "0.82rem", md: "0.86rem" },
+          display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2,
+          overflow: "hidden", maxWidth: 390,
+        }}>
+          {app.description}
+        </Typography>
+        <Box sx={{ mt: "auto", pt: 0.2 }}>
+          <Button component={RouterLink} to="/dashboard/ready-apps" variant="text" size="small"
+            aria-label={"Open " + app.name + " in the Ready App library"}
+            endIcon={<ArrowForwardRoundedIcon className="ready-app-button-arrow" sx={{ fontSize: 15 }} />}
+            sx={{
+              p: 0, minWidth: 0, minHeight: 30, color: "text.primary", fontWeight: 850,
+              justifyContent: "flex-start", textTransform: "none",
+              "&:hover": { bgcolor: "transparent", color: app.accent },
+              "& .ready-app-button-arrow": { transition: "transform .18s ease" },
+              "&:hover .ready-app-button-arrow": { transform: "translateX(3px)" },
+            }}>
+            View in App Library
+          </Button>
         </Box>
       </Stack>
     </Paper>
   );
 }
-
 /* Animation timing constants */
 const ANIM = {
   duration: 0.48,
@@ -1176,35 +1214,64 @@ export default function Home() {
 
       {/* ───────────────── READY APPS ───────────────── */}
       <ScrollScene page>
-        <Container maxWidth="lg">
-          <Reveal>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1.5, md: 3 }} alignItems={{ xs: "flex-start", md: "flex-end" }} justifyContent="space-between">
-              <Box sx={{ maxWidth: 760 }}>
-                <Typography variant="overline" component="p" sx={{ fontWeight: 900, letterSpacing: ".16em", color: "primary.main" }}>
-                  Ready Apps
+        <Box sx={{ position: "relative", overflow: "hidden", py: { xs: 1, md: 2 } }}>
+          <Box component="img" src={readyAppsMesh} alt="" aria-hidden="true" sx={{
+            position: "absolute", top: "50%", left: "50%", width: { xs: "155%", md: "112%" },
+            maxWidth: 1500, height: "auto", transform: "translate(-50%, -50%)",
+            opacity: { xs: 0.36, md: 0.52 }, pointerEvents: "none", userSelect: "none",
+          }} />
+          <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
+            <Reveal>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 2.25, md: 3 }}
+                alignItems={{ xs: "stretch", md: "flex-end" }} justifyContent="space-between">
+                <Box sx={{ maxWidth: 760 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="overline" component="p" sx={{ fontWeight: 900, letterSpacing: ".16em", color: "primary.main", m: 0 }}>
+                      Ready Apps
+                    </Typography>
+                    <Box sx={{ width: 30, height: 1, bgcolor: "primary.main", opacity: 0.45 }} />
+                  </Stack>
+                  <Typography component="h2" sx={{
+                    mt: 1.1, fontWeight: 950, fontSize: { xs: "clamp(1.8rem, 8vw, 2.7rem)", md: "3.65rem" },
+                    letterSpacing: "-.055em", lineHeight: 1.03, maxWidth: 780,
+                  }}>
+                    Start with the software you already know.
+                  </Typography>
+                  <Typography sx={{ mt: 1.55, maxWidth: 690, lineHeight: 1.75, fontSize: { xs: "0.92rem", md: "1.03rem" } }} color="text.secondary">
+                    Pick a proven self-hosted app and let PaaSDeployer handle the supporting services, runtime setup and operational baseline.
+                  </Typography>
+                </Box>
+                <Button component={RouterLink} to="/dashboard/ready-apps" variant="outlined" endIcon={<ArrowForwardRoundedIcon />}
+                  sx={{ alignSelf: { xs: "flex-start", md: "auto" }, minHeight: 44, px: { xs: 1.75, md: 2 }, borderRadius: 2, fontWeight: 850, flexShrink: 0 }}>
+                  Browse all apps
+                </Button>
+              </Stack>
+            </Reveal>
+            <Box sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" },
+              gap: { xs: 1.35, sm: 1.55, md: 1.8 }, mt: { xs: 3, md: 4.4 },
+            }}>
+              {FEATURED_READY_APPS.map((app, index) => (
+                <Reveal key={app.id} delay={index * 0.045} variant="card">
+                  <FeaturedReadyAppCard app={app} />
+                </Reveal>
+              ))}
+            </Box>
+            <Reveal delay={0.12}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 0.65, sm: 1.5 }}
+                alignItems={{ xs: "flex-start", sm: "center" }} sx={{ mt: { xs: 2.1, md: 2.6 }, color: "text.secondary" }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.6 }}>
+                  WordPress · n8n · Mattermost · Matrix · Uptime Kuma · Forgejo
                 </Typography>
-                <Typography component="h2" sx={{ mt: 1, fontWeight: 950, fontSize: { xs: "clamp(1.7rem, 6vw, 2.4rem)", md: "3.6rem" }, letterSpacing: "-.05em", lineHeight: 1.02 }}>
-                  Skip the setup. Start with a working stack.
+                <Typography variant="body2" sx={{ opacity: 0.62 }}>
+                  and more in the App Library
                 </Typography>
-                <Typography sx={{ mt: 1.6, maxWidth: 700, lineHeight: 1.75, fontSize: { xs: "0.95rem", md: "1.05rem" } }} color="text.secondary">
-                  Popular self-hosted software comes with its dependencies, configuration and runtime behavior already understood by the platform.
-                </Typography>
-              </Box>
-              <Button component={RouterLink} to="/dashboard/ready-apps" variant="outlined" endIcon={<ArrowForwardRoundedIcon />} sx={{ minHeight: 44, px: 2, borderRadius: 2, fontWeight: 850, flexShrink: 0 }}>
-                Explore App Library
-              </Button>
-            </Stack>
-          </Reveal>
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" }, gap: { xs: 1.4, md: 1.8 }, mt: { xs: 3, md: 4 } }}>
-            {FEATURED_READY_APPS.map((app, index) => (
-              <Reveal key={app.id} delay={index * 0.045} variant="card">
-                <FeaturedReadyAppCard app={app} index={index} />
-              </Reveal>
-            ))}
-          </Box>
-        </Container>
+              </Stack>
+            </Reveal>
+          </Container>
+        </Box>
       </ScrollScene>
-
       {/* ───────────────── FEATURES ───────────────── */}
       <ScrollScene page>
         <Container maxWidth="lg">
