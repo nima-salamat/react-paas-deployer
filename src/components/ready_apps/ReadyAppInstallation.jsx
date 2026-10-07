@@ -19,6 +19,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
@@ -255,7 +256,7 @@ export default function ReadyAppInstallation() {
         navigate("/dashboard/ready-apps/installations");
         return;
       }
-      setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The Ready App could not be deleted."));
+      setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The App could not be deleted."));
     } finally {
       setDeleting(false);
     }
@@ -327,7 +328,7 @@ export default function ReadyAppInstallation() {
   if (!installation) {
     return (
       <Container maxWidth="md" sx={{ py: 4 }}>
-        <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/ready-apps")}>Ready Apps</Button>
+        <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/ready-apps")}>Apps</Button>
         <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>{error || "Installation not found."}</Alert>
       </Container>
     );
@@ -340,7 +341,7 @@ export default function ReadyAppInstallation() {
         onClick={() => navigate("/dashboard/ready-apps/installations")}
         sx={{ mb: 2 }}
       >
-        My Ready Apps
+        Deployed Apps
       </Button>
 
       <Stack spacing={2}>
@@ -348,7 +349,7 @@ export default function ReadyAppInstallation() {
           <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
             <Box>
               <Typography variant="overline" color="primary.main" sx={{ fontWeight: 900 }}>
-                Ready App
+                App
               </Typography>
               <Typography variant="h5" sx={{ fontWeight: 900 }}>
                 {installation.name}
@@ -418,7 +419,7 @@ export default function ReadyAppInstallation() {
 
           {deletionPending ? (
             <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>
-              This installation is being cleaned up and will disappear from My Ready Apps when all managed resources are safely removed.
+              This installation is being cleaned up and will disappear from Deployed Apps when all managed resources are safely removed.
             </Alert>
           ) : null}
 
@@ -547,9 +548,9 @@ export default function ReadyAppInstallation() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={4}>
             <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
-              <CardContent>
+              <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Resources</Typography>
                 <Stack spacing={1.2} sx={{ mt: 1.5 }}>
                   <Metric icon={<ComputerRoundedIcon />} label="CPU" value={(resources.cpu_vcpu ?? "—") + " vCPU"} />
@@ -558,7 +559,7 @@ export default function ReadyAppInstallation() {
                 </Stack>
                 <Divider sx={{ my: 1.7 }} />
                 <Typography variant="caption" color="text.secondary">
-                  Limits are plan allocations. Live CPU/RAM usage is shown separately for each included service above.
+                  Plan allocation for this app.
                 </Typography>
               </CardContent>
             </Card>
@@ -610,7 +611,7 @@ export default function ReadyAppInstallation() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={{ fontWeight: 900 }}>Cancel this Ready App?</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 900 }}>Cancel this App?</DialogTitle>
           <DialogContent>
             <Typography color="text.secondary">
               The deployment will stop as safely as possible. Any app resources created for this installation are cleaned up by the platform, and the installation remains here as history until you delete it.
@@ -630,7 +631,7 @@ export default function ReadyAppInstallation() {
           maxWidth="sm"
           fullWidth
         >
-          <DialogTitle sx={{ fontWeight: 900 }}>Delete this Ready App installation?</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 900 }}>Delete this App installation?</DialogTitle>
           <DialogContent>
             <Typography color="text.secondary">
               This removes the installation record and any remaining managed resources. This action cannot be undone.
