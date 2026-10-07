@@ -168,7 +168,7 @@ function InstallationCard({ installation }) {
             </Stack>
           ) : (
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              {installation.software_version ? \`v\${installation.software_version}\` : "Managed app"}
+              {installation.software_version ? `v${installation.software_version}` : "Managed app"}
             </Typography>
           )}
         </Box>
