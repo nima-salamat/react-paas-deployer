@@ -5,7 +5,7 @@ import {
   useTransform,
   useReducedMotion,
 } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   Accordion,
   AccordionDetails,
