@@ -156,6 +156,7 @@ export default function GlobalServiceControls({
   onCopyFeedback,
   compact = false,
   managedByApplication = false,
+  managedAppLabel = "Ready App",
   onOpenManagedApplication,
 }) {
   const theme = useTheme();
@@ -279,23 +280,40 @@ export default function GlobalServiceControls({
       )}
 
       {managedByApplication ? (
-        <Alert
-          severity="info"
-          sx={{ mb: compact ? 1.5 : 2, borderRadius: 1.8 }}
-          action={
-            onOpenManagedApplication ? (
-              <Button
-                size="small"
-                onClick={onOpenManagedApplication}
-                sx={{ fontWeight: 750, whiteSpace: "nowrap" }}
-              >
-                Open Ready App
-              </Button>
-            ) : null
-          }
+        <Box
+          sx={{
+            mb: compact ? 1.5 : 2,
+            px: { xs: 1.1, sm: 1.35 },
+            py: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            borderRadius: 1.8,
+            border: "1px solid",
+            borderColor: (t) => t.palette.mode === "dark" ? "rgba(167,139,250,.24)" : "rgba(124,58,237,.16)",
+            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(124,58,237,.08)" : "rgba(124,58,237,.045)",
+          }}
         >
-          This service belongs to a Ready App. Service-level actions remain available here and are enforced by the backend permissions and lifecycle safety rules.
-        </Alert>
+          <Stack direction="row" spacing={1} alignItems="center" minWidth={0}>
+            <Box sx={{ width: 30, height: 30, borderRadius: 1.4, display: "grid", placeItems: "center", flexShrink: 0, color: "secondary.main", bgcolor: "action.hover" }}>
+              <Inventory2Icon sx={{ fontSize: 17 }} />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1.1, fontWeight: 700 }}>
+                Managed by
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 0.25, fontWeight: 850, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {managedAppLabel}
+              </Typography>
+            </Box>
+          </Stack>
+          {onOpenManagedApplication ? (
+            <Button size="small" onClick={onOpenManagedApplication} endIcon={<LinkIcon sx={{ fontSize: 16 }} />} sx={{ flexShrink: 0, borderRadius: 1.5, fontWeight: 800, textTransform: "none" }}>
+              Open app
+            </Button>
+          ) : null}
+        </Box>
       ) : null}
 
       <Stack
