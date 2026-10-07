@@ -60,7 +60,9 @@ function StatusIcon({ status, deleting }) {
   return <HourglassTopRoundedIcon sx={{ fontSize: 15 }} />;
 }
 
-function AppMark() {
+function AppMark({ app }) {
+  const [failed, setFailed] = useState(false);
+  const logo = String(app?.logo || "");
   return (
     <Box
       sx={(theme) => ({
@@ -69,22 +71,34 @@ function AppMark() {
         borderRadius: 3,
         display: "grid",
         placeItems: "center",
+        overflow: "hidden",
         flexShrink: 0,
         color: "primary.main",
         bgcolor:
           theme.palette.mode === "dark"
-            ? alpha(theme.palette.primary.main, .13)
-            : alpha(theme.palette.primary.main, .07),
+            ? "linear-gradient(145deg, rgba(81,129,255,.2), rgba(126,87,255,.11))"
+            : "linear-gradient(145deg, rgba(81,129,255,.08), rgba(126,87,255,.05))",
         border: "1px solid",
         borderColor: alpha(theme.palette.primary.main, .18),
+        boxShadow: "0 8px 24px rgba(0,0,0,.07)",
       })}
     >
-      <AppsRoundedIcon sx={{ fontSize: 25 }} />
+      {!failed && (/^https?:\/\//i.test(logo) || /^\//.test(logo)) ? (
+        <Box
+          component="img"
+          src={logo}
+          alt=""
+          onError={() => setFailed(true)}
+          sx={{ width: "68%", height: "68%", objectFit: "contain" }}
+        />
+      ) : (
+        <AppsRoundedIcon sx={{ fontSize: 25 }} />
+      )}
     </Box>
   );
 }
 
-function InstallationCard({ installation }) {
+function InstallationCard({ installation, app }) {
   const status = String(installation?.status || "pending").toLowerCase();
   const deleting =
     String(installation?.stage || "").toLowerCase() === "deletion_pending" ||
@@ -120,7 +134,7 @@ function InstallationCard({ installation }) {
       >
         <Box sx={{ p: { xs: 2.1, md: 2.4 } }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppMark />
+            <AppMark app={app} />
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
                 variant="caption"
@@ -190,6 +204,7 @@ function InstallationCard({ installation }) {
 
 export default function ReadyAppInstallations() {
   const [installations, setInstallations] = useState([]);
+  const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -199,8 +214,12 @@ export default function ReadyAppInstallations() {
     else setLoading(true);
     setError("");
     try {
-      const response = await apiRequest({ method: "GET", url: ROOT + "/installations/" });
-      setInstallations(listFrom(response.data));
+      const [installationResponse, appResponse] = await Promise.all([
+        apiRequest({ method: "GET", url: ROOT + "/installations/" }),
+        apiRequest({ method: "GET", url: ROOT + "/apps/" }),
+      ]);
+      setInstallations(listFrom(installationResponse.data));
+      setApps(listFrom(appResponse.data));
     } catch (err) {
       setError(
         String(
@@ -330,7 +349,11 @@ export default function ReadyAppInstallations() {
             }}
           >
             {installations.map((installation) => (
-              <InstallationCard key={installation.id} installation={installation} />
+              <InstallationCard
+                key={installation.id}
+                installation={installation}
+                app={apps.find((item) => String(item?.id) === String(installation?.catalog_id))}
+              />
             ))}
           </Box>
         )}
