@@ -78,6 +78,8 @@ function ServiceItem({
   const isRunning = status === "running";
   const statusColor = isRunning ? "success" : isUpdating ? "warning" : "default";
   const isCatalogManaged = String(s?.source_kind || "").toLowerCase() === "catalog" || Boolean(s?.application_instance_id);
+  const catalogId = String(s?.source_config?.catalog_id || s?.catalog_id || s?.application_instance?.catalog_id || "").trim();
+  const catalogLabel = catalogId ? catalogId.replace(/-with-(postgres|postgresql|mariadb|mysql|worker|redis)/gi, "").replace(/[-_]+/g, " ") : "Managed app";
 
   const usage = resolveUsage(
     statusEntry
@@ -105,17 +107,17 @@ function ServiceItem({
         py: 0.35,
         borderRadius: 1.4,
         border: "1px solid",
-        borderColor: isDb ? "info.light" : "divider",
-        bgcolor: (t) => isDb ? alpha(t.palette.info.main, t.palette.mode === "dark" ? 0.14 : 0.07) : "action.hover",
+        borderColor: isCatalogManaged ? "secondary.light" : isDb ? "info.light" : "divider",
+        bgcolor: (t) => isCatalogManaged ? alpha(t.palette.secondary.main, t.palette.mode === "dark" ? 0.14 : 0.07) : isDb ? alpha(t.palette.info.main, t.palette.mode === "dark" ? 0.14 : 0.07) : "action.hover",
       }}
     >
       <PlatformIcon platformKey={platformLabel} label={platformLabel || (isDb ? "database" : "application")} size={15} />
       <Box sx={{ minWidth: 0 }}>
-        <Typography variant="caption" sx={{ display: "block", lineHeight: 1, fontWeight: 800, color: isDb ? "info.main" : "primary.main" }}>
-          {isDb ? "Database" : "Application"}
+        <Typography variant="caption" sx={{ display: "block", lineHeight: 1, fontWeight: 800, color: isCatalogManaged ? "secondary.main" : isDb ? "info.main" : "primary.main" }}>
+          {isCatalogManaged ? "Ready App" : isDb ? "Database" : "Application"}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1, textTransform: "capitalize" }}>
-          {platformLabel || "Unknown platform"}
+          {isCatalogManaged ? catalogLabel : platformLabel || "Unknown platform"}
         </Typography>
       </Box>
     </Stack>
