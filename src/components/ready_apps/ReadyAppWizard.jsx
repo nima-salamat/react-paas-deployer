@@ -41,7 +41,7 @@ const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replac
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
 const PLANS_ROOT = API_ROOT + "/plans";
 
-const STEPS = ["Setup", "Resources & review", "Deploy"];
+const STEPS = ["Configure", "Plan", "Launch"];
 
 function listFrom(data) {
   if (Array.isArray(data)) return data;
@@ -167,13 +167,8 @@ function DynamicField({ field, value, onChange, config }) {
         ),
       } : undefined}
       helperText={
-        type === "secret"
-          ? "Stored securely and never shown in deployment review."
-          : field.ui?.helper_text
-            ? field.ui.helper_text
-            : field.type === "domain"
-              ? "The platform will use its managed hostname."
-              : undefined
+        field.ui?.helper_text ||
+        (field.type === "domain" ? "Platform-managed" : undefined)
       }
     />
   );
@@ -407,37 +402,102 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
       onClose={installing ? undefined : onClose}
       fullWidth
       maxWidth="md"
-      PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 }, minHeight: { md: 620 } } }}
+      PaperProps={{
+        sx: {
+          borderRadius: { xs: 0, sm: 4 },
+          overflow: "hidden",
+          backgroundImage: "none",
+        },
+      }}
     >
-      <DialogTitle sx={{ pr: 6 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 900 }}>
-              Deploy {app?.name || "application"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Configure only what you need. The platform resolves the managed topology and resources.
-            </Typography>
+      <DialogTitle sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+        <Stack direction="row" spacing={1.3} alignItems="center">
+          <Box
+            sx={(theme) => ({
+              width: 42,
+              height: 42,
+              borderRadius: 2.4,
+              display: "grid",
+              placeItems: "center",
+              bgcolor: alpha(theme.palette.primary.main, .1),
+              color: "primary.main",
+              flexShrink: 0,
+            })}
+          >
+            {app?.logo ? (
+              <Box
+                component="img"
+                src={app.logo}
+                alt=""
+                sx={{ width: 27, height: 27, objectFit: "contain" }}
+                onError={(event) => {
+                  event.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <ComputerRoundedIcon sx={{ fontSize: 22 }} />
+            )}
           </Box>
-          <IconButton onClick={onClose} disabled={installing}>
+
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography sx={{ fontSize: 18, fontWeight: 900, letterSpacing: "-.02em" }}>
+              Install {app?.name || "app"}
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ mt: .35 }} alignItems="center">
+              {STEPS.map((label, index) => (
+                <React.Fragment key={label}>
+                  {index > 0 && (
+                    <Box
+                      sx={{
+                        width: 16,
+                        height: 1,
+                        bgcolor: "divider",
+                      }}
+                    />
+                  )}
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: index === activeStep ? 850 : 650,
+                      color: index === activeStep ? "primary.main" : "text.secondary",
+                    }}
+                  >
+                    {index + 1} {label}
+                  </Typography>
+                </React.Fragment>
+              ))}
+            </Stack>
+          </Box>
+
+          <IconButton onClick={onClose} disabled={installing} size="small">
             <CloseRoundedIcon />
           </IconButton>
         </Stack>
       </DialogTitle>
 
-      <Box sx={{ px: { xs: 1.5, sm: 3 }, pb: 1 }}>
-        <Stepper activeStep={activeStep} alternativeLabel>
-          {STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
-        </Stepper>
-      </Box>
+      {installing && <LinearProgress sx={{ height: 2 }} />}
 
-      {installing && <LinearProgress />}
-
-      <DialogContent dividers sx={{ px: { xs: 2, sm: 3 }, py: 2.5 }}>
+      <DialogContent
+        dividers
+        sx={{
+          px: { xs: 2, sm: 3 },
+          py: { xs: 2, sm: 2.5 },
+          "&.MuiDialogContent-dividers": { borderColor: "divider" },
+        }}
+      >
         {activeStep === 0 && (
           <Stack spacing={2}>
+            <Box>
+              <Typography sx={{ fontWeight: 900, fontSize: 22, letterSpacing: "-.03em" }}>
+                Configure
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: .45 }}>
+                Set the name and app-specific options.
+              </Typography>
+            </Box>
+
             <TextField
-              label="Application name"
+              label="App name"
               value={name}
               onChange={(event) => {
                 setName(event.target.value);
@@ -446,7 +506,6 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               }}
               autoFocus
               fullWidth
-              helperText="Use a name you'll recognize later. The public address is assigned automatically after deployment."
             />
 
             {variants.length > 1 && (
@@ -458,7 +517,9 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                   const next = variants.find((item) => item.id === event.target.value);
                   const defaults = {};
                   (next?.fields || []).forEach((field) => {
-                    if (Object.prototype.hasOwnProperty.call(field, "default")) defaults[field.id] = field.default;
+                    if (Object.prototype.hasOwnProperty.call(field, "default")) {
+                      defaults[field.id] = field.default;
+                    }
                   });
                   setVariantId(event.target.value);
                   setConfig(defaults);
@@ -467,266 +528,261 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                 fullWidth
               >
                 {variants.map((item) => (
-                  <MenuItem
-                    key={item.id}
-                    value={item.id}
-                    disabled={item.availability !== "supported"}
-                  >
+                  <MenuItem key={item.id} value={item.id} disabled={item.availability !== "supported"}>
                     {item.label}
                   </MenuItem>
                 ))}
               </TextField>
             )}
 
-            {(variant?.fields || []).filter((field) => fieldVisible(field, config)).map((field) => (
-              <DynamicField
-                key={field.id}
-                field={field}
-                value={config[field.id]}
-                config={config}
-                onChange={updateField}
-              />
-            ))}
-
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" },
+                gap: 1.5,
+              }}
+            >
+              {(variant?.fields || [])
+                .filter((field) => fieldVisible(field, config))
+                .map((field) => (
+                  <Box
+                    key={field.id}
+                    sx={{ gridColumn: { xs: "span 1", sm: field.type === "string" && field.id === "wordpress_site_title" ? "span 2" : "span 1" } }}
+                  >
+                    <DynamicField
+                      field={field}
+                      value={config[field.id]}
+                      config={config}
+                      onChange={updateField}
+                    />
+                  </Box>
+                ))}
+            </Box>
           </Stack>
         )}
 
         {activeStep === 1 && (
-          <Stack spacing={2.2}>
+          <Stack spacing={2}>
             <Box>
-              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
-                {resolved ? "Ready to deploy" : "Choose your resources"}
+              <Typography sx={{ fontWeight: 900, fontSize: 22, letterSpacing: "-.03em" }}>
+                Choose a plan
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {resolved
-                  ? "Everything below has been checked by the platform. Nothing will be created until you confirm."
-                  : "Pick the plan for this application. PassDeployer checks the whole stack before anything is created."}
+              <Typography variant="body2" color="text.secondary" sx={{ mt: .45 }}>
+                Your app will use this plan for its managed runtime.
               </Typography>
             </Box>
 
-            {!resolved && (
-              <>
-                {plansLoading ? (
-                  <Box sx={{ minHeight: 150, display: "grid", placeItems: "center" }}><CircularProgress /></Box>
-                ) : plansError ? (
-                  <Alert severity="error" sx={{ borderRadius: 2 }}>{plansError}</Alert>
-                ) : plans.length === 0 ? (
-                  <Alert severity="warning" sx={{ borderRadius: 2 }}>
-                    No application plans are currently available.
-                  </Alert>
-                ) : (
-                  <RadioGroup value={String(planId)} onChange={(event) => setPlanId(event.target.value)}>
-                    <Stack spacing={1}>
-                      {plans.map((plan) => {
-                        const id = String(plan.id ?? plan.pk ?? plan.uuid);
-                        const selected = id === String(planId);
-                        return (
-                          <Box
-                            key={id}
-                            sx={{
-                              p: 1.6,
-                              borderRadius: 2.2,
-                              border: "1px solid",
-                              borderColor: selected ? "primary.main" : "divider",
-                              bgcolor: selected ? "action.hover" : "transparent",
-                              transition: "border-color 140ms ease, background-color 140ms ease",
-                            }}
-                          >
-                            <FormControlLabel
-                              value={id}
-                              control={<Radio />}
-                              sx={{ m: 0, width: "100%", alignItems: "flex-start" }}
-                              label={
-                                <Box sx={{ width: "100%" }}>
-                                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
-                                    <Box>
-                                      <Typography sx={{ fontWeight: 850 }}>
-                                        {plan.name || plan.title || "Plan"}
-                                      </Typography>
-                                      <Typography variant="caption" color="text.secondary">
-                                        {plan.storage_type || "Storage"}
-                                      </Typography>
-                                    </Box>
-                                    {plan.price_per_hour != null && Number(plan.price_per_hour) > 0 && (
-                                      <Typography variant="body2" color="text.secondary">
-                                        {plan.price_per_hour}/hr
-                                      </Typography>
-                                    )}
-                                  </Stack>
-                                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mt: 1 }}>
-                                    <ResourceRow icon={<ComputerRoundedIcon sx={{ fontSize: 18 }} />} label="CPU" value={plan.max_cpu} />
-                                    <ResourceRow icon={<MemoryRoundedIcon sx={{ fontSize: 18 }} />} label="RAM" value={plan.max_ram + " MB"} />
-                                    <ResourceRow icon={<StorageRoundedIcon sx={{ fontSize: 18 }} />} label="Storage" value={plan.max_storage + " GB"} />
-                                  </Stack>
-                                </Box>
-                              }
-                            />
-                          </Box>
-                        );
+            {plansLoading ? (
+              <Box sx={{ py: 6, display: "grid", placeItems: "center" }}>
+                <CircularProgress />
+              </Box>
+            ) : plansError ? (
+              <Alert severity="error" sx={{ borderRadius: 2.5 }}>{plansError}</Alert>
+            ) : plans.length === 0 ? (
+              <Alert severity="warning" sx={{ borderRadius: 2.5 }}>No plans are available.</Alert>
+            ) : (
+              <Stack spacing={1}>
+                {plans.map((plan) => {
+                  const id = String(plan.id ?? plan.pk ?? plan.uuid);
+                  const selected = id === String(planId);
+                  return (
+                    <Box
+                      key={id}
+                      onClick={() => {
+                        setPlanId(id);
+                        setResolved(null);
+                      }}
+                      sx={(theme) => ({
+                        p: 1.7,
+                        border: "1px solid",
+                        borderColor: selected ? "primary.main" : "divider",
+                        bgcolor: selected
+                          ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? .11 : .055)
+                          : "background.paper",
+                        borderRadius: 2.8,
+                        cursor: "pointer",
+                        transition: "border-color 150ms ease, background-color 150ms ease",
                       })}
-                    </Stack>
-                  </RadioGroup>
-                )}
-              </>
+                    >
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Radio checked={selected} onChange={() => {
+                          setPlanId(id);
+                          setResolved(null);
+                        }} />
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontWeight: 850 }}>
+                            {plan.name || plan.title || "Plan"}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {plan.max_cpu} vCPU · {plan.max_ram} MB RAM · {plan.max_storage} GB
+                          </Typography>
+                        </Box>
+                        {plan.price_per_hour != null && Number(plan.price_per_hour) > 0 && (
+                          <Typography variant="body2" sx={{ fontWeight: 850, whiteSpace: "nowrap" }}>
+                            {plan.price_per_hour}/hr
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Stack>
             )}
 
             {resolved && (
-              <>
-                <Box
-                  sx={{
-                    p: 1.7,
-                    borderRadius: 2.2,
-                    border: "1px solid",
-                    borderColor: "primary.main",
-                    bgcolor: "action.hover",
-                  }}
-                >
-                  <Stack direction="row" spacing={1.1} alignItems="flex-start">
-                    <CheckCircleRoundedIcon color="success" />
-                    <Box>
-                      <Typography sx={{ fontWeight: 900 }}>Configuration checked</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {name.trim()} will be deployed with the selected plan.
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Box>
-
-                {resolved.managed_components?.length > 0 && (
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>
-                      Included
+              <Box
+                sx={(theme) => ({
+                  p: 1.8,
+                  borderRadius: 2.8,
+                  bgcolor: alpha(theme.palette.success.main, .07),
+                  border: "1px solid",
+                  borderColor: alpha(theme.palette.success.main, .18),
+                })}
+              >
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CheckCircleRoundedIcon sx={{ color: "success.main" }} />
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 850 }}>Plan ready</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {resolved.resource_summary?.cpu_vcpu ?? "—"} vCPU · {resolved.resource_summary?.ram_mb ?? "—"} MB RAM · {resolved.resource_summary?.storage_mb ?? "—"} MB storage
                     </Typography>
-                    <Stack direction="row" spacing={0.8} flexWrap="wrap" useFlexGap>
-                      {resolved.managed_components.map((component) => (
-                        <Chip key={component.label} label={component.label} variant="outlined" />
-                      ))}
-                    </Stack>
                   </Box>
-                )}
-
-                <Divider />
-
-                <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1 }}>
-                    Resources
-                  </Typography>
-                  <Stack spacing={0.9}>
-                    <ResourceRow icon={<ComputerRoundedIcon sx={{ fontSize: 18 }} />} label="CPU" value={resolved.resource_summary.cpu_vcpu + " vCPU"} />
-                    <ResourceRow icon={<MemoryRoundedIcon sx={{ fontSize: 18 }} />} label="RAM" value={resolved.resource_summary.ram_mb + " MB"} />
-                    <ResourceRow icon={<StorageRoundedIcon sx={{ fontSize: 18 }} />} label="Storage" value={resolved.resource_summary.storage_mb + " MB"} />
-                  </Stack>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.8 }}>
-                    These are the reserved plan limits for the application, not live usage.
-                  </Typography>
-                </Box>
-
-                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: "action.hover" }}>
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>Platform-managed settings</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Networking, HTTPS, database credentials, and service wiring are configured automatically.
-                  </Typography>
-                </Box>
-
-              </>
+                </Stack>
+              </Box>
             )}
           </Stack>
         )}
 
         {activeStep === 2 && (
           <Stack spacing={2}>
-            <Box sx={{ textAlign: "center", py: 1 }}>
-              {installation?.status === "running" ? (
-                <CheckCircleRoundedIcon color="success" sx={{ fontSize: 52 }} />
+            <Box
+              sx={{
+                py: 2,
+                textAlign: "center",
+              }}
+            >
+              {isSuccessful ? (
+                <CheckCircleRoundedIcon sx={{ fontSize: 56, color: "success.main" }} />
               ) : installation?.status === "failed" ? (
-                <Typography variant="h3" color="error.main">×</Typography>
+                <ErrorOutlineRoundedIcon sx={{ fontSize: 56, color: "error.main" }} />
               ) : installation?.status === "cancelled" ? (
-                <Typography variant="h3" color="warning.main">—</Typography>
+                <ErrorOutlineRoundedIcon sx={{ fontSize: 56, color: "warning.main" }} />
               ) : (
-                <CircularProgress size={46} />
+                <CircularProgress size={48} thickness={4} />
               )}
-              <Typography variant="h6" sx={{ fontWeight: 900, mt: 1 }}>
-                {isSuccessful ? "Application is ready" : installation?.status === "failed" ? "Deployment failed" : installation?.status === "cancelled" ? "Deployment cancelled" : "Deploying application"}
+
+              <Typography sx={{ mt: 1.2, fontSize: 22, fontWeight: 900, letterSpacing: "-.03em" }}>
+                {isSuccessful
+                  ? "You're live"
+                  : installation?.status === "failed"
+                    ? "Install failed"
+                    : installation?.status === "cancelled"
+                      ? "Install cancelled"
+                      : "Installing…"}
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                {prettyStage(installation?.stage || "pending")}
-              </Typography>
+
+              {!isSuccessful && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: .45 }}>
+                  {prettyStage(installation?.stage || "pending")}
+                </Typography>
+              )}
             </Box>
 
-            {installation?.application_url && (
+            {installation?.application_url && isSuccessful && (
               <Button
-                variant="outlined"
-                startIcon={<OpenInNewRoundedIcon />}
+                fullWidth
+                variant="contained"
                 href={installation.application_url}
                 target="_blank"
                 rel="noreferrer"
-                sx={{ alignSelf: "center", borderRadius: 1.7 }}
+                endIcon={<OpenInNewRoundedIcon />}
+                sx={{ borderRadius: 2.3, py: 1.15, fontWeight: 900 }}
               >
-                Open application
+                Open app
               </Button>
             )}
 
-            {installation?.services?.map((service) => (
-              <Box key={service.service_id} sx={{ p: 1.4, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
-                <Stack direction="row" justifyContent="space-between" spacing={1}>
-                  <Typography sx={{ fontWeight: 800 }}>
-                    {service.service_name || String(service.key || "Managed service").replace(/[-_]/g, " ")}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    color={String(service.status).toLowerCase() === "failed" ? "error" : String(service.status).toLowerCase() === "running" ? "success" : "default"}
-                    label={prettyStage(service.status)}
-                  />
-                </Stack>
-                {service.status_message && (
-                  <Typography variant="caption" color="text.secondary">{service.status_message}</Typography>
-                )}
-              </Box>
-            ))}
-
-            {installation?.error_message && (
-              <Alert severity="error" sx={{ borderRadius: 2 }}>{installation.error_message}</Alert>
+            {installation?.services?.length > 0 && (
+              <Stack spacing={.8}>
+                {installation.services.map((service) => (
+                  <Box
+                    key={service.service_id}
+                    sx={{
+                      px: 1.4,
+                      py: 1.15,
+                      borderRadius: 2.2,
+                      bgcolor: "action.hover",
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                      <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
+                        {service.service_name || String(service.key || "Service").replace(/[-_]/g, " ")}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 800,
+                          color:
+                            String(service.status).toLowerCase() === "failed"
+                              ? "error.main"
+                              : String(service.status).toLowerCase() === "running"
+                                ? "success.main"
+                                : "text.secondary",
+                        }}
+                      >
+                        {prettyStage(service.status)}
+                      </Typography>
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
             )}
 
-            {!isTerminal && (
-              <Alert severity="info" sx={{ borderRadius: 2 }}>
-                The deployment continues through the normal application deployment engine. You can close this window and return to the installation workspace.
+            {installation?.error_message && (
+              <Alert severity="error" sx={{ borderRadius: 2.5 }}>
+                {installation.error_message}
               </Alert>
             )}
 
             {existingInstallationId && (
-              <Alert severity="warning" sx={{ borderRadius: 2 }}>
-                An existing installation was found.
-              </Alert>
+              <Button
+                variant="outlined"
+                onClick={() => onOpenInstallation(existingInstallationId)}
+                sx={{ borderRadius: 2.2, fontWeight: 850 }}
+              >
+                Open existing app
+              </Button>
             )}
           </Stack>
         )}
 
-        {error && (
-          <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>
+        {error && !installation?.error_message && (
+          <Alert severity="error" sx={{ mt: 2, borderRadius: 2.5 }}>
             {error}
-            {existingInstallationId && (
-              <Button
-                size="small"
-                sx={{ mt: 1, display: "block" }}
-                onClick={() => onOpenInstallation(existingInstallationId)}
-              >
-                Open existing installation
-              </Button>
-            )}
           </Alert>
         )}
       </DialogContent>
 
-      <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.7, gap: 1 }}>
-        <Button onClick={onClose} disabled={installing} color="inherit">Close</Button>
+      <DialogActions
+        sx={{
+          px: { xs: 2, sm: 3 },
+          py: 1.5,
+          borderTop: "1px solid",
+          borderColor: "divider",
+        }}
+      >
+        {activeStep < 2 && (
+          <Button onClick={onClose} disabled={installing} color="inherit">
+            Close
+          </Button>
+        )}
+
         <Box sx={{ flex: 1 }} />
 
         {activeStep === 0 && (
           <Button
             variant="contained"
             endIcon={<ArrowForwardRoundedIcon />}
-            disabled={!canAdvanceFromConfigure}
             onClick={() => {
               const validation = validateConfigure();
               if (validation) {
@@ -736,46 +792,69 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               setError("");
               setActiveStep(1);
             }}
+            disabled={resolveLoading}
+            sx={{ borderRadius: 2.2, px: 2, fontWeight: 900 }}
           >
-            Resources
+            Continue
           </Button>
         )}
 
         {activeStep === 1 && (
           <>
-            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => {
-              setResolved(null);
-              setActiveStep(0);
-            }} disabled={resolveLoading}>
+            <Button
+              onClick={() => {
+                setResolved(null);
+                setActiveStep(0);
+              }}
+              disabled={resolveLoading || installing}
+              sx={{ borderRadius: 2.2, fontWeight: 800 }}
+            >
               Back
             </Button>
             <Button
               variant="contained"
               endIcon={<ArrowForwardRoundedIcon />}
-              disabled={!canAdvanceFromResources}
               onClick={async () => {
                 if (resolved || await resolvePlan()) setActiveStep(2);
               }}
+              disabled={!planId || resolveLoading}
+              sx={{ borderRadius: 2.2, px: 2, fontWeight: 900 }}
             >
-              {resolved ? "Continue to deploy" : "Check & continue"}
+              {resolveLoading ? "Checking…" : resolved ? "Continue" : "Review"}
             </Button>
           </>
         )}
 
         {activeStep === 2 && !installation?.id && (
           <>
-            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => setActiveStep(1)} disabled={installing}>
+            <Button
+              onClick={() => setActiveStep(1)}
+              disabled={installing}
+              sx={{ borderRadius: 2.2, fontWeight: 800 }}
+            >
               Back
             </Button>
             <Button
               variant="contained"
               onClick={createInstallation}
               disabled={installing || !resolved}
+              sx={{ borderRadius: 2.2, px: 2.2, fontWeight: 900 }}
               startIcon={installing ? <CircularProgress size={16} color="inherit" /> : undefined}
             >
-              {installing ? "Starting…" : "Deploy application"}
+              {installing ? "Launching…" : "Install"}
             </Button>
           </>
+        )}
+
+        {activeStep === 2 && installation?.id && !isTerminal && (
+          <Button
+            color="warning"
+            variant="outlined"
+            onClick={cancelInstallation}
+            sx={{ borderRadius: 2.2, fontWeight: 800 }}
+          >
+            Cancel
+          </Button>
         )}
 
         {activeStep === 2 && installation?.id && isTerminal && (
@@ -783,17 +862,13 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
             variant="contained"
             onClick={() => onOpenInstallation(String(installation.id))}
             disabled={installing}
+            sx={{ borderRadius: 2.2, fontWeight: 900 }}
           >
             Open workspace
-          </Button>
-        )}
-
-        {activeStep === 2 && installation?.id && !isTerminal && (
-          <Button color="warning" variant="outlined" onClick={cancelInstallation}>
-            Cancel deployment
           </Button>
         )}
       </DialogActions>
     </Dialog>
   );
+
 }
