@@ -2790,7 +2790,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       )));
       if (contacts.length || panelHistory.includes("contacts")) {
         const res = await apiRequest({ method: "GET", url: `${MSG_API}/contacts/` });
-        setContacts(unwrapData(res) || []);
+        setContacts(unwrapList(res));
       }
     } catch (e) {
       setError(e?.response?.data?.message || "Failed");
@@ -3617,7 +3617,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const loadContacts = async () => {
     try {
       const res = await apiRequest({ method: "GET", url: `${MSG_API}/contacts/` });
-      setContacts(unwrapData(res) || []);
+      setContacts(unwrapList(res));
     } catch { setContacts([]); }
   };
 
