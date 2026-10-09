@@ -34,7 +34,8 @@ import AddIcon from "@mui/icons-material/Add";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ReplayIcon from "@mui/icons-material/Replay";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import StorageIcon from "@mui/icons-material/Storage";
+import HubIcon from "@mui/icons-material/Hub";
+import { LuHardDrive } from "react-icons/lu";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_NETWORKS = `${API_BASE}/api/networks/`;
@@ -749,9 +750,12 @@ export default function CreateServiceWizard({
 
             {activeStep === 1 && (
               <Box sx={{ display: "grid", gap: 1.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Select network
-                </Typography>
+                <Stack direction="row" spacing={0.8} alignItems="center">
+                  <HubIcon fontSize="small" color="primary" />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Select network
+                  </Typography>
+                </Stack>
                 {networksLoading ? (
                   <Stack direction="row" spacing={1} alignItems="center">
                     <CircularProgress size={18} />
@@ -773,7 +777,14 @@ export default function CreateServiceWizard({
                           key={val}
                           value={val}
                           control={<Radio size="small" />}
-                          label={n.name ?? val}
+                          label={
+                            <Stack direction="row" spacing={0.8} alignItems="center">
+                              <HubIcon sx={{ fontSize: 17, color: "text.secondary" }} />
+                              <Typography variant="body2" fontWeight={600}>
+                                {n.name ?? val}
+                              </Typography>
+                            </Stack>
+                          }
                           sx={{
                             mx: 0,
                             px: 1,
@@ -793,9 +804,12 @@ export default function CreateServiceWizard({
                 )}
 
                 <Divider />
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Or create network
-                </Typography>
+                <Stack direction="row" spacing={0.8} alignItems="center">
+                  <HubIcon fontSize="small" color="primary" />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Or create network
+                  </Typography>
+                </Stack>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                   <TextField
                     size="small"
@@ -832,7 +846,7 @@ export default function CreateServiceWizard({
             {activeStep === 2 && (
               <Box sx={{ display: "grid", gap: 1.5 }}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <StorageIcon fontSize="small" color="primary" />
+                  <LuHardDrive size={18} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                     Attach volumes (exclusive to this service)
                   </Typography>
@@ -881,6 +895,7 @@ export default function CreateServiceWizard({
                           }
                           label={
                             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                              <LuHardDrive size={16} />
                               <Typography variant="body2" fontWeight={600}>
                                 {v.name}
                               </Typography>
@@ -916,9 +931,12 @@ export default function CreateServiceWizard({
 
                 {pendingNewVolumes.length > 0 && (
                   <Box sx={{ display: "grid", gap: 1 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                      New volumes to create
-                    </Typography>
+                    <Stack direction="row" spacing={0.8} alignItems="center">
+                      <LuHardDrive size={17} />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                        New volumes to create
+                      </Typography>
+                    </Stack>
                     {pendingNewVolumes.map((volume) => (
                       <Stack
                         key={volume.draftId}
@@ -935,9 +953,12 @@ export default function CreateServiceWizard({
                         }}
                       >
                         <Box sx={{ minWidth: 0, flex: 1 }}>
-                          <Typography variant="body2" fontWeight={700} noWrap>
-                            {volume.name}
-                          </Typography>
+                          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                            <LuHardDrive size={16} />
+                            <Typography variant="body2" fontWeight={700} noWrap>
+                              {volume.name}
+                            </Typography>
+                          </Stack>
                           <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflowWrap: "anywhere" }}>
                             {volume.default_bind} · {volume.size_mb} MB · {volume.default_mode}
                           </Typography>
@@ -962,9 +983,12 @@ export default function CreateServiceWizard({
                 )}
 
                 <Divider />
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Add new volume
-                </Typography>
+                <Stack direction="row" spacing={0.8} alignItems="center">
+                  <LuHardDrive size={17} />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                    Add new volume
+                  </Typography>
+                </Stack>
                 <Stack spacing={1}>
                   <TextField
                     size="small"
