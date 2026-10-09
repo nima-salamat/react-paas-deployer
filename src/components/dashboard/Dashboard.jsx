@@ -54,6 +54,9 @@ export default function Dashboard({ themeMode, onThemeModeChange }) {
           sx={{
             flex: 1,
             minWidth: 0,
+            overflowX: { xs: "clip", md: "visible" },
+            "& .MuiPaper-root": { minWidth: 0 },
+            "& .MuiTableContainer-root": { maxWidth: "100%", overflowX: "auto" },
             width: { xs: "100%", md: `calc(100% - ${SIDEBAR_WIDTH}px)` },
             maxWidth: { md: `calc(100% - ${SIDEBAR_WIDTH}px)` },
           }}
@@ -61,6 +64,8 @@ export default function Dashboard({ themeMode, onThemeModeChange }) {
           <Box
             sx={{
               width: "100%",
+              minWidth: 0,
+              boxSizing: "border-box",
               maxWidth: 1480,
               mx: "auto",
               px: { xs: 0, sm: 1.5, md: 2.5 },
