@@ -18,8 +18,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import LaunchIcon from "@mui/icons-material/Launch";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
-import ComputerIcon from "@mui/icons-material/Computer";
-import MemoryIcon from "@mui/icons-material/Memory";
+import { LuCpu, LuMemoryStick } from "react-icons/lu";
 import StorageIcon from "@mui/icons-material/Storage";
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import HubIcon from "@mui/icons-material/Hub";
@@ -128,7 +127,7 @@ function ServiceItem({
       {cpu != null && (
         <Chip
           size="small"
-          icon={<ComputerIcon sx={{ fontSize: 13 }} />}
+          icon={<LuCpu size={13} />}
           label={`${cpu} CPU`}
           sx={{ height: 22, fontSize: 11 }}
         />
@@ -136,7 +135,7 @@ function ServiceItem({
       {ram != null && (
         <Chip
           size="small"
-          icon={<MemoryIcon sx={{ fontSize: 13 }} />}
+          icon={<LuMemoryStick size={13} />}
           label={`${ram} MB`}
           sx={{ height: 22, fontSize: 11 }}
         />
