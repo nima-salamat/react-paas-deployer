@@ -67,6 +67,19 @@ test("Plan service wizard stages new volumes until a Service id exists", () => {
   assert.match(wizard, /pendingNewVolumes\.map\(/);
 });
 
+test("CPU and RAM metrics use distinct, semantically correct icons in Services and Plans", () => {
+  const serviceItem = read("src/components/service/services/ServiceItem.jsx");
+  const plans = read("src/components/plans/plans.jsx");
+
+  for (const source of [serviceItem, plans]) {
+    assert.match(source, /import \{ LuCpu, LuMemoryStick \} from "react-icons\/lu"/);
+    assert.match(source, /LuCpu size=\{/);
+    assert.match(source, /LuMemoryStick size=\{/);
+    assert.doesNotMatch(source, /Computer(?:Rounded)?Icon/);
+    assert.doesNotMatch(source, /Memory(?:Rounded)?Icon/);
+  }
+});
+
 test("Volumes and Networks implement protected CRUD with recoverable errors", () => {
   const volumes = read("src/components/volumes/Volumes.jsx");
   const networks = read("src/components/networks/Networks.jsx");
