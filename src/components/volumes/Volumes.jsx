@@ -34,7 +34,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import StorageIcon from "@mui/icons-material/Storage";
+import VolumeIcon from "../VolumeIcon.jsx";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import apiRequest from "../customHooks/apiRequest";
@@ -448,7 +448,7 @@ export default function Volumes() {
               flexShrink: 0,
             }}
           >
-            <StorageIcon fontSize="small" />
+            <VolumeIcon fontSize="small" />
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Typography
