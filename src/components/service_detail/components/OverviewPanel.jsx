@@ -17,6 +17,7 @@ import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import HubIcon from "@mui/icons-material/Hub";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import { LuCpu, LuDatabase, LuHardDrive, LuMemoryStick } from "react-icons/lu";
+import VolumeIcon from "../../VolumeIcon.jsx";
 
 
 function ResourceMetric({ icon, label, value, unit }) {
@@ -33,7 +34,7 @@ function ResourceMetric({ icon, label, value, unit }) {
 function AttachedVolumes({ volumes }) {
   if (!Array.isArray(volumes) || !volumes.length) return <Typography variant="body2" color="text.secondary">No volumes attached to this service.</Typography>;
   return <Stack spacing={0.8}>{volumes.slice(0, 6).map((v) => <Box key={v.id ?? v.pk ?? v.name} sx={{ p: 1, border: "1px solid", borderColor: "divider", borderRadius: 1.7 }}>
-    <Stack direction="row" spacing={1} alignItems="center"><LuHardDrive size={18} /><Box sx={{ flex: 1, minWidth: 0 }}>
+    <Stack direction="row" spacing={1} alignItems="center"><VolumeIcon size={18} /><Box sx={{ flex: 1, minWidth: 0 }}>
       <Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name || "Unnamed volume"}</Typography>
       <Typography variant="caption" color="text.secondary">{v.size_mb != null ? v.size_mb + " MB" : "Size unavailable"} · {v.bind || v.default_bind || "Mount path unavailable"}</Typography>
     </Box><Chip size="small" label={String(v.mode || v.default_mode || "rw").toLowerCase()} color={String(v.mode || v.default_mode || "rw").toLowerCase() === "ro" ? "warning" : "success"} variant="outlined" sx={{ height: 22, fontWeight: 700 }}/></Stack>
@@ -481,7 +482,7 @@ export default function OverviewPanel({
           </Stack>
         </Stack>
       </SectionCard>
-      <SectionCard icon={<LuHardDrive size={18} />} title="Attached volumes">
+      <SectionCard icon={<VolumeIcon size={18} />} title="Attached volumes">
         <AttachedVolumes volumes={attachedVolumes} />
       </SectionCard>
 
