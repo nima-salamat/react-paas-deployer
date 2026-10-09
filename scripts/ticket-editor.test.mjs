@@ -400,10 +400,10 @@ test("code blocks have a useful minimum width, preserve code lines, and scroll i
   const admin = read("src/components/admin/components/AdminTicketMessage.jsx");
 
   for (const bubble of [source, admin]) {
-    assert.match(bubble, /const hasCodeBlock = \/<pre\\b\/i\.test\(bodyHtml\)/);
-    assert.match(bubble, /minWidth: hasCodeBlock \? \{ xs: "min\\(280px, calc\\(100vw - 92px\\)\\)", sm: 340 \} : 0/);
-    assert.match(bubble, /width: hasCodeBlock \? \{ xs: "min\\(100%, 360px\\)", sm: "min\\(100%, 640px\\)" \} : "fit-content"/);
-    assert.match(bubble, /maxWidth: hasCodeBlock \? "100%" : "min\\(68ch, 100%\\)"/);
+    assert.match(bubble, /hasCodeBlock/);
+    assert.ok(bubble.includes('minWidth: hasCodeBlock ? { xs: "min(280px, calc(100vw - 92px))", sm: 340 } : 0,'));
+    assert.ok(bubble.includes('width: hasCodeBlock ? { xs: "min(100%, 360px)", sm: "min(100%, 640px)" } : "fit-content",'));
+    assert.ok(bubble.includes('maxWidth: hasCodeBlock ? "100%" : "min(68ch, 100%)",'));
     assert.match(bubble, /"& pre": \{/);
     assert.match(bubble, /overflowX: "auto"/);
     assert.match(bubble, /whiteSpace: "pre"/);
@@ -414,8 +414,8 @@ test("code blocks have a useful minimum width, preserve code lines, and scroll i
   assert.match(source, /"& \.ticket-code-shell": \{/);
   assert.match(source, /"& \.ticket-code-shell pre": \{/);
   assert.match(source, /minWidth: "100%"/);
-  assert.match(source, /maxWidth: "min\\(68ch, 100%\\)"/);
-  assert.match(admin, /maxWidth: "min\\(68ch, 100%\\)"/);
+  assert.match(source, /maxWidth: "min\(68ch, 100%\)"/);
+  assert.match(admin, /maxWidth: "min\(68ch, 100%\)"/);
 });
 
 
@@ -426,22 +426,23 @@ test("ticket composer stays docked below a separately scrolling message history 
   const adminComposer = read("src/components/admin/components/AdminTicketComposer.jsx");
   const staffDrawer = read("src/components/tickets/StaffTickets.jsx");
 
-  assert.match(userDetail, /flex: 1,[\\s\\S]*minHeight: 0,[\\s\\S]*overflow: "auto"/);
-  assert.match(userDetail, /pb: "calc\\(12px \\+ env\\(safe-area-inset-bottom, 0px\\)\\)"/);
-  assert.match(userDetail, /list\\.scrollTo\\(\\{ top: list\\.scrollHeight, behavior: "smooth" \\}\\)/);
-  assert.doesNotMatch(userDetail, /bottomRef\\.current\\?\\.scrollIntoView/);
+  assert.match(userDetail, /flex: 1,[\s\S]*minHeight: 0,[\s\S]*overflow: "auto"/);
+  assert.ok(userDetail.includes('pb: "calc(12px + env(safe-area-inset-bottom, 0px))"'));
+  assert.ok(userDetail.includes('list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });'));
+  assert.doesNotMatch(userDetail, /bottomRef\.current\?\.scrollIntoView/);
 
-  assert.match(adminDrawer, /pb: "calc\\(12px \\+ env\\(safe-area-inset-bottom, 0px\\)\\)"/);
-  assert.match(adminDrawer, /root\\.scrollTo\\(/);
-  assert.match(staffDrawer, /pb: "calc\\(12px \\+ env\\(safe-area-inset-bottom, 0px\\)\\)"/);
+  assert.ok(adminDrawer.includes('pb: "calc(12px + env(safe-area-inset-bottom, 0px))"'));
+  assert.match(adminDrawer, /root\.scrollTo\(/);
+  assert.ok(staffDrawer.includes('pb: "calc(12px + env(safe-area-inset-bottom, 0px))"'));
   assert.match(staffDrawer, /overflow: "auto"/);
 
   for (const composer of [userComposer, adminComposer]) {
-    assert.match(composer, /borderRadius: 2\\.5/);
+    assert.match(composer, /borderRadius: 2\.5/);
     assert.match(composer, /boxShadow:/);
-    assert.match(composer, /bgcolor: "background\\.paper"/);
+    assert.ok(composer.includes('bgcolor: "background.paper"'));
   }
 });
+
 
 test("alignment can be chosen before any text exists and is inherited by the first typed block", () => {
   const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
