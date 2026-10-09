@@ -9,6 +9,7 @@ import {
   Typography,
   alpha,
   Divider,
+  IconButton,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -22,6 +23,7 @@ import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 export const SIDEBAR_WIDTH = 232;
 
@@ -207,6 +209,7 @@ export default function DashboardSidebar({ mobileOpen, onClose }) {
             minHeight: 56,
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             px: 2,
             borderBottom: "1px solid",
             borderColor: "divider",
@@ -215,6 +218,14 @@ export default function DashboardSidebar({ mobileOpen, onClose }) {
           }}
         >
           Menu
+          <IconButton
+            size="small"
+            aria-label="Close dashboard menu"
+            onClick={onClose}
+            sx={{ borderRadius: 1.5 }}
+          >
+            <CloseRoundedIcon fontSize="small" />
+          </IconButton>
         </Box>
         <SidebarContent onNavigate={onClose} />
       </Drawer>
