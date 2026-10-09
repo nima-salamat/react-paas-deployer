@@ -120,7 +120,8 @@ export default function CreateServiceWizard({
   const [volumes, setVolumes] = useState([]);
   const [volumesLoading, setVolumesLoading] = useState(false);
   const [selectedVolumeIds, setSelectedVolumeIds] = useState([]);
-  // Volumes created in this wizard session (not yet on server attached to service)
+  // New volumes remain local drafts until Service creation returns an id.
+  // The tenant Volume API intentionally requires service ownership at create time.
   const [pendingNewVolumes, setPendingNewVolumes] = useState([]);
   const [newVolume, setNewVolume] = useState({
     name: "",
@@ -128,7 +129,6 @@ export default function CreateServiceWizard({
     default_bind: "/data",
     default_mode: "rw",
   });
-  const [creatingVolume, setCreatingVolume] = useState(false);
   const [volumeMsg, setVolumeMsg] = useState(null);
 
   const [submitting, setSubmitting] = useState(false);
@@ -322,7 +322,7 @@ export default function CreateServiceWizard({
     });
   };
 
-  const handleCreateVolume = async () => {
+  const handleCreateVolume = () => {
     setVolumeMsg(null);
     const n = newVolume.name.trim();
     const bind = newVolume.default_bind.trim();
@@ -335,8 +335,8 @@ export default function CreateServiceWizard({
       setVolumeMsg({ type: "error", text: "Bind must be absolute path, e.g. /data" });
       return;
     }
-    if (!size || size < 1) {
-      setVolumeMsg({ type: "error", text: "Valid size (MB) required." });
+    if (!Number.isInteger(size) || size < 1) {
+      setVolumeMsg({ type: "error", text: "Size must be a positive integer in MB." });
       return;
     }
     if (planQuotaMb != null && selectedUnusedSize + size > planQuotaMb) {
@@ -349,41 +349,25 @@ export default function CreateServiceWizard({
       return;
     }
 
-    setCreatingVolume(true);
-    try {
-      // Create as UNUSED (no service yet). Attach after service is created.
-      const res = await apiRequest({
-        method: "POST",
-        url: volumesUrl,
-        data: {
-          name: n,
-          size_mb: size,
-          default_bind: bind,
-          default_mode: newVolume.default_mode || "rw",
-        },
-      });
-      const id = String(res.data?.id ?? res.data?.pk ?? "");
-      await fetchVolumes();
-      if (id) {
-        setSelectedVolumeIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-        setPendingNewVolumes((prev) => [
-          ...prev,
-          { id, name: n, size_mb: size, default_bind: bind },
-        ]);
-      }
-      setNewVolume({ name: "", size_mb: "1024", default_bind: "/data", default_mode: "rw" });
-      setVolumeMsg({ type: "success", text: "Volume created and selected (will attach to this service only)." });
-    } catch (err) {
-      const errs = err?.response?.data?.errors || err?.response?.data;
-      setVolumeMsg({
-        type: "error",
-        text:
-          parseErrors(errs ?? err?.message).join("\n") ||
-          "Failed to create volume",
-      });
-    } finally {
-      setCreatingVolume(false);
-    }
+    // Do not POST an ownerless tenant volume: the backend requires a Service
+    // to enforce plan quota. Stage the declaration locally, then create it
+    // with service=<new Service UUID> during handleSubmit.
+    const draftId = `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setPendingNewVolumes((prev) => [
+      ...prev,
+      {
+        draftId,
+        name: n,
+        size_mb: size,
+        default_bind: bind,
+        default_mode: newVolume.default_mode || "rw",
+      },
+    ]);
+    setNewVolume({ name: "", size_mb: "1024", default_bind: "/data", default_mode: "rw" });
+    setVolumeMsg({
+      type: "success",
+      text: "Volume added to this wizard. It will be created and attached after the Service is created.",
+    });
   };
 
   /**
@@ -407,7 +391,44 @@ export default function CreateServiceWizard({
         console.warn("attach volume failed", vid, err?.response?.data || err);
       }
     }
-    return { ok, fail };
+    return { ok, fail, failedIds };
+  };
+
+  // Tenant volume creation must include a real Service id. Run after the
+  // Service POST, in sequence, so the backend can enforce the plan's quota.
+  const createPendingVolumesForService = async (serviceId) => {
+    if (!serviceId || !pendingNewVolumes.length) return { ok: 0, failed: [] };
+    let ok = 0;
+    const failed = [];
+    for (const draft of pendingNewVolumes) {
+      try {
+        await apiRequest({
+          method: "POST",
+          url: volumesUrl,
+          data: {
+            name: draft.name,
+            size_mb: Number(draft.size_mb),
+            default_bind: draft.default_bind,
+            default_mode: draft.default_mode || "rw",
+            service: serviceId,
+          },
+        });
+        ok += 1;
+      } catch (err) {
+        const detail = parseErrors(
+          err?.response?.data?.errors ??
+            err?.response?.data?.error ??
+            err?.response?.data ??
+            err?.message ??
+            "Failed to create volume"
+        ).join("\n");
+        failed.push({
+          name: draft.name,
+          detail: detail || "Failed to create volume",
+        });
+      }
+    }
+    return { ok, failed };
   };
 
   const handleSubmit = async () => {
@@ -456,9 +477,11 @@ export default function CreateServiceWizard({
             params: { q_search: name.trim(), page_size: 20 },
           });
           const list = extractList(listRes.data);
-          const match =
-            list.find((s) => String(s.name || "").toLowerCase() === name.trim().toLowerCase()) ||
-            list[0];
+          // Never attach storage to an arbitrary first result when the name
+          // lookup is inconclusive. Exact identity is required for ownership.
+          const match = list.find(
+            (s) => String(s.name || "").toLowerCase() === name.trim().toLowerCase()
+          );
           serviceId = match?.id ?? match?.pk;
         } catch {
           /* ignore */
@@ -466,26 +489,61 @@ export default function CreateServiceWizard({
       }
 
       let attachNote = "";
-      if (ok && serviceId && selectedVolumeIds.length) {
-        const { ok: aOk, fail: aFail } = await attachVolumesToService(serviceId);
-        if (aFail && aOk) {
-          attachNote = ` ${aOk} volume(s) attached, ${aFail} failed (quota or ownership).`;
-        } else if (aFail && !aOk) {
-          attachNote = " Volumes could not be attached (check plan storage quota).";
-        } else if (aOk) {
-          attachNote = " Volumes attached exclusively to this service.";
+      let storageSetupIncomplete = false;
+      const requestedVolumeCount = selectedVolumeIds.length + pendingNewVolumes.length;
+      if (ok && requestedVolumeCount) {
+        if (!serviceId) {
+          storageSetupIncomplete = true;
+          attachNote =
+            " Storage setup incomplete: the Service was created, but its id could not be resolved, so no volumes were attached or created. Open the service's Volumes settings to finish setup.";
+        } else {
+          const existing = selectedVolumeIds.length
+            ? await attachVolumesToService(serviceId)
+            : { ok: 0, fail: 0, failedIds: [] };
+          const created = await createPendingVolumesForService(serviceId);
+          const summary = [];
+          if (selectedVolumeIds.length) {
+            summary.push(`attached ${existing.ok}/${selectedVolumeIds.length} existing volume(s)`);
+          }
+          if (pendingNewVolumes.length) {
+            summary.push(`created ${created.ok}/${pendingNewVolumes.length} new volume(s)`);
+          }
+          const failureCount = existing.fail + created.failed.length;
+          if (failureCount) {
+            storageSetupIncomplete = true;
+            const failedExisting = existing.failedIds.map((id) => {
+              const volume = volumes.find((item) => String(item.id ?? item.pk) === String(id));
+              return volume?.name || id;
+            });
+            const details = [
+              ...failedExisting.map((volumeName) => `existing volume "${volumeName}"`),
+              ...created.failed.map((item) => `new volume "${item.name}": ${item.detail}`),
+            ];
+            attachNote =
+              ` Storage setup incomplete: ${summary.join(", ")}. Failed: ${details.join("; ")}. Open the service's Volumes settings to finish setup.`;
+          } else {
+            attachNote = ` Storage ready: ${summary.join(", ")}.`;
+          }
         }
       }
 
       if (!timedOut && mountedRef.current) {
         setSubmissionResult({
           ok,
+          warning: storageSetupIncomplete,
           message: ok
             ? `Service created successfully.${attachNote}`
             : `Unexpected status ${res?.status}`,
           data: res?.data ?? null,
         });
-        if (ok && notifyOnSuccess) onCreate?.({ ok: true, data: res.data });
+        if (ok && notifyOnSuccess) {
+          onCreate?.({
+            ok: !storageSetupIncomplete,
+            serviceCreated: true,
+            partial: storageSetupIncomplete,
+            data: res.data,
+          });
+        }
       }
     } catch (err) {
       clearTimeout(t);
@@ -503,9 +561,14 @@ export default function CreateServiceWizard({
 
   const handleClose = () => onCancel?.();
   const selectedNet = networks.find((n) => optionValue(n) === String(network));
-  const selectedVols = volumes.filter((v) =>
-    selectedVolumeIds.includes(String(v.id ?? v.pk))
-  );
+  const selectedVols = [
+    ...volumes.filter((v) => selectedVolumeIds.includes(String(v.id ?? v.pk))),
+    ...pendingNewVolumes.map((volume) => ({
+      ...volume,
+      id: volume.draftId,
+      pendingCreate: true,
+    })),
+  ];
 
   return (
     <Dialog
@@ -605,21 +668,24 @@ export default function CreateServiceWizard({
           </Box>
         ) : submissionResult ? (
           <Box sx={{ textAlign: "center", py: 2 }}>
-            {submissionResult.ok ? (
+            {submissionResult.ok && !submissionResult.warning ? (
               <CheckCircleIcon color="success" sx={{ fontSize: 44 }} />
             ) : (
-              <Typography variant="h4" color={submissionResult.timeout ? "warning.main" : "error.main"}>
-                {submissionResult.timeout ? "⏱" : "✖"}
+              <Typography
+                variant="h4"
+                color={submissionResult.warning || submissionResult.timeout ? "warning.main" : "error.main"}
+              >
+                {submissionResult.timeout ? "⏱" : submissionResult.warning ? "⚠" : "✖"}
               </Typography>
             )}
             <Typography
               variant="subtitle1"
               sx={{ mt: 1, mb: 2, fontWeight: 700 }}
               color={
-                submissionResult.ok
-                  ? "success.main"
-                  : submissionResult.timeout
+                submissionResult.warning || submissionResult.timeout
                   ? "warning.main"
+                  : submissionResult.ok
+                  ? "success.main"
                   : "error.main"
               }
             >
@@ -769,7 +835,8 @@ export default function CreateServiceWizard({
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
                   Only unused volumes are listed. Each volume can belong to one service only.
-                  Total size cannot exceed the plan storage limit.
+                  New volumes are staged here and created after the Service exists, allowing the backend
+                  to enforce the selected plan's storage quota.
                 </Typography>
 
                 {planQuotaMb != null && (
@@ -843,9 +910,56 @@ export default function CreateServiceWizard({
                   </Box>
                 )}
 
+                {pendingNewVolumes.length > 0 && (
+                  <Box sx={{ display: "grid", gap: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                      New volumes to create
+                    </Typography>
+                    {pendingNewVolumes.map((volume) => (
+                      <Stack
+                        key={volume.draftId}
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{
+                          border: "1px solid",
+                          borderColor: "primary.main",
+                          borderRadius: 1.5,
+                          px: 1.25,
+                          py: 1,
+                        }}
+                      >
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography variant="body2" fontWeight={700} noWrap>
+                            {volume.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflowWrap: "anywhere" }}>
+                            {volume.default_bind} · {volume.size_mb} MB · {volume.default_mode}
+                          </Typography>
+                          <Chip size="small" label="Create after Service" variant="outlined" sx={{ mt: 0.5, height: 20 }} />
+                        </Box>
+                        <Button
+                          size="small"
+                          color="inherit"
+                          onClick={() =>
+                            setPendingNewVolumes((prev) =>
+                              prev.filter((item) => item.draftId !== volume.draftId)
+                            )
+                          }
+                          disabled={submitting}
+                          sx={{ textTransform: "none", flexShrink: 0 }}
+                        >
+                          Remove
+                        </Button>
+                      </Stack>
+                    ))}
+                  </Box>
+                )}
+
                 <Divider />
                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  Create volume
+                  Add new volume
                 </Typography>
                 <Stack spacing={1}>
                   <TextField
@@ -884,12 +998,12 @@ export default function CreateServiceWizard({
                     startIcon={<AddIcon />}
                     onClick={handleCreateVolume}
                     disabled={
-                      creatingVolume ||
+                      submitting ||
                       (remainingAfterSelection != null && remainingAfterSelection <= 0)
                     }
                     sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700, alignSelf: "flex-start" }}
                   >
-                    {creatingVolume ? "Creating…" : "Create & select"}
+                    Add to wizard
                   </Button>
                   {volumeMsg && (
                     <Alert severity={volumeMsg.type} sx={{ borderRadius: 1.5 }}>
