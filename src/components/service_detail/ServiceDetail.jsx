@@ -58,7 +58,7 @@ import {
 import { getApiErrorMessage, getApiErrorMeta } from "./errorUtils";
 import ServiceErrorAlert from "./components/ServiceErrorAlert";
 
-export default function ServiceDetail() {
+export default function ServiceDetail({ themeMode = "system", onThemeModeChange }) {
   const { id, section } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1694,6 +1694,8 @@ export default function ServiceDetail() {
         serviceDetail
         serviceName={service?.name || "Service"}
         servicePlatform={servicePlatform}
+        themeMode={themeMode}
+        onThemeModeChange={onThemeModeChange}
       />
       <Box sx={{ p: { xs: 1, sm: 1.5, md: 2 }, pt: { xs: 1, md: 2 } }}>
       <ServiceToolbar
