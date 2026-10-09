@@ -833,6 +833,10 @@ export default function ServiceDetail() {
     return String(raw || "").toLowerCase().trim();
   }, [planDetail, service]);
 
+  const servicePlatform = String(
+    selectedPlatform || planPlatform || service?.platform || ""
+  ).toLowerCase().trim();
+
   useEffect(() => {
     if (!planPlatform) return;
     setCreatePlatform(planPlatform);
@@ -1686,7 +1690,11 @@ export default function ServiceDetail() {
         pb: { xs: 9, md: 2 },
       }}
     >
-      <DashboardNavbar serviceDetail serviceName={service?.name || "Service"} />
+      <DashboardNavbar
+        serviceDetail
+        serviceName={service?.name || "Service"}
+        servicePlatform={servicePlatform}
+      />
       <Box sx={{ p: { xs: 1, sm: 1.5, md: 2 }, pt: { xs: 1, md: 2 } }}>
       <ServiceToolbar
           refreshIntervalMs={refreshIntervalMs}
@@ -1782,6 +1790,7 @@ export default function ServiceDetail() {
       {!isDesktop ? (
         <MobileServiceHeader
           service={service}
+          platformKey={servicePlatform}
           serviceRunning={serviceRunning}
           selectedDeploy={selectedDeploy}
           selectedPlatform={selectedPlatform}
