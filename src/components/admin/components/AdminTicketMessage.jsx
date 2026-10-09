@@ -15,6 +15,7 @@ import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import DoneIcon from "@mui/icons-material/Done";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import { authMediaSrc } from "../adminUtils";
+import { normalizeTicketMessageBody, normalizeTicketRichTextHtml } from "../../tickets/ticketRichText.js";
 
 function formatSize(bytes) {
   if (bytes == null || bytes === "") return "";
@@ -336,20 +337,7 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
     (mine ? "Staff" : "User");
 
   const avatarSrc = authorAvatarSrc(author);
-  const bodyHtml = (() => {
-    const body = m?.body;
-    if (body == null) return "";
-    if (typeof body === "string") return body;
-    if (typeof body === "number" || typeof body === "boolean") return String(body);
-    if (typeof body === "object") {
-      if (typeof body.html === "string") return body.html;
-      if (typeof body.body === "string") return body.body;
-      if (typeof body.text === "string") return body.text;
-      if (typeof body.content === "string") return body.content;
-      try { const s = JSON.stringify(body); return s === "{}" ? "" : s; } catch { return ""; }
-    }
-    return String(body);
-  })();
+  const bodyHtml = normalizeTicketMessageBody(m?.body);
   const bodyText = bodyHtml.replace(/<[^>]+>/g, "").trim();
   const hasBody = Boolean(bodyText);
   const hasHtml = /<[a-z][\s\S]*>/i.test(bodyHtml);
@@ -358,6 +346,8 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
   const [showRaw, setShowRaw] = useState(false);
   const [menu, setMenu] = useState(null);
   const [toast, setToast] = useState("");
+
+  const renderedBodyHtml = useMemo(() => normalizeTicketRichTextHtml(bodyHtml), [bodyHtml]);
 
   const plainBody = useMemo(() => {
     if (typeof document === "undefined") return bodyText;
@@ -409,16 +399,23 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
       {/* Bubble */}
       <Box
         sx={{
-          maxWidth: { xs: "88%", sm: "74%" },
-          minWidth: 120,
+          maxWidth: { xs: "calc(100% - 46px)", sm: "74%" },
+          minWidth: 0,
+          width: "fit-content",
+          boxSizing: "border-box",
+          overflowWrap: "anywhere",
           px: 1.5,
           py: 1.05,
-          borderRadius: mine ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
+          borderRadius: mine ? "16px 16px 5px 16px" : "16px 16px 16px 5px",
           bgcolor: mine ? "primary.main" : "background.paper",
           color: mine ? "primary.contrastText" : "text.primary",
-          boxShadow: mine ? "none" : 1,
-          border: mine ? "none" : "1px solid",
-          borderColor: "divider",
+          boxShadow: mine
+            ? (theme) => `0 6px 20px ${alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.13 : 0.15)}`
+            : (theme) => `0 4px 18px ${alpha(theme.palette.common.black, theme.palette.mode === "dark" ? 0.15 : 0.045)}`,
+          border: "1px solid",
+          borderColor: mine
+            ? (theme) => alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.45 : 0.25)
+            : "divider",
           position: "relative",
         }}
       >
@@ -511,41 +508,98 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
         {hasBody && !showRaw && (
           <Box
             sx={{
-              fontSize: 14.5,
-              lineHeight: 1.6,
-              wordBreak: "break-word",
+              fontSize: 14,
+              lineHeight: 1.62,
+              width: "100%",
+              minWidth: 0,
+              maxWidth: "100%",
+              overflow: "hidden",
+              overflowWrap: "anywhere",
+              wordBreak: "normal",
               mt: 0.35,
-              "& p": { m: 0, mb: 0.6 },
+              "& *": { boxSizing: "border-box", maxWidth: "100%" },
+              "& p": { m: 0, mb: 0.55 },
               "& p:last-child": { mb: 0 },
-              "& a": {
-                color: mine ? "inherit" : "primary.main",
-                textDecoration: "underline",
+              "& h1, & h2, & h3, & h4": { mt: 0.8, mb: 0.55, lineHeight: 1.2, fontWeight: 800 },
+              "& h1": { fontSize: "1.45em" },
+              "& h2": { fontSize: "1.3em" },
+              "& h3": { fontSize: "1.18em" },
+              "& h4": { fontSize: "1.08em" },
+              "& ul, & ol": {
+                display: "block",
+                paddingInlineStart: "1.5em",
+                paddingInlineEnd: 0,
+                my: 0.5,
               },
+              "& ul": { listStyleType: "disc" },
+              "& ol": { listStyleType: "decimal" },
+              "& ul ul": { listStyleType: "circle" },
+              "& ul ul ul": { listStyleType: "square" },
+              "& ol ol": { listStyleType: "lower-alpha" },
+              "& ol ol ol": { listStyleType: "lower-roman" },
+              "& li": { display: "list-item", paddingInlineStart: 0.2, mb: 0.2 },
+              '& [dir="rtl"]': { direction: "rtl", unicodeBidi: "plaintext" },
+              '& [dir="ltr"]': { direction: "ltr", unicodeBidi: "plaintext" },
+              "& p.ticket-align-left, & h1.ticket-align-left, & h2.ticket-align-left, & h3.ticket-align-left, & h4.ticket-align-left, & li.ticket-align-left, & blockquote.ticket-align-left, & [data-ticket-align='left']": {
+                textAlign: "left !important",
+              },
+              "& p.ticket-align-center, & h1.ticket-align-center, & h2.ticket-align-center, & h3.ticket-align-center, & h4.ticket-align-center, & li.ticket-align-center, & blockquote.ticket-align-center, & [data-ticket-align='center']": {
+                textAlign: "center !important",
+              },
+              "& p.ticket-align-right, & h1.ticket-align-right, & h2.ticket-align-right, & h3.ticket-align-right, & h4.ticket-align-right, & li.ticket-align-right, & blockquote.ticket-align-right, & [data-ticket-align='right']": {
+                textAlign: "right !important",
+              },
+              "& strong, & b": { fontWeight: 800 },
+              "& em, & i": { fontStyle: "italic" },
+              "& u": { textDecoration: "underline", textUnderlineOffset: "2px" },
+              "& s": { textDecoration: "line-through" },
+              "& a": { color: mine ? "inherit" : "primary.main", textDecoration: "underline", overflowWrap: "anywhere" },
               "& pre": {
+                maxWidth: "100%",
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
                 bgcolor: mine ? "rgba(0,0,0,0.15)" : "action.hover",
                 p: 1,
-                borderRadius: 1,
-                overflow: "auto",
+                borderRadius: 1.3,
                 fontSize: 12,
               },
               "& code": {
                 bgcolor: mine ? "rgba(0,0,0,0.12)" : alpha("#000", 0.06),
                 px: 0.5,
                 borderRadius: 0.5,
-                fontSize: 13,
+                fontSize: "0.9em",
+                overflowWrap: "anywhere",
               },
-              "& ul, & ol": { pl: 2.25, my: 0.45 },
-              "& img": { maxWidth: "100%", borderRadius: 1, display: "block", my: 0.5 },
+              "& img, & video, & audio": { maxWidth: "100%" },
+              "& img": { borderRadius: 1, display: "block", my: 0.5 },
               "& blockquote": {
+                m: "0.65rem 0",
+                pl: 1.5,
+                pr: 1,
+                py: 0.8,
                 borderLeft: "3px solid",
-                borderColor: mine ? "rgba(255,255,255,0.4)" : "divider",
-                pl: 1.25,
-                my: 0.75,
+                borderColor: mine ? "rgba(255,255,255,0.62)" : "divider",
+                borderRadius: "0 8px 8px 0",
+                bgcolor: mine ? "rgba(255,255,255,0.09)" : "action.hover",
+                color: mine ? "rgba(255,255,255,0.93)" : "text.secondary",
+                fontStyle: "italic",
+                position: "relative",
+              },
+              "& blockquote::before": {
+                content: '"“"',
+                position: "absolute",
+                left: 6,
+                top: -4,
+                fontSize: 28,
+                fontWeight: 800,
+                lineHeight: 1,
+                color: mine ? "rgba(255,255,255,0.78)" : "text.secondary",
                 opacity: 0.9,
               },
               userSelect: "text",
             }}
-            dangerouslySetInnerHTML={{ __html: bodyHtml }}
+            dangerouslySetInnerHTML={{ __html: renderedBodyHtml }}
           />
         )}
 
