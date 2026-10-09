@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Box, Chip, CircularProgress, Stack, Typography, Alert, IconButton,
+  Box, Chip, CircularProgress, Stack, Typography, Alert, IconButton, alpha,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -250,7 +250,9 @@ export default function TicketDetail() {
           display: "flex",
           flexDirection: "column",
           gap: 1,
-          bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
+          background: (theme) => theme.palette.mode === "dark"
+            ? `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.palette.background.default} 38%, ${alpha(theme.palette.background.paper, 0.96)})`
+            : `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.045)}, ${theme.palette.background.default} 48%, ${theme.palette.background.paper})`,
         }}
       >
         {(ticket.messages || []).map((m) => {
