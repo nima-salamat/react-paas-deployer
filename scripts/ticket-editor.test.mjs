@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeTicketMessageBody, resolveTicketListLayout } from "../src/components/tickets/ticketRichText.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -351,14 +352,15 @@ test("RTL MUI selectors are syntactically valid and direction-aware", () => {
 });
 
 
-test("message renderer normalizes semantic alignment and RTL before injecting rich text", () => {
+test("shared message renderer normalizes semantic alignment and RTL before injecting rich text", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
+  const richText = read("src/components/tickets/ticketRichText.js");
 
-  assert.match(source, /function normalizeRichTextBlocks/);
-  assert.match(source, /RICH_TEXT_ALIGNMENTS/);
-  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
-  assert.match(source, /block\.style\.setProperty\("direction", direction, "important"\)/);
-  assert.match(source, /normalizeRichTextBlocks\(root\)/);
+  assert.match(source, /normalizeTicketRichTextBlocks\(root\)/);
+  assert.match(richText, /export function normalizeTicketRichTextBlocks/);
+  assert.match(richText, /function getTicketBlockAlignment/);
+  assert.match(richText, /style\.setProperty\("text-align", alignment, "important"\)/);
+  assert.match(richText, /block\.style\.setProperty\("direction", direction, "important"\)/);
 });
 
 test("message renderer visibly supports headings, lists and inline formatting", () => {
@@ -414,14 +416,18 @@ test("alignment can be chosen before any text exists and is inherited by the fir
 });
 
 
-test("ticket renderer preserves ordered and unordered list semantics", () => {
+test("ticket renderer preserves nested ordered and unordered list semantics", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
+  const richText = read("src/components/tickets/ticketRichText.js");
 
   assert.match(source, /"& ul": \{/);
   assert.match(source, /listStyleType: "disc"/);
   assert.match(source, /"& ol": \{/);
   assert.match(source, /listStyleType: "decimal"/);
-  assert.match(source, /display: "list-item"/);
+  assert.match(source, /"& ol ol": \{/);
+  assert.match(source, /listStyleType: "lower-alpha"/);
+  assert.match(richText, /block\.style\.setProperty\("display", "list-item"\)/);
+  assert.doesNotMatch(richText, /list\.style\.setProperty\("list-style-type", "decimal"/);
 });
 
 test("ticket renderer does not auto-detect an unspecified code language", () => {
@@ -472,9 +478,12 @@ test("editor defaults to explicit left alignment instead of automatic start alig
 
 test("rendered ticket messages do not impose a renderer-wide alignment default", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
+  const richText = read("src/components/tickets/ticketRichText.js");
 
-  assert.match(source, /function getStoredAlignment/);
-  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
+  assert.match(source, /normalizeTicketRichTextBlocks/);
+  assert.match(richText, /function getTicketBlockAlignment/);
+  assert.match(richText, /style\.setProperty\("text-align", alignment, "important"\)/);
+  assert.doesNotMatch(richText, /textAlign: "left",/);
 });
 
 
@@ -526,26 +535,76 @@ test("quote Enter resolves the quote from either the anchor or range container",
 
 test("ticket renderer is source-faithful for explicit alignment and never invents dir=auto", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
+  const richText = read("src/components/tickets/ticketRichText.js");
 
-  assert.match(source, /function getStoredAlignment/);
-  assert.match(source, /data-ticket-align/);
-  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
-  assert.match(source, /data-rendered-ticket-align/);
-  assert.doesNotMatch(source, /block\.setAttribute\("dir", "auto"\)/);
-  assert.doesNotMatch(source, /normalizeRichTextBlocks[\s\S]*textAlign: "left",/);
+  assert.match(source, /normalizeTicketRichTextBlocks/);
+  assert.match(richText, /function getTicketBlockAlignment/);
+  assert.match(richText, /data-ticket-align/);
+  assert.match(richText, /style\.setProperty\("text-align", alignment, "important"\)/);
+  assert.match(richText, /data-rendered-ticket-align/);
+  assert.doesNotMatch(richText, /block\.setAttribute\("dir", "auto"\)/);
+  assert.doesNotMatch(richText, /textAlign: "left",/);
 });
 
-test("ticket renderer preserves ordered lists and aligns list items from stored alignment metadata", () => {
-  const source = read("src/components/tickets/MessageBubble.jsx");
-
-  assert.match(source, /block\.tagName === "OL"/);
-  assert.match(source, /list-style-type", "decimal"/);
-  assert.match(source, /block\.tagName === "LI"/);
-  assert.match(source, /alignedItems/);
-  assert.match(source, /list\.style\.setProperty\("text-align", alignedItems\[0\], "important"\)/);
-  assert.match(source, /data-ticket-align=.*right/);
+test("ticket message body normalization preserves stored HTML and safe scalar values", () => {
+  assert.equal(normalizeTicketMessageBody("<p dir='auto'>سلام</p>"), "<p dir='auto'>سلام</p>");
+  assert.equal(normalizeTicketMessageBody({ html: "<ol><li>one</li></ol>" }), "<ol><li>one</li></ol>");
+  assert.equal(normalizeTicketMessageBody(42), "42");
+  assert.equal(normalizeTicketMessageBody(null), "");
 });
 
+test("ticket renderer places ordered markers with right-aligned and mixed-direction list items", () => {
+  const richText = read("src/components/tickets/ticketRichText.js");
+
+  assert.match(richText, /export function resolveTicketListLayout/);
+  assert.match(richText, /list\.style\.setProperty\("direction", layout\.direction, "important"\)/);
+  assert.match(richText, /list\.style\.setProperty\("list-style-position", layout\.listStylePosition\)/);
+  assert.match(richText, /setListItemDirectionForMarker/);
+  assert.match(richText, /item\.style\.setProperty\("unicode-bidi", "plaintext"\)/);
+
+  assert.deepEqual(resolveTicketListLayout("", ["right", "right", "right"]), {
+    alignment: "right",
+    direction: "rtl",
+    listStylePosition: "inside",
+  });
+  assert.deepEqual(resolveTicketListLayout("", ["left", "left"]), {
+    alignment: "left",
+    direction: "ltr",
+    listStylePosition: "outside",
+  });
+  assert.deepEqual(resolveTicketListLayout("right", ["left", "right"]), {
+    alignment: "right",
+    direction: "rtl",
+    listStylePosition: "inside",
+  });
+  assert.deepEqual(resolveTicketListLayout("", ["right", "left"]), {
+    alignment: "",
+    direction: "",
+    listStylePosition: "mixed",
+  });
+  assert.deepEqual(resolveTicketListLayout("", ["center", "center"]), {
+    alignment: "center",
+    direction: "",
+    listStylePosition: "inside",
+  });
+});
+
+
+test("admin and user ticket threads share rich-text normalization and coordinated surfaces", () => {
+  const userBubble = read("src/components/tickets/MessageBubble.jsx");
+  const adminBubble = read("src/components/admin/components/AdminTicketMessage.jsx");
+  const userThread = read("src/components/tickets/TicketDetail.jsx");
+  const adminThread = read("src/components/admin/components/TicketDetailDrawer.jsx");
+
+  assert.match(userBubble, /normalizeTicketRichTextBlocks\(root\)/);
+  assert.match(adminBubble, /normalizeTicketRichTextHtml\(bodyHtml\)/);
+  assert.match(adminBubble, /dangerouslySetInnerHTML=\{\{ __html: renderedBodyHtml \}\}/);
+  assert.match(userBubble, /16px 16px 5px 16px/);
+  assert.match(adminBubble, /16px 16px 5px 16px/);
+  assert.match(userThread, /linear-gradient\(180deg/);
+  assert.match(adminThread, /linear-gradient\(180deg/);
+  assert.match(adminBubble, /paddingInlineStart: "1.5em"/);
+});
 
 test("Create Ticket has a back arrow and uses the shared attachment preview below the attach control", () => {
   const source = read("src/components/tickets/CreateTicket.jsx");
