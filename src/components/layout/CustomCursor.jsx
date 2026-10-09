@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { readCursorPreference } from "./cursorSettings";
+import { DEFAULT_CURSOR, normalizeCursorPreference, readCursorPreference } from "./cursorSettings";
 import { MouseFollower } from "./mouseFollower";
 
 const POINTER_SELECTOR = [
@@ -59,12 +59,12 @@ function resolveCursorState(target) {
 
 export default function CustomCursor() {
   const rootRef = useRef(null);
-  const [enabled, setEnabled] = useState(() => readCursorPreference() === "custom");
+  const [cursorPreference, setCursorPreference] = useState(() => readCursorPreference());
 
   useEffect(() => {
     const syncPreference = (event) => {
-      const next = event?.detail ?? readCursorPreference();
-      setEnabled(next === "custom");
+      const next = normalizeCursorPreference(event?.detail ?? readCursorPreference());
+      setCursorPreference(next);
     };
     const onStorage = (event) => {
       if (event.key === "paas-cursor-preference") syncPreference();
@@ -79,7 +79,12 @@ export default function CustomCursor() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (cursorPreference === DEFAULT_CURSOR) {
+      const root = rootRef.current;
+      root?.classList.remove("is-visible", "is-pressed");
+      document.documentElement.classList.remove("custom-cursor-enabled");
+      return undefined;
+    }
     const finePointer = window.matchMedia("(pointer: fine) and (hover: hover)");
     if (!finePointer.matches) return undefined;
 
@@ -164,14 +169,26 @@ export default function CustomCursor() {
       window.removeEventListener("blur", handleLeave);
       document.removeEventListener("mouseleave", handleLeave);
       document.removeEventListener("visibilitychange", handleVisibility);
+      root.classList.remove(
+        "is-visible",
+        "is-pressed",
+        "is-pointer",
+        "is-text",
+        "is-grab",
+        "is-forbidden",
+        "is-loading",
+      );
+      root.classList.add("is-default");
+      root.dataset.state = "default";
       document.documentElement.classList.remove("custom-cursor-enabled");
     };
-  }, [enabled]);
+  }, [cursorPreference]);
 
   return (
     <div
       ref={rootRef}
-      className="custom-cursor is-default"
+      className={`custom-cursor is-default variant-${cursorPreference}`}
+      data-variant={cursorPreference}
       data-state="default"
       aria-hidden="true"
     >
