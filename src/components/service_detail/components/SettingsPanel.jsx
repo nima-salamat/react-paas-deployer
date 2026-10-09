@@ -31,9 +31,8 @@ import {
   Divider,
 } from "@mui/material";
 import HubIcon from "@mui/icons-material/Hub";
-import DnsIcon from "@mui/icons-material/Dns";
-import StorageIcon from "@mui/icons-material/Storage";
-import SpeedIcon from "@mui/icons-material/Speed";
+import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
+import { LuCpu, LuDatabase, LuHardDrive, LuMemoryStick } from "react-icons/lu";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import AddIcon from "@mui/icons-material/Add";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
@@ -41,8 +40,6 @@ import LinkIcon from "@mui/icons-material/Link";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import MemoryIcon from "@mui/icons-material/Memory";
-import SdStorageIcon from "@mui/icons-material/SdStorage";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
@@ -181,15 +178,21 @@ function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
         {plan.plan_type && <Chip label={plan.plan_type} size="small" variant="outlined" sx={{ height: 22, fontSize: 11 }} />}
         {plan.storage_type && <Chip label={plan.storage_type} size="small" variant="outlined" sx={{ height: 22, fontSize: 11 }} />}
       </Stack>
-      <Stack spacing={0.5}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <MemoryIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+      <Stack spacing={0.65}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "text.secondary" }}>
+          <LuCpu size={16} />
           <Typography variant="body2" color="text.secondary">
-            CPU <strong>{plan.max_cpu ?? "—"}</strong>{" · "}RAM <strong>{plan.max_ram ?? "—"}</strong>
+            CPU <strong>{plan.max_cpu ?? "—"}</strong>
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-          <SdStorageIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "text.secondary" }}>
+          <LuMemoryStick size={16} />
+          <Typography variant="body2" color="text.secondary">
+            RAM <strong>{plan.max_ram ?? "—"}</strong>
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, color: "text.secondary" }}>
+          <LuHardDrive size={16} />
           <Typography variant="body2" color="text.secondary">
             Storage <strong>{plan.max_storage ?? "—"} GB</strong>
           </Typography>
@@ -1398,7 +1401,7 @@ export default function SettingsPanel({
       {/* ═══════════════ DATABASES ═══════════════ */}
       <Paper id="database" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
-          icon={<DnsIcon fontSize="small" />}
+          icon={<LuDatabase size={18} />}
           title="Databases"
           subtitle="Connect a managed database resource to this service. Credentials stay in the backend secret store."
         />
@@ -1493,7 +1496,7 @@ export default function SettingsPanel({
       {/* ═══════════════ VOLUMES ═══════════════ */}
       <Paper id="volume" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
-          icon={<StorageIcon fontSize="small" />}
+          icon={<LuHardDrive size={18} />}
           title="Volumes"
           subtitle="Exclusive storage for this service. Volumes are not shareable."
           action={
@@ -1603,7 +1606,7 @@ export default function SettingsPanel({
       {/* ═══════════════ PLAN ═══════════════ */}
       <Paper id="plan" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
-          icon={<SpeedIcon fontSize="small" />}
+          icon={<SellOutlinedIcon fontSize="small" />}
           title="Plan"
           subtitle={
             currentPlatform
