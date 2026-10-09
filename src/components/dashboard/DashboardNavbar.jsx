@@ -14,6 +14,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ThemeMenuButton from "../layout/ThemeMenuButton.jsx";
 import AccountMenu from "../layout/AccountMenu.jsx";
+import PlatformIcon from "../plans/PlatformIcon.jsx";
 import { useProfiles } from "../profile/profileContext.jsx";
 
 const resolveName = (profile) =>
@@ -27,12 +28,13 @@ const resolveName = (profile) =>
 /**
  * Shared dashboard chrome.
  * - default: title Dashboard + mobile menu
- * - serviceDetail: back + service name
+ * - serviceDetail: platform mark + service name (no duplicate back action)
  * - profileMode: back + Profile (only when profile is outside the shell)
  */
 export default function DashboardNavbar({
   serviceDetail = false,
   serviceName = "",
+  servicePlatform = "",
   profileMode = false,
   onBack = null,
   onMenuClick = null,
@@ -75,7 +77,7 @@ export default function DashboardNavbar({
       ? "Account settings"
       : "Infrastructure";
 
-  const showBack = serviceDetail || profileMode;
+  const showBack = profileMode && !serviceDetail;
   const showMenu = !serviceDetail && !profileMode && typeof onMenuClick === "function";
 
   const handleBack = () => {
@@ -159,17 +161,25 @@ export default function DashboardNavbar({
               </Tooltip>
             )}
 
-            <Box
-              component="img"
-              src="/icon.svg"
-              alt=""
-              sx={{
-                width: { xs: 30, sm: 34 },
-                height: { xs: 30, sm: 34 },
-                objectFit: "contain",
-                flexShrink: 0,
-              }}
-            />
+            {serviceDetail && servicePlatform ? (
+              <PlatformIcon
+                platformKey={servicePlatform}
+                label={servicePlatform}
+                size={20}
+              />
+            ) : (
+              <Box
+                component="img"
+                src="/icon.svg"
+                alt=""
+                sx={{
+                  width: { xs: 30, sm: 34 },
+                  height: { xs: 30, sm: 34 },
+                  objectFit: "contain",
+                  flexShrink: 0,
+                }}
+              />
+            )}
 
             <Box sx={{ minWidth: 0 }}>
               <Typography
