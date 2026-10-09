@@ -19,7 +19,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import LinkIcon from "@mui/icons-material/Launch";
-import { LuCpu, LuHardDrive, LuMemoryStick } from "react-icons/lu";
+import { LuCpu, LuMemoryStick } from "react-icons/lu";
 import HubIcon from "@mui/icons-material/Hub";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -27,6 +27,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ServicePlatformBadge from "../../service/ServicePlatformBadge.jsx";
+import VolumeIcon from "../../VolumeIcon.jsx";
 
 function useCopy() {
   const [copied, setCopied] = useState(null);
@@ -471,7 +472,7 @@ export default function GlobalServiceControls({
               sx={{ borderRadius: 1.5 }}
             />
             <Chip
-              icon={<LuHardDrive size={16} />}
+              icon={<VolumeIcon size={16} />}
               label={`Volumes: ${volumeCount}`}
               size="small"
               variant="outlined"
