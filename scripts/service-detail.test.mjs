@@ -385,6 +385,8 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   const toolbar = read("src/components/service/services/ServicesToolbar.jsx");
   const plans = read("src/components/plans/plans.jsx");
   const plansPreview = read("src/components/home/PlansPreview.jsx");
+  const adminServiceDrawer = read("src/components/admin/components/ServiceAdminDrawer.jsx");
+  const adminServicesPanel = read("src/components/admin/panels/ServicesPanel.jsx");
 
   assert.match(app, /element={<ServiceDetail themeMode=\{themeMode\} onThemeModeChange=\{handleThemeModeChange\} \/>}/);
   assert.match(detail, /themeMode=\{themeMode\}/);
@@ -438,4 +440,8 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(dashboardOverview, /\["Volumes", "\/dashboard\/volumes", VolumeIcon\]/);
   assert.match(volumes, /VolumeIcon/);
   assert.match(volumeIcon, /LuHardDrive/);
+  assert.match(adminServiceDrawer, /startIcon={<VolumeIcon size={18} \/>}/);
+  assert.doesNotMatch(adminServiceDrawer, /StorageIcon/);
+  assert.match(adminServiceDrawer, /\["failed", "error"\]\.includes\(String\(svcDetail\.status \|\| ""\)\.toLowerCase\(\)\)/);
+  assert.match(adminServicesPanel, /error: "error"/);
 });

@@ -10,7 +10,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import CleaningServicesIcon from "@mui/icons-material/CleaningServices";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
-import StorageIcon from "@mui/icons-material/Storage";
+import VolumeIcon from "../../VolumeIcon.jsx";
 import LockIcon from "@mui/icons-material/Lock";
 import apiRequest from "../../customHooks/apiRequest";
 import { hostBase, svcApi, deployApi } from "../adminUtils";
@@ -183,7 +183,7 @@ export default function ServiceAdminDrawer({
                 size="small"
                 label={svcDetail.status || "—"}
                 color={String(svcDetail.status || "").toLowerCase() === "running" ? "success"
-                  : String(svcDetail.status || "").toLowerCase() === "failed" ? "error" : "default"}
+                  : ["failed", "error"].includes(String(svcDetail.status || "").toLowerCase()) ? "error" : "default"}
                 variant={svcDetail.status === "running" ? "filled" : "outlined"}
                 sx={{ borderRadius: 0, height: 20, fontSize: 10 }}
               />
@@ -336,7 +336,7 @@ export default function ServiceAdminDrawer({
                 }}>
                   <Typography variant="overline" fontWeight={700}>Volumes · {svcVolumes.length}</Typography>
                   {canManage && (
-                    <DryCreateButton onClick={() => setVolOpen(true)} startIcon={<StorageIcon />}>
+                    <DryCreateButton onClick={() => setVolOpen(true)} startIcon={<VolumeIcon size={18} />}>
                       Create volume
                     </DryCreateButton>
                   )}

@@ -25,6 +25,7 @@ import {
 const STATUS_COLOR = {
   running: "success",
   failed: "error",
+  error: "error",
   stopped: "default",
   queued: "warning",
   deploying: "info",
