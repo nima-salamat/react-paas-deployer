@@ -33,7 +33,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import CloseIcon from "@mui/icons-material/Close";
 import LaunchIcon from "@mui/icons-material/Launch";
 import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
-import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
+import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import AppsIcon from "@mui/icons-material/Apps";
 import StorageIcon from "@mui/icons-material/Storage";
 import { LuCpu, LuMemoryStick } from "react-icons/lu";
@@ -737,7 +737,7 @@ export default function PlatformPlans() {
                 flexShrink: 0,
               }}
             >
-              <LayersOutlinedIcon fontSize="small" />
+              <SellOutlinedIcon fontSize="small" />
             </Box>
             <Box>
               <Typography component="h1" variant="h3" sx={{ fontWeight: 850, lineHeight: 1.1 }}>
