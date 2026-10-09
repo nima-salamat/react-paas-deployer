@@ -246,6 +246,14 @@ test("About page fills its Ready Apps visual section with branded marks and resp
   }
   assert.match(about, /gridTemplateColumns: \{ xs: "minmax\(0, 1fr\)", md:/);
   assert.match(about, /component="img"/);
+  assert.match(about, /PLATFORM WORKFLOW/);
+  assert.match(about, /From commit to running service/);
+  assert.match(about, /Runtime health/);
+  assert.match(about, /gridTemplateColumns: \{ xs: "repeat\(2, minmax\(0, 1fr\)\)", sm:/);
+  assert.match(about, /APPLICATION FLOW/);
+  assert.match(about, /Data layer/);
+  assert.match(about, /Public route/);
+  assert.match(about, /ArrowForwardRounded sx=\{\{ fontSize: 16, transform: \{ xs: "rotate\(90deg\)", sm: "none" \} \}\}/);
 });
 
 test("dashboard shell and workspace header support narrow viewports consistently", () => {
