@@ -15,8 +15,8 @@ import { useTheme } from "@mui/material/styles";
 import { useLocation, useNavigate } from "react-router-dom";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
-import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
-import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import HubIcon from "@mui/icons-material/Hub";
+import VolumeIcon from "../VolumeIcon.jsx";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
@@ -40,8 +40,8 @@ const NAV_ITEMS = [
     group: "Infrastructure",
     items: [
       { id: "services", label: "Services", path: "/dashboard/services", icon: MiscellaneousServicesOutlinedIcon },
-      { id: "networks", label: "Networks", path: "/dashboard/networks", icon: LanOutlinedIcon },
-      { id: "volumes", label: "Volumes", path: "/dashboard/volumes", icon: StorageOutlinedIcon },
+      { id: "networks", label: "Networks", path: "/dashboard/networks", icon: HubIcon },
+      { id: "volumes", label: "Volumes", path: "/dashboard/volumes", icon: VolumeIcon },
     ],
   },
   {
