@@ -35,7 +35,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ReplayIcon from "@mui/icons-material/Replay";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import HubIcon from "@mui/icons-material/Hub";
-import { LuHardDrive } from "react-icons/lu";
+import VolumeIcon from "../VolumeIcon.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_NETWORKS = `${API_BASE}/api/networks/`;
@@ -846,7 +846,7 @@ export default function CreateServiceWizard({
             {activeStep === 2 && (
               <Box sx={{ display: "grid", gap: 1.5 }}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <LuHardDrive size={18} />
+                  <VolumeIcon size={18} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                     Attach volumes (exclusive to this service)
                   </Typography>
@@ -895,7 +895,7 @@ export default function CreateServiceWizard({
                           }
                           label={
                             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                              <LuHardDrive size={16} />
+                              <VolumeIcon size={16} />
                               <Typography variant="body2" fontWeight={600}>
                                 {v.name}
                               </Typography>
@@ -932,7 +932,7 @@ export default function CreateServiceWizard({
                 {pendingNewVolumes.length > 0 && (
                   <Box sx={{ display: "grid", gap: 1 }}>
                     <Stack direction="row" spacing={0.8} alignItems="center">
-                      <LuHardDrive size={17} />
+                      <VolumeIcon size={17} />
                       <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                         New volumes to create
                       </Typography>
@@ -954,7 +954,7 @@ export default function CreateServiceWizard({
                       >
                         <Box sx={{ minWidth: 0, flex: 1 }}>
                           <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
-                            <LuHardDrive size={16} />
+                            <VolumeIcon size={16} />
                             <Typography variant="body2" fontWeight={700} noWrap>
                               {volume.name}
                             </Typography>
@@ -984,7 +984,7 @@ export default function CreateServiceWizard({
 
                 <Divider />
                 <Stack direction="row" spacing={0.8} alignItems="center">
-                  <LuHardDrive size={17} />
+                  <VolumeIcon size={17} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                     Add new volume
                   </Typography>
