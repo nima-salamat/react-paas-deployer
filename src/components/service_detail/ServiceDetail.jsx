@@ -647,7 +647,9 @@ export default function ServiceDetail() {
               ? nested
               : Array.isArray(nested?.results)
                 ? nested.results
-                : [];
+                : Array.isArray(nested?.items)
+                  ? nested.items
+                  : [];
       setAvailablePlans(list);
     } catch (err) {
       setPlansLoadError(getApiErrorMessage(err, "Could not load available plans."));
