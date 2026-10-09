@@ -693,3 +693,42 @@
     transition-duration: .05s !important;
   }
 }
+
+
+/* Custom cursor variants selected from Profile > Interface. */
+.custom-cursor.variant-dot .custom-cursor__ring {
+  display: none;
+}
+
+.custom-cursor.variant-dot .custom-cursor__dot {
+  width: 9px;
+  height: 9px;
+}
+
+.custom-cursor.variant-crosshair .custom-cursor__ring {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 0;
+  transition: opacity .1s ease-out;
+}
+
+.custom-cursor.variant-crosshair .custom-cursor__ring::before,
+.custom-cursor.variant-crosshair .custom-cursor__ring::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 1px;
+  background: rgba(255,255,255,.95);
+  transform: translate(-50%, -50%);
+}
+
+.custom-cursor.variant-crosshair .custom-cursor__ring::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.custom-cursor.variant-crosshair .custom-cursor__dot {
+  display: none;
+}
