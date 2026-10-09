@@ -51,14 +51,18 @@ export default function MessengerDialogs({
       ? conversations.results
       : Array.isArray(conversations?.data)
         ? conversations.data
-        : [];
+        : Array.isArray(conversations?.data?.results)
+          ? conversations.data.results
+          : [];
   const safeContacts = Array.isArray(contacts)
     ? contacts
     : Array.isArray(contacts?.results)
       ? contacts.results
       : Array.isArray(contacts?.data)
         ? contacts.data
-        : [];
+        : Array.isArray(contacts?.data?.results)
+          ? contacts.data.results
+          : [];
 
   return (
     <>
