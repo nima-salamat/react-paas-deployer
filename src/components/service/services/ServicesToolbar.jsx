@@ -21,7 +21,7 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import SettingsIcon from "@mui/icons-material/Settings";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import AppsIcon from "@mui/icons-material/Apps";
+import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 
@@ -85,7 +85,7 @@ export default function ServicesToolbar({
               to="/dashboard/ready-apps"
               size="small"
               variant="outlined"
-              startIcon={<AppsIcon sx={{ fontSize: 17 }} />}
+              startIcon={<AppsOutlinedIcon sx={{ fontSize: 17 }} />}
               sx={{ borderRadius: 1.8, fontWeight: 800, textTransform: "none", minHeight: 36 }}
             >
               App Library
