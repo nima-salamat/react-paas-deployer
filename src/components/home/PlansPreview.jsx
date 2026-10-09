@@ -16,7 +16,7 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
 import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
-import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
+import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import PlatformIcon from "../plans/PlatformIcon.jsx";
 
 const PLANS_API = `https://${import.meta.env.VITE_API_BASE}/plans/`;
@@ -210,7 +210,7 @@ export default function PlansPreview() {
                     color: "primary.main",
                   }}
                 >
-                  <LayersOutlinedIcon fontSize="small" />
+                  <SellOutlinedIcon fontSize="small" />
                 </Box>
                 <Chip label="Plans" size="small" sx={{ fontWeight: 850 }} />
                 {platformCount > 0 && <Chip label={`${platformCount} platforms`} size="small" variant="outlined" />}
