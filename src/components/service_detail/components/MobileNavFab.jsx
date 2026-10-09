@@ -17,19 +17,19 @@ import {
   useTheme,
   useMediaQuery,
 } from "@mui/material";
-import Inventory2Icon from "@mui/icons-material/Inventory2";
-import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import SpaceDashboardRoundedIcon from "@mui/icons-material/SpaceDashboardRounded";
+import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import SubjectIcon from "@mui/icons-material/Subject";
 import SettingsIcon from "@mui/icons-material/Settings";
 import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
 import CloseIcon from "@mui/icons-material/Close";
 import HubIcon from "@mui/icons-material/Hub";
-import StorageIcon from "@mui/icons-material/Storage";
+import { LuHardDrive } from "react-icons/lu";
 import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 
 const ALL_TABS = [
-  { value: "overview", label: "Overview", icon: <Inventory2Icon /> },
-  { value: "create", label: "Deploys", icon: <AddCircleOutlineIcon /> },
+  { value: "overview", label: "Overview", icon: <SpaceDashboardRoundedIcon /> },
+  { value: "create", label: "Deploys", icon: <RocketLaunchRoundedIcon /> },
   { value: "logs", label: "Logs", icon: <SubjectIcon /> },
   { value: "settings", label: "Settings", icon: <SettingsIcon /> },
   { value: "shell", label: "Shell", icon: <TerminalRoundedIcon /> },
@@ -194,7 +194,7 @@ export default function MobileNavFab({
                     color="text.secondary"
                     sx={{ display: "inline-flex", alignItems: "center", gap: 0.35 }}
                   >
-                    <StorageIcon sx={{ fontSize: 13 }} /> {volumeCount} vol
+                    <LuHardDrive size={13} /> {volumeCount} vol
                   </Typography>
                 ) : null}
                 {deployCount > 0 ? (
