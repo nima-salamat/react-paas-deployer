@@ -45,6 +45,28 @@ test("public Plans page keeps platform discovery, pagination and creation flow",
   assert.match(source, /setModalOpen/);
 });
 
+test("Plan service wizard stages new volumes until a Service id exists", () => {
+  const wizard = read("src/components/plans/CreateDeploymentModal.jsx");
+  const createStart = wizard.indexOf("const handleCreateVolume = () =>");
+  const attachStart = wizard.indexOf("const attachVolumesToService =");
+  assert.ok(createStart >= 0 && attachStart > createStart, "volume draft handler must be present");
+  const draftHandler = wizard.slice(createStart, attachStart);
+
+  assert.match(draftHandler, /setPendingNewVolumes/);
+  assert.doesNotMatch(draftHandler, /apiRequest|volumesUrl/);
+
+  const createStartAfterService = wizard.indexOf("const createPendingVolumesForService = async (serviceId)");
+  const submitStart = wizard.indexOf("const handleSubmit = async () =>", createStartAfterService);
+  assert.ok(createStartAfterService >= 0 && submitStart > createStartAfterService);
+  const createAfterService = wizard.slice(createStartAfterService, submitStart);
+  assert.match(createAfterService, /method:\s*"POST"/);
+  assert.match(createAfterService, /service:\s*serviceId/);
+  assert.match(wizard, /createPendingVolumesForService\(serviceId\)/);
+  assert.match(wizard, /Storage setup incomplete/);
+  assert.match(wizard, /warning:\s*storageSetupIncomplete/);
+  assert.match(wizard, /pendingNewVolumes\.map\(/);
+});
+
 test("Volumes and Networks implement protected CRUD with recoverable errors", () => {
   const volumes = read("src/components/volumes/Volumes.jsx");
   const networks = read("src/components/networks/Networks.jsx");
