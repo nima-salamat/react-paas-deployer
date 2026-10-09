@@ -19,8 +19,7 @@ import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import LinkIcon from "@mui/icons-material/Launch";
-import MemoryIcon from "@mui/icons-material/Memory";
-import StorageIcon from "@mui/icons-material/Storage";
+import { LuCpu, LuHardDrive, LuMemoryStick } from "react-icons/lu";
 import HubIcon from "@mui/icons-material/Hub";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
@@ -482,7 +481,7 @@ export default function GlobalServiceControls({
               sx={{ borderRadius: 1.5 }}
             />
             <Chip
-              icon={<StorageIcon sx={{ fontSize: 16 }} />}
+              icon={<LuHardDrive size={16} />}
               label={`Volumes: ${volumeCount}`}
               size="small"
               variant="outlined"
@@ -526,7 +525,7 @@ export default function GlobalServiceControls({
               variant="caption"
               sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}
             >
-              <MemoryIcon sx={{ fontSize: 14 }} /> CPU
+              <LuCpu size={14} /> CPU
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
               {serviceCpu !== null ? `${serviceCpu}%` : "—"}
@@ -553,7 +552,7 @@ export default function GlobalServiceControls({
               variant="caption"
               sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 0.5 }}
             >
-              <MemoryIcon sx={{ fontSize: 14 }} /> RAM
+              <LuMemoryStick size={14} /> RAM
             </Typography>
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
               {serviceRam !== null ? `${serviceRam}%` : "—"}
