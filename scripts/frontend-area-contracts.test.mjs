@@ -351,3 +351,20 @@ test("homepage metrics keep a four-cell mobile layout with a centered plus divid
   assert.ok(metrics.includes('display: { xs: "grid", md: "none" }'));
   assert.ok(metrics.includes("\n              +\n            </Box>"), "mobile plus marker should be present");
 });
+
+
+test("Volumes page and Service Settings share the organized volume file-tree dialog", () => {
+  const volumes = read("src/components/volumes/Volumes.jsx");
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+  const filesDialog = read("src/components/volumes/VolumeFilesDialog.jsx");
+
+  assert.match(volumes, /import VolumeFilesDialog from "\.\/VolumeFilesDialog\.jsx"/);
+  assert.match(settings, /import VolumeFilesDialog from "\.\.\/\.\.\/volumes\/VolumeFilesDialog\.jsx"/);
+  assert.match(volumes, /<VolumeFilesDialog/);
+  assert.match(settings, /<VolumeFilesDialog/);
+  assert.match(filesDialog, /function normalizeVolumeFiles/);
+  assert.match(filesDialog, /function buildFileTree/);
+  assert.match(filesDialog, /function TreeRow/);
+  assert.match(filesDialog, /const expandAll/);
+  assert.match(filesDialog, /const collapseAll/);
+});

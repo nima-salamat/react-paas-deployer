@@ -35,6 +35,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import VolumeIcon from "../VolumeIcon.jsx";
+import VolumeFilesDialog from "./VolumeFilesDialog.jsx";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import apiRequest from "../customHooks/apiRequest";
@@ -271,19 +272,21 @@ export default function Volumes() {
   const handleViewFiles = async (volume) => {
     setFileLoading(true);
     setFileError(null);
+    setFileList([]);
     setFileVolumeName(volume.name || "");
+    setFileDialogOpen(true);
     try {
       const id = volume.id ?? volume.pk;
       const resp = await apiRequest({
         method: "GET",
         url: `${VOLUME_ROOT}${id}/files/`,
       });
-      const files = resp.data?.files ?? resp.data?.results ?? resp.data;
+      const payload = resp.data;
+      const files = payload?.files ?? payload?.results ?? payload?.items ??
+        payload?.data?.files ?? payload?.data?.results ?? payload;
       setFileList(Array.isArray(files) ? files : []);
-      setFileDialogOpen(true);
     } catch (err) {
       setFileError(friendlyError(err, "Unable to load volume files."));
-      setFileDialogOpen(true);
     } finally {
       setFileLoading(false);
     }
@@ -763,124 +766,14 @@ export default function Volumes() {
         </DialogActions>
       </Dialog>
 
-      <Dialog
+      <VolumeFilesDialog
         open={fileDialogOpen}
         onClose={() => setFileDialogOpen(false)}
-        fullWidth
-        maxWidth="md"
-        fullScreen={isMobile}
-        PaperProps={{ sx: { borderRadius: isMobile ? 0 : 1 } }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
-          Files — {fileVolumeName || "volume"}
-        </DialogTitle>
-        <DialogContent dividers>
-          {fileLoading ? (
-            <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}>
-              <CircularProgress size={28} />
-            </Box>
-          ) : fileError ? (
-            <Alert severity="error" sx={{ borderRadius: 1 }}>
-              {fileError}
-            </Alert>
-          ) : fileList.length === 0 ? (
-            <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
-              No files in this volume.
-            </Typography>
-          ) : isMobile ? (
-            <Stack spacing={1}>
-              {fileList.map((item, index) => (
-                <Paper
-                  key={`${item.path}-${index}`}
-                  elevation={0}
-                  sx={{
-                    p: 1.5,
-                    border: "1px solid",
-                    borderColor: "divider",
-                    borderRadius: 1.75,
-                  }}
-                >
-                  <Typography
-                    fontFamily="monospace"
-                    fontSize={13}
-                    sx={{ wordBreak: "break-all" }}
-                  >
-                    {item.path || "./"}
-                  </Typography>
-                  <Stack direction="row" spacing={1} sx={{ mt: 0.75 }}>
-                    <Chip
-                      size="small"
-                      label={item.type || "file"}
-                      sx={{ height: 20, fontSize: 11 }}
-                    />
-                    <Typography variant="caption" color="text.secondary">
-                      {item.size != null ? `${item.size} B` : "—"}
-                    </Typography>
-                  </Stack>
-                </Paper>
-              ))}
-            </Stack>
-          ) : (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow
-                    sx={{
-                      bgcolor: "action.hover",
-                      "& th": {
-                        borderBottom: "1px solid",
-                        borderColor: "divider",
-                        py: 1,
-                      },
-                    }}
-                  >
-                    <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Path</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Type</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Size</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {fileList.map((item, index) => (
-                    <TableRow
-                      key={`${item.path}-${index}`}
-                      sx={{
-                        "& td": {
-                          borderBottom: "1px solid",
-                          borderColor: "divider",
-                          py: 0.75,
-                        },
-                        "&:last-child td": { borderBottom: 0 },
-                      }}
-                    >
-                      <TableCell
-                        sx={{
-                          fontFamily: "monospace",
-                          fontSize: 13,
-                          wordBreak: "break-all",
-                        }}
-                      >
-                        {item.path || "./"}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 13 }}>{item.type || "file"}</TableCell>
-                      <TableCell sx={{ fontSize: 13 }}>
-                        {item.size != null ? `${item.size} B` : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => setFileDialogOpen(false)}
-            sx={{ textTransform: "none" }}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
+        volumeName={fileVolumeName}
+        files={fileList}
+        loading={fileLoading}
+        error={fileError}
+      />
     </Container>
   );
 }
