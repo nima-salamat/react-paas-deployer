@@ -62,6 +62,7 @@ testFn("Ready App wizard keeps required settings visible and groups optional def
   const source = read("src/components/ready_apps/ReadyAppWizard.jsx");
 
   assert.match(source, /function isOptionalAdvancedField\(field\)/);
+  assert.match(source, /return !field\.required && \(/);
   assert.match(source, /field\.ui\?\.advanced === true/);
   assert.match(source, /const primaryFields = visibleFields\.filter/);
   assert.match(source, /const optionalFields = visibleFields\.filter/);
