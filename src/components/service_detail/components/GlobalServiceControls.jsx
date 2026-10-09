@@ -26,6 +26,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import CancelIcon from "@mui/icons-material/Cancel";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import ServicePlatformBadge from "../../service/ServicePlatformBadge.jsx";
 
 function useCopy() {
   const [copied, setCopied] = useState(null);
@@ -224,6 +225,17 @@ export default function GlobalServiceControls({
       : "default";
 
   const canOpen = Boolean(service?.service_host || service?.service_name) && !selectedIsDb;
+  const servicePlatformKey = String(
+    selectedPlatform || service?.plan?.platform || service?.plan_detail?.platform || service?.platform || ""
+  ).toLowerCase().trim();
+  const servicePlatformLabel = managedByApplication
+    ? managedAppLabel
+    : servicePlatformKey || (selectedIsDb ? "Database" : "Unknown platform");
+  const serviceTypeLabel = managedByApplication
+    ? "Ready App"
+    : selectedIsDb
+      ? "Database"
+      : "Application";
 
   return (
     <Paper
@@ -251,20 +263,33 @@ export default function GlobalServiceControls({
             mb: 2,
           }}
         >
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography
-              variant="h5"
-              sx={{
-                fontWeight: 800,
-                lineHeight: 1.25,
-                letterSpacing: "-0.02em",
-                mb: 0.5,
-              }}
-            >
-              {service?.name || "Service"}
-            </Typography>
-            <ServiceIdentity service={service} onCopied={onCopyFeedback} />
-          </Box>
+          <Stack direction="row" spacing={1.1} alignItems="flex-start" sx={{ minWidth: 0, flex: 1 }}>
+            <ServicePlatformBadge
+              platformKey={servicePlatformKey || servicePlatformLabel}
+              platformLabel={servicePlatformLabel}
+              typeLabel={serviceTypeLabel}
+              isDatabase={selectedIsDb}
+              isReadyApp={managedByApplication}
+            />
+            <Box sx={{ minWidth: 0, flex: 1, textAlign: "right" }}>
+              <Typography
+                variant="h5"
+                title={service?.name || "Service"}
+                sx={{
+                  fontWeight: 800,
+                  lineHeight: 1.25,
+                  letterSpacing: "-0.02em",
+                  mb: 0.5,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {service?.name || "Service"}
+              </Typography>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", minWidth: 0 }}>
+                <ServiceIdentity service={service} onCopied={onCopyFeedback} />
+              </Box>
+            </Box>
+          </Stack>
           <Chip
             label={statusLabel}
             color={statusColor}
