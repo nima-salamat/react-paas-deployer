@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -175,6 +175,12 @@ export default function ReadyApps() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const load = useCallback(async (background = false) => {
     if (background) setRefreshing(true);
@@ -182,12 +188,15 @@ export default function ReadyApps() {
     setError("");
     try {
       const response = await apiRequest({ method: "GET", url: CATALOG_ROOT + "/apps/" });
+      if (!mountedRef.current) return;
       setApps(normalizeList(response.data));
     } catch (err) {
-      setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Couldn't load the app library."));
+      if (mountedRef.current) setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Couldn't load the app library."));
     } finally {
-      if (background) setRefreshing(false);
-      else setLoading(false);
+      if (mountedRef.current) {
+        if (background) setRefreshing(false);
+        else setLoading(false);
+      }
     }
   }, []);
 
