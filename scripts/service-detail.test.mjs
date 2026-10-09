@@ -441,7 +441,7 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(dashboardOverview, /\["Volumes", "\/dashboard\/volumes", VolumeIcon\]/);
   assert.match(volumes, /VolumeIcon/);
   assert.match(volumeIcon, /LuHardDrive/);
-  assert.match(adminServiceDrawer, /startIcon={<VolumeIcon size={18} \/>}/);
+  assert.ok(adminServiceDrawer.includes("startIcon={<VolumeIcon size={18} />}"));
   assert.doesNotMatch(adminServiceDrawer, /StorageIcon/);
   assert.match(adminServiceDrawer, /\["failed", "error"\]\.includes\(String\(svcDetail\.status \|\| ""\)\.toLowerCase\(\)\)/);
   assert.match(adminServicesPanel, /error: "error"/);
