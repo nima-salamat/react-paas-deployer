@@ -260,6 +260,8 @@ test("dashboard shell and workspace header support narrow viewports consistently
   assert.match(navbar, /return "App Library"/);
   assert.match(navbar, /return "Deployed Apps"/);
   assert.match(navbar, /return "Agents"/);
+  assert.match(navbar, /p\.startsWith\("\/dashboard\/tickets\/new"\)\) return "New ticket"/);
+  assert.match(navbar, /p === "\/dashboard" \? "Overview" : "Dashboard"/);
   assert.match(sidebar, /aria-label="Close dashboard menu"/);
   assert.match(volumes, /borderRadius: 1\.75/);
   assert.match(networks, /borderRadius: 1\.75/);
