@@ -184,3 +184,24 @@ test("Ready App deletion uses durable backend state without repeat DELETE pollin
   assert.match(list, /function isDeletionPending/);
   assert.match(list, /Cleaning up/);
 });
+
+test("Messenger member selection normalizes list responses before mapping contacts", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  const dialogs = read("src/components/messenger/components/MessengerDialogs.jsx");
+
+  assert.match(app, /setContacts\(unwrapList\(res\)\)/);
+  assert.match(dialogs, /const safeContacts = Array\.isArray\(contacts\)/);
+  assert.match(dialogs, /const safeConversations = Array\.isArray\(conversations\)/);
+  assert.match(dialogs, /safeContacts\.map\(/);
+  assert.match(dialogs, /safeConversations\.map\(/);
+  assert.doesNotMatch(dialogs, /\{contacts\.map\(/);
+});
+
+test("Ready App cleanup only redirects while its detail route is still active", () => {
+  const source = read("src/components/ready_apps/ReadyAppInstallation.jsx");
+
+  assert.match(source, /useLocation/);
+  assert.match(source, /locationPathRef\.current = location\.pathname/);
+  assert.match(source, /location\.pathname !== installationPath/);
+  assert.match(source, /locationPathRef\.current === installationPath\) navigate/);
+});
