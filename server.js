@@ -12,6 +12,7 @@ import {
   isNoIndex,
   isDocsPath,
 } from './src/seo-config.js';
+import { stripManagedSeoTags } from './src/seo-head.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1359,7 +1360,7 @@ function renderDocument(
       '</noscript>'
     : '';
 
-  let html = template;
+  let html = stripManagedSeoTags(template);
 
   /*
    * Inject dynamic SEO head into the built Vite document.
