@@ -232,13 +232,19 @@ export default function ReadyAppInstallations() {
     else setLoading(true);
     setError("");
     try {
-      const [installationResponse, appResponse] = await Promise.all([
+      const [installationResult, appsResult] = await Promise.allSettled([
         apiRequest({ method: "GET", url: ROOT + "/installations/" }),
         apiRequest({ method: "GET", url: ROOT + "/apps/" }),
       ]);
       if (!mountedRef.current) return;
-      setInstallations(listFrom(installationResponse.data));
-      setApps(listFrom(appResponse.data));
+      if (installationResult.status === "rejected") throw installationResult.reason;
+      setInstallations(listFrom(installationResult.value.data));
+      if (appsResult.status === "fulfilled") {
+        setApps(listFrom(appsResult.value.data));
+      } else {
+        setApps([]);
+        setError("The app catalog could not load; deployment status is still available.");
+      }
     } catch (err) {
       if (mountedRef.current) {
         setError(
@@ -345,7 +351,7 @@ export default function ReadyAppInstallations() {
           </Alert>
         )}
 
-        {loading ? (
+        {loading || (refreshing && installations.length === 0) ? (
           <Box
             sx={{
               display: "grid",
