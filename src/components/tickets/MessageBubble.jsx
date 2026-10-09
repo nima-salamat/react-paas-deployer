@@ -635,7 +635,7 @@ function MessageBubble({
 
       <Box
         sx={{
-          maxWidth: { xs: "88%", sm: "74%" },
+          maxWidth: { xs: "calc(100% - 44px)", sm: "74%" },
           minWidth: 0,
           width: "fit-content",
           maxHeight: "none",
