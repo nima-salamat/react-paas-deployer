@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -19,6 +19,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import apiRequest from "../customHooks/apiRequest";
 
 const API_ROOT =
@@ -45,7 +46,7 @@ function AppLogo({ app, size = 58 }) {
         width: size,
         height: size,
         flexShrink: 0,
-        borderRadius: 3.2,
+        borderRadius: 2.4,
         display: "grid",
         placeItems: "center",
         position: "relative",
@@ -93,7 +94,7 @@ function AppCard({ app }) {
       variant="outlined"
       sx={(theme) => ({
         height: "100%",
-        borderRadius: 4,
+        borderRadius: 2.5,
         borderColor: alpha(theme.palette.divider, theme.palette.mode === "dark" ? 0.75 : 0.9),
         backgroundColor: theme.palette.background.paper,
         overflow: "hidden",
@@ -168,26 +169,33 @@ export default function ReadyApps() {
   const [apps, setApps] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const response = await apiRequest({ method: "GET", url: CATALOG_ROOT + "/apps/" });
-        if (!mounted) return;
-        setApps(normalizeList(response.data));
-      } catch (err) {
-        if (!mounted) return;
-        setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Couldn't load the app library."));
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+  const load = useCallback(async (background = false) => {
+    if (background) setRefreshing(true);
+    else setLoading(true);
+    setError("");
+    try {
+      const response = await apiRequest({ method: "GET", url: CATALOG_ROOT + "/apps/" });
+      setApps(normalizeList(response.data));
+    } catch (err) {
+      setError(String(err?.response?.data?.detail || err?.response?.data?.error || "Couldn't load the app library."));
+    } finally {
+      if (background) setRefreshing(false);
+      else setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!error || loading || refreshing) return undefined;
+    const timer = window.setTimeout(() => load(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, [error, loading, refreshing, load]);
 
   const visibleApps = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -231,21 +239,31 @@ export default function ReadyApps() {
             </Typography>
           </Box>
 
-          <Button
-            component={RouterLink}
-            to="/dashboard/ready-apps/installations"
-            variant="outlined"
-            startIcon={<Inventory2OutlinedIcon />}
-            sx={{
-              borderRadius: 2.2,
-              px: 1.7,
-              py: 1,
-              fontWeight: 850,
-              alignSelf: { xs: "stretch", md: "auto" },
-            }}
-          >
-            Deployed Apps
-          </Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="stretch">
+            <Button
+              variant="outlined"
+              startIcon={<RefreshRoundedIcon />}
+              onClick={() => load(true)}
+              disabled={loading || refreshing}
+              sx={{ borderRadius: 2, px: 1.7, py: 1, fontWeight: 800 }}
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/dashboard/ready-apps/installations"
+              variant="outlined"
+              startIcon={<Inventory2OutlinedIcon />}
+              sx={{
+                borderRadius: 2,
+                px: 1.7,
+                py: 1,
+                fontWeight: 850,
+              }}
+            >
+              Deployed Apps
+            </Button>
+          </Stack>
         </Stack>
 
         <TextField
@@ -271,7 +289,11 @@ export default function ReadyApps() {
         />
 
         {error && (
-          <Alert severity="error" sx={{ borderRadius: 2.5 }}>
+          <Alert
+            severity="error"
+            sx={{ borderRadius: 2.2 }}
+            action={<Button color="inherit" size="small" onClick={() => load(true)} disabled={loading || refreshing}>Retry</Button>}
+          >
             {error}
           </Alert>
         )}
@@ -279,7 +301,7 @@ export default function ReadyApps() {
         {loading ? (
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))", lg: "repeat(3,minmax(0,1fr))" }, gap: 2 }}>
             {Array.from({ length: 6 }).map((_, index) => (
-              <Card key={index} variant="outlined" sx={{ borderRadius: 4, p: 2.5 }}>
+              <Card key={index} variant="outlined" sx={{ borderRadius: 2.5, p: 2.5 }}>
                 <Stack spacing={1.5}>
                   <Skeleton variant="rounded" width={58} height={58} />
                   <Skeleton variant="rounded" width="52%" height={28} />
@@ -289,10 +311,17 @@ export default function ReadyApps() {
               </Card>
             ))}
           </Box>
+        ) : error && apps.length === 0 ? (
+          <Card variant="outlined" sx={{ borderRadius: 2.5, p: { xs: 3.5, md: 5.5 }, textAlign: "center" }}>
+            <AppsRoundedIcon sx={{ fontSize: 42, color: "text.disabled" }} />
+            <Typography sx={{ mt: 1.4, fontWeight: 900 }}>App library unavailable</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>We couldn’t retrieve the app catalog.</Typography>
+            <Button variant="contained" startIcon={<RefreshRoundedIcon />} onClick={() => load(true)} disabled={refreshing} sx={{ mt: 2, borderRadius: 2 }}>Try again</Button>
+          </Card>
         ) : visibleApps.length === 0 ? (
           <Card
             variant="outlined"
-            sx={{ borderRadius: 4, p: { xs: 3.5, md: 5.5 }, textAlign: "center" }}
+            sx={{ borderRadius: 2.5, p: { xs: 3.5, md: 5.5 }, textAlign: "center" }}
           >
             <AppsRoundedIcon sx={{ fontSize: 42, color: "text.disabled" }} />
             <Typography sx={{ mt: 1.4, fontWeight: 900 }}>
