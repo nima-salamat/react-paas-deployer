@@ -133,3 +133,15 @@ test("direct axios usage is limited to the audited public-auth/public-plans modu
     "Unexpected direct axios usage found:\\n" + failures.join("\\n"),
   );
 });
+
+test("runtime error screen shows source context and can copy a diagnostic report", () => {
+  const boundary = read("src/components/error/AppErrorBoundary.jsx");
+
+  assert.match(boundary, /Copy error details/);
+  assert.match(boundary, /copyErrorDetails/);
+  assert.match(boundary, /navigator\.clipboard\?\.writeText/);
+  assert.match(boundary, /Stack trace:/);
+  assert.match(boundary, /Route:/);
+  assert.match(boundary, /errorObject\.stack/);
+  assert.match(boundary, /source=\{this\.state\.source\}/);
+});
