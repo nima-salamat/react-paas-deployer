@@ -45,13 +45,28 @@ export default function MessengerDialogs({
   // day jump
   dayJumpOpen, setDayJumpOpen, messagesWithDays, messages, jumpToDayInChat,
 }) {
+  const safeConversations = Array.isArray(conversations)
+    ? conversations
+    : Array.isArray(conversations?.results)
+      ? conversations.results
+      : Array.isArray(conversations?.data)
+        ? conversations.data
+        : [];
+  const safeContacts = Array.isArray(contacts)
+    ? contacts
+    : Array.isArray(contacts?.results)
+      ? contacts.results
+      : Array.isArray(contacts?.data)
+        ? contacts.data
+        : [];
+
   return (
     <>
       <Dialog open={Boolean(forwardOpen)} onClose={() => setForwardOpen(null)} fullWidth maxWidth="xs">
         <DialogTitle>Forward to…</DialogTitle>
         <DialogContent dividers sx={{ maxHeight: 360 }}>
           <List dense>
-            {conversations.map((c) => (
+            {safeConversations.map((c) => (
               <ListItemButton key={c.id} onClick={() => forwardTo(c.id)}>
                 <ListItemAvatar>
                   <Avatar src={convAvatar(c, meId)}>{convTitle(c, meId)[0]}</Avatar>
@@ -140,7 +155,7 @@ export default function MessengerDialogs({
         <DialogTitle>Add members from contacts</DialogTitle>
         <DialogContent dividers sx={{ maxHeight: 360 }}>
           <List dense>
-            {contacts.map((c) => {
+            {safeContacts.map((c) => {
               const u = c.contact;
               if (!u) return null;
               const checked = addMemberSelected.includes(u.id);
@@ -164,7 +179,7 @@ export default function MessengerDialogs({
                 </ListItemButton>
               );
             })}
-            {!contacts.length && (
+            {!safeContacts.length && (
               <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
                 No contacts. Add contacts from search first.
               </Typography>
