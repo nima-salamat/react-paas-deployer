@@ -80,6 +80,14 @@ function fieldVisible(field, config) {
   return true;
 }
 
+function isOptionalAdvancedField(field) {
+  return field.ui?.advanced === true || (
+    field.ui?.advanced !== false &&
+    !field.required &&
+    Object.prototype.hasOwnProperty.call(field, "default")
+  );
+}
+
 function prettyStage(value) {
   const key = String(value || "pending").toLowerCase().trim();
   const labels = {
@@ -421,6 +429,37 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
 
   const canAdvanceFromConfigure = !resolveLoading;
   const canAdvanceFromResources = !resolveLoading && Boolean(planId);
+  const visibleFields = useMemo(
+    () => (variant?.fields || []).filter(
+      (field) => fieldVisible(field, config) && field?.user_editable !== false
+    ),
+    [variant, config]
+  );
+  const primaryFields = visibleFields.filter((field) => !isOptionalAdvancedField(field));
+  const optionalFields = visibleFields.filter(isOptionalAdvancedField);
+  const renderFields = (fields) => (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" },
+        gap: 1.5,
+      }}
+    >
+      {fields.map((field) => (
+        <Box
+          key={field.id}
+          sx={{ gridColumn: { xs: "span 1", sm: field.ui?.full_width ? "span 2" : "span 1" } }}
+        >
+          <DynamicField
+            field={field}
+            value={config[field.id]}
+            config={config}
+            onChange={updateField}
+          />
+        </Box>
+      ))}
+    </Box>
+  );
 
   return (
     <Dialog
@@ -562,76 +601,36 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               </TextField>
             )}
 
-            {(() => {
-              const visibleFields = (variant?.fields || []).filter(
-                (field) => fieldVisible(field, config) && field?.user_editable !== false
-              );
-              const advancedField = (field) =>
-                field.ui?.advanced === true ||
-                (
-                  field.ui?.advanced !== false &&
-                  !field.required &&
-                  Object.prototype.hasOwnProperty.call(field, "default")
-                );
-              const primaryFields = visibleFields.filter((field) => !advancedField(field));
-              const optionalFields = visibleFields.filter(advancedField);
-              const renderFields = (fields) => (
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" },
-                    gap: 1.5,
-                  }}
-                >
-                  {fields.map((field) => (
-                    <Box
-                      key={field.id}
-                      sx={{ gridColumn: { xs: "span 1", sm: field.ui?.full_width ? "span 2" : "span 1" } }}
-                    >
-                      <DynamicField
-                        field={field}
-                        value={config[field.id]}
-                        config={config}
-                        onChange={updateField}
-                      />
+            <Stack spacing={1.25}>
+              {renderFields(primaryFields)}
+              {optionalFields.length > 0 && (
+                <Box>
+                  <Divider sx={{ mb: 1.1, mt: 0.3 }} />
+                  <Button
+                    type="button"
+                    size="small"
+                    onClick={() => setShowAdvancedFields((shown) => !shown)}
+                    aria-expanded={showAdvancedFields}
+                    endIcon={showAdvancedFields ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
+                    sx={{
+                      px: 0.5,
+                      borderRadius: 1.5,
+                      textTransform: "none",
+                      fontWeight: 750,
+                    }}
+                  >
+                    {showAdvancedFields
+                      ? "Hide optional settings"
+                      : `Show optional settings (${optionalFields.length})`}
+                  </Button>
+                  <Collapse in={showAdvancedFields} unmountOnExit>
+                    <Box sx={{ pt: 1 }}>
+                      {renderFields(optionalFields)}
                     </Box>
-                  ))}
+                  </Collapse>
                 </Box>
-              );
-
-              return (
-                <Stack spacing={1.25}>
-                  {renderFields(primaryFields)}
-                  {optionalFields.length > 0 && (
-                    <Box>
-                      <Divider sx={{ mb: 1.1, mt: 0.3 }} />
-                      <Button
-                        type="button"
-                        size="small"
-                        onClick={() => setShowAdvancedFields((shown) => !shown)}
-                        aria-expanded={showAdvancedFields}
-                        endIcon={showAdvancedFields ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
-                        sx={{
-                          px: 0.5,
-                          borderRadius: 1.5,
-                          textTransform: "none",
-                          fontWeight: 750,
-                        }}
-                      >
-                        {showAdvancedFields
-                          ? "Hide optional settings"
-                          : `Show optional settings (${optionalFields.length})`}
-                      </Button>
-                      <Collapse in={showAdvancedFields} unmountOnExit>
-                        <Box sx={{ pt: 1 }}>
-                          {renderFields(optionalFields)}
-                        </Box>
-                      </Collapse>
-                    </Box>
-                  )}
-                </Stack>
-              );
-            })()}
+              )}
+            </Stack>
           </Stack>
         )}
 
