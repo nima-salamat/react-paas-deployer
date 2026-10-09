@@ -649,3 +649,14 @@ test("syntax highlighting is not recomputed on every keyup while editing a code 
   assert.doesNotMatch(source, /onKeyUp=\{\(\) => \{[\s\S]*highlightEditorCode/);
 });
 
+test("common formatting stays visible while advanced tools are collapsible", () => {
+  const source = read("src/components/tickets/SimpleHtmlEditor.jsx");
+
+  const boldIndex = source.indexOf('aria-label="Bold"');
+  const advancedCollapseIndex = source.indexOf("<Collapse in={expanded}>");
+  assert.ok(boldIndex >= 0 && advancedCollapseIndex > boldIndex);
+  assert.match(source, /aria-expanded=\{expanded\}/);
+  assert.match(source, /\{expanded \? "Less" : "More"\}/);
+  assert.match(source, /aria-label="Block style"/);
+  assert.match(source, /onClick=\{\(\) => toggleInlineFormat\("bold"\)\}/);
+});
