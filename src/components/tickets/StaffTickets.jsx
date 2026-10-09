@@ -3,7 +3,7 @@ import {
   Box, Button, Chip, CircularProgress, Divider, FormControl,
   InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell,
   TableHead, TableRow, TextField, Typography, Pagination, Alert, Drawer,
-  IconButton, Toolbar,
+  IconButton, Toolbar, alpha,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import apiRequest from "../customHooks/apiRequest";
@@ -349,7 +349,17 @@ export default function StaffTickets() {
           )}
           {actionError && <Alert severity="error" sx={{ mx: 2, mt: 1 }}>{actionError}</Alert>}
           {detail && (
-            <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+                overflow: "hidden",
+                boxSizing: "border-box",
+                pb: "calc(12px + env(safe-area-inset-bottom, 0px))",
+              }}
+            >
               <Box sx={{ px: 2, pt: 1.5, pb: 1.25, flexShrink: 0, borderBottom: 1, borderColor: "divider" }}>
                 <Typography variant="h6" fontWeight={700} noWrap>{detail.subject}</Typography>
                 <Typography variant="body2" color="text.secondary" noWrap mb={1}>
@@ -379,7 +389,9 @@ export default function StaffTickets() {
                   flexDirection: "column",
                   gap: 1,
                   p: 1,
-                  bgcolor: (theme) => (theme.palette.mode === "dark" ? "grey.900" : "grey.100"),
+                  background: (theme) => theme.palette.mode === "dark"
+                    ? `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.palette.background.default} 38%, ${alpha(theme.palette.background.paper, 0.96)})`
+                    : `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.045)}, ${theme.palette.background.default} 48%, ${theme.palette.background.paper})`,
                 }}
               >
                 {(detail.messages || []).map((m) => (
@@ -387,7 +399,7 @@ export default function StaffTickets() {
                 ))}
               </Box>
               {detail.status !== "closed" && (
-                <Box sx={{ flexShrink: 0 }}>
+                <Box sx={{ flexShrink: 0, mx: 1.25, mt: 1 }}>
                   <ChatComposer
                     value={reply}
                     onChange={setReply}
