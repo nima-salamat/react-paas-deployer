@@ -43,6 +43,7 @@ import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import apiRequest from "../customHooks/apiRequest";
+import ReadyAppBrandMark from "./ReadyAppBrandMark.jsx";
 
 const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
@@ -491,19 +492,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               flexShrink: 0,
             })}
           >
-            {app?.logo ? (
-              <Box
-                component="img"
-                src={app.logo}
-                alt=""
-                sx={{ width: 27, height: 27, objectFit: "contain" }}
-                onError={(event) => {
-                  event.currentTarget.style.display = "none";
-                }}
-              />
-            ) : (
-              <ComputerRoundedIcon sx={{ fontSize: 22 }} />
-            )}
+            <ReadyAppBrandMark app={app} size={27} />
           </Box>
 
           <Box sx={{ minWidth: 0, flex: 1 }}>

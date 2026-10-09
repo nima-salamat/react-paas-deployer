@@ -14,11 +14,11 @@ import { alpha } from "@mui/material/styles";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
-import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
-import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import apiRequest from "../customHooks/apiRequest";
 import { useNavigate, useParams } from "react-router-dom";
 import ReadyAppWizard from "./ReadyAppWizard.jsx";
+import ReadyAppBrandMark from "./ReadyAppBrandMark.jsx";
+import PlatformIcon from "../plans/PlatformIcon.jsx";
 
 const API_ROOT =
   "https://" +
@@ -28,9 +28,6 @@ const API_ROOT =
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
 
 function AppLogo({ app, size = 84 }) {
-  const [failed, setFailed] = useState(false);
-  const logo = String(app?.logo || "");
-
   return (
     <Box
       sx={(theme) => ({
@@ -51,17 +48,7 @@ function AppLogo({ app, size = 84 }) {
         boxShadow: "0 18px 44px rgba(0,0,0,.10)",
       })}
     >
-      {!failed && (/^https?:\/\//i.test(logo) || /^\//.test(logo)) ? (
-        <Box
-          component="img"
-          src={logo}
-          alt=""
-          onError={() => setFailed(true)}
-          sx={{ width: "68%", height: "68%", objectFit: "contain" }}
-        />
-      ) : (
-        <LayersRoundedIcon sx={{ fontSize: size * .42, color: "primary.main" }} />
-      )}
+      <ReadyAppBrandMark app={app} size={size * 0.68} />
     </Box>
   );
 }
@@ -249,7 +236,7 @@ export default function ReadyAppDetail() {
           >
             <Card variant="outlined" sx={{ borderRadius: 4, p: { xs: 2.2, md: 2.8 } }}>
               <Stack direction="row" spacing={1.1} alignItems="center">
-                <SecurityRoundedIcon sx={{ color: "primary.main" }} />
+                <ReadyAppBrandMark app={app} size={24} />
                 <Typography sx={{ fontWeight: 900 }}>Included</Typography>
               </Stack>
 
@@ -270,12 +257,21 @@ export default function ReadyAppDetail() {
                       bgcolor: "action.hover",
                     }}
                   >
-                    <Typography sx={{ fontWeight: 850 }}>{component.label}</Typography>
-                    {component.role && (
-                      <Typography variant="caption" color="text.secondary">
-                        {component.role}
-                      </Typography>
-                    )}
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <PlatformIcon
+                        platformKey={component.id || component.key || component.label}
+                        label={component.label || component.role}
+                        size={19}
+                      />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 850 }}>{component.label}</Typography>
+                        {component.role && (
+                          <Typography variant="caption" color="text.secondary">
+                            {component.role}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Stack>
                   </Box>
                 ))}
               </Box>

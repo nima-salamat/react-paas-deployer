@@ -71,3 +71,32 @@ testFn("Ready App wizard keeps required settings visible and groups optional def
   assert.match(source, /setShowAdvancedFields\(false\)/);
   assert.match(source, /<Collapse in=\{showAdvancedFields\} unmountOnExit>/);
 });
+
+
+testFn("Ready App brands stay consistent from catalog to details, install flow and deployed apps", () => {
+  const brand = read("src/components/ready_apps/ReadyAppBrandMark.jsx");
+  const catalog = read("src/components/ready_apps/ReadyApps.jsx");
+  const detail = read("src/components/ready_apps/ReadyAppDetail.jsx");
+  const wizard = read("src/components/ready_apps/ReadyAppWizard.jsx");
+  const installations = read("src/components/ready_apps/ReadyAppInstallations.jsx");
+  const platform = read("src/components/plans/PlatformIcon.jsx");
+
+  for (const logo of [
+    "ready-app-wordpress.svg",
+    "ready-app-uptime-kuma.svg",
+    "ready-app-mattermost.svg",
+    "ready-app-synapse.svg",
+    "ready-app-forgejo.svg",
+  ]) {
+    assert.ok(brand.includes(logo), "Missing Ready App brand fallback " + logo);
+  }
+  assert.match(platform, /SiWordpress/);
+  assert.match(platform, /SiUptimekuma/);
+  assert.match(platform, /SiGrafana/);
+  assert.match(catalog, /ReadyAppBrandMark/);
+  assert.match(detail, /ReadyAppBrandMark/);
+  assert.match(detail, /platformKey=\{component\.id \|\| component\.key \|\| component\.label\}/);
+  assert.doesNotMatch(detail, /SecurityRoundedIcon/);
+  assert.match(wizard, /ReadyAppBrandMark/);
+  assert.match(installations, /ReadyAppBrandMark/);
+});

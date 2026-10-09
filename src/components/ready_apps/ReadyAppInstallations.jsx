@@ -19,6 +19,7 @@ import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import HourglassTopRoundedIcon from "@mui/icons-material/HourglassTopRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
+import ReadyAppBrandMark from "./ReadyAppBrandMark.jsx";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { Link as RouterLink } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
@@ -72,9 +73,7 @@ function StatusIcon({ status, deleting }) {
   return <HourglassTopRoundedIcon sx={{ fontSize: 15 }} />;
 }
 
-function AppMark({ app }) {
-  const [failed, setFailed] = useState(false);
-  const logo = String(app?.logo || "");
+function AppMark({ app, installation }) {
   return (
     <Box
       sx={(theme) => ({
@@ -95,17 +94,7 @@ function AppMark({ app }) {
         boxShadow: "0 8px 24px rgba(0,0,0,.07)",
       })}
     >
-      {!failed && (/^https?:\/\//i.test(logo) || /^\//.test(logo)) ? (
-        <Box
-          component="img"
-          src={logo}
-          alt=""
-          onError={() => setFailed(true)}
-          sx={{ width: "68%", height: "68%", objectFit: "contain" }}
-        />
-      ) : (
-        <AppsRoundedIcon sx={{ fontSize: 25 }} />
-      )}
+      <ReadyAppBrandMark app={app || { id: installation?.catalog_id, name: installation?.catalog_id || "Application" }} size={36} />
     </Box>
   );
 }
@@ -146,7 +135,7 @@ function InstallationCard({ installation, app }) {
       >
         <Box sx={{ p: { xs: 2.1, md: 2.4 } }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <AppMark app={app} />
+            <AppMark app={app} installation={installation} />
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography
                 variant="caption"

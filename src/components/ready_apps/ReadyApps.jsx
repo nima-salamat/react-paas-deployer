@@ -19,6 +19,7 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
+import ReadyAppBrandMark from "./ReadyAppBrandMark.jsx";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import apiRequest from "../customHooks/apiRequest";
 
@@ -40,10 +41,6 @@ function normalizeList(data) {
 }
 
 function AppLogo({ app, size = 58 }) {
-  const [failed, setFailed] = useState(false);
-  const logo = String(app?.logo || "");
-  const label = String(app?.name || "?").trim().charAt(0).toUpperCase() || "A";
-
   return (
     <Box
       sx={(theme) => ({
@@ -62,32 +59,9 @@ function AppLogo({ app, size = 58 }) {
         border: "1px solid",
         borderColor: alpha(theme.palette.primary.main, 0.18),
         boxShadow: "0 10px 30px rgba(0,0,0,.08)",
-        "&::after": {
-          content: '""',
-          position: "absolute",
-          inset: 0,
-          background: "linear-gradient(120deg, rgba(255,255,255,.14), transparent 48%)",
-          pointerEvents: "none",
-        },
       })}
     >
-      {!failed && (/^https?:\/\//i.test(logo) || /^\//.test(logo)) ? (
-        <Box
-          component="img"
-          src={logo}
-          alt=""
-          onError={() => setFailed(true)}
-          sx={{
-            width: "68%",
-            height: "68%",
-            objectFit: "contain",
-            position: "relative",
-            zIndex: 1,
-          }}
-        />
-      ) : (
-        <AppsRoundedIcon sx={{ fontSize: size * 0.47, color: "primary.main", position: "relative", zIndex: 1 }} />
-      )}
+      <ReadyAppBrandMark app={app} size={size * 0.68} />
     </Box>
   );
 }
