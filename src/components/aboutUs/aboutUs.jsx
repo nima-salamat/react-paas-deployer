@@ -209,7 +209,7 @@ export default function AboutUs() {
   const dark = theme.palette.mode === "dark";
 
   return (
-    <Box sx={{ bgcolor: "background.default", overflow: "hidden" }}>
+    <Box sx={{ bgcolor: "background.default", overflowX: "clip" }}>
       <Box
         component="section"
         sx={{
