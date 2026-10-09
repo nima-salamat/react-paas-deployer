@@ -2,6 +2,9 @@ import React from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   ArrowForwardRounded,
+  CheckCircleRounded,
+  DnsRounded,
+  MonitorHeartRounded,
   AutoAwesomeRounded,
   CodeRounded,
   GitHub,
@@ -120,86 +123,262 @@ function Surface({ children, sx = {}, ...props }) {
 function ArchitectureVisual() {
   const theme = useTheme();
   const dark = theme.palette.mode === "dark";
-  const border = alpha(theme.palette.primary.main, dark ? 0.22 : 0.16);
+  const border = alpha(theme.palette.primary.main, dark ? 0.22 : 0.15);
   const nodes = [
-    ["Source", CodeRounded, "Repository / config"],
-    ["Control plane", SettingsSuggestRounded, "Django API"],
-    ["Runtime", RocketLaunchRounded, "Docker + Swarm"],
+    { name: "Source", detail: "Repository connected", Icon: CodeRounded, state: "CONNECTED" },
+    { name: "Build", detail: "Immutable image", Icon: RocketLaunchRounded, state: "READY" },
+    { name: "Runtime", detail: "Docker / Swarm", Icon: TerminalRounded, state: "HEALTHY" },
+  ];
+  const signals = [
+    { name: "API", detail: "Reachable", Icon: DnsRounded },
+    { name: "Storage", detail: "Attached", Icon: StorageRounded },
+    { name: "Routing", detail: "HTTPS ready", Icon: SecurityRounded },
   ];
 
   return (
-    <Surface sx={{ p: { xs: 2, sm: 2.5, md: 3 }, height: "100%", overflow: "hidden", position: "relative" }}>
+    <Surface sx={{ p: 0, minWidth: 0, height: "100%", overflow: "hidden", position: "relative" }}>
       <Box
-        aria-hidden="true"
         sx={{
-          position: "absolute",
-          width: 260,
-          height: 260,
-          borderRadius: "50%",
-          right: -120,
-          top: -120,
-          background: alpha(theme.palette.primary.main, dark ? 0.11 : 0.06),
+          px: { xs: 1.7, sm: 2.2 },
+          py: 1.45,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1.2,
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          bgcolor: alpha(theme.palette.primary.main, dark ? 0.045 : 0.025),
         }}
-      />
-      <Stack spacing={1.15} sx={{ position: "relative" }}>
-        {nodes.map(([name, Icon, detail], index) => (
-          <React.Fragment key={name}>
-            <Paper
-              elevation={0}
+      >
+        <Stack direction="row" alignItems="center" spacing={1.15} sx={{ minWidth: 0 }}>
+          <Stack direction="row" spacing={0.45} aria-hidden="true">
+            {["#fb7185", "#fbbf24", "#34d399"].map((color) => (
+              <Box key={color} sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: color }} />
+            ))}
+          </Stack>
+          <Typography
+            variant="caption"
+            sx={{ minWidth: 0, fontWeight: 900, letterSpacing: ".09em", fontSize: ".64rem" }}
+          >
+            PAASDEPLOYER / CONTROL PLANE
+          </Typography>
+        </Stack>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.55}
+          sx={{
+            flexShrink: 0,
+            color: dark ? "#86efac" : "#15803d",
+            bgcolor: dark ? "rgba(34,197,94,.10)" : "rgba(22,163,74,.08)",
+            border: "1px solid",
+            borderColor: dark ? "rgba(74,222,128,.18)" : "rgba(22,163,74,.15)",
+            borderRadius: 1.5,
+            py: 0.5,
+            px: 0.8,
+          }}
+        >
+          <CheckCircleRounded sx={{ fontSize: 14 }} />
+          <Typography variant="caption" sx={{ fontWeight: 850 }}>Workflow ready</Typography>
+        </Stack>
+      </Box>
+
+      <Box
+        sx={{
+          p: { xs: 1.7, sm: 2.2, md: 2.6 },
+          backgroundImage: dark
+            ? "radial-gradient(circle at 85% 0%, rgba(96,165,250,.13), transparent 36%), linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px)"
+            : "radial-gradient(circle at 85% 0%, rgba(59,130,246,.10), transparent 36%), linear-gradient(rgba(15,23,42,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(15,23,42,.035) 1px, transparent 1px)",
+          backgroundSize: "auto, 24px 24px, 24px 24px",
+        }}
+      >
+        <Stack spacing={2}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1.5 }}>
+            <Box>
+              <Typography
+                variant="overline"
+                sx={{ color: "primary.main", fontWeight: 900, letterSpacing: ".14em", fontSize: ".62rem" }}
+              >
+                PLATFORM WORKFLOW
+              </Typography>
+              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.08rem", sm: "1.3rem" }, letterSpacing: "-.035em", lineHeight: 1.2 }}>
+                From commit to running service
+              </Typography>
+            </Box>
+            <Box
               sx={{
-                p: 1.45,
-                borderRadius: 2.2,
+                flexShrink: 0,
+                px: 0.9,
+                py: 0.55,
                 border: "1px solid",
                 borderColor: border,
-                background: alpha(theme.palette.background.paper, dark ? 0.58 : 0.78),
+                borderRadius: 1.3,
+                color: "text.secondary",
+                fontSize: ".62rem",
+                fontWeight: 850,
+                letterSpacing: ".08em",
               }}
             >
-              <Stack direction="row" spacing={1.2} alignItems="center">
-                <Box
+              PREVIEW
+            </Box>
+          </Box>
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={{ xs: 0.8, sm: 0.65 }}
+            alignItems="stretch"
+          >
+            {nodes.map(({ name, detail, Icon, state }, index) => (
+              <React.Fragment key={name}>
+                <Paper
+                  elevation={0}
                   sx={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 1.7,
-                    display: "grid",
-                    placeItems: "center",
-                    color: "primary.main",
-                    bgcolor: alpha(theme.palette.primary.main, dark ? 0.13 : 0.08),
-                    flexShrink: 0,
+                    flex: "1 1 0",
+                    minWidth: 0,
+                    p: { xs: 1.25, sm: 1.1, md: 1.35 },
+                    border: "1px solid",
+                    borderColor: border,
+                    borderRadius: 2,
+                    bgcolor: alpha(theme.palette.background.paper, dark ? 0.88 : 0.94),
+                    boxShadow: dark ? "0 8px 24px rgba(0,0,0,.14)" : "0 8px 24px rgba(15,23,42,.045)",
                   }}
                 >
-                  <Icon sx={{ fontSize: 20 }} />
-                </Box>
-                <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 900 }}>{name}</Typography>
-                  <Typography variant="caption" color="text.secondary">{detail}</Typography>
-                </Box>
-              </Stack>
-            </Paper>
-            {index < nodes.length - 1 ? (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 34,
+                        height: 34,
+                        flexShrink: 0,
+                        borderRadius: 1.5,
+                        display: "grid",
+                        placeItems: "center",
+                        color: "primary.main",
+                        bgcolor: alpha(theme.palette.primary.main, dark ? 0.16 : 0.09),
+                      }}
+                    >
+                      <Icon sx={{ fontSize: 19 }} />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography sx={{ fontSize: ".86rem", fontWeight: 900 }}>{name}</Typography>
+                      <Typography sx={{ fontSize: ".68rem", color: "text.secondary", lineHeight: 1.35 }}>
+                        {detail}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 1.25 }}>
+                    <CheckCircleRounded sx={{ color: dark ? "#86efac" : "#16a34a", fontSize: 13 }} />
+                    <Typography sx={{ color: "text.secondary", fontSize: ".57rem", fontWeight: 900, letterSpacing: ".07em" }}>
+                      {state}
+                    </Typography>
+                  </Stack>
+                </Paper>
+                {index < nodes.length - 1 ? (
+                  <Box
+                    aria-hidden="true"
+                    sx={{
+                      display: "grid",
+                      placeItems: "center",
+                      color: "primary.main",
+                      flexShrink: 0,
+                      py: { xs: 0, sm: 0 },
+                    }}
+                  >
+                    <ArrowForwardRounded sx={{ fontSize: 18, transform: { xs: "rotate(90deg)", sm: "none" }, opacity: 0.8 }} />
+                  </Box>
+                ) : null}
+              </React.Fragment>
+            ))}
+          </Stack>
+
+          <Paper
+            elevation={0}
+            sx={{
+              p: { xs: 1.35, sm: 1.6 },
+              border: "1px solid",
+              borderColor: alpha(theme.palette.divider, dark ? 1 : 0.9),
+              borderRadius: 2,
+              bgcolor: alpha(theme.palette.background.paper, dark ? 0.76 : 0.82),
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1.1}>
               <Box
-                aria-hidden="true"
                 sx={{
-                  width: 2,
-                  height: 22,
-                  mx: "auto",
-                  borderRadius: 99,
-                  background:
-                    "linear-gradient(180deg, " +
-                    alpha(theme.palette.primary.main, 0.08) +
-                    ", " +
-                    alpha(theme.palette.primary.main, 0.38) +
-                    ", " +
-                    alpha(theme.palette.primary.main, 0.08) +
-                    ")",
+                  width: 36,
+                  height: 36,
+                  borderRadius: 1.5,
+                  display: "grid",
+                  placeItems: "center",
+                  flexShrink: 0,
+                  bgcolor: dark ? "rgba(34,197,94,.12)" : "rgba(22,163,74,.08)",
+                  color: dark ? "#86efac" : "#15803d",
                 }}
-              />
-            ) : null}
-          </React.Fragment>
-        ))}
-        <Typography variant="caption" color="text.secondary" sx={{ pt: 1, lineHeight: 1.6 }}>
-          A single path from configuration to an observable running workload.
-        </Typography>
-      </Stack>
+              >
+                <MonitorHeartRounded sx={{ fontSize: 20 }} />
+              </Box>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography sx={{ fontSize: ".87rem", fontWeight: 900 }}>Runtime health</Typography>
+                <Typography sx={{ fontSize: ".7rem", color: "text.secondary", lineHeight: 1.45 }}>
+                  Keep service signals close to everyday operations
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  flexShrink: 0,
+                  display: { xs: "none", sm: "flex" },
+                  alignItems: "center",
+                  gap: 0.65,
+                  color: dark ? "#86efac" : "#15803d",
+                  fontSize: ".68rem",
+                  fontWeight: 850,
+                }}
+              >
+                <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "success.main" }} />
+                Observable
+              </Box>
+            </Stack>
+            <Box
+              sx={{
+                mt: 1.45,
+                pt: 1.25,
+                borderTop: "1px solid",
+                borderColor: "divider",
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                gap: 0.9,
+              }}
+            >
+              {signals.map(({ name, detail, Icon }) => (
+                <Box key={name} sx={{ minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={0.55}>
+                    <Icon sx={{ color: "primary.main", fontSize: 15, flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: ".7rem", fontWeight: 850 }}>{name}</Typography>
+                  </Stack>
+                  <Typography sx={{ pl: 2.55, mt: 0.3, color: "text.secondary", fontSize: ".63rem", overflowWrap: "anywhere" }}>
+                    {detail}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+          </Paper>
+
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            spacing={0.7}
+            sx={{ pt: 0.2 }}
+          >
+            {["CONFIGURE", "DEPLOY", "OPERATE"].map((label, index) => (
+              <React.Fragment key={label}>
+                <Typography sx={{ color: "text.secondary", fontSize: ".61rem", fontWeight: 900, letterSpacing: ".1em" }}>
+                  {label}
+                </Typography>
+                {index < 2 ? <ArrowForwardRounded sx={{ color: alpha(theme.palette.primary.main, 0.72), fontSize: 14 }} /> : null}
+              </React.Fragment>
+            ))}
+          </Stack>
+        </Stack>
+      </Box>
     </Surface>
   );
 }
@@ -422,37 +601,102 @@ export default function AboutUs() {
                     Popular self-hosted applications can arrive with their supporting services, storage and configuration already described by the catalog.
                   </Typography>
                 </Box>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))" },
+                    gap: 1,
+                  }}
+                >
                   {ABOUT_READY_APPS.map(({ name, icon, accent }) => (
-                  <Box
-                    key={name}
-                    component="span"
-                    sx={{
-                      display: "inline-flex",
-                      minWidth: 0,
-                      alignItems: "center",
-                      gap: .7,
-                      px: 1,
-                      py: .65,
-                      borderRadius: 1.6,
-                      border: "1px solid",
-                      borderColor: alpha(accent, dark ? .25 : .2),
-                      bgcolor: alpha(accent, dark ? .08 : .045),
-                    }}
-                  >
                     <Box
-                      component="img"
-                      src={icon}
-                      alt=""
-                      aria-hidden="true"
-                      sx={{ width: 21, height: 21, objectFit: "contain", flexShrink: 0 }}
-                    />
-                    <Typography component="span" sx={{ fontWeight: 800, fontSize: ".8rem", lineHeight: 1.25 }}>
-                      {name}
-                    </Typography>
-                  </Box>
-                ))}
-                </Stack>
+                      key={name}
+                      sx={{
+                        minWidth: 0,
+                        minHeight: 68,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.9,
+                        p: 1.1,
+                        borderRadius: 1.8,
+                        border: "1px solid",
+                        borderColor: alpha(accent, dark ? .25 : .2),
+                        bgcolor: alpha(accent, dark ? .075 : .04),
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={icon}
+                        alt=""
+                        aria-hidden="true"
+                        sx={{ width: 26, height: 26, objectFit: "contain", flexShrink: 0 }}
+                      />
+                      <Typography sx={{ minWidth: 0, fontWeight: 850, fontSize: ".78rem", lineHeight: 1.25, overflowWrap: "anywhere" }}>
+                        {name}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+
+                <Box
+                  sx={{
+                    mt: 0.3,
+                    pt: 1.6,
+                    borderTop: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 850, letterSpacing: ".1em" }}>
+                    APPLICATION FLOW
+                  </Typography>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    alignItems="stretch"
+                    spacing={{ xs: 0.7, sm: 0.6 }}
+                    sx={{ mt: 1.1 }}
+                  >
+                    {[
+                      { title: "App", detail: "Ready to deploy", Icon: RocketLaunchRounded },
+                      { title: "Data layer", detail: "Database & storage", Icon: StorageRounded },
+                      { title: "Public route", detail: "Access & HTTPS", Icon: SecurityRounded },
+                    ].map(({ title, detail, Icon }, index, items) => (
+                      <React.Fragment key={title}>
+                        <Box
+                          sx={{
+                            minWidth: 0,
+                            flex: "1 1 0",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.85,
+                            p: 1,
+                            border: "1px solid",
+                            borderColor: alpha(theme.palette.primary.main, dark ? .2 : .14),
+                            borderRadius: 1.6,
+                            bgcolor: alpha(theme.palette.primary.main, dark ? .065 : .035),
+                          }}
+                        >
+                          <Icon sx={{ color: "primary.main", fontSize: 19, flexShrink: 0 }} />
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontSize: ".75rem", fontWeight: 900, lineHeight: 1.25 }}>
+                              {title}
+                            </Typography>
+                            <Typography sx={{ mt: .25, color: "text.secondary", fontSize: ".65rem", lineHeight: 1.35 }}>
+                              {detail}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        {index < items.length - 1 ? (
+                          <Box
+                            aria-hidden="true"
+                            sx={{ display: "grid", placeItems: "center", color: "primary.main", flexShrink: 0 }}
+                          >
+                            <ArrowForwardRounded sx={{ fontSize: 16, transform: { xs: "rotate(90deg)", sm: "none" } }} />
+                          </Box>
+                        ) : null}
+                      </React.Fragment>
+                    ))}
+                  </Stack>
+                </Box>
                 <Button
                   component={RouterLink}
                   to="/dashboard/ready-apps"
