@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar, Box, Button, Dialog, DialogActions, DialogContent, Divider,
-  IconButton, Menu, MenuItem, Stack, Tooltip, Typography,
+  IconButton, Menu, MenuItem, Stack, Tooltip, Typography, alpha,
 } from "@mui/material";
 import CodeIcon from "@mui/icons-material/Code";
 import DoneIcon from "@mui/icons-material/Done";
@@ -21,6 +21,7 @@ import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
 import hljs from "highlight.js/lib/common";
 import "highlight.js/styles/github-dark.css";
 import { getCodeLanguageLabel } from "./codeLanguages.js";
+import { normalizeTicketMessageBody, normalizeTicketRichTextBlocks } from "./ticketRichText.js";
 
 function SeenTicks({ seen, mine }) {
   if (!mine) return null;
@@ -486,102 +487,7 @@ function AttachmentBlock({ a, mine }) {
 
 /** Normalize message body so we never render "[object Object]". */
 function normalizeMessageBody(body) {
-  if (body == null) return "";
-  if (typeof body === "string") return body;
-  if (typeof body === "number" || typeof body === "boolean") return String(body);
-  if (typeof body === "object") {
-    if (typeof body.html === "string") return body.html;
-    if (typeof body.body === "string") return body.body;
-    if (typeof body.text === "string") return body.text;
-    if (typeof body.content === "string") return body.content;
-    if (typeof body.message === "string") return body.message;
-    try {
-      const s = JSON.stringify(body);
-      return s === "{}" ? "" : s;
-    } catch {
-      return "";
-    }
-  }
-  return String(body);
-}
-
-
-const RICH_TEXT_BLOCKS = ["p", "h1", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "pre"];
-
-const RICH_TEXT_ALIGNMENTS = new Map([
-  ["ticket-align-left", "left"],
-  ["ticket-align-center", "center"],
-  ["ticket-align-right", "right"],
-]);
-
-const EXPLICIT_ALIGNMENTS = new Set(["left", "center", "right"]);
-
-function getStoredAlignment(block) {
-  const metadata = block.getAttribute("data-ticket-align")?.trim().toLowerCase();
-  if (EXPLICIT_ALIGNMENTS.has(metadata)) return metadata;
-
-  for (const [className, value] of RICH_TEXT_ALIGNMENTS) {
-    if (block.classList.contains(className)) return value;
-  }
-
-  const inline = block.style?.textAlign?.trim().toLowerCase();
-  return EXPLICIT_ALIGNMENTS.has(inline) ? inline : "";
-}
-
-function applyStoredAlignment(block) {
-  const alignment = getStoredAlignment(block);
-  if (!alignment) return "";
-
-  // Use an inline important declaration so theme/global typography rules cannot
-  // silently turn an explicitly aligned ticket message back into auto/left.
-  block.style.setProperty("text-align", alignment, "important");
-  block.setAttribute("data-rendered-ticket-align", alignment);
-  return alignment;
-}
-
-function normalizeRichTextBlocks(root) {
-  root.querySelectorAll(RICH_TEXT_BLOCKS.join(",")).forEach((block) => {
-    applyStoredAlignment(block);
-
-    // Never invent a direction while rendering. A missing dir means the stored
-    // HTML did not explicitly choose one, so let normal document bidi handling
-    // render that content rather than replacing it with an artificial auto dir.
-    const direction = block.getAttribute("dir");
-    if (direction === "rtl" || direction === "ltr") {
-      block.style.setProperty("direction", direction, "important");
-      block.style.setProperty("unicode-bidi", "plaintext");
-    }
-
-    if (block.tagName === "UL") {
-      block.style.setProperty("display", "block");
-      block.style.setProperty("list-style-type", "disc");
-      block.style.setProperty("list-style-position", "outside");
-    } else if (block.tagName === "OL") {
-      block.style.setProperty("display", "block");
-      block.style.setProperty("list-style-type", "decimal");
-      block.style.setProperty("list-style-position", "outside");
-    } else if (block.tagName === "LI") {
-      block.style.setProperty("display", "list-item");
-    }
-  });
-
-  root.querySelectorAll("ol, ul").forEach((list) => {
-    const listAlignment = getStoredAlignment(list);
-    const alignedItems = Array.from(list.children)
-      .filter((child) => child.tagName === "LI")
-      .map(getStoredAlignment)
-      .filter(Boolean);
-
-    // The list itself may carry explicit alignment in older/newer messages.
-    // Item-level alignment remains authoritative for the actual message lines.
-    if (listAlignment) {
-      list.style.setProperty("text-align", listAlignment, "important");
-      list.setAttribute("data-rendered-ticket-align", listAlignment);
-    } else if (alignedItems.length && alignedItems.every((value) => value === alignedItems[0])) {
-      list.style.setProperty("text-align", alignedItems[0], "important");
-      list.setAttribute("data-rendered-ticket-align", alignedItems[0]);
-    }
-  });
+  return normalizeTicketMessageBody(body);
 }
 
 /**
@@ -595,7 +501,7 @@ function enhanceRichTextHtml(html) {
   const root = doc.body.firstElementChild;
   if (!root) return html;
   root.innerHTML = html;
-  normalizeRichTextBlocks(root);
+  normalizeTicketRichTextBlocks(root);
 
   root.querySelectorAll("pre").forEach((pre) => {
     const code = pre.firstElementChild?.tagName === "CODE"
@@ -737,12 +643,16 @@ function MessageBubble({
           py: 0.95,
           boxSizing: "border-box",
           overflow: "hidden",
-          borderRadius: mine ? "10px 10px 2px 10px" : "10px 10px 10px 2px",
+          borderRadius: mine ? "16px 16px 5px 16px" : "16px 16px 16px 5px",
           bgcolor: mine ? "primary.main" : "background.paper",
           color: mine ? "primary.contrastText" : "text.primary",
-          boxShadow: mine ? "none" : 1,
-          border: mine ? "none" : "1px solid",
-          borderColor: "divider",
+          boxShadow: mine
+            ? (theme) => `0 6px 20px ${alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.13 : 0.15)}`
+            : (theme) => `0 4px 18px ${alpha(theme.palette.common.black, theme.palette.mode === "dark" ? 0.15 : 0.045)}`,
+          border: "1px solid",
+          borderColor: mine
+            ? (theme) => alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? 0.45 : 0.25)
+            : "divider",
           position: "relative",
         }}
       >
@@ -864,7 +774,8 @@ function MessageBubble({
               "& h4": { fontSize: "1.08em" },
               "& ul, & ol": {
                 display: "block",
-                pl: 2.25,
+                paddingInlineStart: "1.5em",
+                paddingInlineEnd: 0,
                 my: 0.5,
               },
               "& ul": {
@@ -887,7 +798,7 @@ function MessageBubble({
               },
               "& li": {
                 display: "list-item",
-                pl: 0.25,
+                paddingInlineStart: 0.2,
                 mb: 0.2,
               },
               "& strong, & b": { fontWeight: 800 },
