@@ -25,15 +25,14 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import HubIcon from "@mui/icons-material/Hub";
-import StorageIcon from "@mui/icons-material/Storage";
-import SpeedIcon from "@mui/icons-material/Speed";
+import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
+import { LuCpu, LuHardDrive, LuMemoryStick } from "react-icons/lu";
+import PlatformIcon from "../../plans/PlatformIcon.jsx";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import MemoryIcon from "@mui/icons-material/Memory";
-import SdStorageIcon from "@mui/icons-material/SdStorage";
 import apiRequest from "../../customHooks/apiRequest";
 import { VOLUME_API_ROOT } from "./helpers";
 
@@ -518,7 +517,7 @@ function EditBody({
         {/* Plan */}
         <Box>
           <SectionHead
-            icon={<SpeedIcon fontSize="small" />}
+            icon={<SellOutlinedIcon fontSize="small" />}
             title={platform ? `Plan · ${platform}` : "Plan"}
             subtitle="Choose a plan for the same platform. Applied when you save."
           />
@@ -610,9 +609,14 @@ function EditBody({
                       sx={{ mb: 1 }}
                     >
                       <Box sx={{ minWidth: 0 }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                          {p.name || "Plan"}
-                        </Typography>
+                        <Stack direction="row" spacing={0.8} alignItems="center" sx={{ minWidth: 0 }}>
+                          {p.platform ? (
+                            <PlatformIcon platformKey={p.platform} label={p.platform} size={16} />
+                          ) : null}
+                          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                            {p.name || "Plan"}
+                          </Typography>
+                        </Stack>
                         <Stack
                           direction="row"
                           spacing={0.75}
@@ -653,19 +657,19 @@ function EditBody({
 
                     <Stack spacing={0.5}>
                       <Stack direction="row" spacing={0.75} alignItems="center">
-                        <MemoryIcon sx={{ fontSize: 16 }} color="action" />
+                        <LuCpu size={16} />
                         <Typography variant="body2" color="text.secondary">
                           CPU <strong>{p.max_cpu ?? "—"}</strong>
                         </Typography>
                       </Stack>
                       <Stack direction="row" spacing={0.75} alignItems="center">
-                        <MemoryIcon sx={{ fontSize: 16 }} color="action" />
+                        <LuMemoryStick size={16} />
                         <Typography variant="body2" color="text.secondary">
                           RAM <strong>{p.max_ram ?? "—"}</strong>
                         </Typography>
                       </Stack>
                       <Stack direction="row" spacing={0.75} alignItems="center">
-                        <SdStorageIcon sx={{ fontSize: 16 }} color="action" />
+                        <LuHardDrive size={16} />
                         <Typography variant="body2" color="text.secondary">
                           Storage <strong>{p.max_storage ?? "—"} GB</strong>
                         </Typography>
@@ -692,7 +696,7 @@ function EditBody({
         {/* Volumes */}
         <Box>
           <SectionHead
-            icon={<StorageIcon fontSize="small" />}
+            icon={<LuHardDrive size={18} />}
             title="Volumes"
             subtitle="Exclusive to this service. Create or attach unused ones. Applied on Save."
           />
