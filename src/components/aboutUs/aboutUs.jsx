@@ -15,6 +15,12 @@ import {
 } from "@mui/icons-material";
 import { Box, Button, Container, Paper, Stack, Typography, alpha, useTheme } from "@mui/material";
 
+import wordpressReadyAppIcon from "../../assets/home/ready-app-wordpress.svg";
+import n8nReadyAppIcon from "../../assets/home/ready-app-n8n.svg";
+import mattermostReadyAppIcon from "../../assets/home/ready-app-mattermost.svg";
+import synapseReadyAppIcon from "../../assets/home/ready-app-synapse.svg";
+import uptimeKumaReadyAppIcon from "../../assets/home/ready-app-uptime-kuma.svg";
+
 const GITHUB_API = "https://github.com/nima-salamat/django-paas-deployer";
 const GITHUB_FRONTEND = "https://github.com/nima-salamat/react-paas-deployer";
 
@@ -39,6 +45,14 @@ const PRINCIPLES = [
     title: "Open architecture",
     body: "The control plane is split into a Django backend and React frontend that can be inspected, changed and self-hosted.",
   },
+];
+
+const ABOUT_READY_APPS = [
+  { name: "WordPress", icon: wordpressReadyAppIcon, accent: "#21759B" },
+  { name: "n8n", icon: n8nReadyAppIcon, accent: "#EA4B71" },
+  { name: "Mattermost", icon: mattermostReadyAppIcon, accent: "#0058CC" },
+  { name: "Matrix", icon: synapseReadyAppIcon, accent: "#0DBD8B" },
+  { name: "Uptime Kuma", icon: uptimeKumaReadyAppIcon, accent: "#5CDD8B" },
 ];
 
 const PLATFORM_AREAS = [
@@ -90,7 +104,7 @@ function Surface({ children, sx = {}, ...props }) {
       sx={(theme) => ({
         border: "1px solid",
         borderColor: alpha(theme.palette.divider, theme.palette.mode === "dark" ? 0.82 : 0.9),
-        borderRadius: { xs: 3, md: 4 },
+        borderRadius: { xs: 2.25, md: 2.75 },
         background:
           theme.palette.mode === "dark"
             ? "linear-gradient(145deg, rgba(15,24,39,.9), rgba(6,12,23,.94))"
@@ -220,7 +234,7 @@ export default function AboutUs() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1.05fr .95fr" },
+              gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1.05fr) minmax(0, .95fr)" },
               gap: { xs: 4, md: 7 },
               alignItems: "center",
             }}
@@ -304,7 +318,7 @@ export default function AboutUs() {
             sx={{
               mt: { xs: 3.2, md: 4.5 },
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
               gap: 1.7,
             }}
           >
@@ -355,7 +369,7 @@ export default function AboutUs() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "1.05fr .95fr" },
+              gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1.05fr) minmax(0, .95fr)" },
               gap: { xs: 3, md: 6 },
               alignItems: "center",
             }}
@@ -407,23 +421,35 @@ export default function AboutUs() {
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {["WordPress", "n8n", "Mattermost", "Uptime Kuma"].map((name) => (
+                  {ABOUT_READY_APPS.map(({ name, icon, accent }) => (
+                  <Box
+                    key={name}
+                    component="span"
+                    sx={{
+                      display: "inline-flex",
+                      minWidth: 0,
+                      alignItems: "center",
+                      gap: .7,
+                      px: 1,
+                      py: .65,
+                      borderRadius: 1.6,
+                      border: "1px solid",
+                      borderColor: alpha(accent, dark ? .25 : .2),
+                      bgcolor: alpha(accent, dark ? .08 : .045),
+                    }}
+                  >
                     <Box
-                      key={name}
-                      sx={{
-                        px: 1.15,
-                        py: .75,
-                        borderRadius: 1.7,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        bgcolor: "background.paper",
-                        fontWeight: 800,
-                        fontSize: ".82rem",
-                      }}
-                    >
+                      component="img"
+                      src={icon}
+                      alt=""
+                      aria-hidden="true"
+                      sx={{ width: 21, height: 21, objectFit: "contain", flexShrink: 0 }}
+                    />
+                    <Typography component="span" sx={{ fontWeight: 800, fontSize: ".8rem", lineHeight: 1.25 }}>
                       {name}
-                    </Box>
-                  ))}
+                    </Typography>
+                  </Box>
+                ))}
                 </Stack>
                 <Button
                   component={RouterLink}
