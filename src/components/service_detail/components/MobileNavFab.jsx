@@ -24,7 +24,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
 import CloseIcon from "@mui/icons-material/Close";
 import HubIcon from "@mui/icons-material/Hub";
-import { LuHardDrive } from "react-icons/lu";
+import VolumeIcon from "../../VolumeIcon.jsx";
 import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 
 const ALL_TABS = [
@@ -194,7 +194,7 @@ export default function MobileNavFab({
                     color="text.secondary"
                     sx={{ display: "inline-flex", alignItems: "center", gap: 0.35 }}
                   >
-                    <LuHardDrive size={13} /> {volumeCount} vol
+                    <VolumeIcon size={13} /> {volumeCount} vol
                   </Typography>
                 ) : null}
                 {deployCount > 0 ? (
