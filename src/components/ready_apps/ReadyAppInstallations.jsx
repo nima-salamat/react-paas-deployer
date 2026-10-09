@@ -220,6 +220,7 @@ export default function ReadyAppInstallations() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [appsWarning, setAppsWarning] = useState("");
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -231,6 +232,7 @@ export default function ReadyAppInstallations() {
     if (background) setRefreshing(true);
     else setLoading(true);
     setError("");
+    setAppsWarning("");
     try {
       const [installationResult, appsResult] = await Promise.allSettled([
         apiRequest({ method: "GET", url: ROOT + "/installations/" }),
@@ -243,7 +245,7 @@ export default function ReadyAppInstallations() {
         setApps(listFrom(appsResult.value.data));
       } else {
         setApps([]);
-        setError("The app catalog could not load; deployment status is still available.");
+        setAppsWarning("The app catalog could not load; deployment status is still available.");
       }
     } catch (err) {
       if (mountedRef.current) {
@@ -283,10 +285,10 @@ export default function ReadyAppInstallations() {
   }, [active, load]);
 
   useEffect(() => {
-    if (!error || loading || refreshing) return undefined;
+    if ((!error && !appsWarning) || loading || refreshing) return undefined;
     const timer = window.setTimeout(() => load(true), 12000);
     return () => window.clearTimeout(timer);
-  }, [error, loading, refreshing, load]);
+  }, [error, appsWarning, loading, refreshing, load]);
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
@@ -348,6 +350,16 @@ export default function ReadyAppInstallations() {
             action={<Button color="inherit" size="small" onClick={() => load(true)} disabled={loading || refreshing}>Retry</Button>}
           >
             {error}
+          </Alert>
+        )}
+
+        {appsWarning && (
+          <Alert
+            severity="warning"
+            sx={{ borderRadius: 2.2 }}
+            action={<Button color="inherit" size="small" onClick={() => load(true)} disabled={loading || refreshing}>Retry</Button>}
+          >
+            {appsWarning}
           </Alert>
         )}
 
