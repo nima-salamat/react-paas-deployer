@@ -307,3 +307,53 @@ test("service settings normalizes plan API envelopes and offers retry", () => {
   assert.match(settings, /Refresh plans/);
   assert.match(settings, /plansError/);
 });
+
+
+test("service detail uses semantic resource icons and distinct navigation actions", () => {
+  const detail = read("src/components/service_detail/ServiceDetail.jsx");
+  const navbar = read("src/components/dashboard/DashboardNavbar.jsx");
+  const toolbar = read("src/components/service_detail/components/ServiceToolbar.jsx");
+  const overview = read("src/components/service_detail/components/OverviewPanel.jsx");
+  const globalControls = read("src/components/service_detail/components/GlobalServiceControls.jsx");
+  const mobileHeader = read("src/components/service_detail/components/MobileServiceHeader.jsx");
+  const tabs = read("src/components/service_detail/components/TabSidebar.jsx");
+  const mobileNav = read("src/components/service_detail/components/MobileNavFab.jsx");
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+  const editDialog = read("src/components/service/services/ServiceEditDialog.jsx");
+  const serviceItem = read("src/components/service/services/ServiceItem.jsx");
+
+  assert.match(toolbar, /const handleBack = \(\) => navigate\("\/dashboard\/services"\);/);
+  assert.doesNotMatch(toolbar, /navigate\(-1\)/);
+  assert.match(navbar, /const showBack = profileMode && !serviceDetail/);
+  assert.match(navbar, /serviceDetail && servicePlatform/);
+  assert.match(navbar, /PlatformIcon/);
+  assert.match(detail, /servicePlatform = String\([\s\S]*selectedPlatform \|\| planPlatform/);
+  assert.match(detail, /servicePlatform=\{servicePlatform\}/);
+  assert.match(mobileHeader, /PlatformIcon/);
+  assert.match(mobileHeader, /RocketLaunchRoundedIcon/);
+  assert.match(mobileHeader, /LuHardDrive/);
+
+  for (const content of [overview, globalControls, settings, editDialog]) {
+    assert.match(content, /LuCpu/);
+    assert.match(content, /LuMemoryStick/);
+  }
+  for (const content of [overview, settings, editDialog, serviceItem, mobileHeader, mobileNav]) {
+    assert.match(content, /LuHardDrive/);
+  }
+  for (const content of [overview, settings, serviceItem]) {
+    assert.match(content, /LuDatabase/);
+  }
+  assert.match(overview, /LuDatabase size=\{18\}/);
+  assert.match(settings, /id="database"[\s\S]*LuDatabase/);
+  assert.match(settings, /id="volume"[\s\S]*LuHardDrive/);
+  assert.match(settings, /SellOutlinedIcon/);
+  assert.match(editDialog, /SellOutlinedIcon/);
+  assert.match(editDialog, /PlatformIcon/);
+  assert.match(tabs, /RocketLaunchRoundedIcon/);
+  assert.match(mobileNav, /RocketLaunchRoundedIcon/);
+  assert.match(serviceItem, /ArrowForwardRoundedIcon/);
+  assert.match(serviceItem, /Details/);
+  assert.doesNotMatch(serviceItem, />\s*Open\s*<\/Button>/);
+  assert.match(globalControls, /openServiceInNewTab/);
+  assert.match(globalControls, /LinkIcon/);
+});
