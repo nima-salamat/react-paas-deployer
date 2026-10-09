@@ -875,7 +875,7 @@ export default function CreateServiceWizard({
                             <Checkbox
                               size="small"
                               checked={checked}
-                              disabled={wouldExceed}
+                              disabled={submitting || wouldExceed}
                               onChange={() => toggleVolume(id)}
                             />
                           }
