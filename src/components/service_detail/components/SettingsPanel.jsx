@@ -50,6 +50,16 @@ import EditIcon from "@mui/icons-material/Edit";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import { getApiErrorMessage } from "../errorUtils";
 
+function normalizePlanPlatform(value) {
+  const raw = value && typeof value === "object"
+    ? value.key ?? value.value ?? value.code ?? value.name ?? value.label ?? value.platform ?? ""
+    : value;
+  const normalized = String(raw || "").toLowerCase().trim().replace(/[\\s_]+/g, "-");
+  return ["docker-swarm", "swarm", "docker-engine", "docker-engine-swarm"].includes(normalized)
+    ? "docker"
+    : normalized;
+}
+
 // ─────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────
@@ -1012,13 +1022,14 @@ export default function SettingsPanel({
   }, [attachedVolumes, availableVolumes, isVolumeMounted]);
 
   // ── Plan helpers ───────────────────────────────────────────────────────
-  const currentPlatform = useMemo(() => {
-    const raw = planDetail?.platform ?? service?.plan?.platform ?? service?.plan_detail?.platform ?? "";
-    const normalized = String(raw || "").toLowerCase().trim().replace(/[\s_]+/g, "-");
-    return ["docker-swarm", "swarm", "docker-engine", "docker-engine-swarm"].includes(normalized)
-      ? "docker"
-      : normalized;
-  }, [planDetail, service]);
+  const currentPlatform = useMemo(() => normalizePlanPlatform(
+    planDetail?.platform ??
+    service?.plan?.platform ??
+    service?.plan_detail?.platform ??
+    service?.platform ??
+    service?.runtime_platform ??
+    ""
+  ), [planDetail, service]);
 
   const currentPlanId = useMemo(() => {
     const candidates = [
@@ -1036,12 +1047,10 @@ export default function SettingsPanel({
     if (!Array.isArray(availablePlans)) return [];
     if (!currentPlatform) return availablePlans;
     return availablePlans.filter((plan) => {
-      const rawPlatform = String(plan?.platform || "").toLowerCase().trim().replace(/[\s_]+/g, "-");
-      if (!rawPlatform) return true;
-      const platform = ["docker-swarm", "swarm", "docker-engine", "docker-engine-swarm"].includes(rawPlatform)
-        ? "docker"
-        : rawPlatform;
-      return platform === currentPlatform;
+      const platform = normalizePlanPlatform(plan?.platform);
+      // Some plan endpoints omit the platform label on otherwise valid plans.
+      // Keep those visible instead of presenting a false empty state.
+      return !platform || platform === currentPlatform;
     });
   }, [availablePlans, currentPlatform]);
 
