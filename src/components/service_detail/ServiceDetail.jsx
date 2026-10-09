@@ -523,18 +523,21 @@ export default function ServiceDetail() {
             method: "GET",
             url: `${PLANS_BASE}?id=${String(plan)}`,
           });
-          const payload = p?.data;
+          const responseData = p?.data;
+          const payload = responseData?.data && typeof responseData.data === "object"
+            ? responseData.data
+            : responseData;
           const candidates = Array.isArray(payload)
             ? payload
             : Array.isArray(payload?.results)
               ? payload.results
-              : Array.isArray(payload?.data?.results)
-                ? payload.data.results
+              : Array.isArray(payload?.items)
+                ? payload.items
                 : [];
           const match = candidates.find((item) => String(item?.id ?? item?.pk ?? "") === String(plan));
           const resolvedPlan = match || (
             payload && typeof payload === "object" && !Array.isArray(payload) &&
-            !Array.isArray(payload.results) ? payload : null
+            !Array.isArray(payload.results) && !Array.isArray(payload.items) ? payload : null
           );
           if (mountedRef.current && resolvedPlan) setPlanDetail(resolvedPlan);
         } catch (err) {
