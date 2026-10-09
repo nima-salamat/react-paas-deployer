@@ -294,3 +294,16 @@ test("service status polling uses the canonical API route", () => {
   }
 });
 
+test("service settings normalizes plan API envelopes and offers retry", () => {
+  const service = read("src/components/service_detail/ServiceDetail.jsx");
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+
+  assert.match(service, /const \[plansLoadError, setPlansLoadError\] = useState\(" "\)|const \[plansLoadError, setPlansLoadError\] = useState\("\ "\)|const \[plansLoadError, setPlansLoadError\] = useState\("\/\*\s*\*\/"\)/);
+  assert.match(service, /Array\.isArray\(data\?\.items\)/);
+  assert.match(service, /plansError=\{plansLoadError\}/);
+  assert.match(service, /onRefreshPlans=\{fetchPlans\}/);
+  assert.match(settings, /function normalizePlanPlatform/);
+  assert.match(settings, /normalizePlanPlatform\(plan\?\.platform\)/);
+  assert.match(settings, /Refresh plans/);
+  assert.match(settings, /plansError/);
+});
