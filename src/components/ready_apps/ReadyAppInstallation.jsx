@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -31,7 +31,7 @@ import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import MiscellaneousServicesRoundedIcon from "@mui/icons-material/MiscellaneousServicesRounded";
 import apiRequest from "../customHooks/apiRequest";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replace(/^https?:\/\//, "").replace(/\/+$/, "");
 const ROOT = API_ROOT + "/api/application-catalog";
@@ -74,6 +74,10 @@ function statusColor(status) {
 export default function ReadyAppInstallation() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const installationPath = `/dashboard/ready-apps/installations/${encodeURIComponent(id)}`;
+  const locationPathRef = useRef(location.pathname);
+  locationPathRef.current = location.pathname;
   const [installation, setInstallation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -122,7 +126,7 @@ export default function ReadyAppInstallation() {
   }, [id]);
 
   useEffect(() => {
-    if (!cleanupDeletePending || !id) return undefined;
+    if (!cleanupDeletePending || !id || location.pathname !== installationPath) return undefined;
     let active = true;
 
     const refreshDeleteStatus = async () => {
@@ -150,7 +154,7 @@ export default function ReadyAppInstallation() {
           const services = Array.isArray(current?.services) ? current.services : [];
           if (status === "cancelled" && services.length === 0) {
             setCleanupDeletePending(false);
-            navigate("/dashboard/ready-apps/installations");
+            if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
           }
         }
       } catch (err) {
@@ -158,7 +162,7 @@ export default function ReadyAppInstallation() {
         const statusCode = err?.response?.status;
         if (statusCode === 404) {
           setCleanupDeletePending(false);
-          navigate("/dashboard/ready-apps/installations");
+          if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
           return;
         }
         setError(
@@ -177,7 +181,7 @@ export default function ReadyAppInstallation() {
       active = false;
       window.clearInterval(timer);
     };
-  }, [cleanupDeletePending, id, navigate]);
+  }, [cleanupDeletePending, id, installationPath, location.pathname, navigate]);
 
 
   useEffect(() => {
@@ -250,10 +254,10 @@ export default function ReadyAppInstallation() {
         setError("");
         return;
       }
-      navigate("/dashboard/ready-apps/installations");
+      if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
     } catch (err) {
       if (err?.response?.status === 404) {
-        navigate("/dashboard/ready-apps/installations");
+        if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
         return;
       }
       setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The App could not be deleted."));
