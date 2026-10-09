@@ -28,6 +28,8 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -115,6 +117,7 @@ function DynamicField({ field, value, onChange, config }) {
   const type = String(field.type || "string");
   const label = String(field.label || id);
   const required = Boolean(field.required);
+  const [showSecret, setShowSecret] = useState(false);
 
   if (type === "boolean") {
     return (
@@ -151,7 +154,7 @@ function DynamicField({ field, value, onChange, config }) {
     );
   }
 
-  const inputType = type === "secret" ? "password" : type === "integer" ? "number" : "text";
+  const inputType = type === "secret" ? (showSecret ? "text" : "password") : type === "integer" ? "number" : "text";
   return (
     <TextField
       fullWidth
@@ -165,6 +168,19 @@ function DynamicField({ field, value, onChange, config }) {
         startAdornment: (
           <InputAdornment position="start">
             <LockRoundedIcon sx={{ fontSize: 18 }} />
+          </InputAdornment>
+        ),
+        endAdornment: (
+          <InputAdornment position="end">
+            <IconButton
+              size="small"
+              edge="end"
+              aria-label={showSecret ? "Hide password" : "Show password"}
+              onClick={() => setShowSecret((visible) => !visible)}
+              onMouseDown={(event) => event.preventDefault()}
+            >
+              {showSecret ? <VisibilityOffRoundedIcon fontSize="small" /> : <VisibilityRoundedIcon fontSize="small" />}
+            </IconButton>
           </InputAdornment>
         ),
       } : undefined}
@@ -406,7 +422,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
       maxWidth="md"
       PaperProps={{
         sx: {
-          borderRadius: { xs: 0, sm: 4 },
+          borderRadius: { xs: 0, sm: 2.5 },
           overflow: "hidden",
           backgroundImage: "none",
         },
@@ -601,7 +617,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                         bgcolor: selected
                           ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? .11 : .055)
                           : "background.paper",
-                        borderRadius: 2.8,
+                        borderRadius: 2.2,
                         cursor: "pointer",
                         transition: "border-color 150ms ease, background-color 150ms ease",
                       })}
