@@ -251,10 +251,9 @@ export default function TicketDetailDrawer({
                     flexDirection: "column",
                     gap: 1.75,
                     p: 1.75,
-                    bgcolor: (t) =>
-                      t.palette.mode === "dark"
-                        ? alpha(t.palette.common.black, 0.25)
-                        : alpha(t.palette.grey[100], 0.85),
+                    background: (theme) => theme.palette.mode === "dark"
+                      ? `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.035)}, ${theme.palette.background.default} 38%, ${alpha(theme.palette.background.paper, 0.96)})`
+                      : `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.045)}, ${theme.palette.background.default} 48%, ${theme.palette.background.paper})`,
                   }}
                 >
                   {(detail.messages || []).length === 0 ? (
