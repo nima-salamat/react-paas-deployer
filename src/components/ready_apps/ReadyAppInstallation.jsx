@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -78,7 +78,10 @@ export default function ReadyAppInstallation() {
   const installationPath = `/dashboard/ready-apps/installations/${encodeURIComponent(id)}`;
   const locationPathRef = useRef(location.pathname);
   const cleanupDeleteTargetRef = useRef(null);
-  locationPathRef.current = location.pathname;
+
+  useLayoutEffect(() => {
+    locationPathRef.current = location.pathname;
+  }, [location.pathname]);
   const [installation, setInstallation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
