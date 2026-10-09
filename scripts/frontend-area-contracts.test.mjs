@@ -201,7 +201,7 @@ test("Ready App cleanup only redirects while its detail route is still active", 
   const source = read("src/components/ready_apps/ReadyAppInstallation.jsx");
 
   assert.match(source, /useLocation/);
-  assert.match(source, /locationPathRef\.current = location\.pathname/);
+  assert.match(source, /useLayoutEffect\(\(\) => \{\s*locationPathRef\.current = location\.pathname/);
   assert.match(source, /location\.pathname !== installationPath/);
   assert.match(source, /locationPathRef\.current === installationPath\) navigate/);
 });
