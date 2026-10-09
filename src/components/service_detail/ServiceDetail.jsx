@@ -163,6 +163,7 @@ export default function ServiceDetail() {
 
   const [availablePlans, setAvailablePlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
+  const [plansLoadError, setPlansLoadError] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [planActionLoading, setPlanActionLoading] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState(null);
@@ -522,7 +523,20 @@ export default function ServiceDetail() {
             method: "GET",
             url: `${PLANS_BASE}?id=${String(plan)}`,
           });
-          if (mountedRef.current) setPlanDetail(p.data);
+          const payload = p?.data;
+          const candidates = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.results)
+              ? payload.results
+              : Array.isArray(payload?.data?.results)
+                ? payload.data.results
+                : [];
+          const match = candidates.find((item) => String(item?.id ?? item?.pk ?? "") === String(plan));
+          const resolvedPlan = match || (
+            payload && typeof payload === "object" && !Array.isArray(payload) &&
+            !Array.isArray(payload.results) ? payload : null
+          );
+          if (mountedRef.current && resolvedPlan) setPlanDetail(resolvedPlan);
         } catch (err) {
           if (mountedRef.current) {
             setError(err, "Could not load the service plan.");
@@ -615,13 +629,25 @@ export default function ServiceDetail() {
 
   const fetchPlans = useCallback(async () => {
     setPlansLoading(true);
+    setPlansLoadError("");
     try {
       const resp = await apiRequest({ method: "GET", url: PLANS_BASE, params: { page_size: 100 } });
-      const data = resp.data;
-      const list = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
+      const data = resp?.data;
+      const nested = data?.data;
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.items)
+            ? data.items
+            : Array.isArray(nested)
+              ? nested
+              : Array.isArray(nested?.results)
+                ? nested.results
+                : [];
       setAvailablePlans(list);
     } catch (err) {
-      setAvailablePlans([]);
+      setPlansLoadError(getApiErrorMessage(err, "Could not load available plans."));
       setError(err, "Could not load available plans.");
     } finally {
       if (mountedRef.current) setPlansLoading(false);
@@ -1983,6 +2009,8 @@ export default function ServiceDetail() {
               purgeRuntimeLoading={volumeActionLoading}
               availablePlans={availablePlans}
               plansLoading={plansLoading}
+              plansError={plansLoadError}
+              onRefreshPlans={fetchPlans}
               selectedPlanId={selectedPlanId}
               setSelectedPlanId={setSelectedPlanId}
               planActionLoading={planActionLoading}
