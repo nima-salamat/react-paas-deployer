@@ -40,13 +40,7 @@ export default function ServiceToolbar({
     handleCloseMenu();
   };
 
-  const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-    navigate("/dashboard/services");
-  };
+  const handleBack = () => navigate("/dashboard/services");
 
   const isOff = refreshIntervalMs == null || refreshIntervalMs < 1000;
   const currentLabel = isOff
