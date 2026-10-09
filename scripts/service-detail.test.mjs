@@ -298,7 +298,7 @@ test("service settings normalizes plan API envelopes and offers retry", () => {
   const service = read("src/components/service_detail/ServiceDetail.jsx");
   const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
 
-  assert.match(service, /const \[plansLoadError, setPlansLoadError\] = useState\(" "\)|const \[plansLoadError, setPlansLoadError\] = useState\("\ "\)|const \[plansLoadError, setPlansLoadError\] = useState\("\/\*\s*\*\/"\)/);
+  assert.match(service, /const \[plansLoadError, setPlansLoadError\] = useState\("")/);
   assert.match(service, /Array\.isArray\(data\?\.items\)/);
   assert.match(service, /plansError=\{plansLoadError\}/);
   assert.match(service, /onRefreshPlans=\{fetchPlans\}/);
