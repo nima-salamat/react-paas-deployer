@@ -428,7 +428,8 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(dashboardOverview, /\["Deployed Apps", "\/dashboard\/ready-apps\/installations", Inventory2OutlinedIcon\]/);
   assert.match(serviceItem, /ServicePlatformBadge/);
   assert.match(globalControls, /ServicePlatformBadge/);
-  assert.match(globalControls, /icon={<VolumeIcon size={16} \/>}[\s\S]*label={`Volumes: ${volumeCount}`}/);
+  assert.ok(globalControls.includes('icon={<VolumeIcon size={16} />}'));
+  assert.ok(globalControls.includes('label={`Volumes: ${volumeCount}`}'));
   assert.match(globalControls, /servicePlatformKey/);
 
   assert.match(networks, /HubIcon/);
