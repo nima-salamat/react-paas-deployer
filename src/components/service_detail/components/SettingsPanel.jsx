@@ -54,7 +54,7 @@ function normalizePlanPlatform(value) {
   const raw = value && typeof value === "object"
     ? value.key ?? value.value ?? value.code ?? value.name ?? value.label ?? value.platform ?? ""
     : value;
-  const normalized = String(raw || "").toLowerCase().trim().replace(/[\\s_]+/g, "-");
+  const normalized = String(raw || "").toLowerCase().trim().replace(/[\s_]+/g, "-");
   return ["docker-swarm", "swarm", "docker-engine", "docker-engine-swarm"].includes(normalized)
     ? "docker"
     : normalized;
