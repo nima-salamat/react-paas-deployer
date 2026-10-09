@@ -382,6 +382,7 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   const volumeIcon = read("src/components/VolumeIcon.jsx");
   const toolbar = read("src/components/service/services/ServicesToolbar.jsx");
   const plans = read("src/components/plans/plans.jsx");
+  const plansPreview = read("src/components/home/PlansPreview.jsx");
 
   assert.match(app, /element={<ServiceDetail themeMode=\{themeMode\} onThemeModeChange=\{handleThemeModeChange\} \/>}/);
   assert.match(detail, /themeMode=\{themeMode\}/);
@@ -407,9 +408,15 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(mobileHeader, /textAlign: "left"/);
   assert.match(toolbar, /gridTemplateColumns:[\s\S]*minmax\(220px, 1fr\)/);
   assert.match(toolbar, /WidgetsOutlinedIcon/);
-  assert.match(toolbar, /startIcon={<AppsIcon/);
+  assert.match(toolbar, /startIcon={<AppsOutlinedIcon/);
   assert.match(plans, /SellOutlinedIcon/);
   assert.doesNotMatch(plans, /LayersOutlinedIcon/);
+  assert.match(plansPreview, /SellOutlinedIcon/);
+  assert.doesNotMatch(plansPreview, /LayersOutlinedIcon/);
+  assert.match(sidebar, /label: "App Library", path: "\/dashboard\/ready-apps", icon: AppsOutlinedIcon/);
+  assert.match(sidebar, /label: "Deployed Apps", path: "\/dashboard\/ready-apps\/installations", icon: Inventory2OutlinedIcon/);
+  assert.match(dashboardOverview, /\["App Library", "\/dashboard\/ready-apps", AppsOutlinedIcon\]/);
+  assert.match(dashboardOverview, /\["Deployed Apps", "\/dashboard\/ready-apps\/installations", Inventory2OutlinedIcon\]/);
   assert.match(serviceItem, /ServicePlatformBadge/);
   assert.match(globalControls, /ServicePlatformBadge/);
   assert.match(globalControls, /servicePlatformKey/);
