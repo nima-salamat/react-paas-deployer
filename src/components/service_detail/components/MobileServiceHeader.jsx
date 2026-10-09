@@ -16,7 +16,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import HubIcon from "@mui/icons-material/Hub";
-import { LuHardDrive } from "react-icons/lu";
+import VolumeIcon from "../../VolumeIcon.jsx";
 import ServicePlatformBadge from "../../service/ServicePlatformBadge.jsx";
 
 /**
@@ -99,7 +99,7 @@ export default function MobileServiceHeader({
           py: 1.25,
         }}
       >
-        <Stack spacing={0.9} sx={{ width: "100%", minWidth: 0 }}>
+        <Stack spacing={0.8} sx={{ width: "100%", minWidth: 0 }}>
           <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ width: "100%", minWidth: 0 }}>
             <ServicePlatformBadge
               platformKey={platformKey || selectedPlatform || service?.plan?.platform || ""}
@@ -108,82 +108,36 @@ export default function MobileServiceHeader({
               isDatabase={selectedIsDb}
               isReadyApp={managedByApplication}
             />
-            <Box sx={{ flex: 1, minWidth: 0, textAlign: "right" }}>
-              <Typography
-                variant="subtitle1"
-                title={service?.name || "Service"}
-                sx={{
-                  fontWeight: 800,
-                  lineHeight: 1.2,
-                  letterSpacing: "-0.02em",
-                  wordBreak: "break-word",
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {service?.name || "Service"}
-              </Typography>
-              <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.65 }}>
-                <Chip
-                  label={statusLabel}
-                  size="small"
-                  color={statusColor}
-                  sx={{ height: 22, fontWeight: 700, fontSize: 11 }}
-                />
-                {activeTabLabel ? (
-                  <Chip
-                    label={activeTabLabel}
-                    size="small"
-                    variant="outlined"
-                    color="primary"
-                    sx={{ height: 22, fontSize: 11, fontWeight: 600 }}
-                  />
-                ) : null}
-              </Stack>
-            </Box>
+            <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="wrap" useFlexGap
+              sx={{ ml: "auto", minWidth: 0, flexShrink: 0 }}>
+              <Chip label={statusLabel} size="small" color={statusColor} sx={{ height: 22, fontWeight: 700, fontSize: 11 }} />
+              {activeTabLabel ? <Chip label={activeTabLabel} size="small" variant="outlined" color="primary"
+                sx={{ height: 22, fontSize: 11, fontWeight: 600 }} /> : null}
+            </Stack>
           </Stack>
-
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ minWidth: 0 }}>
+          <Typography variant="subtitle1" title={service?.name || "Service"}
+            sx={{ width: "100%", minWidth: 0, textAlign: "left", fontWeight: 800, lineHeight: 1.2,
+              letterSpacing: "-0.02em", overflowWrap: "anywhere" }}>
+            {service?.name || "Service"}
+          </Typography>
+          <Stack direction="row" alignItems="center" justifyContent="flex-start" spacing={1} sx={{ minWidth: 0 }}>
             {(host || serviceName) ? (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  minWidth: 0,
-                  flex: 1,
-                  fontFamily: "ui-monospace, Menlo, Monaco, Consolas, monospace",
-                  fontSize: 11,
-                  overflowWrap: "anywhere",
-                  lineHeight: 1.35,
-                }}
-              >
+              <Typography variant="caption" color="text.secondary"
+                sx={{ minWidth: 0, flex: 1, fontFamily: "ui-monospace, Menlo, Monaco, Consolas, monospace",
+                  fontSize: 11, textAlign: "left", overflowWrap: "anywhere", wordBreak: "break-all", lineHeight: 1.35 }}>
                 {host || serviceName}
               </Typography>
             ) : <Box sx={{ flex: 1 }} />}
             <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
               {copyTarget ? (
                 <Tooltip title={copied ? "Copied" : "Copy host"}>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopy();
-                    }}
-                    sx={{ p: 0.5 }}
-                    aria-label="Copy service host"
-                  >
-                    {copied ? (
-                      <CheckIcon sx={{ fontSize: 18, color: "success.main" }} />
-                    ) : (
-                      <ContentCopyIcon sx={{ fontSize: 18 }} />
-                    )}
+                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+                    sx={{ p: 0.5 }} aria-label="Copy service host">
+                    {copied ? <CheckIcon sx={{ fontSize: 18, color: "success.main" }} /> : <ContentCopyIcon sx={{ fontSize: 18 }} />}
                   </IconButton>
                 </Tooltip>
               ) : null}
-              {expanded ? (
-                <ExpandLessIcon sx={{ color: "text.secondary", fontSize: 22 }} />
-              ) : (
-                <ExpandMoreIcon sx={{ color: "text.secondary", fontSize: 22 }} />
-              )}
+              {expanded ? <ExpandLessIcon sx={{ color: "text.secondary", fontSize: 22 }} /> : <ExpandMoreIcon sx={{ color: "text.secondary", fontSize: 22 }} />}
             </Stack>
           </Stack>
         </Stack>
@@ -200,7 +154,7 @@ export default function MobileServiceHeader({
               sx={{ height: 24, fontWeight: 600 }}
             />
             <Chip
-              icon={<LuHardDrive size={14} />}
+              icon={<VolumeIcon size={14} />}
               label={`${volumeCount}`}
               size="small"
               variant="outlined"
