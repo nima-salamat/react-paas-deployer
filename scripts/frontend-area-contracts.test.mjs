@@ -326,3 +326,28 @@ test("primary navigation omits Tickets while the Dashboard sidebar keeps it", ()
   assert.match(dashboardSidebar, /label: "Tickets", path: "\/dashboard\/tickets"/);
   assert.match(dashboardSidebar, /pathname\.startsWith\("\/dashboard\/tickets"\)/);
 });
+
+
+test("homepage metrics keep a four-cell mobile layout with a centered plus divider", () => {
+  const source = read("src/components/home/home.jsx");
+  const metricsStart = source.indexOf("/* ───────────────── METRICS ───────────────── */");
+  const plansStart = source.indexOf("/* ───────────────── PLANS ───────────────── */", metricsStart);
+  assert.ok(metricsStart >= 0 && plansStart > metricsStart, "metrics panel should remain between hero and plans");
+  const metrics = source.slice(metricsStart, plansStart);
+
+  for (const label of [
+    "1 control plane",
+    "Docker-native",
+    "Hourly-ready",
+    "Self-hosted",
+  ]) {
+    assert.ok(metrics.includes(label), `missing homepage metric: ${label}`);
+  }
+
+  assert.match(metrics, /gridTemplateColumns: \{ xs: "repeat\\(2, minmax\\(0, 1fr\\)\\)", md: "repeat\\(4, minmax\\(0, 1fr\\)\\)" \}/);
+  assert.match(metrics, /gridTemplateRows: \{ xs: "repeat\\(2, minmax\\(0, 1fr\\)\\)", md: "none" \}/);
+  assert.match(metrics, /borderRight:[\\s\\S]*xs: i % 2 === 0/);
+  assert.match(metrics, /borderBottom:[\\s\\S]*xs: i < 2/);
+  assert.match(metrics, /display: \{ xs: "grid", md: "none" \}/);
+  assert.match(metrics, /\n\s*\+\s*\n\s*</);
+});
