@@ -189,7 +189,7 @@ export default function Networks() {
           p: 2,
           border: "1px solid",
           borderColor: "divider",
-          borderRadius: 1,
+          borderRadius: 1.75,
           mb: 1.5,
         }}
       >
@@ -268,7 +268,7 @@ export default function Networks() {
             sx={{
               width: 36,
               height: 36,
-              borderRadius: 1,
+              borderRadius: 1.75,
               display: "grid",
               placeItems: "center",
               bgcolor: "primary.main",
@@ -300,7 +300,7 @@ export default function Networks() {
             sx={{
               border: "1px solid",
               borderColor: "divider",
-              borderRadius: 1,
+              borderRadius: 1.75,
               flexShrink: 0,
             }}
           >
@@ -314,7 +314,7 @@ export default function Networks() {
             sx={{
               textTransform: "none",
               fontWeight: 700,
-              borderRadius: 1,
+              borderRadius: 1.75,
               whiteSpace: "nowrap",
             }}
           >
@@ -353,7 +353,7 @@ export default function Networks() {
           sx={{
             border: "1px solid",
             borderColor: "divider",
-            borderRadius: 1,
+            borderRadius: 1.75,
             py: 6,
             textAlign: "center",
           }}
@@ -381,7 +381,7 @@ export default function Networks() {
         <Paper
           elevation={0}
           sx={{
-            borderRadius: 1,
+            borderRadius: 1.75,
             border: "1px solid",
             borderColor: "divider",
             overflow: "hidden",
