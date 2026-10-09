@@ -232,7 +232,17 @@ export default function TicketDetailDrawer({
             </Stack>
           </Box>
 
-          <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+              boxSizing: "border-box",
+              pb: "calc(12px + env(safe-area-inset-bottom, 0px))",
+            }}
+          >
             {detailLoading && !detail && (
               <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
                 <CircularProgress size={32} />
@@ -277,14 +287,16 @@ export default function TicketDetailDrawer({
 
                 {detail.status !== "closed" && (
                   <Box sx={{ flexShrink: 0 }}>
-                    <AdminTicketComposer
-                      value={reply}
-                      onChange={setReply}
-                      files={files}
-                      onFilesChange={setFiles}
-                      onSend={onSend}
-                      sending={sending}
-                    />
+                    <Box sx={{ flexShrink: 0, mx: 1.25, mt: 1 }}>
+                      <AdminTicketComposer
+                        value={reply}
+                        onChange={setReply}
+                        files={files}
+                        onFilesChange={setFiles}
+                        onSend={onSend}
+                        sending={sending}
+                      />
+                    </Box>
                   </Box>
                 )}
                 {detail.status === "closed" && (
