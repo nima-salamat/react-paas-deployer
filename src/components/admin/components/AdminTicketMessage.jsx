@@ -338,6 +338,7 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
 
   const avatarSrc = authorAvatarSrc(author);
   const bodyHtml = normalizeTicketMessageBody(m?.body);
+  const hasCodeBlock = /<pre\b/i.test(bodyHtml);
   const bodyText = bodyHtml.replace(/<[^>]+>/g, "").trim();
   const hasBody = Boolean(bodyText);
   const hasHtml = /<[a-z][\s\S]*>/i.test(bodyHtml);
@@ -399,9 +400,9 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
       {/* Bubble */}
       <Box
         sx={{
-          maxWidth: { xs: "calc(100% - 46px)", sm: "74%" },
-          minWidth: 0,
-          width: "fit-content",
+          maxWidth: { xs: "calc(100% - 46px)", sm: "min(74%, 680px)" },
+          minWidth: hasCodeBlock ? { xs: "min(280px, calc(100vw - 92px))", sm: 340 } : 0,
+          width: hasCodeBlock ? { xs: "min(100%, 360px)", sm: "min(100%, 640px)" } : "fit-content",
           boxSizing: "border-box",
           overflowWrap: "anywhere",
           px: 1.5,
@@ -512,12 +513,15 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
               lineHeight: 1.62,
               width: "100%",
               minWidth: 0,
-              maxWidth: "100%",
+              maxWidth: "min(68ch, 100%)",
               overflow: "hidden",
               overflowWrap: "anywhere",
               wordBreak: "normal",
               mt: 0.35,
               "& *": { boxSizing: "border-box", maxWidth: "100%" },
+              "& p, & li, & blockquote, & h1, & h2, & h3, & h4": {
+                maxWidth: "min(68ch, 100%)",
+              },
               "& p": { m: 0, mb: 0.55 },
               "& p:last-child": { mb: 0 },
               "& h1, & h2, & h3, & h4": { mt: 0.8, mb: 0.55, lineHeight: 1.2, fontWeight: 800 },
@@ -555,14 +559,29 @@ export default function AdminTicketMessage({ message: m, showHtmlToggle = true, 
               "& s": { textDecoration: "line-through" },
               "& a": { color: mine ? "inherit" : "primary.main", textDecoration: "underline", overflowWrap: "anywhere" },
               "& pre": {
+                display: "block",
+                width: "100%",
+                minWidth: "100%",
                 maxWidth: "100%",
-                overflow: "auto",
-                whiteSpace: "pre-wrap",
-                overflowWrap: "anywhere",
+                boxSizing: "border-box",
+                overflowX: "auto",
+                overflowY: "hidden",
+                overscrollBehaviorX: "contain",
+                WebkitOverflowScrolling: "touch",
+                whiteSpace: "pre",
+                overflowWrap: "normal",
                 bgcolor: mine ? "rgba(0,0,0,0.15)" : "action.hover",
                 p: 1,
                 borderRadius: 1.3,
                 fontSize: 12,
+                lineHeight: 1.6,
+              },
+              "& pre code": {
+                display: "block",
+                minWidth: "max-content",
+                maxWidth: "none",
+                whiteSpace: "inherit",
+                overflowWrap: "normal",
               },
               "& code": {
                 bgcolor: mine ? "rgba(0,0,0,0.12)" : alpha("#000", 0.06),
