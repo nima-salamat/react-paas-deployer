@@ -1300,31 +1300,57 @@ export default function SimpleHtmlEditor({
       }}
     >
       {showToolbarToggle && (
-        <Collapse in={expanded}>
-          <Box
-            sx={{
-              px: 0.5,
-              py: 0.1,
-              borderBottom: 1,
-              borderColor: "divider",
-              bgcolor: "action.hover",
-              overflowX: "auto",
-              overflowY: "hidden",
-              WebkitOverflowScrolling: "touch",
-              scrollbarWidth: "thin",
-              overscrollBehaviorX: "contain",
-            }}
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.75}
+            sx={{ px: 0.75, py: 0.35, bgcolor: "action.hover", minWidth: 0 }}
           >
-            <ButtonGroup
-              size="small"
-              variant="text"
-              sx={{ minWidth: "max-content", flexWrap: "nowrap" }}
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                overflowX: "auto",
+                overflowY: "hidden",
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "thin",
+                overscrollBehaviorX: "contain",
+              }}
             >
-              <Tooltip title="Bold"><span><IconButton type="button" size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Italic"><span><IconButton type="button" size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Underline"><span><IconButton type="button" size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
-<Tooltip title="Bullets"><span><IconButton type="button" size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onPointerDown={saveSelection} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
-              <Tooltip title="Numbered"><span><IconButton type="button" size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onPointerDown={saveSelection} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
+              <ButtonGroup size="small" variant="text" sx={{ minWidth: "max-content", flexWrap: "nowrap" }}>
+                <Tooltip title="Bold"><span><IconButton type="button" size="small" aria-label="Bold" aria-pressed={activeFormats.bold} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("bold")} disabled={disabled} sx={{ bgcolor: activeFormats.bold ? "action.selected" : undefined, color: activeFormats.bold ? "primary.main" : undefined }}><FormatBoldIcon fontSize="small" /></IconButton></span></Tooltip>
+                <Tooltip title="Italic"><span><IconButton type="button" size="small" aria-label="Italic" aria-pressed={activeFormats.italic} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("italic")} disabled={disabled} sx={{ bgcolor: activeFormats.italic ? "action.selected" : undefined, color: activeFormats.italic ? "primary.main" : undefined }}><FormatItalicIcon fontSize="small" /></IconButton></span></Tooltip>
+                <Tooltip title="Underline"><span><IconButton type="button" size="small" aria-label="Underline" aria-pressed={activeFormats.underline} onPointerDown={saveSelection} onClick={() => toggleInlineFormat("underline")} disabled={disabled} sx={{ bgcolor: activeFormats.underline ? "action.selected" : undefined, color: activeFormats.underline ? "primary.main" : undefined }}><FormatUnderlinedIcon fontSize="small" /></IconButton></span></Tooltip>
+                <Tooltip title="Bullets"><span><IconButton type="button" size="small" aria-label="Bulleted list" aria-pressed={activeFormats.bullet} onPointerDown={saveSelection} onClick={() => toggleList(false)} disabled={disabled} sx={{ bgcolor: activeFormats.bullet ? "action.selected" : undefined, color: activeFormats.bullet ? "primary.main" : undefined }}><FormatListBulletedIcon fontSize="small" /></IconButton></span></Tooltip>
+                <Tooltip title="Numbered"><span><IconButton type="button" size="small" aria-label="Numbered list" aria-pressed={activeFormats.ordered} onPointerDown={saveSelection} onClick={() => toggleList(true)} disabled={disabled} sx={{ bgcolor: activeFormats.ordered ? "action.selected" : undefined, color: activeFormats.ordered ? "primary.main" : undefined }}><FormatListNumberedIcon fontSize="small" /></IconButton></span></Tooltip>
+              </ButtonGroup>
+            </Box>
+            <Button
+              type="button"
+              size="small"
+              onClick={() => setExpanded((current) => !current)}
+              aria-expanded={expanded}
+              endIcon={expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+              sx={{ flexShrink: 0, textTransform: "none", fontWeight: 750, borderRadius: 1.5, minWidth: "auto", px: 1 }}
+            >
+              {expanded ? "Less" : "More"}
+            </Button>
+          </Stack>
+          <Collapse in={expanded}>
+            <Box
+              sx={{
+                px: 0.5,
+                py: 0.35,
+                bgcolor: "background.paper",
+                overflowX: "auto",
+                overflowY: "hidden",
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "thin",
+                overscrollBehaviorX: "contain",
+              }}
+            >
+              <ButtonGroup size="small" variant="text" sx={{ minWidth: "max-content", flexWrap: "nowrap" }}>
               <Box sx={{ display: "inline-flex", alignItems: "center", mx: 0.25 }}>
                 <Button
 type="button"
@@ -1391,9 +1417,11 @@ type="button"
               </FormControl>
               <Tooltip title="Undo"><span><IconButton type="button" size="small" aria-label="Undo" onPointerDown={saveSelection} onClick={undo} disabled={disabled || historyIndexRef.current <= 0} sx={{ opacity: historyIndexRef.current <= 0 ? 0.45 : 1 }}><UndoIcon fontSize="small" /></IconButton></span></Tooltip>
               <Tooltip title="Redo"><span><IconButton type="button" size="small" aria-label="Redo" onPointerDown={saveSelection} onClick={redo} disabled={disabled || historyIndexRef.current >= historyRef.current.length - 1} sx={{ opacity: historyIndexRef.current >= historyRef.current.length - 1 ? 0.45 : 1 }}><RedoIcon fontSize="small" /></IconButton></span></Tooltip>
-            </ButtonGroup>
-          </Box>
-        </Collapse>
+
+              </ButtonGroup>
+            </Box>
+          </Collapse>
+        </Box>
       )}
 
       <Menu
@@ -1543,13 +1571,7 @@ type="button"
             "& a": { color: "primary.main" },
           }}
         />
-        {showToolbarToggle && (
-          <Tooltip title={expanded ? "Hide formatting" : "Formatting"}>
-            <IconButton type="button" size="small" onClick={() => setExpanded(!expanded)} sx={{ mb: 0.5, mr: 0.5 }}>
-              {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-            </IconButton>
-          </Tooltip>
-        )}
+
       </Box>
 
       <Popover
