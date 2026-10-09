@@ -329,7 +329,7 @@ test("service detail uses semantic resource icons and distinct navigation action
   assert.match(navbar, /PlatformIcon/);
   assert.match(detail, /servicePlatform = String\([\s\S]*selectedPlatform \|\| planPlatform/);
   assert.match(detail, /servicePlatform=\{servicePlatform\}/);
-  assert.match(mobileHeader, /PlatformIcon/);
+  assert.match(mobileHeader, /ServicePlatformBadge/);
   assert.match(mobileHeader, /RocketLaunchRoundedIcon/);
   assert.match(mobileHeader, /LuHardDrive/);
 
@@ -356,4 +356,45 @@ test("service detail uses semantic resource icons and distinct navigation action
   assert.doesNotMatch(serviceItem, />\s*Open\s*<\/Button>/);
   assert.match(globalControls, /openServiceInNewTab/);
   assert.match(globalControls, /LinkIcon/);
+});
+
+
+test("dashboard theme, cursor selection, service identity badges and wizard icons stay consistent", () => {
+  const app = read("src/App.jsx");
+  const detail = read("src/components/service_detail/ServiceDetail.jsx");
+  const navbar = read("src/components/dashboard/DashboardNavbar.jsx");
+  const cursorSettings = read("src/components/layout/cursorSettings.js");
+  const cursor = read("src/components/layout/CustomCursor.jsx");
+  const cursorCss = read("src/index.css");
+  const profile = read("src/components/profile/profile.jsx");
+  const badge = read("src/components/service/ServicePlatformBadge.jsx");
+  const serviceItem = read("src/components/service/services/ServiceItem.jsx");
+  const globalControls = read("src/components/service_detail/components/GlobalServiceControls.jsx");
+  const wizard = read("src/components/plans/CreateDeploymentModal.jsx");
+  const networks = read("src/components/networks/Networks.jsx");
+
+  assert.match(app, /element={<ServiceDetail themeMode=\{themeMode\} onThemeModeChange=\{handleThemeModeChange\} \/>}/);
+  assert.match(detail, /themeMode=\{themeMode\}/);
+  assert.match(detail, /onThemeModeChange=\{onThemeModeChange\}/);
+  assert.match(navbar, /<ThemeMenuButton[\s\S]*themeMode=\{themeMode\}[\s\S]*onThemeModeChange=\{onThemeModeChange\}/);
+
+  assert.match(cursorSettings, /id: "custom",[\s\S]*label: "Ring"/);
+  assert.match(cursorSettings, /id: "dot"/);
+  assert.match(cursorSettings, /id: "crosshair"/);
+  assert.match(cursorSettings, /value === "ring"/);
+  assert.match(profile, /<ButtonBase[\s\S]*aria-pressed=\{selected\}/);
+  assert.match(profile, /onClick=\{\(\) => setCursorPreference\(writeCursorPreference\(option\.id\)\)\}/);
+  assert.match(cursor, /root\.classList\.remove\([\s\S]*"is-visible"/);
+  assert.match(cursor, /document\.documentElement\.classList\.remove\("custom-cursor-enabled"\)/);
+  assert.match(cursorCss, /\.custom-cursor\.variant-dot/);
+  assert.match(cursorCss, /\.custom-cursor\.variant-crosshair/);
+
+  assert.match(badge, /width: \{ xs: 132, sm: 156 \}/);
+  assert.match(serviceItem, /ServicePlatformBadge/);
+  assert.match(globalControls, /ServicePlatformBadge/);
+  assert.match(globalControls, /servicePlatformKey/);
+
+  assert.match(networks, /HubIcon/);
+  assert.match(wizard, /HubIcon/);
+  assert.match(wizard, /LuHardDrive/);
 });
