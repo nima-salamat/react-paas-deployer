@@ -20,6 +20,7 @@ import n8nReadyAppIcon from "../../assets/home/ready-app-n8n.svg";
 import mattermostReadyAppIcon from "../../assets/home/ready-app-mattermost.svg";
 import synapseReadyAppIcon from "../../assets/home/ready-app-synapse.svg";
 import uptimeKumaReadyAppIcon from "../../assets/home/ready-app-uptime-kuma.svg";
+import forgejoReadyAppIcon from "../../assets/home/ready-app-forgejo.svg";
 
 const GITHUB_API = "https://github.com/nima-salamat/django-paas-deployer";
 const GITHUB_FRONTEND = "https://github.com/nima-salamat/react-paas-deployer";
@@ -53,6 +54,7 @@ const ABOUT_READY_APPS = [
   { name: "Mattermost", icon: mattermostReadyAppIcon, accent: "#0058CC" },
   { name: "Matrix", icon: synapseReadyAppIcon, accent: "#0DBD8B" },
   { name: "Uptime Kuma", icon: uptimeKumaReadyAppIcon, accent: "#5CDD8B" },
+  { name: "Forgejo", icon: forgejoReadyAppIcon, accent: "#FB923C" },
 ];
 
 const PLATFORM_AREAS = [
