@@ -2,8 +2,8 @@ import { Link as RouterLink } from "react-router-dom";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, Chip, Paper, Skeleton, Stack, Typography, alpha } from "@mui/material";
 import MiscellaneousServicesOutlinedIcon from "@mui/icons-material/MiscellaneousServicesOutlined";
-import LanOutlinedIcon from "@mui/icons-material/LanOutlined";
-import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import HubIcon from "@mui/icons-material/Hub";
+import VolumeIcon from "../VolumeIcon.jsx";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
@@ -22,8 +22,8 @@ const QUICK_LINKS = [
   ["Services", "/dashboard/services", MiscellaneousServicesOutlinedIcon],
   ["App Library", "/dashboard/ready-apps", AppsOutlinedIcon],
   ["Deployed Apps", "/dashboard/ready-apps/installations", AppsOutlinedIcon],
-  ["Networks", "/dashboard/networks", LanOutlinedIcon],
-  ["Volumes", "/dashboard/volumes", StorageOutlinedIcon],
+  ["Networks", "/dashboard/networks", HubIcon],
+  ["Volumes", "/dashboard/volumes", VolumeIcon],
   ["Tickets", "/dashboard/tickets", ConfirmationNumberOutlinedIcon],
   ["Agents", "/dashboard/agents", SmartToyOutlinedIcon],
   ["Plans", "/dashboard/plans", SellOutlinedIcon],
