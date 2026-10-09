@@ -116,7 +116,9 @@ function Surface({ children, sx = {}, ...props }) {
             : "linear-gradient(145deg, rgba(255,255,255,.96), rgba(247,250,255,.96))",
         ...sx,
       })}
-    />
+    >
+      {children}
+    </Paper>
   );
 }
 
