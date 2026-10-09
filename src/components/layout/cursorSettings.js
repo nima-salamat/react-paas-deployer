@@ -9,14 +9,26 @@ export const CURSOR_OPTIONS = [
   },
   {
     id: "custom",
-    label: "Custom",
-    description: "Use the PaaSDeployer ring cursor on desktop.",
+    label: "Ring",
+    description: "A smooth ring and center dot that expands over interactive controls.",
+  },
+  {
+    id: "dot",
+    label: "Minimal dot",
+    description: "A small, precise dot with no surrounding ring.",
+  },
+  {
+    id: "crosshair",
+    label: "Crosshair",
+    description: "A fine crosshair for a more technical, precise pointer.",
   },
 ];
 
 const VALID_CURSOR_IDS = new Set(CURSOR_OPTIONS.map((option) => option.id));
 
 export function normalizeCursorPreference(value) {
+  // Preserve preferences saved by previous versions.
+  if (value === "ring") return "custom";
   return VALID_CURSOR_IDS.has(value) ? value : DEFAULT_CURSOR;
 }
 
