@@ -17,7 +17,7 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import HubIcon from "@mui/icons-material/Hub";
 import { LuHardDrive } from "react-icons/lu";
-import PlatformIcon from "../../plans/PlatformIcon.jsx";
+import ServicePlatformBadge from "../../service/ServicePlatformBadge.jsx";
 
 /**
  * Compact sticky header for mobile — single source of truth for
@@ -30,6 +30,8 @@ export default function MobileServiceHeader({
   selectedPlatform,
   selectedIsDb,
   platformKey = "",
+  managedByApplication = false,
+  managedAppLabel = "Ready App",
   deployCount = 0,
   volumeCount = 0,
   networkName,
@@ -97,86 +99,92 @@ export default function MobileServiceHeader({
           py: 1.25,
         }}
       >
-        <Stack direction="row" spacing={1} alignItems="flex-start">
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-              {(platformKey || selectedPlatform) ? (
-                <PlatformIcon
-                  platformKey={platformKey || selectedPlatform}
-                  label={platformKey || selectedPlatform}
-                  size={17}
-                />
-              ) : null}
+        <Stack spacing={0.9} sx={{ width: "100%", minWidth: 0 }}>
+          <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ width: "100%", minWidth: 0 }}>
+            <ServicePlatformBadge
+              platformKey={platformKey || selectedPlatform || service?.plan?.platform || ""}
+              platformLabel={managedByApplication ? managedAppLabel : (platformKey || selectedPlatform || service?.plan?.platform || "Unknown platform")}
+              typeLabel={managedByApplication ? "Ready App" : selectedIsDb ? "Database" : "Application"}
+              isDatabase={selectedIsDb}
+              isReadyApp={managedByApplication}
+            />
+            <Box sx={{ flex: 1, minWidth: 0, textAlign: "right" }}>
               <Typography
                 variant="subtitle1"
+                title={service?.name || "Service"}
                 sx={{
                   fontWeight: 800,
                   lineHeight: 1.2,
                   letterSpacing: "-0.02em",
                   wordBreak: "break-word",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {service?.name || "Service"}
               </Typography>
-              <Chip
-                label={statusLabel}
-                size="small"
-                color={statusColor}
-                sx={{ height: 22, fontWeight: 700, fontSize: 11 }}
-              />
-              {activeTabLabel ? (
+              <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.65 }}>
                 <Chip
-                  label={activeTabLabel}
+                  label={statusLabel}
                   size="small"
-                  variant="outlined"
-                  color="primary"
-                  sx={{ height: 22, fontSize: 11, fontWeight: 600 }}
+                  color={statusColor}
+                  sx={{ height: 22, fontWeight: 700, fontSize: 11 }}
                 />
-              ) : null}
-            </Stack>
+                {activeTabLabel ? (
+                  <Chip
+                    label={activeTabLabel}
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    sx={{ height: 22, fontSize: 11, fontWeight: 600 }}
+                  />
+                ) : null}
+              </Stack>
+            </Box>
+          </Stack>
 
-            {(host || serviceName) && (
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ minWidth: 0 }}>
+            {(host || serviceName) ? (
               <Typography
                 variant="caption"
                 color="text.secondary"
                 sx={{
-                  display: "block",
-                  mt: 0.4,
+                  minWidth: 0,
+                  flex: 1,
                   fontFamily: "ui-monospace, Menlo, Monaco, Consolas, monospace",
-                  fontSize: 11.5,
-                  wordBreak: "break-all",
+                  fontSize: 11,
+                  overflowWrap: "anywhere",
                   lineHeight: 1.35,
                 }}
               >
                 {host || serviceName}
               </Typography>
-            )}
-          </Box>
-
-          <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0, mt: 0.25 }}>
-            {copyTarget ? (
-              <Tooltip title={copied ? "Copied" : "Copy host"}>
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopy();
-                  }}
-                  sx={{ p: 0.5 }}
-                >
-                  {copied ? (
-                    <CheckIcon sx={{ fontSize: 18, color: "success.main" }} />
-                  ) : (
-                    <ContentCopyIcon sx={{ fontSize: 18 }} />
-                  )}
-                </IconButton>
-              </Tooltip>
-            ) : null}
-            {expanded ? (
-              <ExpandLessIcon sx={{ color: "text.secondary", fontSize: 22 }} />
-            ) : (
-              <ExpandMoreIcon sx={{ color: "text.secondary", fontSize: 22 }} />
-            )}
+            ) : <Box sx={{ flex: 1 }} />}
+            <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
+              {copyTarget ? (
+                <Tooltip title={copied ? "Copied" : "Copy host"}>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCopy();
+                    }}
+                    sx={{ p: 0.5 }}
+                    aria-label="Copy service host"
+                  >
+                    {copied ? (
+                      <CheckIcon sx={{ fontSize: 18, color: "success.main" }} />
+                    ) : (
+                      <ContentCopyIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
+                </Tooltip>
+              ) : null}
+              {expanded ? (
+                <ExpandLessIcon sx={{ color: "text.secondary", fontSize: 22 }} />
+              ) : (
+                <ExpandMoreIcon sx={{ color: "text.secondary", fontSize: 22 }} />
+              )}
+            </Stack>
           </Stack>
         </Stack>
       </ButtonBase>
