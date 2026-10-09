@@ -57,3 +57,16 @@ testFn("Ready Apps lists expose manual refresh and retry failed catalog requests
   assert.match(wizard, /Hide password/);
   assert.match(wizard, /setShowSecret\(\(visible\) => !visible\)/);
 });
+
+testFn("Ready App wizard keeps required settings visible and groups optional defaults", () => {
+  const source = read("src/components/ready_apps/ReadyAppWizard.jsx");
+
+  assert.match(source, /function isOptionalAdvancedField\(field\)/);
+  assert.match(source, /field\.ui\?\.advanced === true/);
+  assert.match(source, /const primaryFields = visibleFields\.filter/);
+  assert.match(source, /const optionalFields = visibleFields\.filter/);
+  assert.match(source, /Show optional settings/);
+  assert.match(source, /Hide optional settings/);
+  assert.match(source, /setShowAdvancedFields\(false\)/);
+  assert.match(source, /<Collapse in=\{showAdvancedFields\} unmountOnExit>/);
+});
