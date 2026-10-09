@@ -36,7 +36,6 @@ import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import PaidOutlinedIcon from "@mui/icons-material/PaidOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
-import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
@@ -57,7 +56,6 @@ const baseNavItems = [
   { path: "/", label: "Home", icon: HomeOutlinedIcon, guest: true },
   { path: "/docs", label: "Docs", icon: MenuBookOutlinedIcon, guest: true },
   { path: "/dashboard", label: "Dashboard", icon: DashboardOutlinedIcon, guest: false },
-  { path: "/tickets", label: "Tickets", icon: ConfirmationNumberOutlinedIcon, guest: false },
   { path: "/messenger", label: "Messenger", icon: ChatBubbleOutlineIcon, guest: false },
   { path: "/admin", label: "Admin", icon: AdminPanelSettingsOutlinedIcon, guest: false, staffOnly: true },
   { path: "/plans", label: "Plans", icon: PaidOutlinedIcon, guest: true },
@@ -115,9 +113,6 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
         location.pathname.startsWith("/service/") ||
         location.pathname.startsWith("/services/")
       );
-    }
-    if (path === "/tickets") {
-      return location.pathname === "/tickets" || location.pathname.startsWith("/tickets/");
     }
     if (path === "/admin") {
       return location.pathname === "/admin" || location.pathname.startsWith("/admin/");
