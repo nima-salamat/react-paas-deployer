@@ -31,7 +31,20 @@ export default function AdminTicketComposer({
   };
 
   return (
-    <Box sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", p: { xs: 1, sm: 1.25 } }}>
+    <Box
+      sx={{
+        minWidth: 0,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 2.5,
+        bgcolor: "background.paper",
+        backgroundImage: "none",
+        boxShadow: (theme) => theme.palette.mode === "dark"
+          ? "0 8px 28px rgba(0,0,0,.24)"
+          : "0 8px 28px rgba(15,23,42,.08)",
+        p: { xs: 0.9, sm: 1.1 },
+      }}
+    >
       {(files || []).length > 0 && (
         <Stack direction="row" gap={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
           {files.map((file, index) => (
