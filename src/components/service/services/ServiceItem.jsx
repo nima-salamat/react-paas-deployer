@@ -15,14 +15,14 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
-import LaunchIcon from "@mui/icons-material/Launch";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import StopIcon from "@mui/icons-material/Stop";
-import { LuCpu, LuMemoryStick } from "react-icons/lu";
-import StorageIcon from "@mui/icons-material/Storage";
+import { LuCpu, LuDatabase, LuHardDrive, LuMemoryStick } from "react-icons/lu";
+
 import AttachMoneyIcon from "@mui/icons-material/AttachMoney";
 import HubIcon from "@mui/icons-material/Hub";
-import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+
 import AppsIcon from "@mui/icons-material/Apps";
 import ShareIcon from "@mui/icons-material/Share";
 import { RULE_LABELS } from "./ShareServiceDialog";
@@ -143,7 +143,7 @@ function ServiceItem({
       {storage != null && (
         <Chip
           size="small"
-          icon={<StorageIcon sx={{ fontSize: 13 }} />}
+          icon={<LuHardDrive size={13} />}
           label={`${storage} GB`}
           sx={{ height: 22, fontSize: 11 }}
         />
@@ -227,14 +227,14 @@ function ServiceItem({
       <Button
         size="small"
         variant="contained"
-        startIcon={<LaunchIcon fontSize="small" />}
+        startIcon={<ArrowForwardRoundedIcon fontSize="small" />}
         onClick={(e) => {
           e.stopPropagation();
           onOpen?.(s);
         }}
         sx={actionBtnSx}
       >
-        Open
+        Details
       </Button>
       {isCatalogManaged ? (
         <Button
@@ -523,7 +523,7 @@ function ServiceItem({
               }}
             >
               {isDb ? (
-                <StorageOutlinedIcon sx={{ fontSize: 20 }} />
+                <LuDatabase size={20} />
               ) : (
                 <AppsIcon sx={{ fontSize: 20 }} />
               )}
