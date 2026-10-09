@@ -22,6 +22,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import SettingsIcon from "@mui/icons-material/Settings";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import AppsIcon from "@mui/icons-material/Apps";
+import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
 import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
 
 export default function ServicesToolbar({
@@ -169,11 +170,11 @@ export default function ServicesToolbar({
         <Paper
           elevation={0}
           sx={{
-            p: 2,
+            p: { xs: 1.5, sm: 2 },
             mb: 3,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1.5,
+            display: "grid",
+            gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(220px, 1fr) 125px minmax(0, max-content)" },
+            gap: 1.25,
             alignItems: "center",
             borderRadius: 2.5,
             border: "1px solid",
@@ -186,13 +187,7 @@ export default function ServicesToolbar({
               e.preventDefault();
               onSearch();
             }}
-            sx={{
-              display: "flex",
-              gap: 1,
-              flexGrow: 1,
-              width: { xs: "100%", sm: "auto" },
-              minWidth: { xs: 0, sm: 200 },
-            }}
+            sx={{ display: "flex", gap: 1, flexGrow: 1, width: "100%", minWidth: 0, gridColumn: { xs: "1 / -1", md: "1" } }}
           >
             <TextField
               fullWidth
@@ -228,7 +223,7 @@ export default function ServicesToolbar({
               Search
             </Button>
           </Box>
-          <FormControl size="small" sx={{ width: { xs: "100%", sm: 140 }, minWidth: 0 }}>
+          <FormControl size="small" sx={{ gridColumn: { xs: "1 / -1", md: "2" }, width: { xs: "100%", md: 125 }, minWidth: 0 }}>
             <InputLabel>View</InputLabel>
             <Select
               value={viewMode}
@@ -247,7 +242,7 @@ export default function ServicesToolbar({
               alignItems="center"
               flexWrap="wrap"
               useFlexGap
-              sx={{ width: "100%", mb: 0.5 }}
+              sx={{ width: "100%", mb: 0, gridColumn: "1 / -1", gridRow: { md: 2 } }}
             >
               {[
                 { key: "mine", label: `Mine (${shareCounts.mine ?? 0})` },
@@ -278,6 +273,7 @@ export default function ServicesToolbar({
             alignItems="center"
             flexWrap="wrap"
             useFlexGap
+            sx={{ gridColumn: { xs: "1 / -1", md: "3" }, gridRow: { md: 1 }, justifyContent: { xs: "flex-start", md: "flex-end" }, minWidth: 0 }}
           >
             <FilterListIcon sx={{ fontSize: 18, color: "text.secondary" }} />
             {[
@@ -285,7 +281,7 @@ export default function ServicesToolbar({
               {
                 key: "app",
                 label: `App (${kindCounts.app})`,
-                icon: <AppsIcon sx={{ fontSize: 16 }} />,
+                icon: <WidgetsOutlinedIcon sx={{ fontSize: 16 }} />,
               },
               {
                 key: "db",
