@@ -48,6 +48,10 @@ function applyStoredAlignment(block) {
 }
 
 function setListItemDirectionForMarker(item, alignment) {
+  if (alignment === "center") {
+    item.style.setProperty("list-style-position", "inside");
+    return;
+  }
   if (alignment !== "left" && alignment !== "right") return;
 
   // Direction controls which side an outside marker occupies. Plaintext bidi
