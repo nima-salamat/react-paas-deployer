@@ -178,13 +178,13 @@ function FeaturedReadyAppCard({ app }) {
       <Stack sx={{ height: "100%", position: "relative", zIndex: 1 }} spacing={1.35}>
         <Stack direction="row" spacing={1.35} alignItems="flex-start">
           <Box sx={{
-            width: { xs: 52, md: 58 }, height: { xs: 52, md: 58 }, flexShrink: 0,
+            width: { xs: 54, md: 60 }, height: { xs: 54, md: 60 }, flexShrink: 0,
             borderRadius: 2.1, display: "grid", placeItems: "center",
             border: "1px solid", borderColor: alpha(app.accent, 0.18),
             bgcolor: alpha(app.accent, theme.palette.mode === "dark" ? 0.085 : 0.055),
             boxShadow: "inset 0 1px 0 rgba(255,255,255,.06)",
           }}>
-            <Box component="img" src={app.icon} alt="" sx={{ width: { xs: 31, md: 35 }, height: { xs: 31, md: 35 }, display: "block" }} />
+            <Box component="img" src={app.icon} alt="" sx={{ width: { xs: 35, md: 38 }, height: { xs: 35, md: 38 }, display: "block" }} />
           </Box>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography sx={{ fontSize: { xs: "1rem", md: "1.06rem" }, fontWeight: 900, letterSpacing: "-.02em" }}>
@@ -314,6 +314,8 @@ function Reveal({
   once = true,
 }) {
   const reduceMotion = useReducedMotion();
+  const theme = useTheme();
+  const isMdUp = useMediaQuery(theme.breakpoints.up("md"));
   const variants = reduceMotion
     ? reducedVariants
     : variant === "card"
@@ -326,7 +328,7 @@ function Reveal({
     <motion.div
       className={className}
       variants={variants}
-      initial="hidden"
+      initial={reduceMotion || !isMdUp ? "show" : "hidden"}
       whileInView="show"
       viewport={{ once, amount: 0.18, margin: "0px 0px -8% 0px" }}
       transition={{
