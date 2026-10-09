@@ -373,6 +373,7 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   const badge = read("src/components/service/ServicePlatformBadge.jsx");
   const serviceItem = read("src/components/service/services/ServiceItem.jsx");
   const globalControls = read("src/components/service_detail/components/GlobalServiceControls.jsx");
+  const mobileHeader = read("src/components/service_detail/components/MobileServiceHeader.jsx");
   const wizard = read("src/components/plans/CreateDeploymentModal.jsx");
   const networks = read("src/components/networks/Networks.jsx");
   const sidebar = read("src/components/dashboard/DashboardSidebar.jsx");
