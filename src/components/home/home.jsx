@@ -1172,14 +1172,22 @@ export default function Home() {
 
       {/* ───────────────── METRICS ───────────────── */}
       <Container maxWidth="xl" sx={{ pb: { xs: 3.5, md: 9 }, px: { xs: 2, sm: 3 } }}>
-        <GlassPanel sx={{ borderRadius: { xs: 2.5, md: 5 }, p: { xs: 1.75, sm: 2, md: 3 }, mt: { xs: 0, md: -1 } }}>
+        <GlassPanel
+          sx={{
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: { xs: 2.5, md: 5 },
+            p: { xs: 1.25, sm: 2, md: 3 },
+            mt: { xs: 0, md: -1 },
+          }}
+        >
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" },
-              gap: { xs: 1.75, sm: 2, md: 0 },
-              columnGap: { md: 0 },
-              rowGap: { xs: 2, md: 0 },
+              position: "relative",
+              gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" },
+              columnGap: 0,
+              rowGap: 0,
             }}
           >
             {[
@@ -1191,8 +1199,9 @@ export default function Home() {
               <Box
                 key={value}
                 sx={{
-                  px: { md: 2 },
-                  py: { xs: 0.25, md: 0 },
+                  minWidth: 0,
+                  px: { xs: 1.15, sm: 1.75, md: 2 },
+                  py: { xs: 1.85, sm: 2.1, md: 0 },
                   borderRight: {
                     xs: i % 2 === 0 ? "1px solid" : "none",
                     md: i < 3 ? "1px solid" : "none",
@@ -1207,6 +1216,32 @@ export default function Home() {
                 <Metric value={value} label={label} accent={accent} />
               </Box>
             ))}
+            <Box
+              aria-hidden="true"
+              sx={{
+                position: "absolute",
+                zIndex: 2,
+                left: "50%",
+                top: "50%",
+                transform: "translate(-50%, -50%)",
+                display: { xs: "grid", md: "none" },
+                placeItems: "center",
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                bgcolor: "background.paper",
+                color: "text.secondary",
+                border: "1px solid",
+                borderColor: border,
+                boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
+                fontSize: "1rem",
+                fontWeight: 900,
+                lineHeight: 1,
+                pointerEvents: "none",
+              }}
+            >
+              +
+            </Box>
           </Box>
         </GlassPanel>
       </Container>
