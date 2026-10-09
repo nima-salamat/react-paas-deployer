@@ -753,7 +753,6 @@ function MessageBubble({
               lineHeight: 1.55,
               width: "100%",
               minWidth: 0,
-              maxWidth: "100%",
               overflow: "hidden",
               whiteSpace: "normal",
               overflowWrap: "anywhere",
