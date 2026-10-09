@@ -331,21 +331,24 @@ test("service detail uses semantic resource icons and distinct navigation action
   assert.match(detail, /servicePlatform=\{servicePlatform\}/);
   assert.match(mobileHeader, /ServicePlatformBadge/);
   assert.match(mobileHeader, /RocketLaunchRoundedIcon/);
-  assert.match(mobileHeader, /LuHardDrive/);
+  assert.match(mobileHeader, /VolumeIcon/);
 
   for (const content of [overview, globalControls, settings, editDialog]) {
     assert.match(content, /LuCpu/);
     assert.match(content, /LuMemoryStick/);
   }
-  for (const content of [overview, settings, editDialog, serviceItem, mobileHeader, mobileNav]) {
+  for (const content of [overview, settings, editDialog, serviceItem]) {
     assert.match(content, /LuHardDrive/);
+  }
+  for (const content of [overview, settings, mobileHeader, mobileNav]) {
+    assert.match(content, /VolumeIcon/);
   }
   for (const content of [overview, settings, serviceItem]) {
     assert.match(content, /LuDatabase/);
   }
   assert.match(overview, /LuDatabase size=\{18\}/);
   assert.match(settings, /id="database"[\s\S]*LuDatabase/);
-  assert.match(settings, /id="volume"[\s\S]*LuHardDrive/);
+  assert.match(settings, /id="volume"[\s\S]*VolumeIcon/);
   assert.match(settings, /SellOutlinedIcon/);
   assert.match(editDialog, /SellOutlinedIcon/);
   assert.match(editDialog, /PlatformIcon/);
@@ -376,6 +379,8 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   const dashboardOverview = read("src/components/dashboard/DashboardOverview.jsx");
   const volumes = read("src/components/volumes/Volumes.jsx");
   const volumeIcon = read("src/components/VolumeIcon.jsx");
+  const toolbar = read("src/components/service/services/ServicesToolbar.jsx");
+  const plans = read("src/components/plans/plans.jsx");
 
   assert.match(app, /element={<ServiceDetail themeMode=\{themeMode\} onThemeModeChange=\{handleThemeModeChange\} \/>}/);
   assert.match(detail, /themeMode=\{themeMode\}/);
@@ -394,13 +399,23 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(cursorCss, /\.custom-cursor\.variant-crosshair/);
 
   assert.match(badge, /width: \{ xs: 132, sm: 156 \}/);
+  assert.match(serviceItem, /@container \(max-width: 560px\)/);
+  assert.match(serviceItem, /gridTemplateColumns: "auto minmax\(0, 1fr\) auto"/);
+  assert.match(globalControls, /gridTemplateAreas: '"badge title status"'/);
+  assert.match(globalControls, /textAlign: "left"/);
+  assert.match(mobileHeader, /textAlign: "left"/);
+  assert.match(toolbar, /gridTemplateColumns:[\s\S]*minmax\(220px, 1fr\)/);
+  assert.match(toolbar, /WidgetsOutlinedIcon/);
+  assert.match(toolbar, /startIcon={<AppsIcon/);
+  assert.match(plans, /SellOutlinedIcon/);
+  assert.doesNotMatch(plans, /LayersOutlinedIcon/);
   assert.match(serviceItem, /ServicePlatformBadge/);
   assert.match(globalControls, /ServicePlatformBadge/);
   assert.match(globalControls, /servicePlatformKey/);
 
   assert.match(networks, /HubIcon/);
   assert.match(wizard, /HubIcon/);
-  assert.match(wizard, /LuHardDrive/);
+  assert.match(wizard, /VolumeIcon/);
   assert.match(sidebar, /icon: HubIcon/);
   assert.match(dashboardOverview, /\["Networks", "\/dashboard\/networks", HubIcon\]/);
   assert.match(sidebar, /icon: VolumeIcon/);
