@@ -266,3 +266,24 @@ test("admin table/profile/session tools have direct action handlers wired in the
     assert.ok(sessions.includes(marker), "Missing session operation: " + marker);
   }
 });
+
+
+test("admin user profile photos use crop and robust reorder interaction", () => {
+  const manager = read("src/components/admin/components/ProfileImageManager.jsx");
+  const users = read("src/components/admin/panels/UsersPanel.jsx");
+  const profile = read("src/components/profile/profile.jsx");
+
+  assert.match(manager, /ImageCropDialog/);
+  assert.match(manager, /circular/);
+  assert.match(manager, /outputSize=\{512\}/);
+  assert.match(manager, /TouchSensor/);
+  assert.match(manager, /KeyboardSensor/);
+  assert.match(manager, /sortableKeyboardCoordinates/);
+  assert.match(manager, /touchAction: disabled \? "auto" : "none"/);
+  assert.match(manager, /Primary avatar/);
+  assert.match(manager, /adminUserProfileReorderApi/);
+  assert.match(manager, /MediaLightbox/);
+  assert.match(users, /<ProfileImageManager/);
+  assert.match(profile, /useSensor\(TouchSensor/);
+  assert.match(profile, /useSensor\(KeyboardSensor/);
+});

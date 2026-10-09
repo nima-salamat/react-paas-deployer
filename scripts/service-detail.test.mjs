@@ -370,6 +370,8 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   const cursor = read("src/components/layout/CustomCursor.jsx");
   const cursorCss = read("src/index.css");
   const profile = read("src/components/profile/profile.jsx");
+  const cursorPicker = read("src/components/layout/CursorPreferencePicker.jsx");
+  const messengerRightPanel = read("src/components/messenger/components/RightPanel.jsx");
   const badge = read("src/components/service/ServicePlatformBadge.jsx");
   const serviceItem = read("src/components/service/services/ServiceItem.jsx");
   const globalControls = read("src/components/service_detail/components/GlobalServiceControls.jsx");
@@ -397,8 +399,12 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(cursorSettings, /id: "dot"/);
   assert.match(cursorSettings, /id: "crosshair"/);
   assert.match(cursorSettings, /value === "ring"/);
-  assert.match(profile, /<ButtonBase[\s\S]*aria-pressed=\{selected\}/);
-  assert.match(profile, /onClick=\{\(\) => setCursorPreference\(writeCursorPreference\(option\.id\)\)\}/);
+  assert.match(cursorPicker, /<ButtonBase[\s\S]*aria-pressed=\{selected\}/);
+  assert.match(cursorPicker, /onClick=\{\(\) => setCursorPreference\(writeCursorPreference\(option\.id\)\)\}/);
+  assert.match(cursorPicker, /paasdeployer:cursor-preference/);
+  assert.match(profile, /<CursorPreferencePicker/);
+  assert.match(messengerRightPanel, /<CursorPreferencePicker compact/);
+  assert.doesNotMatch(messengerRightPanel, /value=\{cursorPreference\}/);
   assert.match(cursor, /root\.classList\.remove\([\s\S]*"is-visible"/);
   assert.match(cursor, /document\.documentElement\.classList\.remove\("custom-cursor-enabled"\)/);
   assert.match(cursorCss, /\.custom-cursor\.variant-dot/);

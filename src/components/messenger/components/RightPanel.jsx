@@ -43,7 +43,7 @@ import {
 import ProfileView from "./ProfileView";
 import ContextMenu from "./ContextMenu";
 import OnlineDot from "./OnlineDot";
-import { CURSOR_OPTIONS, readCursorPreference, writeCursorPreference } from "../../layout/cursorSettings";
+import CursorPreferencePicker from "../../layout/CursorPreferencePicker.jsx";
 import { useTheme } from "@mui/material/styles";
 import { getPalette } from "../modules/appearance";
 import SessionManager from "../../security/SessionManager.jsx";
@@ -106,7 +106,6 @@ export default function RightPanel({
   // the hook count varies between renders of different `kind` panels and
   // React throws "Invalid hook call" (#300) when the user switches panels.
     const [showSharedMedia, setShowSharedMedia] = useState(false);
-  const [cursorPreference, setCursorPreference] = useState(() => readCursorPreference());
   const [showSharedServices, setShowSharedServices] = useState(false);
   const [memberCtx, setMemberCtx] = useState(null); // { x, y, user, role }
   const [memberMenuAnchor, setMemberMenuAnchor] = useState(null); // for ⋮ button
@@ -435,26 +434,7 @@ export default function RightPanel({
           {sectionTitle("Cursor")}
           <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
             <Box sx={{ px: 2, py: 1.25 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Cursor</InputLabel>
-                <Select
-                  value={cursorPreference}
-                  label="Cursor"
-                  onChange={(e) => {
-                    const next = writeCursorPreference(e.target.value);
-                    setCursorPreference(next);
-                  }}
-                >
-                  {CURSOR_OPTIONS.map((option) => (
-                    <MenuItem key={option.id} value={option.id}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
-                {CURSOR_OPTIONS.find((option) => option.id === cursorPreference)?.description}
-              </Typography>
+              <CursorPreferencePicker compact />
             </Box>
           </List>
 

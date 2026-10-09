@@ -53,8 +53,6 @@ import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import StarIcon from "@mui/icons-material/Star";
 import BrokenImageIcon from "@mui/icons-material/BrokenImage";
-import NearMeIcon from "@mui/icons-material/NearMe";
-import GpsFixedIcon from "@mui/icons-material/GpsFixed";
 import InsertEmoticonIcon from "@mui/icons-material/InsertEmoticon";
 import ZoomInIcon from "@mui/icons-material/ZoomIn";
 import RotateRightIcon from "@mui/icons-material/RotateRight";
@@ -138,7 +136,7 @@ function isImageFile(file) {
 }
 
 import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
-import { CURSOR_OPTIONS, readCursorPreference, writeCursorPreference } from "../layout/cursorSettings";
+import CursorPreferencePicker from "../layout/CursorPreferencePicker.jsx";
 import SessionManager from "../security/SessionManager.jsx";
 
 // --- DND-Kit Imports ---
@@ -349,7 +347,6 @@ const Profile = ({ embedded = false }) => {
   const isMobileViewport = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
   const prefersFinePointer = useMediaQuery("(pointer: fine)", { noSsr: true });
   const enableFileDrop = isDesktop && prefersFinePointer;
-  const [cursorPreference, setCursorPreference] = useState(() => readCursorPreference());
 
   // When rendered inside the dashboard shell, chrome is provided by the shell.
   const fromDashboard =
@@ -1403,97 +1400,7 @@ const Profile = ({ embedded = false }) => {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Choose how the mouse cursor is displayed. This preference is stored locally in this browser.
           </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(4, minmax(0, 1fr))" },
-              gap: 1.25,
-            }}
-          >
-            {CURSOR_OPTIONS.map((option) => {
-              const selected = cursorPreference === option.id;
-              return (
-                <ButtonBase
-                  key={option.id}
-                  onClick={() => setCursorPreference(writeCursorPreference(option.id))}
-                  aria-pressed={selected}
-                  sx={{ display: "block", width: "100%", borderRadius: 2, textAlign: "left" }}
-                >
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      width: "100%",
-                      height: "100%",
-                      minHeight: 158,
-                      p: 1.25,
-                      borderRadius: 2,
-                      borderWidth: selected ? 2 : 1,
-                      borderColor: selected ? "primary.main" : "divider",
-                      bgcolor: selected ? "action.selected" : "background.paper",
-                      transition: "border-color 160ms ease, background-color 160ms ease, transform 160ms ease",
-                      "&:hover": { borderColor: "primary.main", transform: "translateY(-1px)" },
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        height: 76,
-                        mb: 1.1,
-                        borderRadius: 1.5,
-                        display: "grid",
-                        placeItems: "center",
-                        position: "relative",
-                        overflow: "hidden",
-                        bgcolor: (t) => t.palette.mode === "dark" ? "#0b1220" : "#eef2f7",
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
-                      {option.id === "custom" ? (
-                        <Box
-                          sx={{
-                            width: 32,
-                            height: 32,
-                            border: "1.5px solid",
-                            borderColor: (t) => t.palette.mode === "dark" ? "#f8fafc" : "#334155",
-                            borderRadius: "50%",
-                            display: "grid",
-                            placeItems: "center",
-                            boxShadow: "0 0 0 5px rgba(148,163,184,.10)",
-                          }}
-                        >
-                          <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: (t) => t.palette.mode === "dark" ? "#f8fafc" : "#334155" }} />
-                        </Box>
-                      ) : option.id === "dot" ? (
-                        <Box
-                          sx={{
-                            width: 9,
-                            height: 9,
-                            borderRadius: "50%",
-                            bgcolor: (t) => t.palette.mode === "dark" ? "#f8fafc" : "#334155",
-                            boxShadow: "0 0 0 7px rgba(148,163,184,.16)",
-                          }}
-                        />
-                      ) : option.id === "crosshair" ? (
-                        <GpsFixedIcon sx={{ fontSize: 34, color: (t) => t.palette.mode === "dark" ? "#f8fafc" : "#334155" }} />
-                      ) : (
-                        <NearMeIcon sx={{ fontSize: 34, color: (t) => t.palette.mode === "dark" ? "#f8fafc" : "#334155", transform: "rotate(-12deg)" }} />
-                      )}
-                    </Box>
-                    <Typography variant="body2" sx={{ fontWeight: 800, lineHeight: 1.25 }}>
-                      {option.label}
-                    </Typography>
-                    <Typography variant="caption" color={selected ? "primary.main" : "text.secondary"} sx={{ display: "block", mt: 0.65, lineHeight: 1.35 }}>
-                      {selected ? "Selected" : "Choose cursor"}
-                    </Typography>
-                  </Paper>
-                </ButtonBase>
-              );
-            })}
-          </Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.25, lineHeight: 1.5 }}>
-            {CURSOR_OPTIONS.find((option) => option.id === cursorPreference)?.description}
-            {" "}Your choice is applied immediately and saved in this browser.
-          </Typography>
+          <CursorPreferencePicker />
         </Paper>
 
         {/* Photos List */}
