@@ -16,8 +16,44 @@ function normalizeError(error) {
   }
 }
 
-function ErrorPanel({ error, boot = false }) {
-  const message = normalizeError(error).message || "An unknown application error occurred.";
+function ErrorPanel({ error, boot = false, source = "runtime" }) {
+  const errorObject = normalizeError(error);
+  const message = errorObject.message || "An unknown application error occurred.";
+  const [copyStatus, setCopyStatus] = React.useState("");
+
+  const copyErrorDetails = async () => {
+    const report = [
+      "Paas Deploy error report",
+      `Source: ${boot ? "startup" : source || "runtime"}`,
+      `Route: ${typeof window !== "undefined" ? window.location.pathname : "unknown"}`,
+      `Time: ${new Date().toISOString()}`,
+      `Message: ${message}`,
+      errorObject.stack ? `Stack trace:\n${errorObject.stack}` : "",
+    ].filter(Boolean).join("\n\n");
+
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(report);
+      setCopyStatus("Copied");
+      return;
+    } catch {
+      let copied = false;
+      try {
+        const area = document.createElement("textarea");
+        area.value = report;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        copied = document.execCommand("copy");
+        area.remove();
+      } catch {
+        copied = false;
+      }
+      setCopyStatus(copied ? "Copied" : "Copy failed");
+    }
+  };
   const canGoBack = typeof window !== "undefined" && window.history.length > 1;
 
   const goBack = () => {
@@ -92,7 +128,7 @@ function ErrorPanel({ error, boot = false }) {
             textTransform: "uppercase",
           }}
         >
-          PaaSDeployer
+          Paas Deploy
         </p>
 
         <h1
@@ -116,7 +152,7 @@ function ErrorPanel({ error, boot = false }) {
           }}
         >
           {boot
-            ? "The browser could not finish starting the PaaSDeployer interface. You can retry or return to a safe page."
+            ? "The browser could not finish starting Paas Deploy. You can retry or return to a safe page."
             : "This page could not be rendered correctly. Your data has not been intentionally changed by this error screen."}
         </p>
 
@@ -131,14 +167,39 @@ function ErrorPanel({ error, boot = false }) {
         >
           <div
             style={{
-              marginBottom: 6,
-              color: "#cbd5e1",
-              fontSize: 12,
-              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 10,
+              marginBottom: 8,
             }}
           >
-            Error message
+            <div style={{ color: "#cbd5e1", fontSize: 12, fontWeight: 800 }}>
+              Error message
+              <span style={{ marginLeft: 8, color: "#94a3b8", fontWeight: 500 }}>
+                · {boot ? "startup" : source || "runtime"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={copyErrorDetails}
+              style={{
+                border: "1px solid rgba(138, 180, 255, 0.35)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                background: "rgba(138, 180, 255, 0.08)",
+                color: "#bfdbfe",
+                cursor: "pointer",
+                font: "700 12px/1.2 Inter, system-ui, sans-serif",
+              }}
+            >
+              {copyStatus || "Copy error details"}
+            </button>
           </div>
+          <p style={{ margin: "0 0 8px", color: "#94a3b8", fontSize: 11 }}>
+            Route: {typeof window !== "undefined" ? window.location.pathname : "unknown"}
+          </p>
           <code
             style={{
               display: "block",
@@ -154,7 +215,7 @@ function ErrorPanel({ error, boot = false }) {
           </code>
         </div>
 
-        {!boot && normalizeError(error).stack && (
+        {!boot && errorObject.stack && (
           <details style={{ marginTop: 14 }}>
             <summary
               style={{
@@ -181,7 +242,7 @@ function ErrorPanel({ error, boot = false }) {
                 overflowWrap: "anywhere",
               }}
             >
-              {normalizeError(error).stack}
+              {errorObject.stack}
             </pre>
           </details>
         )}
@@ -306,7 +367,7 @@ export class AppErrorBoundary extends React.Component {
 
   render() {
     if (this.state.error) {
-      return <ErrorPanel error={this.state.error} />;
+      return <ErrorPanel error={this.state.error} source={this.state.source} />;
     }
 
     return this.props.children;
@@ -314,7 +375,7 @@ export class AppErrorBoundary extends React.Component {
 }
 
 export function BootErrorScreen({ error }) {
-  return <ErrorPanel error={error} boot />;
+  return <ErrorPanel error={error} boot source="startup" />;
 }
 
 export default AppErrorBoundary;
