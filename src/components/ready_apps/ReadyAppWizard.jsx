@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
@@ -30,6 +31,8 @@ import { alpha } from "@mui/material/styles";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import ExpandLessRoundedIcon from "@mui/icons-material/ExpandLessRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
@@ -201,6 +204,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
   const [variantId, setVariantId] = useState(defaultVariant?.id || "");
   const [name, setName] = useState("");
   const [config, setConfig] = useState({});
+  const [showAdvancedFields, setShowAdvancedFields] = useState(false);
   const [plans, setPlans] = useState([]);
   const [planId, setPlanId] = useState("");
   const [plansLoading, setPlansLoading] = useState(false);
@@ -231,6 +235,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
     setVariantId(nextVariant?.id || "");
     setName("");
     setConfig(defaults);
+    setShowAdvancedFields(false);
     setPlans([]);
     setPlanId("");
     setActiveStep(0);
@@ -544,6 +549,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                   });
                   setVariantId(event.target.value);
                   setConfig(defaults);
+                  setShowAdvancedFields(false);
                   setResolved(null);
                 }}
                 fullWidth
@@ -556,29 +562,76 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               </TextField>
             )}
 
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" },
-                gap: 1.5,
-              }}
-            >
-              {(variant?.fields || [])
-                .filter((field) => fieldVisible(field, config))
-                .map((field) => (
-                  <Box
-                    key={field.id}
-                    sx={{ gridColumn: { xs: "span 1", sm: field.ui?.full_width ? "span 2" : "span 1" } }}
-                  >
-                    <DynamicField
-                      field={field}
-                      value={config[field.id]}
-                      config={config}
-                      onChange={updateField}
-                    />
-                  </Box>
-                ))}
-            </Box>
+            {(() => {
+              const visibleFields = (variant?.fields || []).filter(
+                (field) => fieldVisible(field, config) && field?.user_editable !== false
+              );
+              const advancedField = (field) =>
+                field.ui?.advanced === true ||
+                (
+                  field.ui?.advanced !== false &&
+                  !field.required &&
+                  Object.prototype.hasOwnProperty.call(field, "default")
+                );
+              const primaryFields = visibleFields.filter((field) => !advancedField(field));
+              const optionalFields = visibleFields.filter(advancedField);
+              const renderFields = (fields) => (
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))" },
+                    gap: 1.5,
+                  }}
+                >
+                  {fields.map((field) => (
+                    <Box
+                      key={field.id}
+                      sx={{ gridColumn: { xs: "span 1", sm: field.ui?.full_width ? "span 2" : "span 1" } }}
+                    >
+                      <DynamicField
+                        field={field}
+                        value={config[field.id]}
+                        config={config}
+                        onChange={updateField}
+                      />
+                    </Box>
+                  ))}
+                </Box>
+              );
+
+              return (
+                <Stack spacing={1.25}>
+                  {renderFields(primaryFields)}
+                  {optionalFields.length > 0 && (
+                    <Box>
+                      <Divider sx={{ mb: 1.1, mt: 0.3 }} />
+                      <Button
+                        type="button"
+                        size="small"
+                        onClick={() => setShowAdvancedFields((shown) => !shown)}
+                        aria-expanded={showAdvancedFields}
+                        endIcon={showAdvancedFields ? <ExpandLessRoundedIcon /> : <ExpandMoreRoundedIcon />}
+                        sx={{
+                          px: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: "none",
+                          fontWeight: 750,
+                        }}
+                      >
+                        {showAdvancedFields
+                          ? "Hide optional settings"
+                          : `Show optional settings (${optionalFields.length})`}
+                      </Button>
+                      <Collapse in={showAdvancedFields} unmountOnExit>
+                        <Box sx={{ pt: 1 }}>
+                          {renderFields(optionalFields)}
+                        </Box>
+                      </Collapse>
+                    </Box>
+                  )}
+                </Stack>
+              );
+            })()}
           </Stack>
         )}
 
