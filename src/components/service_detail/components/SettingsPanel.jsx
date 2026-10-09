@@ -33,6 +33,7 @@ import {
 import HubIcon from "@mui/icons-material/Hub";
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import { LuCpu, LuDatabase, LuHardDrive, LuMemoryStick } from "react-icons/lu";
+import VolumeIcon from "../../VolumeIcon.jsx";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import AddIcon from "@mui/icons-material/Add";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
@@ -1496,7 +1497,7 @@ export default function SettingsPanel({
       {/* ═══════════════ VOLUMES ═══════════════ */}
       <Paper id="volume" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
-          icon={<LuHardDrive size={18} />}
+          icon={<VolumeIcon size={18} />}
           title="Volumes"
           subtitle="Exclusive storage for this service. Volumes are not shareable."
           action={
