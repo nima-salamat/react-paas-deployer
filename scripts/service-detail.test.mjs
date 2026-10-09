@@ -372,6 +372,10 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   const globalControls = read("src/components/service_detail/components/GlobalServiceControls.jsx");
   const wizard = read("src/components/plans/CreateDeploymentModal.jsx");
   const networks = read("src/components/networks/Networks.jsx");
+  const sidebar = read("src/components/dashboard/DashboardSidebar.jsx");
+  const dashboardOverview = read("src/components/dashboard/DashboardOverview.jsx");
+  const volumes = read("src/components/volumes/Volumes.jsx");
+  const volumeIcon = read("src/components/VolumeIcon.jsx");
 
   assert.match(app, /element={<ServiceDetail themeMode=\{themeMode\} onThemeModeChange=\{handleThemeModeChange\} \/>}/);
   assert.match(detail, /themeMode=\{themeMode\}/);
@@ -397,4 +401,10 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(networks, /HubIcon/);
   assert.match(wizard, /HubIcon/);
   assert.match(wizard, /LuHardDrive/);
+  assert.match(sidebar, /icon: HubIcon/);
+  assert.match(dashboardOverview, /\["Networks", "\/dashboard\/networks", HubIcon\]/);
+  assert.match(sidebar, /icon: VolumeIcon/);
+  assert.match(dashboardOverview, /\["Volumes", "\/dashboard\/volumes", VolumeIcon\]/);
+  assert.match(volumes, /VolumeIcon/);
+  assert.match(volumeIcon, /LuHardDrive/);
 });
