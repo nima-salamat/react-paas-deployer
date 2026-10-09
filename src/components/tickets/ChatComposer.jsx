@@ -61,7 +61,21 @@ export default function ChatComposer({
   }, [sending, disabled, onSend]);
 
   return (
-    <Box sx={{ borderTop: 1, borderColor: "divider", bgcolor: "background.paper", px: 0.75, py: 0.6 }}>
+    <Box
+      sx={{
+        minWidth: 0,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 2.5,
+        bgcolor: "background.paper",
+        backgroundImage: "none",
+        boxShadow: (theme) => theme.palette.mode === "dark"
+          ? "0 8px 28px rgba(0,0,0,.24)"
+          : "0 8px 28px rgba(15,23,42,.08)",
+        px: { xs: 0.75, sm: 1 },
+        py: { xs: 0.6, sm: 0.8 },
+      }}
+    >
       <PendingFilesBar
         files={files}
         onRemove={(i) => onFilesChange?.((files || []).filter((_, idx) => idx !== i))}
