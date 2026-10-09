@@ -311,7 +311,7 @@ export default function ReadyApps() {
           </Alert>
         )}
 
-        {loading ? (
+        {loading || (refreshing && apps.length === 0) ? (
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2,minmax(0,1fr))", lg: "repeat(3,minmax(0,1fr))" }, gap: 2 }}>
             {Array.from({ length: 6 }).map((_, index) => (
               <Card key={index} variant="outlined" sx={{ borderRadius: 2.5, p: 2.5 }}>
