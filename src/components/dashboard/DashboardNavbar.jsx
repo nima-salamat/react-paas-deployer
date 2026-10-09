@@ -56,6 +56,9 @@ export default function DashboardNavbar({
     if (serviceDetail) return serviceName || "Service";
     if (profileMode) return "Profile";
     const p = location.pathname;
+    if (p.startsWith("/dashboard/ready-apps/installations")) return "Deployed Apps";
+    if (p.startsWith("/dashboard/ready-apps")) return "App Library";
+    if (p.startsWith("/dashboard/agents")) return "Agents";
     if (p.startsWith("/dashboard/networks")) return "Networks";
     if (p.startsWith("/dashboard/volumes")) return "Volumes";
     if (p.startsWith("/dashboard/plans")) return "Plans";
