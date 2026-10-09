@@ -75,7 +75,11 @@ function ServiceItem({
     status
   );
   const isRunning = status === "running";
-  const statusColor = isRunning ? "success" : isUpdating ? "warning" : "default";
+  const isFailed = ["failed", "error"].includes(status);
+  const statusColor = isRunning ? "success" : isUpdating ? "warning" : isFailed ? "error" : "default";
+  const statusLabel = status
+    ? status.replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase())
+    : "Unknown";
   const isCatalogManaged = String(s?.source_kind || "").toLowerCase() === "catalog" || Boolean(s?.application_instance_id);
   const catalogId = String(s?.source_config?.catalog_id || s?.catalog_id || s?.application_instance?.catalog_id || "").trim();
   const catalogLabel = catalogId ? catalogId.replace(/-with-(postgres|postgresql|mariadb|mysql|worker|redis)/gi, "").replace(/[-_]+/g, " ") : "Managed app";
@@ -392,79 +396,57 @@ function ServiceItem({
   if (layout === "row") {
     return (
       <>
-      {myPermsDialog}
-      <Paper
-        elevation={0}
-        onMouseEnter={() => onPrefetch?.(s)}
-        onFocus={() => onPrefetch?.(s)}
-        sx={{
-          p: { xs: 1.5, sm: 2 },
-          mb: 1.25,
-          borderRadius: 2,
-          border: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={{ xs: 1.25, md: 2 }}
-          alignItems={{ xs: "stretch", md: "center" }}
-        >
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: 0 }}>
-              {kindChip}
-              <Box sx={{ flex: 1, minWidth: 0, textAlign: "right" }}>
-                <Typography
-                  variant="subtitle1"
-                  title={s.name || "(no name)"}
-                  fontWeight={800}
-                  sx={{
-                    lineHeight: 1.25,
-                    minHeight: 40,
-                    overflowWrap: "anywhere",
-                    display: "-webkit-box",
-                    WebkitBoxOrient: "vertical",
-                    WebkitLineClamp: 2,
-                    overflow: "hidden",
-                  }}
-                >
+        {myPermsDialog}
+        <Paper elevation={0} onMouseEnter={() => onPrefetch?.(s)} onFocus={() => onPrefetch?.(s)}
+          sx={{ p: { xs: 1.5, sm: 2 }, mb: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1.25, md: 2 }}
+            alignItems={{ xs: "stretch", md: "center" }}>
+            <Box sx={{ flex: 1, minWidth: 0, containerType: "inline-size" }}>
+              <Box sx={{
+                display: "grid",
+                gridTemplateColumns: "auto minmax(0, 1fr) auto",
+                gridTemplateRows: "auto",
+                alignItems: "center",
+                columnGap: 1,
+                rowGap: 0.7,
+                width: "100%",
+                minWidth: 0,
+                containerType: "inline-size",
+                "@container (max-width: 560px)": {
+                  gridTemplateColumns: "auto minmax(0, 1fr)",
+                  gridTemplateRows: "auto auto",
+                  alignItems: "start",
+                  "& .service-item-name": { gridColumn: "1 / -1", gridRow: 2, mt: 0.15 },
+                  "& .service-item-status": { gridColumn: 2, gridRow: 1, justifySelf: "end" },
+                },
+              }}>
+                {kindChip}
+                <Typography className="service-item-name" variant="subtitle1" title={s.name || "(no name)"} fontWeight={800}
+                  sx={{ minWidth: 0, textAlign: "left", lineHeight: 1.25, overflowWrap: "anywhere",
+                    display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden" }}>
                   {s.name || "(no name)"}
                 </Typography>
-                <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-                  {shareMeta?.isReceived && (
-                    <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
-                  )}
-                  {shareMeta?.adminOnly && (
-                    <Chip size="small" color="warning" variant="outlined" label="Admins only" sx={{ fontWeight: 700, height: 22 }} />
-                  )}
-                  {shareMeta?.preset && (
-                    <Chip size="small" variant="outlined" label={shareMeta.preset} sx={{ fontWeight: 700, height: 22 }} />
-                  )}
-                  {shareMeta?.isOwnerShare && (
-                    <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
-                  )}
-                  <Chip
-                    label={s.status ?? "unknown"}
-                    color={statusColor}
-                    size="small"
-                    sx={{ fontWeight: 700, height: 22 }}
-                  />
+                <Stack className="service-item-status" direction="row" spacing={0.5} justifyContent="flex-end"
+                  alignItems="center" flexWrap="wrap" useFlexGap sx={{ minWidth: 0 }}>
+                  {shareMeta?.isReceived && <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />}
+                  {shareMeta?.adminOnly && <Chip size="small" color="warning" variant="outlined" label="Admins only" sx={{ fontWeight: 700, height: 22 }} />}
+                  {shareMeta?.preset && <Chip size="small" variant="outlined" label={shareMeta.preset} sx={{ fontWeight: 700, height: 22 }} />}
+                  {shareMeta?.isOwnerShare && <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />}
+                  <Chip label={statusLabel} color={statusColor} size="small" sx={{ fontWeight: 700, height: 22, flexShrink: 0 }} />
                 </Stack>
               </Box>
-            </Stack>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5, mt: 0.65, textAlign: "right", overflowWrap: "anywhere" }}
-            >
-              <HubIcon sx={{ fontSize: 14, flexShrink: 0 }} /> {networkName}
-            </Typography>
-            {metaChips}
-            {usageBars}
-          </Box>
-          <Box sx={{ width: { xs: "100%", md: 280 }, flexShrink: 0 }}>{actions}</Box>
-        </Stack>
-      </Paper>
+              <Typography variant="body2" color="text.secondary"
+                sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 0.5, mt: 0.75,
+                  textAlign: "left", overflowWrap: "anywhere", minWidth: 0 }}>
+                <HubIcon sx={{ fontSize: 14, flexShrink: 0 }} />
+                <Box component="span" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>{networkName}</Box>
+              </Typography>
+              {metaChips}
+              {usageBars}
+            </Box>
+            <Box sx={{ width: { xs: "100%", md: 280 }, flexShrink: 0 }}>{actions}</Box>
+          </Stack>
+        </Paper>
       </>
     );
   }
@@ -472,98 +454,47 @@ function ServiceItem({
   /* ─── Card layout ─── */
   return (
     <>
-    {myPermsDialog}
-    <Paper
-      elevation={0}
-      onMouseEnter={() => onPrefetch?.(s)}
-      onFocus={() => onPrefetch?.(s)}
-      sx={{
-        width: "100%",
-        height: "100%",
-        minHeight: { xs: 220, sm: 240 },
-        display: "flex",
-        flexDirection: "column",
-        borderRadius: 2.5,
-        border: "1px solid",
-        borderColor: "divider",
-        overflow: "hidden",
-        backgroundImage: (t) =>
-          t.palette.mode === "dark"
+      {myPermsDialog}
+      <Paper elevation={0} onMouseEnter={() => onPrefetch?.(s)} onFocus={() => onPrefetch?.(s)}
+        sx={{
+          width: "100%", height: "100%", minHeight: { xs: 220, sm: 240 },
+          display: "flex", flexDirection: "column", borderRadius: 2.5, border: "1px solid",
+          borderColor: "divider", overflow: "hidden",
+          backgroundImage: (t) => t.palette.mode === "dark"
             ? "linear-gradient(145deg, rgba(30,41,59,0.55), rgba(15,23,42,0.75))"
             : "linear-gradient(145deg, #ffffff, #f8fafc)",
-      }}
-    >
-      <Box
-        sx={{
-          p: { xs: 1.5, sm: 2 },
-          flexGrow: 1,
-          display: "flex",
-          flexDirection: "column",
-          minHeight: { xs: 140, sm: 150 },
-        }}
-      >
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-          {kindChip}
-          <Box sx={{ minWidth: 0, flex: 1, textAlign: "right" }}>
-            <Typography
-              variant="subtitle1"
-              title={s.name || "(no name)"}
-              fontWeight={800}
-              sx={{
-                lineHeight: 1.25,
-                minHeight: 40,
-                overflowWrap: "anywhere",
-                display: "-webkit-box",
-                WebkitBoxOrient: "vertical",
-                WebkitLineClamp: 2,
-                overflow: "hidden",
-              }}
-            >
-              {s.name || "(no name)"}
-            </Typography>
-            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-              {shareMeta?.isReceived && (
-                <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
-              )}
-              {shareMeta?.isOwnerShare && (
-                <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
-              )}
-              <Chip
-                label={s.status ?? "unknown"}
-                color={statusColor}
-                size="small"
-                sx={{ fontWeight: 700, height: 22, flexShrink: 0 }}
-              />
+        }}>
+        <Box sx={{ p: { xs: 1.5, sm: 2 }, flexGrow: 1, display: "flex", flexDirection: "column",
+          minHeight: { xs: 140, sm: 150 }, minWidth: 0 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1} sx={{ minWidth: 0 }}>
+            {kindChip}
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end"
+              flexWrap="wrap" useFlexGap sx={{ minWidth: 0, flexShrink: 0 }}>
+              {shareMeta?.isReceived && <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />}
+              {shareMeta?.isOwnerShare && <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />}
+              <Chip label={statusLabel} color={statusColor} size="small" sx={{ fontWeight: 700, height: 22, flexShrink: 0 }} />
             </Stack>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.35, mt: 0.6, overflowWrap: "anywhere" }}
-            >
-              <HubIcon sx={{ fontSize: 13, flexShrink: 0 }} /> {networkName}
-            </Typography>
-          </Box>
-        </Stack>
-
-        {metaChips}
-        {usageBars}
-        <Box sx={{ flexGrow: 1 }} />
-      </Box>
-
-      <Box
-        sx={{
-          px: { xs: 1.25, sm: 1.5 },
-          py: 1.25,
-          mt: "auto",
-          borderTop: "1px solid",
-          borderColor: "divider",
-          bgcolor: (t) =>
-            t.palette.mode === "dark" ? "rgba(0,0,0,0.18)" : "rgba(15,23,42,0.02)",
-        }}
-      >
-        {actions}
-      </Box>
-    </Paper>
+          </Stack>
+          <Typography variant="subtitle1" title={s.name || "(no name)"} fontWeight={800}
+            sx={{ mt: 1, minWidth: 0, minHeight: 26, textAlign: "left", lineHeight: 1.25, overflowWrap: "anywhere",
+              display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, overflow: "hidden" }}>
+            {s.name || "(no name)"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary"
+            sx={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 0.35, mt: 0.65,
+              minWidth: 0, textAlign: "left", overflowWrap: "anywhere" }}>
+            <HubIcon sx={{ fontSize: 13, flexShrink: 0 }} />
+            <Box component="span" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>{networkName}</Box>
+          </Typography>
+          {metaChips}
+          {usageBars}
+          <Box sx={{ flexGrow: 1 }} />
+        </Box>
+        <Box sx={{ px: { xs: 1.25, sm: 1.5 }, py: 1.25, mt: "auto", borderTop: "1px solid",
+          borderColor: "divider", bgcolor: (t) => t.palette.mode === "dark" ? "rgba(0,0,0,0.18)" : "rgba(15,23,42,0.02)" }}>
+          {actions}
+        </Box>
+      </Paper>
     </>
   );
 }
