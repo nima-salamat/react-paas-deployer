@@ -70,65 +70,33 @@ function ServiceIdentity({ service, onCopied }) {
     copy(v, k);
     onCopied?.(k, v);
   };
-
   const serviceName = service?.service_name || null;
   const serviceHost = service?.service_host || null;
-
   if (!serviceName && !serviceHost) {
-    return (
-      <Typography variant="body2" color="text.secondary">
-        —
-      </Typography>
-    );
+    return <Typography variant="body2" color="text.secondary" sx={{ textAlign: "left" }}>—</Typography>;
   }
-
   return (
-    <Stack spacing={0.35}>
+    <Stack spacing={0.35} alignItems="flex-start" sx={{ minWidth: 0, width: "100%", textAlign: "left" }}>
       {serviceHost ? (
-        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{
-              fontFamily:
-                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-              fontSize: 12.5,
-              wordBreak: "break-all",
-            }}
-          >
+        <Stack direction="row" alignItems="flex-start" spacing={0.5} sx={{ minWidth: 0, maxWidth: "100%" }}>
+          <Typography variant="body2" color="text.secondary"
+            sx={{ minWidth: 0, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontSize: 12.5, wordBreak: "break-all", textAlign: "left" }}>
             {serviceHost}
           </Typography>
-          <CopyBtn
-            value={serviceHost}
-            k="host"
-            title="Copy host"
-            copied={copied}
-            onCopy={handle}
-          />
+          <CopyBtn value={serviceHost} k="host" title="Copy host" copied={copied} onCopy={handle} />
         </Stack>
       ) : null}
       {serviceName ? (
-        <Stack direction="row" alignItems="center" spacing={0.5}>
-          <Typography variant="caption" color="text.secondary">
+        <Stack direction="row" alignItems="flex-start" spacing={0.5} sx={{ minWidth: 0, maxWidth: "100%" }}>
+          <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0, textAlign: "left", overflowWrap: "anywhere" }}>
             Service name:{" "}
-            <Box
-              component="span"
-              sx={{
-                fontFamily: "ui-monospace, monospace",
-                fontWeight: 700,
-                color: "text.primary",
-              }}
-            >
+            <Box component="span" sx={{ fontFamily: "ui-monospace, monospace", fontWeight: 700, color: "text.primary",
+              overflowWrap: "anywhere", wordBreak: "break-all", textAlign: "left" }}>
               {serviceName}
             </Box>
           </Typography>
-          <CopyBtn
-            value={serviceName}
-            k="name"
-            title="Copy service name"
-            copied={copied}
-            onCopy={handle}
-          />
+          <CopyBtn value={serviceName} k="name" title="Copy service name" copied={copied} onCopy={handle} />
         </Stack>
       ) : null}
     </Stack>
@@ -222,6 +190,8 @@ export default function GlobalServiceControls({
       : serviceRunning === true ||
         ["running", "success"].includes(lifecycleStatus)
       ? "success"
+      : ["failed", "error"].includes(lifecycleStatus)
+      ? "error"
       : "default";
 
   const canOpen = Boolean(service?.service_host || service?.service_name) && !selectedIsDb;
@@ -253,49 +223,44 @@ export default function GlobalServiceControls({
       }}
     >
       {!compact ? (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 1.5,
-            flexWrap: "wrap",
-            mb: 2,
-          }}
-        >
-          <Stack direction="row" spacing={1.1} alignItems="flex-start" sx={{ minWidth: 0, flex: 1 }}>
-            <ServicePlatformBadge
-              platformKey={servicePlatformKey || servicePlatformLabel}
-              platformLabel={servicePlatformLabel}
-              typeLabel={serviceTypeLabel}
-              isDatabase={selectedIsDb}
-              isReadyApp={managedByApplication}
-            />
-            <Box sx={{ minWidth: 0, flex: 1, textAlign: "right" }}>
-              <Typography
-                variant="h5"
-                title={service?.name || "Service"}
-                sx={{
-                  fontWeight: 800,
-                  lineHeight: 1.25,
-                  letterSpacing: "-0.02em",
-                  mb: 0.5,
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {service?.name || "Service"}
-              </Typography>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", minWidth: 0 }}>
-                <ServiceIdentity service={service} onCopied={onCopyFeedback} />
-              </Box>
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: "auto minmax(0, 1fr) auto",
+          gridTemplateAreas: '"badge title status"',
+          alignItems: "start",
+          columnGap: 1.25,
+          rowGap: 0.75,
+          mb: 2,
+          minWidth: 0,
+          containerType: "inline-size",
+          "& .service-header-badge": { gridArea: "badge" },
+          "& .service-header-title": { gridArea: "title" },
+          "& .service-header-status": { gridArea: "status" },
+          "@container (max-width: 640px)": {
+            gridTemplateColumns: "auto minmax(0, 1fr)",
+            gridTemplateAreas: '"badge status" "title title"',
+            columnGap: 1,
+            rowGap: 0.75,
+            "& .service-header-title": { mt: 0.25 },
+            "& .service-header-status": { justifySelf: "end" },
+          },
+        }}>
+          <Box className="service-header-badge" sx={{ minWidth: 0 }}>
+            <ServicePlatformBadge platformKey={servicePlatformKey || servicePlatformLabel} platformLabel={servicePlatformLabel}
+              typeLabel={serviceTypeLabel} isDatabase={selectedIsDb} isReadyApp={managedByApplication} />
+          </Box>
+          <Box className="service-header-title" sx={{ minWidth: 0, textAlign: "left" }}>
+            <Typography variant="h5" title={service?.name || "Service"}
+              sx={{ fontWeight: 800, lineHeight: 1.25, letterSpacing: "-0.02em", mb: 0, minWidth: 0,
+                textAlign: "left", overflowWrap: "anywhere" }}>
+              {service?.name || "Service"}
+            </Typography>
+            <Box sx={{ display: "flex", justifyContent: "flex-start", minWidth: 0, mt: 0.65, textAlign: "left" }}>
+              <ServiceIdentity service={service} onCopied={onCopyFeedback} />
             </Box>
-          </Stack>
-          <Chip
-            label={statusLabel}
-            color={statusColor}
-            size="medium"
-            sx={{ fontWeight: 700, height: 28 }}
-          />
+          </Box>
+          <Chip className="service-header-status" label={statusLabel} color={statusColor} size="medium"
+            sx={{ fontWeight: 700, height: 28, flexShrink: 0 }} />
         </Box>
       ) : (
         <Typography variant="subtitle2" color="text.secondary" sx={{ fontWeight: 700, mb: 1.25 }}>
