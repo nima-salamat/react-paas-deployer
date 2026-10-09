@@ -344,10 +344,10 @@ test("homepage metrics keep a four-cell mobile layout with a centered plus divid
     assert.ok(metrics.includes(label), `missing homepage metric: ${label}`);
   }
 
-  assert.match(metrics, /gridTemplateColumns: \{ xs: "repeat\\(2, minmax\\(0, 1fr\\)\\)", md: "repeat\\(4, minmax\\(0, 1fr\\)\\)" \}/);
-  assert.match(metrics, /gridTemplateRows: \{ xs: "repeat\\(2, minmax\\(0, 1fr\\)\\)", md: "none" \}/);
-  assert.match(metrics, /borderRight:[\\s\\S]*xs: i % 2 === 0/);
-  assert.match(metrics, /borderBottom:[\\s\\S]*xs: i < 2/);
-  assert.match(metrics, /display: \{ xs: "grid", md: "none" \}/);
-  assert.match(metrics, /\n\s*\+\s*\n\s*</);
+  assert.ok(metrics.includes('gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" }'));
+  assert.ok(metrics.includes('gridTemplateRows: { xs: "repeat(2, minmax(0, 1fr))", md: "none" }'));
+  assert.ok(metrics.includes("xs: i % 2 === 0"));
+  assert.ok(metrics.includes("xs: i < 2"));
+  assert.ok(metrics.includes('display: { xs: "grid", md: "none" }'));
+  assert.ok(metrics.includes("\n              +\n            </Box>"), "mobile plus marker should be present");
 });
