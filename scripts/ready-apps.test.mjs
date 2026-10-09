@@ -39,3 +39,21 @@ testFn("Ready Apps catalog accepts both plain arrays and paginated results", () 
   assert.match(source, /if \(Array\.isArray\(data\)\) return data/);
   assert.match(source, /Array\.isArray\(data\?\.results\)/);
 });
+
+testFn("Ready Apps lists expose manual refresh and retry failed catalog requests", () => {
+  const library = read("src/components/ready_apps/ReadyApps.jsx");
+  const installations = read("src/components/ready_apps/ReadyAppInstallations.jsx");
+  for (const source of [library, installations]) {
+    assert.match(source, /RefreshRoundedIcon/);
+    assert.match(source, /onClick=\{\(\) => load\(true\)\}/);
+    assert.match(source, /setTimeout\(\(\) => load\(true\), 12000\)/);
+    assert.match(source, /disabled=\{loading \|\| refreshing\}/);
+  }
+
+  const wizard = read("src/components/ready_apps/ReadyAppWizard.jsx");
+  assert.match(wizard, /VisibilityRoundedIcon/);
+  assert.match(wizard, /VisibilityOffRoundedIcon/);
+  assert.match(wizard, /Show password/);
+  assert.match(wizard, /Hide password/);
+  assert.match(wizard, /setShowSecret\(\(visible\) => !visible\)/);
+});
