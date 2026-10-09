@@ -1026,8 +1026,6 @@ export default function SettingsPanel({
     planDetail?.platform ??
     service?.plan?.platform ??
     service?.plan_detail?.platform ??
-    service?.platform ??
-    service?.runtime_platform ??
     ""
   ), [planDetail, service]);
 
