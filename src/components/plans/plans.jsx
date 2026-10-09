@@ -36,8 +36,7 @@ import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 import AppsIcon from "@mui/icons-material/Apps";
 import StorageIcon from "@mui/icons-material/Storage";
-import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
-import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
+import { LuCpu, LuMemoryStick } from "react-icons/lu";
 import PlatformIcon from "./PlatformIcon";
 
 const CreateDeploymentModal = lazy(() => import("./CreateDeploymentModal"));
@@ -257,14 +256,14 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
         <Stack spacing={1.1}>
           {cpu != null && (
             <SpecRow
-              icon={<ComputerRoundedIcon sx={{ fontSize: 15 }} />}
+              icon={<LuCpu size={15} />}
               label="CPU"
               value={cpu}
             />
           )}
           {ram != null && (
             <SpecRow
-              icon={<MemoryRoundedIcon sx={{ fontSize: 15 }} />}
+              icon={<LuMemoryStick size={15} />}
               label="RAM"
               value={ram}
             />
