@@ -284,10 +284,10 @@ test("primary navigation omits Tickets while the Dashboard sidebar keeps it", ()
   const navbar = read("src/components/layout/Navbar.jsx");
   const dashboardSidebar = read("src/components/dashboard/DashboardSidebar.jsx");
 
-  assert.doesNotMatch(navbar, /path:\\s*["']\\/tickets["'],\\s*label:\\s*["']Tickets["']/);
+  assert.doesNotMatch(navbar, /path:\s*["']\/tickets["'],\s*label:\s*["']Tickets["']/);
   assert.doesNotMatch(navbar, /ConfirmationNumberOutlinedIcon/);
-  assert.equal((navbar.match(/visibleNavItems\\.map\\(/g) || []).length, 2);
+  assert.equal((navbar.match(/visibleNavItems\.map\(/g) || []).length, 2);
 
-  assert.match(dashboardSidebar, /label: "Tickets", path: "\\/dashboard\\/tickets"/);
-  assert.match(dashboardSidebar, /pathname\\.startsWith\\("\\/dashboard\\/tickets"\\)/);
+  assert.match(dashboardSidebar, /label: "Tickets", path: "\/dashboard\/tickets"/);
+  assert.match(dashboardSidebar, /pathname\.startsWith\("\/dashboard\/tickets"\)/);
 });
