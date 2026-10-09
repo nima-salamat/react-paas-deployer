@@ -62,10 +62,11 @@ export default function DashboardNavbar({
     if (p.startsWith("/dashboard/networks")) return "Networks";
     if (p.startsWith("/dashboard/volumes")) return "Volumes";
     if (p.startsWith("/dashboard/plans")) return "Plans";
+    if (p.startsWith("/dashboard/tickets/new")) return "New ticket";
     if (p.startsWith("/dashboard/tickets")) return "Tickets";
     if (p.startsWith("/dashboard/profile")) return "Profile";
     if (p.startsWith("/dashboard/services")) return "Services";
-    return "Dashboard";
+    return p === "/dashboard" ? "Overview" : "Dashboard";
   }, [location.pathname, serviceDetail, profileMode, serviceName]);
 
   const subtitle = serviceDetail
