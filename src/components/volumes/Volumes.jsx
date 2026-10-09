@@ -327,7 +327,7 @@ export default function Volumes() {
           p: 2,
           border: "1px solid",
           borderColor: "divider",
-          borderRadius: 1,
+          borderRadius: 1.75,
           mb: 1.5,
         }}
       >
@@ -440,7 +440,7 @@ export default function Volumes() {
             sx={{
               width: 36,
               height: 36,
-              borderRadius: 1,
+              borderRadius: 1.75,
               display: "grid",
               placeItems: "center",
               bgcolor: "primary.main",
@@ -471,7 +471,7 @@ export default function Volumes() {
           sx={{
             border: "1px solid",
             borderColor: "divider",
-            borderRadius: 1,
+            borderRadius: 1.75,
             alignSelf: { xs: "flex-end", sm: "center" },
           }}
         >
@@ -508,7 +508,7 @@ export default function Volumes() {
           sx={{
             border: "1px solid",
             borderColor: "divider",
-            borderRadius: 1,
+            borderRadius: 1.75,
             py: 6,
             textAlign: "center",
           }}
@@ -525,7 +525,7 @@ export default function Volumes() {
         <Paper
           elevation={0}
           sx={{
-            borderRadius: 1,
+            borderRadius: 1.75,
             border: "1px solid",
             borderColor: "divider",
             overflow: "hidden",
@@ -797,7 +797,7 @@ export default function Volumes() {
                     p: 1.5,
                     border: "1px solid",
                     borderColor: "divider",
-                    borderRadius: 1,
+                    borderRadius: 1.75,
                   }}
                 >
                   <Typography
