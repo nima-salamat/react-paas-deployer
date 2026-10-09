@@ -432,8 +432,14 @@ export function App({ prerender = false }) {
 
               {/* Service detail keeps its own chrome (outside the list shell) */}
               <Route path="dashboard/service/:id" element={<LegacyServiceRedirect />} />
-              <Route path="dashboard/services/:id/:section" element={<ServiceDetail />} />
-              <Route path="dashboard/services/:id" element={<ServiceDetail />} />
+              <Route
+                path="dashboard/services/:id/:section"
+                element={<ServiceDetail themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}
+              />
+              <Route
+                path="dashboard/services/:id"
+                element={<ServiceDetail themeMode={themeMode} onThemeModeChange={handleThemeModeChange} />}
+              />
 
               <Route
                 path="services"
