@@ -211,15 +211,16 @@ test("Create Ticket does not force the editor expanded state", () => {
 });
 
 
-test("renderer uses adaptive quote contrast and renders persisted alignment classes", () => {
+test("renderer uses adaptive quote contrast and shared persisted alignment normalization", () => {
   const source = read("src/components/tickets/MessageBubble.jsx");
+  const richText = read("src/components/tickets/ticketRichText.js");
 
   assert.match(source, /borderColor: mine \? "rgba\(255,255,255,0\.62\)" : "divider"/);
   assert.match(source, /bgcolor: mine \? "rgba\(255,255,255,0\.09\)" : "action\.hover"/);
-  assert.match(source, /data-ticket-align=\\"center\\"/);
-  assert.match(source, /data-ticket-align=.*right/);
-  assert.match(source, /style\.setProperty\("text-align", alignment, "important"\)/);
-  assert.match(source, /data-rendered-ticket-align/);
+  assert.match(source, /normalizeTicketRichTextBlocks/);
+  assert.match(richText, /data-ticket-align/);
+  assert.match(richText, /style\.setProperty\("text-align", alignment, "important"\)/);
+  assert.match(richText, /data-rendered-ticket-align/);
 });
 
 
