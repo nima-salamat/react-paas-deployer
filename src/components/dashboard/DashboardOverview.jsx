@@ -7,6 +7,7 @@ import VolumeIcon from "../VolumeIcon.jsx";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
@@ -21,7 +22,7 @@ import { TICKETS_API, unwrapList } from "../tickets/api.js";
 const QUICK_LINKS = [
   ["Services", "/dashboard/services", MiscellaneousServicesOutlinedIcon],
   ["App Library", "/dashboard/ready-apps", AppsOutlinedIcon],
-  ["Deployed Apps", "/dashboard/ready-apps/installations", AppsOutlinedIcon],
+  ["Deployed Apps", "/dashboard/ready-apps/installations", Inventory2OutlinedIcon],
   ["Networks", "/dashboard/networks", HubIcon],
   ["Volumes", "/dashboard/volumes", VolumeIcon],
   ["Tickets", "/dashboard/tickets", ConfirmationNumberOutlinedIcon],
