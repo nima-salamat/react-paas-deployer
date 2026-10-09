@@ -6,17 +6,17 @@ import {
 } from "@mui/material";
 import {
   Visibility, VisibilityOff, ContentCopy, Refresh as RefreshIcon,
-  Storage as StorageIcon, VpnKey as VpnKeyIcon, Terminal as TerminalIcon, Memory as MemoryIcon,
+  VpnKey as VpnKeyIcon, Terminal as TerminalIcon,
 } from "@mui/icons-material";
 import { formatDate, parseDeployConfig, isDbPlatform, buildConnectionString, buildConnectionHints } from "../utils";
 import { DEPLOY_BASE } from "../constants";
 import apiRequest from "../../customHooks/apiRequest";
 import { getApiErrorMessage } from "../errorUtils";
 import DnsIcon from "@mui/icons-material/Dns";
-import SpeedIcon from "@mui/icons-material/Speed";
+import SellOutlinedIcon from "@mui/icons-material/SellOutlined";
 import HubIcon from "@mui/icons-material/Hub";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
-import DeveloperBoardRoundedIcon from "@mui/icons-material/DeveloperBoardRounded";
+import { LuCpu, LuDatabase, LuHardDrive, LuMemoryStick } from "react-icons/lu";
 
 
 function ResourceMetric({ icon, label, value, unit }) {
@@ -33,7 +33,7 @@ function ResourceMetric({ icon, label, value, unit }) {
 function AttachedVolumes({ volumes }) {
   if (!Array.isArray(volumes) || !volumes.length) return <Typography variant="body2" color="text.secondary">No volumes attached to this service.</Typography>;
   return <Stack spacing={0.8}>{volumes.slice(0, 6).map((v) => <Box key={v.id ?? v.pk ?? v.name} sx={{ p: 1, border: "1px solid", borderColor: "divider", borderRadius: 1.7 }}>
-    <Stack direction="row" spacing={1} alignItems="center"><StorageIcon sx={{ fontSize: 18, color: "text.secondary" }}/><Box sx={{ flex: 1, minWidth: 0 }}>
+    <Stack direction="row" spacing={1} alignItems="center"><LuHardDrive size={18} /><Box sx={{ flex: 1, minWidth: 0 }}>
       <Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name || "Unnamed volume"}</Typography>
       <Typography variant="caption" color="text.secondary">{v.size_mb != null ? v.size_mb + " MB" : "Size unavailable"} · {v.bind || v.default_bind || "Mount path unavailable"}</Typography>
     </Box><Chip size="small" label={String(v.mode || v.default_mode || "rw").toLowerCase()} color={String(v.mode || v.default_mode || "rw").toLowerCase() === "ro" ? "warning" : "success"} variant="outlined" sx={{ height: 22, fontWeight: 700 }}/></Stack>
@@ -309,7 +309,7 @@ function DatabaseCredentialsCard({ selectedDeploy, serviceName, serviceHost }) {
 
   return (
     <SectionCard
-      icon={<StorageIcon color="primary" fontSize="small" />}
+      icon={<LuDatabase size={18} />}
       title="Database credentials"
     >
       {loading && (
@@ -465,14 +465,14 @@ export default function OverviewPanel({
       )}
 
       <SectionCard
-        icon={<SpeedIcon color="primary" fontSize="small" />}
+        icon={<SellOutlinedIcon color="primary" fontSize="small" />}
         title="Plan & resources"
       >
         <Stack spacing={1.5}>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <ResourceMetric icon={<DeveloperBoardRoundedIcon fontSize="small" />} label="CPU" value={planDetail?.max_cpu ?? service?.plan?.max_cpu} unit="vCPU" />
-            <ResourceMetric icon={<MemoryIcon fontSize="small" />} label="RAM" value={planDetail?.max_ram ?? service?.plan?.max_ram} unit="MB" />
-            <ResourceMetric icon={<StorageIcon fontSize="small" />} label="Storage" value={planDetail?.max_storage ?? service?.plan?.max_storage} unit="GB" />
+            <ResourceMetric icon={<LuCpu size={18} />} label="CPU" value={planDetail?.max_cpu ?? service?.plan?.max_cpu} unit="vCPU" />
+            <ResourceMetric icon={<LuMemoryStick size={18} />} label="RAM" value={planDetail?.max_ram ?? service?.plan?.max_ram} unit="MB" />
+            <ResourceMetric icon={<LuHardDrive size={18} />} label="Storage" value={planDetail?.max_storage ?? service?.plan?.max_storage} unit="GB" />
           </Stack>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <InfoRow label="Plan" value={planDetail?.name ?? service?.plan?.name} />
@@ -481,7 +481,7 @@ export default function OverviewPanel({
           </Stack>
         </Stack>
       </SectionCard>
-      <SectionCard icon={<StorageIcon color="primary" fontSize="small" />} title="Attached volumes">
+      <SectionCard icon={<LuHardDrive size={18} />} title="Attached volumes">
         <AttachedVolumes volumes={attachedVolumes} />
       </SectionCard>
 
