@@ -1186,6 +1186,7 @@ export default function Home() {
               display: "grid",
               position: "relative",
               gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", md: "repeat(4, minmax(0, 1fr))" },
+              gridTemplateRows: { xs: "repeat(2, minmax(0, 1fr))", md: "none" },
               columnGap: 0,
               rowGap: 0,
             }}
