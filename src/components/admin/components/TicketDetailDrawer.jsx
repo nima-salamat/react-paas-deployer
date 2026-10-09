@@ -55,7 +55,11 @@ export default function TicketDetailDrawer({
       if (firstUnread) {
         const el = root.querySelector(`[data-msg-id="${firstUnread.id}"]`);
         if (el) {
-          el.scrollIntoView({ block: "center", behavior: "smooth" });
+          const messageTop = el.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop;
+          root.scrollTo({
+            top: Math.max(0, messageTop - (root.clientHeight - el.clientHeight) / 2),
+            behavior: "smooth",
+          });
           return;
         }
       }
