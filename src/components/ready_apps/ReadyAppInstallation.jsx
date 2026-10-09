@@ -77,6 +77,7 @@ export default function ReadyAppInstallation() {
   const location = useLocation();
   const installationPath = `/dashboard/ready-apps/installations/${encodeURIComponent(id)}`;
   const locationPathRef = useRef(location.pathname);
+  const cleanupDeleteTargetRef = useRef(null);
   locationPathRef.current = location.pathname;
   const [installation, setInstallation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -108,6 +109,7 @@ export default function ReadyAppInstallation() {
             Array.isArray(response.data?.services) &&
             response.data.services.length > 0);
         setCleanupDeletePending(cleanupPending);
+        cleanupDeleteTargetRef.current = cleanupPending ? String(id) : null;
         setPolling(
           !cleanupPending &&
           (!["running", "failed"].includes(nextStatus) &&
@@ -126,7 +128,7 @@ export default function ReadyAppInstallation() {
   }, [id]);
 
   useEffect(() => {
-    if (!cleanupDeletePending || !id || location.pathname !== installationPath) return undefined;
+    if (!cleanupDeletePending || !id || String(cleanupDeleteTargetRef.current) !== String(id) || location.pathname !== installationPath) return undefined;
     let active = true;
 
     const refreshDeleteStatus = async () => {
@@ -154,6 +156,7 @@ export default function ReadyAppInstallation() {
           const services = Array.isArray(current?.services) ? current.services : [];
           if (status === "cancelled" && services.length === 0) {
             setCleanupDeletePending(false);
+            cleanupDeleteTargetRef.current = null;
             if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
           }
         }
@@ -162,6 +165,7 @@ export default function ReadyAppInstallation() {
         const statusCode = err?.response?.status;
         if (statusCode === 404) {
           setCleanupDeletePending(false);
+          cleanupDeleteTargetRef.current = null;
           if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
           return;
         }
@@ -240,6 +244,7 @@ export default function ReadyAppInstallation() {
   };
 
   const deleteInstallation = async () => {
+    cleanupDeleteTargetRef.current = String(id);
     setDeleting(true);
     setError("");
     setActionDialog(null);
