@@ -31,7 +31,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import { resolveServiceKind, resolveUsage, getKey } from "./helpers";
-import PlatformIcon from "../../plans/PlatformIcon.jsx";
+import ServicePlatformBadge from "../ServicePlatformBadge.jsx";
 import UsageBar from "./UsageBar";
 
 function ServiceItem({
@@ -97,29 +97,13 @@ function ServiceItem({
     usage.ram == null && (!statusEntry || statusEntry.loading);
 
   const kindChip = (
-    <Stack
-      direction="row"
-      spacing={0.6}
-      alignItems="center"
-      sx={{
-        px: 0.7,
-        py: 0.35,
-        borderRadius: 1.4,
-        border: "1px solid",
-        borderColor: isCatalogManaged ? "secondary.light" : isDb ? "info.light" : "divider",
-        bgcolor: (t) => isCatalogManaged ? alpha(t.palette.secondary.main, t.palette.mode === "dark" ? 0.14 : 0.07) : isDb ? alpha(t.palette.info.main, t.palette.mode === "dark" ? 0.14 : 0.07) : "action.hover",
-      }}
-    >
-      <PlatformIcon platformKey={platformLabel} label={platformLabel || (isDb ? "database" : "application")} size={15} />
-      <Box sx={{ minWidth: 0 }}>
-        <Typography variant="caption" sx={{ display: "block", lineHeight: 1, fontWeight: 800, color: isCatalogManaged ? "secondary.main" : isDb ? "info.main" : "primary.main" }}>
-          {isCatalogManaged ? "Ready App" : isDb ? "Database" : "Application"}
-        </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", lineHeight: 1, textTransform: "capitalize" }}>
-          {isCatalogManaged ? catalogLabel : platformLabel || "Unknown platform"}
-        </Typography>
-      </Box>
-    </Stack>
+    <ServicePlatformBadge
+      platformKey={platformLabel || (isDb ? "database" : "application")}
+      typeLabel={isCatalogManaged ? "Ready App" : isDb ? "Database" : "Application"}
+      platformLabel={isCatalogManaged ? catalogLabel : platformLabel || "Unknown platform"}
+      isDatabase={isDb}
+      isReadyApp={isCatalogManaged}
+    />
   );
 
   const metaChips = (
@@ -427,36 +411,53 @@ function ServiceItem({
           alignItems={{ xs: "stretch", md: "center" }}
         >
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="subtitle1" fontWeight={800} sx={{ lineHeight: 1.25 }}>
-                {s.name || "(no name)"}
-              </Typography>
+            <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: 0 }}>
               {kindChip}
-              {shareMeta?.isReceived && (
-                <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
-              )}
-              {shareMeta?.adminOnly && (
-                <Chip size="small" color="warning" variant="outlined" label="Admins only" sx={{ fontWeight: 700, height: 22 }} />
-              )}
-              {shareMeta?.preset && (
-                <Chip size="small" variant="outlined" label={shareMeta.preset} sx={{ fontWeight: 700, height: 22 }} />
-              )}
-              {shareMeta?.isOwnerShare && (
-                <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
-              )}
-              <Chip
-                label={s.status ?? "unknown"}
-                color={statusColor}
-                size="small"
-                sx={{ fontWeight: 700, height: 22 }}
-              />
+              <Box sx={{ flex: 1, minWidth: 0, textAlign: "right" }}>
+                <Typography
+                  variant="subtitle1"
+                  title={s.name || "(no name)"}
+                  fontWeight={800}
+                  sx={{
+                    lineHeight: 1.25,
+                    minHeight: 40,
+                    overflowWrap: "anywhere",
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                    WebkitLineClamp: 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  {s.name || "(no name)"}
+                </Typography>
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end" alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                  {shareMeta?.isReceived && (
+                    <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
+                  )}
+                  {shareMeta?.adminOnly && (
+                    <Chip size="small" color="warning" variant="outlined" label="Admins only" sx={{ fontWeight: 700, height: 22 }} />
+                  )}
+                  {shareMeta?.preset && (
+                    <Chip size="small" variant="outlined" label={shareMeta.preset} sx={{ fontWeight: 700, height: 22 }} />
+                  )}
+                  {shareMeta?.isOwnerShare && (
+                    <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
+                  )}
+                  <Chip
+                    label={s.status ?? "unknown"}
+                    color={statusColor}
+                    size="small"
+                    sx={{ fontWeight: 700, height: 22 }}
+                  />
+                </Stack>
+              </Box>
             </Stack>
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.35 }}
+              sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.5, mt: 0.65, textAlign: "right", overflowWrap: "anywhere" }}
             >
-              <HubIcon sx={{ fontSize: 14 }} /> {networkName}
+              <HubIcon sx={{ fontSize: 14, flexShrink: 0 }} /> {networkName}
             </Typography>
             {metaChips}
             {usageBars}
@@ -502,67 +503,46 @@ function ServiceItem({
         }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-          <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: 0, flex: 1 }}>
-            <Box
+          {kindChip}
+          <Box sx={{ minWidth: 0, flex: 1, textAlign: "right" }}>
+            <Typography
+              variant="subtitle1"
+              title={s.name || "(no name)"}
+              fontWeight={800}
               sx={{
-                width: 36,
-                height: 36,
-                borderRadius: 1.5,
-                display: "grid",
-                placeItems: "center",
-                flexShrink: 0,
-                bgcolor: (t) =>
-                  isDb
-                    ? t.palette.mode === "dark"
-                      ? "rgba(6,182,212,0.2)"
-                      : "rgba(6,182,212,0.12)"
-                    : t.palette.mode === "dark"
-                    ? "rgba(99,102,241,0.2)"
-                    : "rgba(99,102,241,0.1)",
-                color: isDb ? "info.main" : "primary.main",
+                lineHeight: 1.25,
+                minHeight: 40,
+                overflowWrap: "anywhere",
+                display: "-webkit-box",
+                WebkitBoxOrient: "vertical",
+                WebkitLineClamp: 2,
+                overflow: "hidden",
               }}
             >
-              {isDb ? (
-                <LuDatabase size={20} />
-              ) : (
-                <AppsIcon sx={{ fontSize: 20 }} />
+              {s.name || "(no name)"}
+            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+              {shareMeta?.isReceived && (
+                <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
               )}
-            </Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography
-                variant="subtitle1"
-                fontWeight={800}
-                sx={{
-                  lineHeight: 1.25,
-                  wordBreak: "break-word",
-                }}
-              >
-                {s.name || "(no name)"}
-              </Typography>
-              <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-                {kindChip}
-                {shareMeta?.isReceived && (
-                  <Chip size="small" color="secondary" label={shareMeta.label || "Shared"} sx={{ fontWeight: 700, height: 22 }} />
-                )}
-                {shareMeta?.isOwnerShare && (
-                  <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
-                )}
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: "inline-flex", alignItems: "center", gap: 0.35 }}
-                >
-                  <HubIcon sx={{ fontSize: 13 }} /> {networkName}
-                </Typography>
-              </Stack>
-            </Box>
-          </Stack>
-          <Chip
-            label={s.status ?? "unknown"}
-            color={statusColor}
-            size="small"
-            sx={{ fontWeight: 700, height: 22, flexShrink: 0 }}
-          />
+              {shareMeta?.isOwnerShare && (
+                <Chip size="small" color="info" variant="outlined" label="I shared" sx={{ fontWeight: 700, height: 22 }} />
+              )}
+              <Chip
+                label={s.status ?? "unknown"}
+                color={statusColor}
+                size="small"
+                sx={{ fontWeight: 700, height: 22, flexShrink: 0 }}
+              />
+            </Stack>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 0.35, mt: 0.6, overflowWrap: "anywhere" }}
+            >
+              <HubIcon sx={{ fontSize: 13, flexShrink: 0 }} /> {networkName}
+            </Typography>
+          </Box>
         </Stack>
 
         {metaChips}
