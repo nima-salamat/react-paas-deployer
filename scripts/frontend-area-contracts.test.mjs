@@ -205,3 +205,63 @@ test("Ready App cleanup only redirects while its detail route is still active", 
   assert.match(source, /location\.pathname !== installationPath/);
   assert.match(source, /locationPathRef\.current === installationPath\) navigate/);
 });
+
+test("Home Ready Apps uses authentic local brand marks and keeps mobile copy visible", () => {
+  const home = read("src/components/home/home.jsx");
+  const logoPaths = [
+    "ready-app-wordpress.svg",
+    "ready-app-n8n.svg",
+    "ready-app-mattermost.svg",
+    "ready-app-synapse.svg",
+    "ready-app-uptime-kuma.svg",
+    "ready-app-forgejo.svg",
+  ];
+
+  for (const logoPath of logoPaths) {
+    assert.ok(home.includes(logoPath), "Missing local Ready App brand mark: " + logoPath);
+    const icon = read("src/assets/home/" + logoPath);
+    assert.match(icon, /<title>/);
+    assert.match(icon, /fill="#[0-9A-Fa-f]{6}"/);
+    assert.match(icon, /<path\s+d=/);
+  }
+
+  assert.match(home, /FEATURED_READY_APPS\.map\(/);
+  assert.match(home, /initial=\{reduceMotion \|\| !isMdUp \? "show" : "hidden"\}/);
+});
+
+test("About page fills its Ready Apps visual section with branded marks and responsive columns", () => {
+  const about = read("src/components/aboutUs/aboutUs.jsx");
+
+  assert.match(about, /ABOUT_READY_APPS/);
+  assert.match(about, /ABOUT_READY_APPS\.map/);
+  for (const logo of [
+    "ready-app-wordpress.svg",
+    "ready-app-n8n.svg",
+    "ready-app-mattermost.svg",
+    "ready-app-synapse.svg",
+    "ready-app-uptime-kuma.svg",
+    "ready-app-forgejo.svg",
+  ]) {
+    assert.ok(about.includes(logo), "About page does not use " + logo);
+  }
+  assert.match(about, /gridTemplateColumns: \{ xs: "minmax\(0, 1fr\)", md:/);
+  assert.match(about, /component="img"/);
+});
+
+test("dashboard shell and workspace header support narrow viewports consistently", () => {
+  const shell = read("src/components/dashboard/Dashboard.jsx");
+  const navbar = read("src/components/dashboard/DashboardNavbar.jsx");
+  const sidebar = read("src/components/dashboard/DashboardSidebar.jsx");
+  const volumes = read("src/components/volumes/Volumes.jsx");
+  const networks = read("src/components/networks/Networks.jsx");
+
+  assert.match(shell, /overflowX: \{ xs: "clip", md: "visible" \}/);
+  assert.match(shell, /"& \.MuiTableContainer-root": \{ maxWidth: "100%", overflowX: "auto" \}/);
+  assert.match(navbar, /return "App Library"/);
+  assert.match(navbar, /return "Deployed Apps"/);
+  assert.match(navbar, /return "Agents"/);
+  assert.match(sidebar, /aria-label="Close dashboard menu"/);
+  assert.match(volumes, /borderRadius: 1\.75/);
+  assert.match(networks, /borderRadius: 1\.75/);
+});
+
