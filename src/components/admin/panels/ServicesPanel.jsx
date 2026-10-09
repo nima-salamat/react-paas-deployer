@@ -254,7 +254,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
     svcList.forEach((s) => {
       const st = String(s.status || "").toLowerCase();
       if (st === "running") counts.running++;
-      else if (st === "failed") counts.failed++;
+      else if (st === "failed" || st === "error") counts.failed++;
       else counts.other++;
     });
     return { ...counts, total: svcCount };

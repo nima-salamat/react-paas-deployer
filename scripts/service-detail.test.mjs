@@ -445,4 +445,5 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.doesNotMatch(adminServiceDrawer, /StorageIcon/);
   assert.match(adminServiceDrawer, /\["failed", "error"\]\.includes\(String\(svcDetail\.status \|\| ""\)\.toLowerCase\(\)\)/);
   assert.match(adminServicesPanel, /error: "error"/);
+  assert.match(adminServicesPanel, /st === "failed" \|\| st === "error"/);
 });
