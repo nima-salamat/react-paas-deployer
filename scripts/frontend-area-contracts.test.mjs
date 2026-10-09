@@ -235,7 +235,7 @@ test("About page fills its Ready Apps visual section with branded marks and resp
   const visualStart = about.indexOf("function ArchitectureVisual(", surfaceStart);
   const surfaceComponent = about.slice(surfaceStart, visualStart);
   assert.ok(surfaceStart >= 0 && visualStart > surfaceStart, "About Surface component must be present");
-  assert.match(surfaceComponent, /<Paper[\\s\\S]*>\\s*\\{children\\}\\s*<\\/Paper>/);
+  assert.match(surfaceComponent, /<Paper[\s\S]*>\s*\{children\}\s*<\/Paper>/);
 
   assert.match(about, /ABOUT_READY_APPS/);
   assert.match(about, /ABOUT_READY_APPS\.map/);
