@@ -57,58 +57,53 @@ function setListItemDirectionForMarker(item, alignment) {
   item.style.setProperty("list-style-position", alignment === "right" ? "inside" : "outside");
 }
 
+export function resolveTicketListLayout(listAlignment, itemAlignments = []) {
+  const explicitAlignment = EXPLICIT_ALIGNMENTS.has(listAlignment) ? listAlignment : "";
+  const allItemsShareAlignment = itemAlignments.length > 0
+    && itemAlignments.every((alignment) => EXPLICIT_ALIGNMENTS.has(alignment) && alignment === itemAlignments[0]);
+  const alignment = explicitAlignment || (allItemsShareAlignment ? itemAlignments[0] : "");
+  return {
+    alignment,
+    direction: alignment === "right" ? "rtl" : alignment === "left" ? "ltr" : "",
+    listStylePosition: alignment === "right" || alignment === "center"
+      ? "inside"
+      : alignment === "left"
+        ? "outside"
+        : "mixed",
+  };
+}
+
 function normalizeList(list) {
   const directItems = Array.from(list.children).filter((child) => child.tagName === "LI");
   const listAlignment = getTicketBlockAlignment(list);
   const itemAlignments = directItems.map(getTicketBlockAlignment);
-  const allItemsShareAlignment = itemAlignments.length > 0
-    && itemAlignments.every((alignment) => Boolean(alignment) && alignment === itemAlignments[0]);
-  const effectiveAlignment = listAlignment || (allItemsShareAlignment ? itemAlignments[0] : "");
+  const layout = resolveTicketListLayout(listAlignment, itemAlignments);
 
-  if (effectiveAlignment) {
-    list.style.setProperty("text-align", effectiveAlignment, "important");
-    list.setAttribute("data-rendered-ticket-align", effectiveAlignment);
+  if (layout.alignment) {
+    list.style.setProperty("text-align", layout.alignment, "important");
+    list.setAttribute("data-rendered-ticket-align", layout.alignment);
   }
 
-  if (effectiveAlignment === "right") {
-    // Keep the marker on the right, while plaintext bidi handles line content.
-    list.style.setProperty("direction", "rtl", "important");
-    list.style.setProperty("list-style-position", "inside");
-    directItems.forEach((item) => {
-      const itemDirection = item.getAttribute("dir")?.trim().toLowerCase();
-      if (!EXPLICIT_DIRECTIONS.has(itemDirection)) {
-        item.style.setProperty("direction", "rtl", "important");
-        item.style.setProperty("unicode-bidi", "plaintext");
-      }
-      item.style.setProperty("list-style-position", "inside");
-    });
-    return;
+  if (layout.direction) {
+    // The list controls marker-side layout; each item uses plaintext bidi so
+    // mixed Persian/Latin content keeps its own natural direction.
+    list.style.setProperty("direction", layout.direction, "important");
+  }
+  if (layout.listStylePosition !== "mixed") {
+    list.style.setProperty("list-style-position", layout.listStylePosition);
   }
 
-  if (effectiveAlignment === "left") {
-    list.style.setProperty("direction", "ltr", "important");
-    list.style.setProperty("list-style-position", "outside");
-    directItems.forEach((item) => {
-      const itemDirection = item.getAttribute("dir")?.trim().toLowerCase();
-      if (!EXPLICIT_DIRECTIONS.has(itemDirection)) {
-        item.style.setProperty("direction", "ltr", "important");
-        item.style.setProperty("unicode-bidi", "plaintext");
-      }
-      item.style.setProperty("list-style-position", "outside");
-    });
-    return;
-  }
+  directItems.forEach((item, index) => {
+    const itemDirection = item.getAttribute("dir")?.trim().toLowerCase();
+    const itemAlignment = itemAlignments[index];
+    const effectiveItemAlignment = itemAlignment || layout.alignment;
 
-  if (effectiveAlignment === "center") {
-    list.style.setProperty("list-style-position", "inside");
-    directItems.forEach((item) => item.style.setProperty("list-style-position", "inside"));
-    return;
-  }
-
-  // Mixed lists can align individual lines differently without forcing all
-  // list markers to the same side.
-  directItems.forEach((item) => {
-    setListItemDirectionForMarker(item, getTicketBlockAlignment(item));
+    // An explicit alignment on an LI wins over a list-level/default alignment.
+    if (!EXPLICIT_DIRECTIONS.has(itemDirection)) {
+      setListItemDirectionForMarker(item, effectiveItemAlignment);
+    } else {
+      item.style.setProperty("list-style-position", itemDirection === "rtl" ? "inside" : "outside");
+    }
   });
 }
 
