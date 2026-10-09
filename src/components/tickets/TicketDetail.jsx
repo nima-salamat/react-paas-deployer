@@ -27,7 +27,6 @@ export default function TicketDetail() {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState([]);
-  const bottomRef = useRef(null);
   const listRef = useRef(null);
 
   const applySeenLocal = useCallback((ids, at) => {
@@ -124,7 +123,11 @@ export default function TicketDetail() {
   }, [connected, load]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const list = listRef.current;
+    if (!list) return;
+    // Scroll only the message history. scrollIntoView on a sentinel can move
+    // the whole dashboard and pull the header/composer against the viewport.
+    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
   }, [ticket?.messages?.length]);
 
   const sendReply = async (bodyOverride) => {
@@ -206,6 +209,8 @@ export default function TicketDetail() {
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
+        boxSizing: "border-box",
+        pb: "calc(12px + env(safe-area-inset-bottom, 0px))",
         bgcolor: "background.default",
       }}
     >
@@ -259,21 +264,22 @@ export default function TicketDetail() {
           const mine = userId != null && m.author?.id != null && String(m.author.id) === String(userId);
           return <MessageBubble key={m.id} message={m} mine={mine} />;
         })}
-        <div ref={bottomRef} />
       </Box>
 
       {/* Composer */}
       {ticket.status === "closed" ? (
-        <Alert severity="info" sx={{ borderRadius: 0 }}>This ticket is closed.</Alert>
+        <Alert severity="info" sx={{ borderRadius: 2, mx: { xs: 1, sm: 1.5 }, mt: 1, flexShrink: 0 }}>This ticket is closed.</Alert>
       ) : (
-        <ChatComposer
-          value={reply}
-          onChange={setReply}
-          files={files}
-          onFilesChange={setFiles}
-          onSend={sendReply}
-          sending={sending}
-        />
+        <Box sx={{ flexShrink: 0, mx: { xs: 1, sm: 1.5 }, mt: 1 }}>
+          <ChatComposer
+            value={reply}
+            onChange={setReply}
+            files={files}
+            onFilesChange={setFiles}
+            onSend={sendReply}
+            sending={sending}
+          />
+        </Box>
       )}
     </Box>
   );
