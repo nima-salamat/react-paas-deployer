@@ -31,7 +31,7 @@ const QUICK_LINKS = [
   ["Profile", "/dashboard/profile", PersonOutlineOutlinedIcon],
 ];
 
-const STATUS_LABELS = { running: "Running", stopped: "Stopped", failed: "Failed", queued: "Queued", deploying: "Deploying", stopping: "Stopping", pending: "Pending", succeeded: "Succeeded" };
+const STATUS_LABELS = { running: "Running", stopped: "Stopped", failed: "Failed", error: "Failed", queued: "Queued", deploying: "Deploying", stopping: "Stopping", pending: "Pending", succeeded: "Succeeded" };
 const dateLabel = (v) => { const d = new Date(v || 0); return Number.isNaN(d.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d); };
 
 function StatCard({ icon, label, value, tone = "primary" }) {
@@ -51,7 +51,7 @@ function ServiceMini({ service }) {
   return <Button component={RouterLink} to={"/dashboard/services/" + id} sx={{ justifyContent: "flex-start", textAlign: "left", px: 1, py: 0.8, borderRadius: 1.5, color: "text.primary", minWidth: 0, "&:hover": { bgcolor: "action.hover" } }}>
     <PlatformIcon platformKey={platform} label={platform || kind} size={17} />
     <Box sx={{ ml: 1, minWidth: 0, flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{service?.name || "(no name)"}</Typography>
-      <Stack direction="row" spacing={0.7} alignItems="center"><Typography variant="caption" color="text.secondary">{kind === "db" ? "Database" : "Application"}</Typography><Chip size="small" label={STATUS_LABELS[status] || status || "Unknown"} color={status === "running" ? "success" : status === "failed" ? "error" : "default"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /></Stack>
+      <Stack direction="row" spacing={0.7} alignItems="center"><Typography variant="caption" color="text.secondary">{kind === "db" ? "Database" : "Application"}</Typography><Chip size="small" label={STATUS_LABELS[status] || status || "Unknown"} color={status === "running" ? "success" : ["failed", "error"].includes(status) ? "error" : "default"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /></Stack>
     </Box><LaunchRoundedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
   </Button>;
 }

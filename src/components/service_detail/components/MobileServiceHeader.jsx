@@ -57,8 +57,10 @@ export default function MobileServiceHeader({
     serviceRunning === true ||
     ["running", "success"].includes(String(service?.status || ""))
       ? "success"
-      : ["queued", "deploying", "stopping"].includes(String(service?.status || ""))
+      : ["queued", "deploying", "stopping"].includes(String(service?.status || "").toLowerCase())
       ? "warning"
+      : ["failed", "error"].includes(String(service?.status || "").toLowerCase())
+      ? "error"
       : "default";
 
   const handleCopy = useCallback(async () => {

@@ -374,6 +374,8 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   const serviceItem = read("src/components/service/services/ServiceItem.jsx");
   const globalControls = read("src/components/service_detail/components/GlobalServiceControls.jsx");
   const mobileHeader = read("src/components/service_detail/components/MobileServiceHeader.jsx");
+  const mobileNavFab = read("src/components/service_detail/components/MobileNavFab.jsx");
+  const deleteDialog = read("src/components/service/services/ServiceDeleteDialog.jsx");
   const wizard = read("src/components/plans/CreateDeploymentModal.jsx");
   const networks = read("src/components/networks/Networks.jsx");
   const sidebar = read("src/components/dashboard/DashboardSidebar.jsx");
@@ -406,6 +408,11 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(globalControls, /gridTemplateAreas: '"badge title status"'/);
   assert.match(globalControls, /textAlign: "left"/);
   assert.match(mobileHeader, /textAlign: "left"/);
+  assert.match(mobileHeader, /\["failed", "error"\]\.includes/);
+  assert.match(mobileNavFab, /\["failed", "error"\]\.includes/);
+  assert.match(deleteDialog, /\["failed", "error"\]\.includes\(status\)/);
+  assert.match(dashboardOverview, /error: "Failed"/);
+  assert.match(dashboardOverview, /\["failed", "error"\]\.includes\(status\)/);
   assert.match(toolbar, /gridTemplateColumns:[\s\S]*minmax\(220px, 1fr\)/);
   assert.match(toolbar, /WidgetsOutlinedIcon/);
   assert.match(toolbar, /startIcon={<AppsOutlinedIcon/);

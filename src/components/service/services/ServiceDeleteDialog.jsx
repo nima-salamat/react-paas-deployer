@@ -109,7 +109,7 @@ export default function ServiceDeleteDialog({
               <Chip
                 size="small"
                 label={status}
-                color={status === "running" ? "success" : busy ? "warning" : "default"}
+                color={status === "running" ? "success" : busy ? "warning" : ["failed", "error"].includes(status) ? "error" : "default"}
                 sx={{ fontWeight: 750, textTransform: "capitalize" }}
               />
             </Stack>
