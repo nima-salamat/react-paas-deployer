@@ -115,12 +115,12 @@ function ResourceRow({ icon, label, value }) {
 }
 
 function DynamicField({ field, value, onChange, config }) {
+  const [showSecret, setShowSecret] = useState(false);
   if (!fieldVisible(field, config) || field?.user_editable === false) return null;
   const id = String(field.id);
   const type = String(field.type || "string");
   const label = String(field.label || id);
   const required = Boolean(field.required);
-  const [showSecret, setShowSecret] = useState(false);
 
   if (type === "boolean") {
     return (
