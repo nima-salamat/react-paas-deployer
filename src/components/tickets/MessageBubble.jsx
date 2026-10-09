@@ -758,7 +758,7 @@ function MessageBubble({
               whiteSpace: "normal",
               overflowWrap: "anywhere",
               wordBreak: "normal",
-              maxWidth: "min(68ch, 100%)",
+              maxWidth: hasCodeBlock ? "100%" : "min(68ch, 100%)",
               "& p, & li, & blockquote, & h1, & h2, & h3, & h4": {
                 fontSize: "14px",
                 maxWidth: "min(68ch, 100%)",
