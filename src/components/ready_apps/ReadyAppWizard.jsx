@@ -81,10 +81,12 @@ function fieldVisible(field, config) {
 }
 
 function isOptionalAdvancedField(field) {
-  return field.ui?.advanced === true || (
-    field.ui?.advanced !== false &&
-    !field.required &&
-    Object.prototype.hasOwnProperty.call(field, "default")
+  return !field.required && (
+    field.ui?.advanced === true ||
+    (
+      field.ui?.advanced !== false &&
+      Object.prototype.hasOwnProperty.call(field, "default")
+    )
   );
 }
 
