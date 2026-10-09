@@ -375,9 +375,12 @@ export default function CreateServiceWizard({
    * (no /attach/ endpoint required).
    */
   const attachVolumesToService = async (serviceId) => {
-    if (!selectedVolumeIds.length || !serviceId) return { ok: 0, fail: 0 };
+    if (!selectedVolumeIds.length || !serviceId) {
+      return { ok: 0, fail: 0, failedIds: [] };
+    }
     let ok = 0;
     let fail = 0;
+    const failedIds = [];
     for (const vid of selectedVolumeIds) {
       try {
         await apiRequest({
@@ -388,6 +391,7 @@ export default function CreateServiceWizard({
         ok += 1;
       } catch (err) {
         fail += 1;
+        failedIds.push(vid);
         console.warn("attach volume failed", vid, err?.response?.data || err);
       }
     }
