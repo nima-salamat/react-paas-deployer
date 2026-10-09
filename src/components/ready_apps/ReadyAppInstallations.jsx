@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -220,6 +220,12 @@ export default function ReadyAppInstallations() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const load = useCallback(async (background = false) => {
     if (background) setRefreshing(true);
@@ -230,19 +236,24 @@ export default function ReadyAppInstallations() {
         apiRequest({ method: "GET", url: ROOT + "/installations/" }),
         apiRequest({ method: "GET", url: ROOT + "/apps/" }),
       ]);
+      if (!mountedRef.current) return;
       setInstallations(listFrom(installationResponse.data));
       setApps(listFrom(appResponse.data));
     } catch (err) {
-      setError(
-        String(
-          err?.response?.data?.detail ||
-            err?.response?.data?.error ||
-            "Couldn't load deployed apps."
-        )
-      );
+      if (mountedRef.current) {
+        setError(
+          String(
+            err?.response?.data?.detail ||
+              err?.response?.data?.error ||
+              "Couldn't load deployed apps."
+          )
+        );
+      }
     } finally {
-      if (background) setRefreshing(false);
-      else setLoading(false);
+      if (mountedRef.current) {
+        if (background) setRefreshing(false);
+        else setLoading(false);
+      }
     }
   }, []);
 
