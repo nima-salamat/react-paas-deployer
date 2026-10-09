@@ -72,7 +72,7 @@ test("CPU and RAM metrics use distinct, semantically correct icons in Services a
   const plans = read("src/components/plans/plans.jsx");
 
   for (const source of [serviceItem, plans]) {
-    assert.match(source, /import \{ LuCpu, LuMemoryStick \} from "react-icons\/lu"/);
+    assert.match(source, /import \{[^}]*\bLuCpu\b[^}]*\bLuMemoryStick\b[^}]*\} from "react-icons\/lu"/);
     assert.match(source, /LuCpu size=\{/);
     assert.match(source, /LuMemoryStick size=\{/);
     assert.doesNotMatch(source, /Computer(?:Rounded)?Icon/);
