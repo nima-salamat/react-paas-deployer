@@ -34,6 +34,7 @@ import HubIcon from "@mui/icons-material/Hub";
 import DnsIcon from "@mui/icons-material/Dns";
 import StorageIcon from "@mui/icons-material/Storage";
 import SpeedIcon from "@mui/icons-material/Speed";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import AddIcon from "@mui/icons-material/Add";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import LinkIcon from "@mui/icons-material/Link";
@@ -845,6 +846,8 @@ export default function SettingsPanel({
   deleteServiceLoading = false,
   availablePlans,
   plansLoading,
+  plansError = "",
+  onRefreshPlans,
   selectedPlanId,
   setSelectedPlanId,
   planActionLoading,
@@ -1011,7 +1014,10 @@ export default function SettingsPanel({
   // ── Plan helpers ───────────────────────────────────────────────────────
   const currentPlatform = useMemo(() => {
     const raw = planDetail?.platform ?? service?.plan?.platform ?? service?.plan_detail?.platform ?? "";
-    return String(raw || "").toLowerCase().trim();
+    const normalized = String(raw || "").toLowerCase().trim().replace(/[\s_]+/g, "-");
+    return ["docker-swarm", "swarm", "docker-engine", "docker-engine-swarm"].includes(normalized)
+      ? "docker"
+      : normalized;
   }, [planDetail, service]);
 
   const currentPlanId = useMemo(() => {
@@ -1029,7 +1035,14 @@ export default function SettingsPanel({
   const samePlatformPlans = useMemo(() => {
     if (!Array.isArray(availablePlans)) return [];
     if (!currentPlatform) return availablePlans;
-    return availablePlans.filter((p) => String(p.platform || "").toLowerCase().trim() === currentPlatform);
+    return availablePlans.filter((plan) => {
+      const rawPlatform = String(plan?.platform || "").toLowerCase().trim().replace(/[\s_]+/g, "-");
+      if (!rawPlatform) return true;
+      const platform = ["docker-swarm", "swarm", "docker-engine", "docker-engine-swarm"].includes(rawPlatform)
+        ? "docker"
+        : rawPlatform;
+      return platform === currentPlatform;
+    });
   }, [availablePlans, currentPlatform]);
 
   const currentNetworkId = useMemo(() => {
@@ -1590,14 +1603,40 @@ export default function SettingsPanel({
               ? `Plans for platform "${currentPlatform}". Current plan cannot be re-selected.`
               : "Choose a plan for this service."
           }
+          action={
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<RefreshRoundedIcon />}
+              onClick={() => onRefreshPlans?.()}
+              disabled={plansLoading}
+              sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
+            >
+              {plansLoading ? "Loading…" : "Refresh plans"}
+            </Button>
+          }
         />
+
+        {plansError && (
+          <Alert
+            severity="error"
+            sx={{ mb: 1.5, borderRadius: 1.5 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => onRefreshPlans?.()} disabled={plansLoading}>
+                Retry
+              </Button>
+            }
+          >
+            {plansError}
+          </Alert>
+        )}
 
         {plansLoading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
             <CircularProgress size={28} />
           </Box>
         ) : samePlatformPlans.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No plans available for this platform.</Typography>
+          <Typography variant="body2" color="text.secondary">No plans are available for this platform. Refresh to try again or check that plans are configured for this runtime.</Typography>
         ) : (
           <>
             <Box
