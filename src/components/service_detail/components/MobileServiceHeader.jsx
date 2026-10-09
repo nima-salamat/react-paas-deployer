@@ -14,9 +14,10 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CheckIcon from "@mui/icons-material/Check";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import Inventory2Icon from "@mui/icons-material/Inventory2";
-import StorageIcon from "@mui/icons-material/Storage";
+import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import HubIcon from "@mui/icons-material/Hub";
+import { LuHardDrive } from "react-icons/lu";
+import PlatformIcon from "../../plans/PlatformIcon.jsx";
 
 /**
  * Compact sticky header for mobile — single source of truth for
@@ -28,6 +29,7 @@ export default function MobileServiceHeader({
   selectedDeploy,
   selectedPlatform,
   selectedIsDb,
+  platformKey = "",
   deployCount = 0,
   volumeCount = 0,
   networkName,
@@ -98,6 +100,13 @@ export default function MobileServiceHeader({
         <Stack direction="row" spacing={1} alignItems="flex-start">
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+              {(platformKey || selectedPlatform) ? (
+                <PlatformIcon
+                  platformKey={platformKey || selectedPlatform}
+                  label={platformKey || selectedPlatform}
+                  size={17}
+                />
+              ) : null}
               <Typography
                 variant="subtitle1"
                 sx={{
@@ -176,14 +185,14 @@ export default function MobileServiceHeader({
         <Box sx={{ px: 1.5, pb: 1.5, pt: 0 }}>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
             <Chip
-              icon={<Inventory2Icon sx={{ fontSize: "14px !important" }} />}
+              icon={<RocketLaunchRoundedIcon sx={{ fontSize: "14px !important" }} />}
               label={`${deployCount}`}
               size="small"
               variant="outlined"
               sx={{ height: 24, fontWeight: 600 }}
             />
             <Chip
-              icon={<StorageIcon sx={{ fontSize: "14px !important" }} />}
+              icon={<LuHardDrive size={14} />}
               label={`${volumeCount}`}
               size="small"
               variant="outlined"
