@@ -19,6 +19,7 @@ import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import HourglassTopRoundedIcon from "@mui/icons-material/HourglassTopRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import AppsRoundedIcon from "@mui/icons-material/AppsRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { Link as RouterLink } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 
@@ -75,7 +76,7 @@ function AppMark({ app }) {
       sx={(theme) => ({
         width: 54,
         height: 54,
-        borderRadius: 3,
+        borderRadius: 2.2,
         display: "grid",
         placeItems: "center",
         overflow: "hidden",
@@ -121,7 +122,7 @@ function InstallationCard({ installation, app }) {
     <Card
       variant="outlined"
       sx={(theme) => ({
-        borderRadius: 4,
+        borderRadius: 2.5,
         overflow: "hidden",
         borderColor: alpha(theme.palette.divider, .86),
         transition: "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
@@ -260,6 +261,12 @@ export default function ReadyAppInstallations() {
     return () => window.clearInterval(timer);
   }, [active, load]);
 
+  useEffect(() => {
+    if (!error || loading || refreshing) return undefined;
+    const timer = window.setTimeout(() => load(true), 12000);
+    return () => window.clearTimeout(timer);
+  }, [error, loading, refreshing, load]);
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
       <Stack spacing={3}>
@@ -291,19 +298,34 @@ export default function ReadyAppInstallations() {
             )}
           </Box>
 
-          <Button
-            component={RouterLink}
-            to="/dashboard/ready-apps"
-            variant="contained"
-            startIcon={<AddRoundedIcon />}
-            sx={{ borderRadius: 2.2, px: 1.7, py: 1, fontWeight: 850 }}
-          >
-            Install app
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" flexWrap="wrap">
+            <Button
+              variant="outlined"
+              startIcon={<RefreshRoundedIcon />}
+              onClick={() => load(true)}
+              disabled={loading || refreshing}
+              sx={{ borderRadius: 2, px: 1.5, py: 1, fontWeight: 800 }}
+            >
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/dashboard/ready-apps"
+              variant="contained"
+              startIcon={<AddRoundedIcon />}
+              sx={{ borderRadius: 2, px: 1.7, py: 1, fontWeight: 850 }}
+            >
+              Install app
+            </Button>
+          </Stack>
         </Stack>
 
         {error && (
-          <Alert severity="error" sx={{ borderRadius: 2.5 }}>
+          <Alert
+            severity="error"
+            sx={{ borderRadius: 2.2 }}
+            action={<Button color="inherit" size="small" onClick={() => load(true)} disabled={loading || refreshing}>Retry</Button>}
+          >
             {error}
           </Alert>
         )}
@@ -317,7 +339,7 @@ export default function ReadyAppInstallations() {
             }}
           >
             {Array.from({ length: 6 }).map((_, index) => (
-              <Card key={index} variant="outlined" sx={{ borderRadius: 4, p: 2.4 }}>
+              <Card key={index} variant="outlined" sx={{ borderRadius: 2.5, p: 2.4 }}>
                 <Stack spacing={1.5}>
                   <Skeleton variant="rounded" width={54} height={54} />
                   <Skeleton variant="rounded" width="60%" height={26} />
@@ -326,10 +348,17 @@ export default function ReadyAppInstallations() {
               </Card>
             ))}
           </Box>
+        ) : installations.length === 0 && error ? (
+          <Card variant="outlined" sx={{ borderRadius: 2.5, p: { xs: 3.5, md: 5.5 }, textAlign: "center" }}>
+            <AppsRoundedIcon sx={{ fontSize: 42, color: "text.disabled" }} />
+            <Typography sx={{ mt: 1.4, fontWeight: 900 }}>Deployed apps unavailable</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>We couldn’t retrieve your installations.</Typography>
+            <Button variant="contained" startIcon={<RefreshRoundedIcon />} onClick={() => load(true)} disabled={refreshing} sx={{ mt: 2, borderRadius: 2 }}>Try again</Button>
+          </Card>
         ) : installations.length === 0 ? (
           <Card
             variant="outlined"
-            sx={{ borderRadius: 4, p: { xs: 4, md: 6 }, textAlign: "center" }}
+            sx={{ borderRadius: 2.5, p: { xs: 4, md: 6 }, textAlign: "center" }}
           >
             <AppsRoundedIcon sx={{ fontSize: 44, color: "text.disabled" }} />
             <Typography sx={{ mt: 1.5, fontWeight: 900, fontSize: 19 }}>
