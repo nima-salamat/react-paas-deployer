@@ -590,6 +590,7 @@ function MessageBubble({
     : "";
   // Coerce body to string to avoid "[object Object]" when API returns non-string
   const bodyHtml = normalizeMessageBody(m?.body);
+  const hasCodeBlock = /<pre\b/i.test(bodyHtml);
   const bodyText = bodyHtml.replace(/<[^>]+>/g, "").trim();
   const hasBody = Boolean(bodyText);
   const attachments = m.attachments || [];
@@ -635,9 +636,9 @@ function MessageBubble({
 
       <Box
         sx={{
-          maxWidth: { xs: "calc(100% - 44px)", sm: "74%" },
-          minWidth: 0,
-          width: "fit-content",
+          maxWidth: { xs: "calc(100% - 44px)", sm: "min(74%, 680px)" },
+          minWidth: hasCodeBlock ? { xs: "min(280px, calc(100vw - 92px))", sm: 340 } : 0,
+          width: hasCodeBlock ? { xs: "min(100%, 360px)", sm: "min(100%, 640px)" } : "fit-content",
           maxHeight: "none",
           px: 1.4,
           py: 0.95,
@@ -756,8 +757,12 @@ function MessageBubble({
               overflow: "hidden",
               whiteSpace: "normal",
               overflowWrap: "anywhere",
-              wordBreak: "break-word",
-              "& p, & li, & blockquote": { fontSize: "14px", maxWidth: "100%" },
+              wordBreak: "normal",
+              maxWidth: "min(68ch, 100%)",
+              "& p, & li, & blockquote, & h1, & h2, & h3, & h4": {
+                fontSize: "14px",
+                maxWidth: "min(68ch, 100%)",
+              },
               "& *": { boxSizing: "border-box", maxWidth: "100%" },
               mt: 0.25,
               "& p": { m: 0, mb: 0.5 },
@@ -840,6 +845,10 @@ function MessageBubble({
               },
               "& .ticket-code-shell": {
                 my: 1,
+                width: "100%",
+                minWidth: "100%",
+                maxWidth: "100%",
+                boxSizing: "border-box",
                 borderRadius: 0.75,
                 overflow: "hidden",
                 border: "1px solid",
@@ -883,18 +892,27 @@ function MessageBubble({
                 transform: "translateY(1px)",
               },
               "& .ticket-code-shell pre": {
+                display: "block",
                 m: 0,
                 p: 1.25,
-                overflow: "auto",
+                width: "100%",
+                minWidth: "100%",
+                maxWidth: "100%",
+                boxSizing: "border-box",
                 overflowX: "auto",
                 overflowY: "hidden",
+                overscrollBehaviorX: "contain",
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "thin",
                 fontSize: 12.5,
                 lineHeight: 1.6,
                 whiteSpace: "pre",
-                maxWidth: "100%",
                 bgcolor: "transparent",
               },
               "& .ticket-code-shell code": {
+                display: "block",
+                minWidth: "max-content",
+                maxWidth: "none",
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               },
               "& blockquote": {
