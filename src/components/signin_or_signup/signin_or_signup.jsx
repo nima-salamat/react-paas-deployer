@@ -175,7 +175,6 @@ export default function SigninOrSignup() {
   const handleCredentials = async (e) => {
     e.preventDefault();
     setError("");
-    if (settings.allow_username && !form.username.trim()) return showError("Username is required");
     if (method === "email" && !form.email.trim()) return showError("Email is required");
     if (method === "phone" && !form.phone.trim()) return showError("Phone is required");
     setLoading(true);
@@ -187,7 +186,8 @@ export default function SigninOrSignup() {
       if (next === "done" && res.data.access) completeLogin(res.data.access, res.data.refresh);
       else setStep(next);
     } catch (err) {
-      showError(err.response?.data?.message || err.message || "Failed");
+      const errors = err.response?.data?.errors;
+      showError(err.response?.data?.message || (errors ? JSON.stringify(errors) : err.message || "Failed"));
     } finally { setLoading(false); }
   };
 
