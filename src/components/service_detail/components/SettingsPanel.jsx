@@ -1015,7 +1015,7 @@ export default function SettingsPanel({
         <SectionHeader
           icon={<LuDatabase size={18} />}
           title="Databases"
-          subtitle="Shows databases provided by Ready Apps and optional managed database bindings. Credentials stay in the backend secret store."
+          subtitle="Choose a managed database resource or an existing database service. The backend checks ownership and private-network reachability; credentials stay in the backend secret store."
         />
         {databaseFormError ? <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{databaseFormError}</Alert> : null}
         {databaseLoading ? (
@@ -1068,7 +1068,8 @@ export default function SettingsPanel({
                     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
                       <Typography variant="body2" sx={{ fontWeight: 800 }}>{binding.database_name_runtime || binding.database_name || binding.database}</Typography>
                       {binding.engine ? <Chip size="small" label={binding.engine} color="primary" variant="outlined" sx={{ height: 22 }} /> : null}
-                      {binding.status ? <Chip size="small" label={binding.status} variant="outlined" sx={{ height: 22 }} /> : null}
+                      {binding.status ? <Chip size="small" label={`Resource: ${binding.status}`} variant="outlined" sx={{ height: 22 }} /> : null}
+                      {binding.binding_status === "configured_unverified" ? <Chip size="small" label="Binding saved · not tested" variant="outlined" sx={{ height: 22 }} /> : null}
                     </Stack>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                       {binding.host || "managed"}{binding.port ? `:${binding.port}` : ""} · alias {binding.alias || "default"} · env prefix {binding.env_prefix || "DB"} · {String(binding.access_mode || "rw").toUpperCase()}
@@ -1090,26 +1091,38 @@ export default function SettingsPanel({
             ))}
 
             <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, bgcolor: "background.default" }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Connect a database resource</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Connect a database resource or service</Typography>
               {(databaseResources || []).length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   {catalogDatabaseDependencies.length > 0
-                    ? "The database declared by this Ready App is shown above. No additional managed database resources are available to attach."
-                    : "No managed database resources are available yet. Create/provision a database resource first; Ready App dependencies, when present, are shown separately above."}
+                    ? "The database declared by this Ready App is shown above. No additional managed database resources or regular database services are available to attach."
+                    : "No database resources or database services are available yet. Create a database service or register an external database resource first."}
                 </Typography>
               ) : (
                 <Stack spacing={1.25}>
+                  {(databaseResources || []).some((resource) => resource.resource_type === "database_service" && resource.connectable === false) ? (
+                    <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                      To use an existing database service, attach this service and the database service to the same private network first.
+                    </Alert>
+                  ) : null}
                   <TextField
-                    select fullWidth size="small" label="Database resource"
+                    select fullWidth size="small" label="Database resource or service"
                     value={selectedDatabaseId}
                     onChange={(e) => setSelectedDatabaseId(e.target.value)}
                     disabled={databaseActionLoading || statusBusy}
                   >
-                    {(databaseResources || []).map((resource) => (
-                      <MenuItem value={String(resource.id ?? resource.pk)} key={String(resource.id ?? resource.pk)}>
-                        {resource.name} · {resource.engine} {resource.status ? `· ${resource.status}` : ""}
-                      </MenuItem>
-                    ))}
+                    {(databaseResources || []).map((resource) => {
+                      const resourceId = String(resource.id ?? resource.pk);
+                      const needsNetwork = resource.connectable === false;
+                      const sourceLabel = resource.resource_type === "database_service" ? "existing service" : "managed resource";
+                      return (
+                        <MenuItem value={resourceId} key={resourceId} disabled={needsNetwork}>
+                          {resource.name} · {resource.engine} · {sourceLabel}
+                          {resource.status ? ` · ${resource.status}` : ""}
+                          {needsNetwork ? " · network required" : ""}
+                        </MenuItem>
+                      );
+                    })}
                   </TextField>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                     <TextField size="small" fullWidth label="Alias" value={databaseAlias} onChange={(e) => setDatabaseAlias(e.target.value)} disabled={databaseActionLoading} />
@@ -1137,8 +1150,8 @@ export default function SettingsPanel({
                   </Button>
                 </Stack>
               )}
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                Passwords are never shown here. When a database credential exists, revision compilation stores it as a service secret and injects it only at runtime.
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, lineHeight: 1.6 }}>
+                Passwords are never shown here. Binding records the selected database and prepares its environment variables for the next deployment; it does not test a live connection. Credentials are stored encrypted and injected only at runtime.
               </Typography>
             </Paper>
           </Stack>
