@@ -26,6 +26,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
   const verifierRef = useRef(null);
   const requestRef = useRef(null);
   const sasRef = useRef(null);
+  const attachVerifierRef = useRef(null);
   const onVerifiedRef = useRef(onVerified);
   useEffect(() => { onVerifiedRef.current = onVerified; }, [onVerified]);
 
@@ -58,6 +59,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
         setError(err?.message || "Device verification did not complete.");
       });
     };
+    attachVerifierRef.current = attachVerifier;
     const onRequestChange = () => {
       if (cancelled || !activeRequest) return;
       setPhase((current) => (
@@ -106,10 +108,16 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
 
     return () => {
       cancelled = true;
-      if (activeRequest) activeRequest.off(VerificationRequestEvent.Change, onRequestChange);
+      if (activeRequest) {
+        activeRequest.off(VerificationRequestEvent.Change, onRequestChange);
+        if (activeRequest.pending) {
+          void activeRequest.cancel({ reason: "Verification dialog closed" }).catch(() => {});
+        }
+      }
       requestRef.current = null;
       verifierRef.current = null;
       sasRef.current = null;
+      attachVerifierRef.current = null;
     };
   }, [open]);
 
@@ -120,22 +128,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
     setError("");
     try {
       const verifier = activeRequest.verifier || await activeRequest.startVerification("m.sas.v1");
-      if (verifier) {
-        verifierRef.current = verifier;
-        verifier.on(VerifierEvent.ShowSas, (sas) => {
-          sasRef.current = sas;
-          setSasCallbacks(sas);
-          setPhase("compare");
-        });
-        void verifier.verify().then(() => {
-          setPhase("verified");
-          setSuccess(true);
-          onVerifiedRef.current?.();
-        }).catch((err) => {
-          setPhase("cancelled");
-          setError(err?.message || "Device verification did not complete.");
-        });
-      }
+      attachVerifierRef.current?.(verifier);
     } catch (err) {
       setError(err?.message || "Could not start emoji verification.");
     } finally {
