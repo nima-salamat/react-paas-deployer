@@ -2033,6 +2033,12 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
               setSelectedPlanId={setSelectedPlanId}
               planActionLoading={planActionLoading}
               onApplyPlan={handleApplyPlan}
+              databaseBindings={databaseBindings}
+              databaseResources={databaseResources}
+              databaseLoading={databaseLoading}
+              databaseActionLoading={databaseActionLoading}
+              onBindDatabase={handleBindDatabase}
+              onUnbindDatabase={handleUnbindDatabase}
               error={error}
               successMessage={settingsSuccess}
             />
