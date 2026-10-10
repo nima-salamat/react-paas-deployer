@@ -366,7 +366,10 @@ export async function getRecoveryState(matrixClient) {
   if (secretStatus.ready && backupInfo) {
     try {
       const checked = await crypto.checkKeyBackupAndEnable();
-      if (checked) {
+      if (
+        checked?.trustInfo?.trusted === true
+        && checked?.trustInfo?.matchesDecryptionKey === true
+      ) {
         return { state: "ready", backupInfo, crossSigningReady, deviceCount };
       }
     } catch {
@@ -427,8 +430,12 @@ export async function commitRecoveryKey(matrixClient, generatedKey) {
     });
     const ready = await crypto.isSecretStorageReady();
     const backupCheck = await crypto.checkKeyBackupAndEnable();
-    if (!ready || !backupCheck) {
-      throw new MatrixSecureError("Matrix did not confirm a trusted key backup. Sending remains disabled.", "backup_not_ready");
+    if (
+      !ready
+      || backupCheck?.trustInfo?.trusted !== true
+      || backupCheck?.trustInfo?.matchesDecryptionKey !== true
+    ) {
+      throw new MatrixSecureError("Matrix did not confirm that the encrypted key backup is trusted and matches this recovery key. Sending remains disabled.", "backup_not_ready");
     }
     const backupInfo = await crypto.getKeyBackupInfo();
     if (!backupInfo) {
@@ -471,8 +478,11 @@ export async function restoreRecoveryKey(matrixClient, rawRecoveryKey) {
       await crypto.storeSessionBackupPrivateKey(bytes, backupInfo.version);
     }
     const checked = await crypto.checkKeyBackupAndEnable();
-    if (!checked) {
-      throw new MatrixSecureError("The recovery key could not verify this account's backup.", "backup_untrusted");
+    if (
+      checked?.trustInfo?.trusted !== true
+      || checked?.trustInfo?.matchesDecryptionKey !== true
+    ) {
+      throw new MatrixSecureError("The recovery key did not verify a trusted Matrix backup or does not match its decryption key.", "backup_untrusted");
     }
     const restored = await crypto.restoreKeyBackup();
     const now = await getRecoveryState(matrixClient);
