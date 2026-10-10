@@ -699,8 +699,8 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
         url: `${SERVICE_BASE}${id}/databases/`,
         data: { database, alias: alias || "default", env_prefix: env_prefix || "DB", access_mode: access_mode || "rw" },
       });
-      safeSetSnackbar("success", "Database connected.");
-      setSettingsSuccess("Database connected. Its connection variables will be materialized at runtime.");
+      safeSetSnackbar("success", "Database binding saved.");
+      setSettingsSuccess("Database binding saved. Connection variables will be applied on the next deployment; live connectivity has not been tested.");
       await fetchDatabaseConfiguration();
     } catch (err) {
       setError(err, "Could not connect the database.");
