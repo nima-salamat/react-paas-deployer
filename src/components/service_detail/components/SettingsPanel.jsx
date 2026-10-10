@@ -1151,7 +1151,7 @@ export default function SettingsPanel({
                 </Stack>
               )}
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, lineHeight: 1.6 }}>
-                Passwords are never shown here. Binding records the selected database and prepares its environment variables for the next deployment; it does not test a live connection. Credentials are stored encrypted and injected only at runtime.
+                Passwords are never shown here. Saving a binding does not test live connectivity. Create a new deployment revision to apply a connection or disconnection; restarting an old immutable revision does not rewrite its stored settings. Credentials are stored encrypted and injected only at runtime.
               </Typography>
             </Paper>
           </Stack>
