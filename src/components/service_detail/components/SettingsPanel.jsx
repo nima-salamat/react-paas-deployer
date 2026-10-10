@@ -1090,6 +1090,11 @@ export default function SettingsPanel({
               </Paper>
             ))}
 
+            {String(service?.source_kind || "").toLowerCase() === "catalog" ? (
+              <Alert severity="info" sx={{ borderRadius: 2 }}>
+                This service is managed by a Ready App. Its database dependencies are controlled by the app definition; manual database bindings are disabled here.
+              </Alert>
+            ) : (
             <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, bgcolor: "background.default" }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Connect a database resource or service</Typography>
               {(databaseResources || []).length === 0 ? (
@@ -1154,6 +1159,7 @@ export default function SettingsPanel({
                 Passwords are never shown here. Saving a binding does not test live connectivity. Create a new deployment revision to apply a connection or disconnection; restarting an old immutable revision does not rewrite its stored settings. Credentials are stored encrypted and injected only at runtime.
               </Typography>
             </Paper>
+            )}
           </Stack>
         )}
       </Paper>
