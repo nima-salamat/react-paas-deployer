@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert, Avatar, Box, Button, CircularProgress, Divider, IconButton, Paper,
+  Alert, Box, Button, CircularProgress, Divider, IconButton, Paper,
   Stack, TextField, Typography,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
@@ -113,7 +113,6 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
   useEffect(() => {
     let cancelled = false;
     let activeClient = null;
-    let activeRoom = null;
     const onTimeline = (event, room) => {
       if (!room || room.roomId !== roomId) return;
       refreshTimeline(activeClient);
@@ -166,7 +165,6 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
             "room_not_encrypted",
           );
         }
-        activeRoom = room;
         const state = await getRecoveryState(client);
         if (cancelled) return;
         setRecoveryState(state);
@@ -191,7 +189,6 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         activeClient.off("Event.decrypted", onDecrypted);
         activeClient.off("sync", onSync);
       }
-      activeRoom = null;
     };
   }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title]);
 
