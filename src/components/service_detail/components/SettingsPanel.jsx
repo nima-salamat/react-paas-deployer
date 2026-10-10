@@ -447,6 +447,7 @@ export default function SettingsPanel({
   availableVolumes,
   databaseBindings = [],
   databaseResources = [],
+  catalogDatabaseDependencies = [],
   databaseLoading = false,
   databaseActionLoading = false,
   onBindDatabase,
@@ -1014,16 +1015,51 @@ export default function SettingsPanel({
         <SectionHeader
           icon={<LuDatabase size={18} />}
           title="Databases"
-          subtitle="Connect a managed database resource to this service. Credentials stay in the backend secret store."
+          subtitle="Shows databases provided by Ready Apps and optional managed database bindings. Credentials stay in the backend secret store."
         />
         {databaseFormError ? <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{databaseFormError}</Alert> : null}
         {databaseLoading ? (
           <Box sx={{ py: 4, display: "flex", justifyContent: "center" }}><CircularProgress size={28} /></Box>
         ) : (
           <Stack spacing={1.25}>
+            {catalogDatabaseDependencies.length > 0 ? (
+              <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+                  Database declared by this Ready App
+                </Typography>
+                <Stack spacing={1}>
+                  {catalogDatabaseDependencies.map((database) => (
+                    <Box key={database.service_id || database.service_key} sx={{ minWidth: 0 }}>
+                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                          {database.name || database.service_key || "Database service"}
+                        </Typography>
+                        {database.engine ? (
+                          <Chip size="small" label={database.engine} color="primary" variant="outlined" sx={{ height: 22 }} />
+                        ) : null}
+                        <Chip size="small" label="Ready App dependency" color="success" variant="outlined" sx={{ height: 22 }} />
+                        {database.status ? (
+                          <Chip size="small" label={database.status} variant="outlined" sx={{ height: 22 }} />
+                        ) : null}
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                        Host alias: {database.host || database.service_key || "—"}
+                        {database.port ? `:${database.port}` : ""}
+                        {database.database_name ? ` · Database ${database.database_name}` : ""}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.25, lineHeight: 1.6 }}>
+                  This connection is declared by the Ready App installation and is managed with that application. It is separate from optional managed bindings below; this panel does not test live database connectivity or reveal passwords.
+                </Typography>
+              </Paper>
+            ) : null}
             {databaseBindings.length === 0 ? (
-              <Alert severity="info" sx={{ borderRadius: 2 }}>
-                No database is connected. A managed binding will inject its host, port, database name and credential-backed password into the runtime under the selected prefix.
+              <Alert severity={catalogDatabaseDependencies.length > 0 ? "success" : "info"} sx={{ borderRadius: 2 }}>
+                {catalogDatabaseDependencies.length > 0
+                  ? "This service has a database dependency configured by its Ready App. No separate managed binding is required for that declared connection."
+                  : "No managed database binding is attached. Connections configured through the application runtime or a Ready App are separate and may already exist."}
               </Alert>
             ) : databaseBindings.map((binding) => (
               <Paper key={binding.id || `${binding.database}-${binding.alias}`} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
@@ -1056,7 +1092,11 @@ export default function SettingsPanel({
             <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, bgcolor: "background.default" }}>
               <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Connect a database resource</Typography>
               {(databaseResources || []).length === 0 ? (
-                <Typography variant="body2" color="text.secondary">No database resources are available yet. Create/provision a database service first.</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {catalogDatabaseDependencies.length > 0
+                    ? "The database declared by this Ready App is shown above. No additional managed database resources are available to attach."
+                    : "No managed database resources are available yet. Create/provision a database resource first; Ready App dependencies, when present, are shown separately above."}
+                </Typography>
               ) : (
                 <Stack spacing={1.25}>
                   <TextField
