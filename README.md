@@ -8,6 +8,8 @@ Backend:
 
 Architecture proposal (not implemented yet):  
 [Git Hosting and PaaS source deployment feasibility](https://github.com/nima-salamat/django-paas-deployer/blob/master/documentation/proposals/git-hosting-paas-feasibility.md)
+Implementation review (not implemented yet):  
+[Git Hosting implementation gap analysis](https://github.com/nima-salamat/django-paas-deployer/blob/master/documentation/proposals/git-hosting-implementation-gap-analysis.md)
 
 ---
 
