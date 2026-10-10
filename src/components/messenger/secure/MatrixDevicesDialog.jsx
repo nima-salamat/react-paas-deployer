@@ -25,7 +25,7 @@ async function parseApiResponse(response) {
   return body?.data ?? body;
 }
 
-export default function MatrixDevicesDialog({ open, onClose }) {
+export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevoked }) {
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busyDevice, setBusyDevice] = useState("");
@@ -75,6 +75,7 @@ export default function MatrixDevicesDialog({ open, onClose }) {
       const isCurrent = device.is_current || session?.deviceId === device.device_id;
       if (isCurrent) {
         shutdownSecureMatrixClient();
+        onCurrentDeviceRevoked?.();
       }
       setPendingRevoke(null);
       setMessage(isCurrent
