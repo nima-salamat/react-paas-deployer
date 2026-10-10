@@ -21,6 +21,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import CallIcon from "@mui/icons-material/Call";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import CheckIcon from "@mui/icons-material/Check";
 import { convAvatar, convTitle } from "../messengerUtils";
 
@@ -63,6 +64,7 @@ export default function ChatHeader(props) {
     setConfirmLeave,
     onCreateTopic,
     onSwitchTopic,
+    onStartSecureChat,
   } = props;
 
   const [topicMenuAnchor, setTopicMenuAnchor] = React.useState(null);
@@ -331,6 +333,18 @@ export default function ChatHeader(props) {
       {peer && !peer.is_contact && !peer.is_blocked && (
         <MenuItem onClick={() => { addContact(peer.id); setHeaderMenu(null); }}>
           <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Add contact
+        </MenuItem>
+      )}
+      {activeConv?.type === "private"
+        && activeConv?.security_mode !== "matrix_e2ee"
+        && peer?.id
+        && !peer?.is_blocked && (
+        <MenuItem onClick={() => { onStartSecureChat?.(peer.id); setHeaderMenu(null); }}>
+          <ListItemIcon><LockOutlinedIcon fontSize="small" color="success" /></ListItemIcon>
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            <Typography variant="body2">Start separate secure chat</Typography>
+            <Typography variant="caption" color="text.secondary">Encrypted history starts fresh</Typography>
+          </Box>
         </MenuItem>
       )}
       {activeConv?.type === "group" && !activeConv?.parent_conversation
