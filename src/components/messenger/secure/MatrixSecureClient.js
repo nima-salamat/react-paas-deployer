@@ -147,7 +147,7 @@ async function acquireDeviceLock(deviceId) {
 async function validateStoredSession(session) {
   try {
     const response = await fetch(
-      `${session.homeserverUrl.replace(/\\/+$/, "")}/_matrix/client/v3/account/whoami`,
+      `${session.homeserverUrl.replace(/\/+$/, "")}/_matrix/client/v3/account/whoami`,
       { headers: { Authorization: `Bearer ${session.accessToken}` } },
     );
     if (!response.ok) return false;
