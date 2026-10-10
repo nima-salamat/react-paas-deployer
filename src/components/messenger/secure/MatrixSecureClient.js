@@ -109,7 +109,7 @@ async function writeDeviceMarker(deviceId) {
 }
 
 async function acquireDeviceLock(deviceId) {
-  if (!navigator?.locks?.request) {
+  if (!globalThis.navigator?.locks?.request) {
     throw new MatrixSecureError(
       "This browser cannot safely coordinate Matrix encryption storage across tabs. Use a current browser that supports Web Locks.",
       "web_locks_unavailable",
@@ -119,7 +119,7 @@ async function acquireDeviceLock(deviceId) {
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
   const hold = new Promise((resolve) => { release = resolve; });
-  const lockTask = navigator.locks.request(
+  const lockTask = globalThis.navigator.locks.request(
     `pd-matrix-crypto-${deviceId}`,
     { mode: "exclusive", ifAvailable: true },
     async (lock) => {
@@ -147,12 +147,27 @@ async function acquireDeviceLock(deviceId) {
 async function validateStoredSession(session) {
   try {
     const response = await fetch(
-      `${session.homeserverUrl.replace(/\/+$/, "")}/_matrix/client/v3/account/whoami`,
+      `${session.homeserverUrl.replace(/\\/+$/, "")}/_matrix/client/v3/account/whoami`,
       { headers: { Authorization: `Bearer ${session.accessToken}` } },
     );
     if (!response.ok) return false;
     const data = await response.json();
-    return data.user_id === session.userId && data.device_id === session.deviceId;
+    if (data.user_id !== session.userId || data.device_id !== session.deviceId) return false;
+
+    // The Matrix token must also belong to the Django account currently logged
+    // in to this tab. A stale session from a previous app user is never reused.
+    const bindingResponse = await fetch(`${MSG_API}/secure/device-session/`, {
+      headers: authHeaders({
+        "X-Matrix-Access-Token": session.accessToken,
+        "X-Matrix-Device-ID": session.deviceId,
+      }),
+    });
+    if (!bindingResponse.ok) return false;
+    const bindingBody = await bindingResponse.json();
+    const binding = bindingBody?.data || bindingBody;
+    return bindingBody?.success !== false
+      && binding?.valid === true
+      && binding?.device_id === session.deviceId;
   } catch {
     return false;
   }
@@ -534,7 +549,7 @@ export async function createEncryptedConversation({ type, title = "", descriptio
       via: [serverName],
       suggested: true,
     }, roomId);
-    const localUserIds = [...new Set([...memberIds.map(Number), Number(localStorage.getItem("user_id"))].filter((id) => Number.isInteger(id) && id > 0))];
+    const localUserIds = [...new Set(memberIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
     const mapped = await mapEncryptedConversation({
       type: "group",
       title: title.trim(),
