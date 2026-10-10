@@ -18,6 +18,9 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import GroupsIcon from "@mui/icons-material/Groups";
+import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CallIcon from "@mui/icons-material/Call";
 import CallEndIcon from "@mui/icons-material/CallEnd";
 import VideocamIcon from "@mui/icons-material/Videocam";
@@ -121,6 +124,7 @@ export default function Sidebar({
   const [listMenuAnchor, setListMenuAnchor] = useState(null);
   const [publicSearchQ, setPublicSearchQ] = useState("");
   const [chatFilter, setChatFilter] = useState("all");
+  const [expandedForumIds, setExpandedForumIds] = useState(() => new Set());
   const swipeStartRef = useRef(null);
 
   const clearPublicSearch = () => {
@@ -658,13 +662,18 @@ export default function Sidebar({
               return visible.map((c) => {
                 const unread = formatUnread(c.unread_count);
                 const pinned = Boolean(c.is_pinned);
+                const forumTopics = c.type === "group" && c.is_forum && Array.isArray(c.topics)
+                  ? c.topics
+                  : [];
+                const activeTopicInForum = forumTopics.some((topic) => String(topic.id) === String(activeId));
+                const topicsExpanded = activeTopicInForum || expandedForumIds.has(String(c.id));
                 const isIncomingRinging =
                   Boolean(incomingCall)
                   && String(incomingCall.conversation_id) === String(c.id);
                 const incomingIsVideo = Boolean(incomingCall?.media?.video || incomingCall?.is_video);
                 return (
+                  <React.Fragment key={c.id}>
                   <ListItemButton
-                    key={c.id}
                     selected={c.id === activeId}
                     onClick={() => openChat(c)}
                     onContextMenu={(e) => onRowContext(e, c)}
@@ -732,6 +741,28 @@ export default function Sidebar({
                         </Typography>
                       }
                     />
+                    {forumTopics.length > 0 && (
+                      <IconButton
+                        size="small"
+                        aria-label={topicsExpanded ? `Collapse topics in ${convTitle(c, meId)}` : `Expand topics in ${convTitle(c, meId)}`}
+                        title={topicsExpanded ? "Collapse topics" : "Show topics"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setExpandedForumIds((previous) => {
+                            const next = new Set(previous);
+                            const key = String(c.id);
+                            if (next.has(key)) next.delete(key);
+                            else next.add(key);
+                            return next;
+                          });
+                        }}
+                        sx={{ flexShrink: 0, ml: 0.25, color: topicsExpanded ? "primary.main" : "text.secondary" }}
+                      >
+                        {topicsExpanded
+                          ? <ExpandMoreIcon fontSize="small" />
+                          : <ChevronRightIcon fontSize="small" />}
+                      </IconButton>
+                    )}
                     {isIncomingRinging && (
                       <Stack
                         direction="row"
@@ -783,6 +814,77 @@ export default function Sidebar({
                       </Stack>
                     )}
                   </ListItemButton>
+                  {forumTopics.length > 0 && topicsExpanded && (
+                    <Box
+                      sx={{
+                        ml: 4.5,
+                        mr: 0.75,
+                        mb: 0.75,
+                        pl: 1,
+                        borderLeft: "1px solid",
+                        borderColor: "divider",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.25,
+                      }}
+                    >
+                      {forumTopics.map((topic) => {
+                        const selected = String(topic.id) === String(activeId);
+                        return (
+                          <ListItemButton
+                            key={topic.id}
+                            selected={selected}
+                            onClick={() => openChat({
+                              ...topic,
+                              type: "group",
+                              parent_conversation: c.id,
+                              parent_conversation_title: c.title,
+                            })}
+                            sx={{
+                              minHeight: 42,
+                              py: 0.5,
+                              px: 1,
+                              borderRadius: 1.75,
+                              "&.Mui-selected": {
+                                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                              },
+                            }}
+                          >
+                            <ListItemAvatar sx={{ minWidth: 34 }}>
+                              <Avatar
+                                src={withTokenQuery(topic.avatar_url || topic.avatar) || undefined}
+                                sx={{
+                                  width: 27,
+                                  height: 27,
+                                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.09),
+                                  color: "primary.main",
+                                }}
+                              >
+                                <ForumOutlinedIcon sx={{ fontSize: 15 }} />
+                              </Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={topic.title}
+                              secondary={topic.description || "Topic"}
+                              primaryTypographyProps={{
+                                noWrap: true,
+                                fontSize: 13,
+                                fontWeight: selected ? 700 : 500,
+                              }}
+                              secondaryTypographyProps={{
+                                noWrap: true,
+                                fontSize: 11,
+                              }}
+                            />
+                            {topic.is_closed && (
+                              <Typography variant="caption" color="text.secondary">Closed</Typography>
+                            )}
+                          </ListItemButton>
+                        );
+                      })}
+                    </Box>
+                  )}
+                  </React.Fragment>
                 );
               });
             })()}
