@@ -4,6 +4,9 @@
  */
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -34,6 +37,7 @@ import {
 } from "@mui/material";
 import ShareIcon from "@mui/icons-material/Share";
 import SearchIcon from "@mui/icons-material/Search";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import GroupIcon from "@mui/icons-material/Group";
 import PersonIcon from "@mui/icons-material/Person";
 import apiRequest from "../../customHooks/apiRequest";
@@ -53,6 +57,8 @@ export const DEFAULT_SHARE_RULES = {
   can_view_metrics: true,
   can_view_db_credentials: false,
   can_shell: false,
+  can_shell_replace: false,
+  can_shell_advanced: false,
   can_start: false,
   can_stop: false,
   can_restart: false,
@@ -82,6 +88,8 @@ export const RULE_LABELS = {
   can_view_metrics: "View metrics",
   can_view_db_credentials: "View DB credentials",
   can_shell: "Use restricted service shell",
+  can_shell_replace: "Replace another active shell session",
+  can_shell_advanced: "Use advanced shell tools (for example Tinker)",
   can_start: "Start",
   can_stop: "Stop",
   can_restart: "Restart",
@@ -189,38 +197,137 @@ function applyLocalPreset(name) {
   return { ...DEFAULT_SHARE_RULES, ...(local[name] || {}) };
 }
 
+const RULE_GROUPS = [
+  {
+    title: "View & access",
+    keys: [
+      "can_view",
+      "can_view_logs",
+      "can_view_deploy_logs",
+      "can_view_metrics",
+      "can_view_db_credentials",
+      "can_shell",
+      "can_shell_replace",
+      "can_shell_advanced",
+    ],
+  },
+  {
+    title: "Runtime controls",
+    keys: ["can_start", "can_stop", "can_restart", "can_rebuild", "can_purge"],
+  },
+  {
+    title: "Deployments",
+    keys: [
+      "can_deploy_add",
+      "can_deploy_edit",
+      "can_deploy_remove",
+      "can_deploy_select",
+      "can_deploy_download",
+      "can_deploy_edit_others",
+      "can_deploy_remove_others",
+    ],
+  },
+  {
+    title: "Storage, network & configuration",
+    keys: [
+      "can_volume_add",
+      "can_volume_edit",
+      "can_volume_delete",
+      "can_volume_attach",
+      "can_volume_detach",
+      "can_network_change",
+      "can_change_config",
+    ],
+  },
+];
+
 function RulesGrid({ rules, onChange }) {
   return (
-    <Stack spacing={1}>
-      <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.5}>
-        {Object.keys(DEFAULT_SHARE_RULES)
-          .filter((k) => k !== "daily_deploy_limit")
-          .map((key) => (
-            <FormControlLabel
-              key={key}
-              control={
-                <Checkbox
-                  size="small"
-                  checked={!!rules[key]}
-                  onChange={() => onChange({ ...rules, [key]: !rules[key] })}
-                />
-              }
-              label={<Typography variant="caption">{RULE_LABELS[key] || key}</Typography>}
+    <Stack spacing={1.25}>
+      <Alert severity="info" variant="outlined" sx={{ borderRadius: 1.5 }}>
+        Start with a preset, then grant only the actions this recipient needs. Service deletion and ownership transfer are never shared.
+      </Alert>
+
+      {RULE_GROUPS.map((group, index) => {
+        const enabledCount = group.keys.filter((key) => Boolean(rules[key])).length;
+        return (
+          <Accordion
+            key={group.title}
+            defaultExpanded={index === 0}
+            disableGutters
+            elevation={0}
+            sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: "12px !important",
+              "&:before": { display: "none" },
+              overflow: "hidden",
+              bgcolor: "background.paper",
+            }}
+          >
+            <AccordionSummary
+              expandIcon={<ExpandMoreRoundedIcon />}
               sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
-                pr: 1,
-                m: 0.25,
-                minWidth: "46%",
+                minHeight: 48,
+                "& .MuiAccordionSummary-content": { my: 1, alignItems: "center", gap: 1 },
               }}
-            />
-          ))}
-      </Stack>
+            >
+              <Typography variant="body2" fontWeight={750} sx={{ flex: 1 }}>
+                {group.title}
+              </Typography>
+              <Chip
+                size="small"
+                variant="outlined"
+                color={enabledCount ? "primary" : "default"}
+                label={`${enabledCount}/${group.keys.length}`}
+              />
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 0, pb: 1.5 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                  gap: 0.75,
+                }}
+              >
+                {group.keys.map((key) => (
+                  <FormControlLabel
+                    key={key}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={Boolean(rules[key])}
+                        onChange={() => onChange({ ...rules, [key]: !rules[key] })}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">
+                        {RULE_LABELS[key] || key}
+                      </Typography>
+                    }
+                    sx={{
+                      mx: 0,
+                      px: 1,
+                      py: 0.25,
+                      border: "1px solid",
+                      borderColor: rules[key] ? "primary.main" : "divider",
+                      borderRadius: 1.5,
+                      bgcolor: rules[key] ? "action.selected" : "transparent",
+                      minWidth: 0,
+                    }}
+                  />
+                ))}
+              </Box>
+            </AccordionDetails>
+          </Accordion>
+        );
+      })}
+
+      <Divider />
       <TextField
         size="small"
         type="number"
-        label="Daily deploy limit (max 50)"
+        label="Daily deploy limit (0–50)"
         value={rules.daily_deploy_limit ?? 50}
         onChange={(e) => {
           let n = parseInt(e.target.value, 10);
@@ -229,7 +336,7 @@ function RulesGrid({ rules, onChange }) {
           onChange({ ...rules, daily_deploy_limit: n });
         }}
         inputProps={{ min: 0, max: 50 }}
-        helperText="Deploys/builds allowed per day"
+        helperText="Maximum deployments/builds allowed each day for this share."
         fullWidth
       />
     </Stack>
