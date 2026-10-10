@@ -5,6 +5,7 @@ import {
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyIcon from "@mui/icons-material/Key";
+import MatrixDeviceVerificationDialog from "./MatrixDeviceVerificationDialog";
 import {
   commitRecoveryKey, getRecoveryState, getSecureMatrixClient,
   prepareRecoveryKey, restoreRecoveryKey,
@@ -13,6 +14,7 @@ import {
 export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
   const [phase, setPhase] = useState("loading");
   const [recoveryState, setRecoveryState] = useState(null);
+  const [verificationOpen, setVerificationOpen] = useState(false);
   const [generatedKey, setGeneratedKey] = useState(null);
   const [savedConfirmed, setSavedConfirmed] = useState(false);
   const [enteredKey, setEnteredKey] = useState("");
@@ -148,8 +150,15 @@ export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
           {phase === "needs_setup" && (
             <>
               <Alert severity="warning">
-                This appears to be the first secure device for this Matrix account. Create the encrypted key backup now and save its recovery key outside this browser. Without it, losing this device may make old messages unreadable.
+                {recoveryState?.historyMayBeUnavailable
+                  ? "No existing encrypted key backup was found, but other devices have been registered. You may verify an existing device first; creating a new backup protects future history but does not by itself unlock older messages."
+                  : "This appears to be the first secure device for this Matrix account. Create the encrypted key backup now and save its recovery key outside this browser. Without it, losing this device may make old messages unreadable."}
               </Alert>
+              {Number(recoveryState?.deviceCount || 0) > 1 && (
+                <Button variant="outlined" onClick={() => setVerificationOpen(true)} disabled={busy}>
+                  Verify using an existing device
+                </Button>
+              )}
               <Button variant="contained" onClick={generateKey} disabled={busy}>
                 {busy ? "Preparing…" : "Create recovery key"}
               </Button>
@@ -180,7 +189,7 @@ export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
           {phase === "recovery_required" && (
             <>
               <Alert severity="warning">
-                This account already has device or recovery state. The app will not replace an existing backup. Enter the existing recovery key to restore message keys, or verify an existing device in a later step. A new key will not recover older messages.
+                This account already has recovery settings. The app will not replace the existing backup. Enter the existing recovery key to restore message keys, or verify this device from a trusted device you still control.
               </Alert>
               <TextField
                 fullWidth multiline minRows={3} label="Existing recovery key"
@@ -190,6 +199,9 @@ export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
               />
               <Button variant="contained" onClick={restore} disabled={!enteredKey.trim() || busy}>
                 {busy ? "Restoring…" : "Restore encrypted history"}
+              </Button>
+              <Button variant="outlined" onClick={() => setVerificationOpen(true)} disabled={busy}>
+                Verify using an existing device
               </Button>
             </>
           )}
@@ -208,6 +220,14 @@ export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
       <DialogActions>
         <Button onClick={onClose} disabled={busy}>Close</Button>
       </DialogActions>
+      <MatrixDeviceVerificationDialog
+        open={verificationOpen}
+        onClose={() => setVerificationOpen(false)}
+        onVerified={() => {
+          setVerificationOpen(false);
+          void refreshState().catch((err) => setError(err?.message || "Could not refresh recovery state."));
+        }}
+      />
     </Dialog>
   );
 }
