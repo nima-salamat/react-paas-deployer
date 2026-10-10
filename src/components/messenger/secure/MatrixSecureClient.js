@@ -108,7 +108,7 @@ async function writeDeviceMarker(deviceId) {
   }
 }
 
-async function acquireDeviceLock(deviceId) {
+async function acquireDeviceLock() {
   if (!globalThis.navigator?.locks?.request) {
     throw new MatrixSecureError(
       "This browser cannot safely coordinate Matrix encryption storage across tabs. Use a current browser that supports Web Locks.",
@@ -119,8 +119,11 @@ async function acquireDeviceLock(deviceId) {
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
   const hold = new Promise((resolve) => { release = resolve; });
+  // matrix-js-sdk's Rust crypto storage is profile-scoped. Use one exclusive
+  // profile-wide lock, not one per Matrix device ID, so two different devices
+  // cannot initialize concurrently against the same IndexedDB crypto store.
   const lockTask = globalThis.navigator.locks.request(
-    `pd-matrix-crypto-${deviceId}`,
+    "pd-matrix-crypto-store",
     { mode: "exclusive", ifAvailable: true },
     async (lock) => {
       if (!lock) {
@@ -241,67 +244,91 @@ function cryptoCallbacks() {
   };
 }
 
+async function revokeLostLocalDevice(deviceId) {
+  if (!deviceId) return;
+  try {
+    await fetch(`${MSG_API}/secure/devices/${encodeURIComponent(deviceId)}/revoke/`, {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({}),
+    });
+  } catch {
+    // The new device still receives a fresh random ID; never reuse the lost
+    // device's ID even if remote revocation is temporarily unavailable.
+  }
+}
+
 async function initializeClient() {
-  let session = readSession();
-  if (session) {
-    const hasMarker = await hasDeviceMarker(session.deviceId);
-    if (!hasMarker) {
-      // A session without its local crypto-store marker may be a browser that
-      // lost local crypto state. Never reuse that device ID with fresh keys.
+  let lockAcquired = false;
+  let nextClient = null;
+  try {
+    lockAcquired = await acquireDeviceLock();
+    if (!lockAcquired) {
+      throw new MatrixSecureError(
+        "Matrix encryption is already open in another tab of this browser. Close the other Messenger tab before opening secure chats here.",
+        "device_lock_conflict",
+      );
+    }
+
+    let session = readSession();
+    if (session) {
+      const hasMarker = await hasDeviceMarker(session.deviceId);
+      if (!hasMarker) {
+        // The device's local crypto storage appears to have been lost. Revoke
+        // the old session and never initialize fresh keys under its device ID.
+        await revokeLostLocalDevice(session.deviceId);
+        clearSession();
+        session = null;
+      }
+    }
+
+    if (session && !(await validateStoredSession(session))) {
+      // Do not carry a token across Django-account changes. The old device's
+      // remote mapping is not trusted under the current logged-in account.
       clearSession();
       session = null;
     }
-  }
+    if (!session) session = await requestNewDeviceSession();
 
-  if (session && !(await validateStoredSession(session))) {
-    clearSession();
-    session = null;
-  }
-
-  if (session) {
-    const locked = await acquireDeviceLock(session.deviceId);
-    if (!locked) {
-      // sessionStorage may be copied into a second tab. Give that tab a new
-      // Matrix device ID and thus an independent Rust crypto store.
-      sessionStorage.removeItem(SESSION_KEY);
-      session = await requestNewDeviceSession();
-      const newLock = await acquireDeviceLock(session.deviceId);
-      if (!newLock) throw new MatrixSecureError("Could not isolate the Matrix device across tabs.", "device_lock_conflict");
-    }
-  } else {
-    session = await requestNewDeviceSession();
-    const locked = await acquireDeviceLock(session.deviceId);
-    if (!locked) throw new MatrixSecureError("Could not isolate the Matrix device across tabs.", "device_lock_conflict");
-  }
-
-  const nextClient = createClient({
-    baseUrl: session.homeserverUrl,
-    accessToken: session.accessToken,
-    userId: session.userId,
-    deviceId: session.deviceId,
-    cryptoCallbacks: cryptoCallbacks(),
-  });
-  try {
+    nextClient = createClient({
+      baseUrl: session.homeserverUrl,
+      accessToken: session.accessToken,
+      userId: session.userId,
+      deviceId: session.deviceId,
+      cryptoCallbacks: cryptoCallbacks(),
+    });
     await nextClient.initRustCrypto();
     await writeDeviceMarker(session.deviceId);
     nextClient.startClient({ initialSyncLimit: 40 });
+    client = nextClient;
+    currentSession = session;
+    return client;
   } catch (error) {
-    nextClient.stopClient();
-    if (releaseDeviceLock) releaseDeviceLock();
-    releaseDeviceLock = null;
-    clearSession();
+    try { nextClient?.stopClient(); } catch { /* no-op */ }
+    if (nextClient && !client) clearSession();
+    if (lockAcquired && releaseDeviceLock) releaseDeviceLock();
+    if (lockAcquired) releaseDeviceLock = null;
+    if (error instanceof MatrixSecureError) throw error;
     throw new MatrixSecureError(
       "Matrix cryptography could not initialize. The device was not enabled for sending messages.",
       "crypto_init_failed",
     );
   }
-  client = nextClient;
-  currentSession = session;
-  return client;
 }
 
 export async function getSecureMatrixClient() {
-  if (client) return client;
+  if (client) {
+    const session = currentSession || readSession();
+    if (session && await validateStoredSession(session)) return client;
+    // The Django login changed or the Matrix device was revoked while this
+    // tab stayed open. Clear cached auth and fail closed; a user gesture/reload
+    // can establish a fresh, separate device.
+    shutdownSecureMatrixClient();
+    throw new MatrixSecureError(
+      "The Matrix device no longer belongs to the current Messenger session. Reopen secure chat to establish a new device and recover keys.",
+      "account_binding_changed",
+    );
+  }
   if (!clientPromise) {
     clientPromise = initializeClient().finally(() => { clientPromise = null; });
   }
