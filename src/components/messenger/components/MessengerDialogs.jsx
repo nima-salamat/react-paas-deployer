@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Box, Typography, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
+  Alert, Box, Typography, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
   ListItemText, Fade, Chip, Snackbar, CircularProgress,
 } from "@mui/material";
@@ -23,6 +23,7 @@ export default function MessengerDialogs({
   forwardOpen, setForwardOpen, forwardTo,
   // create group
   createGroupOpen, setCreateGroupOpen, groupTitle, setGroupTitle, groupPublic, setGroupPublic, createGroup,
+  secureGroup, setSecureGroup, secureGroupMembers, setSecureGroupMembers,
   // forum topics
   topicDialogOpen, setTopicDialogOpen, topicParentConversation,
   topicTitle, setTopicTitle, topicSubmitting, createForumTopic,
@@ -86,18 +87,77 @@ export default function MessengerDialogs({
         <DialogActions><Button onClick={() => setForwardOpen(null)}>Cancel</Button></DialogActions>
       </Dialog>
 
-      <Dialog open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} fullWidth maxWidth="xs">
+      <Dialog open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>New group</DialogTitle>
         <DialogContent>
           <TextField fullWidth label="Group title" value={groupTitle}
             onChange={(e) => setGroupTitle(e.target.value)} sx={{ mt: 1 }} />
           <FormControlLabel sx={{ mt: 1.5 }}
-            control={<Switch checked={groupPublic} onChange={(e) => setGroupPublic(e.target.checked)} />}
-            label="Public (appears in search)" />
+            control={(
+              <Switch
+                checked={secureGroup}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+                  setSecureGroup(enabled);
+                  if (enabled) setGroupPublic(false);
+                  if (!enabled) setSecureGroupMembers([]);
+                }}
+              />
+            )}
+            label="End-to-end encrypted group" />
+          {secureGroup ? (
+            <>
+              <Alert severity="info" sx={{ mt: 1, mb: 1.5 }}>
+                This creates a separate Matrix-encrypted group with a secure General room. Members must be selected now; ordinary public join links and server-side search are disabled for secure groups.
+              </Alert>
+              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Invite members</Typography>
+              <List dense sx={{ maxHeight: 250, overflow: "auto", border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+                {safeContacts.map((contact) => {
+                  const user = contact?.contact;
+                  if (!user?.id || String(user.id) === String(meId)) return null;
+                  const checked = secureGroupMembers.some((id) => String(id) === String(user.id));
+                  return (
+                    <ListItemButton
+                      key={user.id}
+                      selected={checked}
+                      onClick={() => setSecureGroupMembers((current) => (
+                        checked
+                          ? current.filter((id) => String(id) !== String(user.id))
+                          : [...current, user.id]
+                      ))}
+                    >
+                      <ListItemAvatar>
+                        <Avatar src={withTokenQuery(user.avatar) || undefined}>{user.username?.[0]?.toUpperCase()}</Avatar>
+                      </ListItemAvatar>
+                      <ListItemText primary={user.username || user.email || `User ${user.id}`} secondary={checked ? "Will be invited" : "Not selected"} />
+                    </ListItemButton>
+                  );
+                })}
+                {!safeContacts.some((contact) => contact?.contact?.id && String(contact.contact.id) !== String(meId)) && (
+                  <Typography color="text.secondary" variant="body2" sx={{ p: 2 }}>
+                    Add people to your contacts before creating an encrypted group.
+                  </Typography>
+                )}
+              </List>
+              <Typography color="text.secondary" variant="caption">
+                The recovery-key setup is required before the first encrypted message can be sent.
+              </Typography>
+            </>
+          ) : (
+            <FormControlLabel sx={{ mt: 0.75 }}
+              control={<Switch checked={groupPublic} onChange={(e) => setGroupPublic(e.target.checked)} />}
+              label="Public (appears in search)" />
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCreateGroupOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={createGroup} disabled={!groupTitle.trim()}>Create</Button>
+          <Button
+            variant="contained"
+            onClick={createGroup}
+            disabled={!groupTitle.trim() || (secureGroup && !secureGroupMembers.length)}
+          >
+            {secureGroup ? "Create secure group" : "Create"}
+          </Button>
         </DialogActions>
       </Dialog>
 
