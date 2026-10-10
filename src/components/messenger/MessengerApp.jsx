@@ -440,6 +440,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [groupPublic, setGroupPublic] = useState(false);
+  const [topicDialogOpen, setTopicDialogOpen] = useState(false);
+  const [topicParentConversation, setTopicParentConversation] = useState(null);
+  const [topicTitle, setTopicTitle] = useState("");
+  const [topicSubmitting, setTopicSubmitting] = useState(false);
   const [forwardOpen, setForwardOpen] = useState(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -2305,6 +2309,32 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }
   };
 
+
+  const createForumTopic = async () => {
+    const parentId = topicParentConversation?.id;
+    const title = topicTitle.trim();
+    if (!parentId || !title || topicSubmitting) return;
+    setTopicSubmitting(true);
+    try {
+      const res = await apiRequest({
+        method: "POST",
+        url: `${MSG_API}/conversations/${parentId}/topics/`,
+        data: { title },
+      });
+      const result = unwrapData(res);
+      const topic = result?.topic;
+      setTopicDialogOpen(false);
+      setTopicTitle("");
+      setTopicParentConversation(null);
+      await loadConversations({ silent: true });
+      await loadConversationDetail(parentId);
+      if (topic?.id) await openChat(topic);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Could not create topic");
+    } finally {
+      setTopicSubmitting(false);
+    }
+  };
 
   const onChatDragEnter = (e) => {
     if (!activeIdRef.current) return;
@@ -5135,6 +5165,16 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             setConfirmDelete={setConfirmDelete}
             role={role}
             setConfirmLeave={setConfirmLeave}
+            onCreateTopic={(conv) => {
+              setTopicParentConversation(conv || activeConv);
+              setTopicTitle("");
+              setTopicDialogOpen(true);
+            }}
+            onSwitchTopic={(topic) => {
+              if (!topic?.id) return;
+              const listed = conversations.find((row) => String(row.id) === String(topic.id));
+              void openChat(listed || topic);
+            }}
           />
 
           {/* Mini-player sits UNDER the user header (avatar + username) */}
@@ -6400,6 +6440,13 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         groupPublic={groupPublic}
         setGroupPublic={setGroupPublic}
         createGroup={createGroup}
+        topicDialogOpen={topicDialogOpen}
+        setTopicDialogOpen={setTopicDialogOpen}
+        topicParentConversation={topicParentConversation}
+        topicTitle={topicTitle}
+        setTopicTitle={setTopicTitle}
+        topicSubmitting={topicSubmitting}
+        createForumTopic={createForumTopic}
         joinOpen={joinOpen}
         setJoinOpen={setJoinOpen}
         joinCode={joinCode}
