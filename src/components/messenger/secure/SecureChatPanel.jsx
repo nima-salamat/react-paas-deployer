@@ -8,6 +8,7 @@ import KeyIcon from "@mui/icons-material/Key";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import MatrixRecoveryDialog from "./MatrixRecoveryDialog";
+import MatrixDevicesDialog from "./MatrixDevicesDialog";
 import {
   assertSecureMessagingReady, getRecoveryState, getSecureMatrixClient,
   MatrixSecureError,
@@ -95,6 +96,7 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
   const [phase, setPhase] = useState("connecting");
   const [error, setError] = useState("");
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [devicesOpen, setDevicesOpen] = useState(false);
   const [recoveryState, setRecoveryState] = useState(null);
   const [matrixClient, setMatrixClient] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -248,6 +250,9 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         <IconButton aria-label="Reconnect secure chat" onClick={() => setRevision((value) => value + 1)} disabled={phase === "connecting"}>
           <RefreshIcon />
         </IconButton>
+        <Button size="small" onClick={() => setDevicesOpen(true)}>
+          Devices
+        </Button>
         <Button size="small" startIcon={<KeyIcon />} onClick={() => setRecoveryOpen(true)}>
           Recovery
         </Button>
@@ -360,6 +365,17 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         open={recoveryOpen}
         onClose={() => setRecoveryOpen(false)}
         onReady={onRecoveryReady}
+      />
+      <MatrixDevicesDialog
+        open={devicesOpen}
+        onClose={() => setDevicesOpen(false)}
+        onCurrentDeviceRevoked={() => {
+          setDevicesOpen(false);
+          setError("This Matrix device was revoked. Reopen secure chat only after creating a new device and completing the key-recovery flow.");
+          setPhase("error");
+          setMatrixClient(null);
+          setMessages([]);
+        }}
       />
     </Box>
   );
