@@ -490,7 +490,7 @@ export default function ServiceSharingPanel({ service }) {
           <Skeleton variant="rounded" height={136} />
           <Skeleton variant="rounded" height={136} />
         </Stack>
-      ) : visibleShares.length ? (
+      ) : !error && visibleShares.length ? (
         <Stack spacing={1.25}>
           {visibleShares.map((share) => (
             <ShareSummaryCard
@@ -502,7 +502,7 @@ export default function ServiceSharingPanel({ service }) {
             />
           ))}
         </Stack>
-      ) : (
+      ) : !error ? (
         <Paper
           variant="outlined"
           sx={{
@@ -537,7 +537,7 @@ export default function ServiceSharingPanel({ service }) {
             </Button>
           ) : null}
         </Paper>
-      )}
+      ) : null}
 
       <ShareServiceDialog
         open={dialogOpen}
