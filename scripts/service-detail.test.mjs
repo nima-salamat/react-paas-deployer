@@ -515,3 +515,27 @@ test("database provider services hide the consumer-side Databases settings secti
     /isDatabaseService\s*\? \["network", "volume", "plan", "danger-zone"\]/,
   );
 });
+
+test("service owners can manage shares and granular rules from Service Detail", () => {
+  const detail = read("src/components/service_detail/ServiceDetail.jsx");
+  const sidebar = read("src/components/service_detail/components/TabSidebar.jsx");
+  const mobileNav = read("src/components/service_detail/components/MobileNavFab.jsx");
+  const sharingPanel = read("src/components/service_detail/components/ServiceSharingPanel.jsx");
+  const shareDialog = read("src/components/service/services/ShareServiceDialog.jsx");
+
+  assert.match(detail, /\["overview", "create", "logs", "settings", "sharing", "shell"\]/);
+  assert.match(detail, /activeTab === "sharing" && !shareAccess\.loading && effectiveIsOwner/);
+  assert.match(sidebar, /value: "sharing", label: "Sharing"/);
+  assert.match(mobileNav, /value: "sharing", label: "Sharing"/);
+
+  assert.match(sharingPanel, /params: \{ scope: "created" \}/);
+  assert.match(sharingPanel, /method: "DELETE"/);
+  assert.match(sharingPanel, /ShareServiceDialog/);
+  assert.match(sharingPanel, /onEdit=\{openEditDialog\}/);
+  assert.match(sharingPanel, /onRemove=\{setShareToRemove\}/);
+
+  assert.match(shareDialog, /can_shell_replace/);
+  assert.match(shareDialog, /can_shell_advanced/);
+  assert.match(shareDialog, /const RULE_GROUPS = \[/);
+  assert.match(shareDialog, /<Accordion/);
+});
