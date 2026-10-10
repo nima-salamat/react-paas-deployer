@@ -3859,6 +3859,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   /* -------------------- derived -------------------- */
 
   const activeConv = activeDetail || conversations.find((c) => c.id === activeId);
+  // Until the Matrix client, device verification and key-recovery flow are
+  // configured, encrypted conversations must never fall through to the
+  // plaintext Django composer/timeline.
+  const isMatrixE2EE = activeConv?.security_mode === "matrix_e2ee";
   const peer = peerUser(activeConv, meId);
   const role = myRole(activeConv, meId);
 
@@ -5129,6 +5133,33 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               </Box>
             </Box>
           )}
+          {isMatrixE2EE ? (
+            <Paper
+              elevation={0}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                minHeight: 56,
+                px: 1.25,
+                py: 0.75,
+                bgcolor: "background.paper",
+                borderBottom: "1px solid",
+                borderColor: "divider",
+              }}
+            >
+              <IconButton onClick={closeChat} size="small" aria-label="Back to chats">
+                <ArrowBackIcon />
+              </IconButton>
+              <LockOutlinedIcon color="warning" />
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography fontWeight={700} noWrap>{convTitle(activeConv, meId)}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Secure chat unavailable
+                </Typography>
+              </Box>
+            </Paper>
+          ) : (
           <ChatHeader
             isMobile={isMobile}
             msgSearchOpen={msgSearchOpen}
@@ -5176,7 +5207,52 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               void openChat(listed || topic);
             }}
           />
+          )}
 
+          {isMatrixE2EE ? (
+            <Paper
+              elevation={0}
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 1.5,
+                px: { xs: 2.5, sm: 5 },
+                py: 4,
+                textAlign: "center",
+                borderRadius: 0,
+                bgcolor: "background.default",
+              }}
+            >
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  display: "grid",
+                  placeItems: "center",
+                  bgcolor: "warning.main",
+                  color: "warning.contrastText",
+                }}
+              >
+                <LockOutlinedIcon sx={{ fontSize: 32 }} />
+              </Box>
+              <Typography variant="h6" fontWeight={800}>
+                Encrypted chat is not ready
+              </Typography>
+              <Typography color="text.secondary" sx={{ maxWidth: 460 }}>
+                This conversation is marked for end-to-end encryption, but Matrix device authentication,
+                verification and key recovery are not configured in this deployment.
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460 }}>
+                To prevent an unsafe downgrade, messaging, attachments, search and calls are disabled here.
+                No messages will be sent through the normal plaintext Messenger path.
+              </Typography>
+            </Paper>
+          ) : (
+            <>
           {/* Mini-player sits UNDER the user header (avatar + username) */}
           <AudioPlayerBar
             player={audioPlayer}
@@ -5795,6 +5871,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
                 )}
               </Button>
             </Box>
+          )}
+            </>
           )}
         </>
       )}
