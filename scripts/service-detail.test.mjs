@@ -500,3 +500,18 @@ test("regular service database settings offer existing database services and lab
     /Create a new deployment revision to apply it; live connectivity has not been tested\./,
   );
 });
+
+test("database provider services hide the consumer-side Databases settings section", () => {
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+
+  assert.match(settings, /planDetail\?\.plan_type/);
+  assert.match(settings, /const isDatabaseService = servicePlanType === "DB"/);
+  assert.match(
+    settings,
+    /\{!isDatabaseService \? \([\s\S]*?<Paper id="database"[\s\S]*?\) : null\}/,
+  );
+  assert.match(
+    settings,
+    /isDatabaseService\s*\? \["network", "volume", "plan", "danger-zone"\]/,
+  );
+});
