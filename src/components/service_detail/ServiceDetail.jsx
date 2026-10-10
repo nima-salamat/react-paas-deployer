@@ -700,7 +700,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
         data: { database, alias: alias || "default", env_prefix: env_prefix || "DB", access_mode: access_mode || "rw" },
       });
       safeSetSnackbar("success", "Database binding saved.");
-      setSettingsSuccess("Database binding saved. Connection variables will be applied on the next deployment; live connectivity has not been tested.");
+      setSettingsSuccess("Database binding saved. Create a new deployment revision to apply it; live connectivity has not been tested.");
       await fetchDatabaseConfiguration();
     } catch (err) {
       setError(err, "Could not connect the database.");
@@ -720,8 +720,8 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
         url: `${SERVICE_BASE}${id}/databases/`,
         params: { alias: alias || "default" },
       });
-      safeSetSnackbar("success", "Database disconnected.");
-      setSettingsSuccess("Database disconnected.");
+      safeSetSnackbar("success", "Database binding removed.");
+      setSettingsSuccess("Database binding removed. Create a new deployment revision to remove its runtime variables.");
       await fetchDatabaseConfiguration();
     } catch (err) {
       setError(err, "Could not disconnect the database.");
