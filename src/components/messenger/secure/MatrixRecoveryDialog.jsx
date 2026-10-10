@@ -195,7 +195,7 @@ export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
           )}
           {phase === "ready" && (
             <Alert severity="success">
-              This device has a verified Matrix key backup. Messages that were never included in the backup, or whose keys were never shared with this account, may still be unreadable.
+              This device has a verified Matrix key backup. {Number.isFinite(recoveryState?.deviceCount) ? `${recoveryState.deviceCount} secure device(s) are registered with this Messenger account. ` : ""}Messages that were never included in the backup, or whose keys were never shared with this account, may still be unreadable.
             </Alert>
           )}
           {phase === "error" && (
