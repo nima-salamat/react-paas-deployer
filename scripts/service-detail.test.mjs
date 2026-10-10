@@ -221,6 +221,8 @@ test("service settings exposes managed database bindings", () => {
 
 test("service detail forwards fetched database state and handlers into SettingsPanel", () => {
   const service = read("src/components/service_detail/ServiceDetail.jsx");
+  assert.match(service, /bindingsResp\?\.data\?\.catalog_dependencies/);
+  assert.match(service, /setCatalogDatabaseDependencies\(catalogDependencies\)/);
   const start = service.indexOf("<SettingsPanel");
   const end = service.indexOf("/>", start);
   assert.ok(start >= 0 && end > start, "SettingsPanel invocation should exist");
