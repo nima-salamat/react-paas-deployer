@@ -6,6 +6,9 @@ Manage services, deploys, volumes, networks, plans, and curated Ready Apps again
 Backend:  
 [django-paas-deployer](https://github.com/nima-salamat/django-paas-deployer)
 
+Architecture proposal (not implemented yet):  
+[Git Hosting and PaaS source deployment feasibility](https://github.com/nima-salamat/django-paas-deployer/blob/master/documentation/proposals/git-hosting-paas-feasibility.md)
+
 ---
 
 ## Purpose
