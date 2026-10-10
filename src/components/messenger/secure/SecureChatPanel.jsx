@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert, Box, Button, CircularProgress, Divider, IconButton, Paper,
   Stack, TextField, Typography,
@@ -118,6 +118,9 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const timelineRef = useRef(null);
   const [revision, setRevision] = useState(0);
   const [roomDisplayName, setRoomDisplayName] = useState(conversation?.title || "");
 
@@ -188,6 +191,7 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         setRecoveryState(state);
         setMatrixClient(client);
         setRoomDisplayName(room.name || conversation?.title || "Secure conversation");
+        setHasMoreHistory(true);
         setMessages(getRoomMessages(room, client.getUserId()));
         client.on("Room.timeline", onTimeline);
         client.on("Event.decrypted", onDecrypted);
@@ -209,6 +213,42 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
       }
     };
   }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title]);
+
+  const loadOlderHistory = useCallback(async () => {
+    if (!matrixClient || !roomId || loadingOlder || !hasMoreHistory) return;
+    const room = matrixClient.getRoom(roomId);
+    if (!room) {
+      setHasMoreHistory(false);
+      return;
+    }
+    const scroller = timelineRef.current;
+    const beforeHeight = scroller?.scrollHeight || 0;
+    const beforeTop = scroller?.scrollTop || 0;
+    const beforeCount = room.getLiveTimeline?.().getEvents?.().length || 0;
+    setLoadingOlder(true);
+    setError("");
+    try {
+      await matrixClient.scrollback(room, 40);
+      const afterCount = room.getLiveTimeline?.().getEvents?.().length || 0;
+      refreshTimeline(matrixClient);
+      if (afterCount <= beforeCount) setHasMoreHistory(false);
+      requestAnimationFrame(() => {
+        if (scroller) {
+          scroller.scrollTop = beforeTop + Math.max(0, scroller.scrollHeight - beforeHeight);
+        }
+      });
+    } catch (err) {
+      setError(err?.message || "Could not load older encrypted messages from Matrix.");
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [matrixClient, roomId, loadingOlder, hasMoreHistory, refreshTimeline]);
+
+  const onTimelineScroll = (event) => {
+    if (event.currentTarget.scrollTop < 48 && hasMoreHistory && !loadingOlder) {
+      void loadOlderHistory();
+    }
+  };
 
   const onRecoveryReady = async () => {
     setRecoveryOpen(false);
@@ -317,7 +357,18 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
 
       {phase === "ready" && (
         <>
-          <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: { xs: 1.5, md: 3 }, py: 2 }}>
+          <Box
+            ref={timelineRef}
+            onScroll={onTimelineScroll}
+            sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: { xs: 1.5, md: 3 }, py: 2 }}
+          >
+            {hasMoreHistory && (
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 1.5 }}>
+                <Button size="small" onClick={() => void loadOlderHistory()} disabled={loadingOlder}>
+                  {loadingOlder ? "Loading older encrypted messages…" : "Load older messages"}
+                </Button>
+              </Box>
+            )}
             {messages.length === 0 && (
               <Typography color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
                 No readable messages are available on this device yet.
