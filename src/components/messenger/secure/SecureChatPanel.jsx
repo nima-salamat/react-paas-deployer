@@ -16,10 +16,26 @@ import {
 
 function describeEvent(event, ownUserId) {
   const type = event.getType();
+  const wireType = event.getWireType?.() || type;
   const content = event.getContent?.() || {};
   const sender = event.getSender?.() || "";
   const timestamp = Number(event.getTs?.() || Date.now());
   const eventId = event.getId?.() || `${sender}:${timestamp}`;
+
+  if (type === "m.room.message" && wireType !== "m.room.encrypted") {
+    // E2EE room membership and a room-level encryption state are not enough:
+    // a buggy/malicious client can still submit an unencrypted m.room.message.
+    // Never show its body in a UI that claims this room is end-to-end encrypted.
+    return {
+      id: eventId,
+      sender,
+      timestamp,
+      isOwn: sender === ownUserId,
+      body: "Unencrypted event rejected. Its content is hidden because it did not arrive through Matrix E2EE.",
+      undecryptable: true,
+      unencrypted: true,
+    };
+  }
 
   if (type === "m.room.encrypted") {
     return {
