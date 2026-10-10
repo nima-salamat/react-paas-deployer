@@ -154,6 +154,17 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
     }
   };
 
+  const mismatchSas = async () => {
+    try {
+      sasRef.current?.mismatch?.();
+    } catch {
+      // Keep the mismatch indication local if the remote session has already ended.
+    }
+    setError("The security codes did not match. This device remains unverified.");
+    setPhase("cancelled");
+    setSuccess(false);
+  };
+
   const cancel = async () => {
     try {
       await requestRef.current?.cancel({ reason: "User cancelled verification" });
@@ -185,7 +196,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
               {phaseLabel}
             </Alert>
           )}
-          {phase === "3" && (
+          {phase === 3 && (
             <Button variant="contained" onClick={beginSas} disabled={busy}>
               {busy ? "Starting…" : "Compare emoji codes"}
             </Button>
@@ -210,7 +221,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
               <Button variant="contained" fullWidth onClick={confirmSas} disabled={busy}>
                 The codes match
               </Button>
-              <Button variant="outlined" color="error" fullWidth onClick={cancel} disabled={busy}>
+              <Button variant="outlined" color="error" fullWidth onClick={mismatchSas} disabled={busy}>
                 They do not match
               </Button>
             </Stack>
