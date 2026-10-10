@@ -152,6 +152,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
   const [availableVolumes, setAvailableVolumes] = useState([]);
   const [databaseBindings, setDatabaseBindings] = useState([]);
   const [databaseResources, setDatabaseResources] = useState([]);
+  const [catalogDatabaseDependencies, setCatalogDatabaseDependencies] = useState([]);
   const [databaseLoading, setDatabaseLoading] = useState(false);
   const [databaseActionLoading, setDatabaseActionLoading] = useState(false);
   const [selectedNetworkId, setSelectedNetworkId] = useState("");
@@ -673,9 +674,13 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
       const resources = Array.isArray(resourcesResp?.data)
         ? resourcesResp.data
         : resourcesResp?.data?.results || [];
+      const catalogDependencies = Array.isArray(bindingsResp?.data?.catalog_dependencies)
+        ? bindingsResp.data.catalog_dependencies
+        : [];
       if (mountedRef.current) {
         setDatabaseBindings(bindings);
         setDatabaseResources(resources);
+        setCatalogDatabaseDependencies(catalogDependencies);
       }
     } catch (err) {
       if (mountedRef.current) setError(err, "Could not load database configuration.");
@@ -2035,6 +2040,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
               onApplyPlan={handleApplyPlan}
               databaseBindings={databaseBindings}
               databaseResources={databaseResources}
+              catalogDatabaseDependencies={catalogDatabaseDependencies}
               databaseLoading={databaseLoading}
               databaseActionLoading={databaseActionLoading}
               onBindDatabase={handleBindDatabase}
