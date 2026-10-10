@@ -26,6 +26,7 @@ import CreateDeployPanel from "./components/CreateDeployPanel";
 import LogsPanel from "./components/LogsPanel";
 import ServiceToolbar from "./components/ServiceToolbar";
 import SettingsPanel from "./components/SettingsPanel";
+import ServiceSharingPanel from "./components/ServiceSharingPanel";
 import ShellPanel from "./components/ShellPanel";
 import MobileNavFab from "./components/MobileNavFab";
 import MobileServiceHeader from "./components/MobileServiceHeader";
@@ -81,7 +82,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
   const settingsHashChangeSourceRef = useRef("route");
 
   const SERVICE_TAB_VALUES = useMemo(
-    () => ["overview", "create", "logs", "settings", "shell"],
+    () => ["overview", "create", "logs", "settings", "sharing", "shell"],
     []
   );
 
@@ -127,7 +128,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
     settingsHashChangeSourceRef.current = "observer";
     navigateToServiceTab("settings", normalizedHash, { replace: true });
   }, [activeTab, navigateToServiceTab]);
-  const [shareAccess, setShareAccess] = useState({ loading: true, is_owner: true, permissions: null });
+  const [shareAccess, setShareAccess] = useState({ loading: true, is_owner: false, permissions: null });
   const meId = useMemo(() => {
     try {
       const raw = localStorage.getItem("user") || localStorage.getItem("me");
@@ -288,7 +289,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
           // so the real owner is not locked out of Select / Create.
           setShareAccess((prev) => ({
             loading: false,
-            is_owner: Boolean(prev?.is_owner),
+            is_owner: false,
             permissions: prev?.permissions || {},
             share_id: prev?.share_id || null,
           }));
@@ -326,7 +327,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
   const allowedTabs = useMemo(() => {
     if (shareAccess.loading && !effectiveIsOwner) return ["overview"];
     if (effectiveIsOwner || shareAccess.is_owner) {
-      return ["overview", "create", "logs", "settings", "shell"];
+      return ["overview", "create", "logs", "settings", "sharing", "shell"];
     }
     const p = shareAccess.permissions || {};
     const tabs = ["overview"];
@@ -1680,6 +1681,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
     create: "Deploys",
     logs: "Logs",
     settings: "Settings",
+    sharing: "Sharing",
     shell: "Shell",
   };
 
@@ -1976,6 +1978,10 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
               handleCopyEntries={handleCopyEntries}
             />
           )}
+
+          {activeTab === "sharing" && !shareAccess.loading && effectiveIsOwner ? (
+            <ServiceSharingPanel service={service} />
+          ) : null}
 
           {activeTab === "shell" ? (
             <Box sx={{ minWidth: 0 }}>
