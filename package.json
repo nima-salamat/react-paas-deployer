@@ -18,6 +18,7 @@
     "test:plans-admin": "node --test scripts/plans-admin.test.mjs",
     "test:runtime-bindings": "node --test scripts/react-runtime-bindings.test.mjs",
     "test:source-integrity": "node --test scripts/frontend-source-integrity.test.mjs",
+    "test:messenger-topics": "node --test scripts/messenger-topics.test.mjs",
     "test:domain-contracts": "node --test scripts/frontend-domain-contracts.test.mjs",
     "test:admin-surface": "node --test scripts/frontend-admin-surface.test.mjs",
     "test:api-contracts": "node --test scripts/frontend-api-contracts.test.mjs",
