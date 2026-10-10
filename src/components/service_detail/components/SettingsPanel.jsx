@@ -481,6 +481,15 @@ export default function SettingsPanel({
   successMessage,
 }) {
   const navigate = useNavigate();
+  // Database plans represent database-provider services, not workloads that
+  // need to attach to a database. Hide the consumer-side binding UI for them.
+  const servicePlanType = String(
+    planDetail?.plan_type ??
+    service?.plan?.plan_type ??
+    service?.plan_detail?.plan_type ??
+    ""
+  ).trim().toUpperCase();
+  const isDatabaseService = servicePlanType === "DB";
 
   // Network dialog
   const [createNetworkOpen, setCreateNetworkOpen] = useState(false);
@@ -887,7 +896,9 @@ export default function SettingsPanel({
   );
 
   // ─────────────────────────────────────────────────────────────────────
-  const SETTINGS_SECTION_IDS = ["network", "database", "volume", "plan", "danger-zone"];
+  const SETTINGS_SECTION_IDS = isDatabaseService
+    ? ["network", "volume", "plan", "danger-zone"]
+    : ["network", "database", "volume", "plan", "danger-zone"];
 
   useEffect(() => {
     if (!onSectionChange || typeof IntersectionObserver === "undefined") return undefined;
@@ -929,7 +940,7 @@ export default function SettingsPanel({
 
     nodes.forEach((node) => observer.observe(node));
     return () => observer.disconnect();
-  }, [onSectionChange]);
+  }, [onSectionChange, isDatabaseService]);
 
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
@@ -1010,6 +1021,8 @@ export default function SettingsPanel({
         </Collapse>
       </Paper>
 
+      {!isDatabaseService ? (
+        <>
       {/* ═══════════════ DATABASES ═══════════════ */}
       <Paper id="database" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
@@ -1163,6 +1176,9 @@ export default function SettingsPanel({
           </Stack>
         )}
       </Paper>
+
+        </>
+      ) : null}
       {/* ═══════════════ VOLUMES ═══════════════ */}
       <Paper id="volume" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
