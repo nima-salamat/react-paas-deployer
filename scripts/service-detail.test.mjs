@@ -496,6 +496,6 @@ test("regular service database settings offer existing database services and lab
   assert.match(settings, /Database resource or service/);
   assert.match(
     service,
-    /Connection variables will be applied on the next deployment; live connectivity has not been tested\./,
+    /Create a new deployment revision to apply it; live connectivity has not been tested\./,
   );
 });
