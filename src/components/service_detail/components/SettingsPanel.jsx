@@ -1015,7 +1015,7 @@ export default function SettingsPanel({
         <SectionHeader
           icon={<LuDatabase size={18} />}
           title="Databases"
-          subtitle="Choose a managed database resource or an existing database service. The backend checks ownership and private-network reachability; credentials stay in the backend secret store."
+          subtitle="Choose a managed database resource or an existing database service. The backend checks ownership and shared private-network configuration; credentials stay in the backend secret store."
         />
         {databaseFormError ? <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{databaseFormError}</Alert> : null}
         {databaseLoading ? (
