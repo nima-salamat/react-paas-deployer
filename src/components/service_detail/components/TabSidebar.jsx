@@ -14,6 +14,7 @@ import SpaceDashboardRoundedIcon from "@mui/icons-material/SpaceDashboardRounded
 import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import SubjectIcon from "@mui/icons-material/Subject";
 import SettingsIcon from "@mui/icons-material/Settings";
+import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
 
 const ALL_TABS = [
@@ -21,6 +22,7 @@ const ALL_TABS = [
   { value: "create", label: "Create deploy", icon: <RocketLaunchRoundedIcon fontSize="small" /> },
   { value: "logs", label: "Logs", icon: <SubjectIcon fontSize="small" /> },
   { value: "settings", label: "Settings", icon: <SettingsIcon fontSize="small" /> },
+  { value: "sharing", label: "Sharing", icon: <ShareOutlinedIcon fontSize="small" /> },
   { value: "shell", label: "Shell", icon: <TerminalRoundedIcon fontSize="small" /> },
 ];
 
