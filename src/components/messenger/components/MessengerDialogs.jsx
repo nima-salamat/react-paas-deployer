@@ -23,6 +23,9 @@ export default function MessengerDialogs({
   forwardOpen, setForwardOpen, forwardTo,
   // create group
   createGroupOpen, setCreateGroupOpen, groupTitle, setGroupTitle, groupPublic, setGroupPublic, createGroup,
+  // forum topics
+  topicDialogOpen, setTopicDialogOpen, topicParentConversation,
+  topicTitle, setTopicTitle, topicSubmitting, createForumTopic,
   // join invite
   joinOpen, setJoinOpen, joinCode, setJoinCode, joinByCode,
   // join public group confirm
@@ -95,6 +98,47 @@ export default function MessengerDialogs({
         <DialogActions>
           <Button onClick={() => setCreateGroupOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={createGroup} disabled={!groupTitle.trim()}>Create</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={topicDialogOpen}
+        onClose={() => { if (!topicSubmitting) setTopicDialogOpen(false); }}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>
+          {topicParentConversation?.is_forum ? "Create a topic" : "Organize group into topics"}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            The existing conversation stays in General. Group members will also be added to this topic.
+          </Typography>
+          <TextField
+            fullWidth
+            autoFocus
+            label="Topic name"
+            placeholder="Announcements, Development, Support…"
+            value={topicTitle}
+            onChange={(event) => setTopicTitle(event.target.value)}
+            inputProps={{ maxLength: 100 }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && topicTitle.trim() && !topicSubmitting) {
+                event.preventDefault();
+                createForumTopic();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTopicDialogOpen(false)} disabled={topicSubmitting}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={createForumTopic}
+            disabled={!topicTitle.trim() || topicSubmitting}
+          >
+            {topicSubmitting ? "Creating…" : "Create topic"}
+          </Button>
         </DialogActions>
       </Dialog>
 
