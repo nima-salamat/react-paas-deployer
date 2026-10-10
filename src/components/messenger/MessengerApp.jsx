@@ -52,6 +52,9 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 
 import apiRequest, { refreshAccessToken } from "../customHooks/apiRequest.jsx";
 import { MSG_API, unwrapData, unwrapList, authHeaders } from "./api";
+import SecureChatPanel from "./secure/SecureChatPanel";
+import MatrixRecoveryDialog from "./secure/MatrixRecoveryDialog";
+import { createEncryptedConversation, createEncryptedTopic } from "./secure/MatrixSecureClient";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
   copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE, LOAD_OLDER_SIZE,
@@ -440,6 +443,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [groupPublic, setGroupPublic] = useState(false);
+  const [secureGroup, setSecureGroup] = useState(false);
+  const [secureGroupMembers, setSecureGroupMembers] = useState([]);
+  const [secureRecoveryOpen, setSecureRecoveryOpen] = useState(false);
+  const pendingSecureOperationRef = useRef(null);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [topicParentConversation, setTopicParentConversation] = useState(null);
   const [topicTitle, setTopicTitle] = useState("");
@@ -2292,15 +2299,70 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }
   };
 
+  const runPendingSecureOperation = async () => {
+    setSecureRecoveryOpen(false);
+    const operation = pendingSecureOperationRef.current;
+    pendingSecureOperationRef.current = null;
+    if (typeof operation === "function") {
+      try {
+        await operation();
+      } catch (e) {
+        setError(e?.message || "The secure-chat operation failed.");
+      }
+    }
+  };
+
+  const deferSecureOperationUntilRecovery = (error, operation) => {
+    if (["needs_setup", "recovery_required"].includes(error?.code)) {
+      pendingSecureOperationRef.current = operation;
+      setSecureRecoveryOpen(true);
+      return true;
+    }
+    return false;
+  };
+
   const createGroup = async () => {
-    if (!groupTitle.trim()) return;
+    const title = groupTitle.trim();
+    if (!title) return;
+
+    if (secureGroup) {
+      const memberIds = [...secureGroupMembers];
+      const createSecureGroup = async () => {
+        const conv = await createEncryptedConversation({
+          type: "group",
+          title,
+          memberIds,
+        });
+        setCreateGroupOpen(false);
+        setGroupTitle("");
+        setGroupPublic(false);
+        setSecureGroup(false);
+        setSecureGroupMembers([]);
+        closePanel();
+        await loadConversations({ silent: true });
+        if (conv) await openChat(conv);
+      };
+      try {
+        await createSecureGroup();
+      } catch (e) {
+        if (!deferSecureOperationUntilRecovery(e, createSecureGroup)) {
+          setError(e?.message || "Could not create the encrypted group.");
+        }
+      }
+      return;
+    }
+
     try {
       const res = await apiRequest({
         method: "POST", url: `${MSG_API}/conversations/`,
-        data: { type: "group", title: groupTitle.trim(), is_public: groupPublic },
+        data: { type: "group", title, is_public: groupPublic },
       });
       const conv = unwrapData(res);
-      setCreateGroupOpen(false); setGroupTitle(""); setGroupPublic(false);
+      setCreateGroupOpen(false);
+      setGroupTitle("");
+      setGroupPublic(false);
+      setSecureGroup(false);
+      setSecureGroupMembers([]);
       closePanel();
       await loadConversations();
       if (conv) await openChat(conv);
@@ -2309,19 +2371,50 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }
   };
 
+  const startSecureChat = async (rawPeerId) => {
+    const peerId = Number(rawPeerId);
+    if (!Number.isInteger(peerId) || peerId <= 0) {
+      setError("Could not identify the recipient for the secure chat.");
+      return;
+    }
+    const existing = conversations.find((row) => {
+      if (row?.type !== "private" || row?.security_mode !== "matrix_e2ee") return false;
+      const ids = (row.participants || []).map((participant) =>
+        Number(participant?.user?.id ?? participant?.user_id ?? participant?.id)
+      );
+      return ids.includes(peerId) && ids.includes(Number(meId));
+    });
+    if (existing) {
+      await openChat(existing);
+      return;
+    }
+    const createSecureDM = async () => {
+      const conv = await createEncryptedConversation({
+        type: "private",
+        memberIds: [peerId],
+      });
+      await loadConversations({ silent: true });
+      if (conv) await openChat(conv);
+    };
+    try {
+      await createSecureDM();
+    } catch (e) {
+      if (!deferSecureOperationUntilRecovery(e, createSecureDM)) {
+        setError(e?.message || "Could not start an encrypted conversation.");
+      }
+    }
+  };
 
   const createForumTopic = async () => {
     const parentId = topicParentConversation?.id;
     const title = topicTitle.trim();
     if (!parentId || !title || topicSubmitting) return;
     setTopicSubmitting(true);
-    try {
-      const res = await apiRequest({
-        method: "POST",
-        url: `${MSG_API}/conversations/${parentId}/topics/`,
-        data: { title },
+    const createSecureTopicOperation = async () => {
+      const result = await createEncryptedTopic({
+        conversation: topicParentConversation,
+        title,
       });
-      const result = unwrapData(res);
       const topic = result?.topic;
       setTopicDialogOpen(false);
       setTopicTitle("");
@@ -2329,8 +2422,35 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       await loadConversations({ silent: true });
       await loadConversationDetail(parentId);
       if (topic?.id) await openChat(topic);
+    };
+    try {
+      if (topicParentConversation?.security_mode === "matrix_e2ee") {
+        await createSecureTopicOperation();
+      } else {
+        const res = await apiRequest({
+          method: "POST",
+          url: `${MSG_API}/conversations/${parentId}/topics/`,
+          data: { title },
+        });
+        const result = unwrapData(res);
+        const topic = result?.topic;
+        setTopicDialogOpen(false);
+        setTopicTitle("");
+        setTopicParentConversation(null);
+        await loadConversations({ silent: true });
+        await loadConversationDetail(parentId);
+        if (topic?.id) await openChat(topic);
+      }
     } catch (e) {
-      setError(e?.response?.data?.message || "Could not create topic");
+      if (
+        topicParentConversation?.security_mode === "matrix_e2ee"
+        && deferSecureOperationUntilRecovery(e, createSecureTopicOperation)
+      ) {
+        // Retry after the user finishes recovery setup; the action itself keeps
+        // using the Matrix transport and never sends topic content through Django.
+      } else {
+        setError(e?.message || "Could not create topic");
+      }
     } finally {
       setTopicSubmitting(false);
     }
@@ -5140,33 +5260,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               </Box>
             </Box>
           )}
-          {isMatrixE2EE ? (
-            <Paper
-              elevation={0}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                minHeight: 56,
-                px: 1.25,
-                py: 0.75,
-                bgcolor: "background.paper",
-                borderBottom: "1px solid",
-                borderColor: "divider",
-              }}
-            >
-              <IconButton onClick={closeChat} size="small" aria-label="Back to chats">
-                <ArrowBackIcon />
-              </IconButton>
-              <LockOutlinedIcon color="warning" />
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography fontWeight={700} noWrap>{convTitle(activeConv, meId)}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Secure chat unavailable
-                </Typography>
-              </Box>
-            </Paper>
-          ) : (
+          {isMatrixE2EE ? null : (
           <ChatHeader
             isMobile={isMobile}
             msgSearchOpen={msgSearchOpen}
@@ -5213,51 +5307,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               const listed = conversations.find((row) => String(row.id) === String(topic.id));
               void openChat(listed || topic);
             }}
+            onStartSecureChat={startSecureChat}
           />
           )}
 
           {isMatrixE2EE ? (
-            <Paper
-              elevation={0}
-              sx={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1.5,
-                px: { xs: 2.5, sm: 5 },
-                py: 4,
-                textAlign: "center",
-                borderRadius: 0,
-                bgcolor: "background.default",
-              }}
-            >
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: "50%",
-                  display: "grid",
-                  placeItems: "center",
-                  bgcolor: "warning.main",
-                  color: "warning.contrastText",
-                }}
-              >
-                <LockOutlinedIcon sx={{ fontSize: 32 }} />
-              </Box>
-              <Typography variant="h6" fontWeight={800}>
-                Encrypted chat is not ready
-              </Typography>
-              <Typography color="text.secondary" sx={{ maxWidth: 460 }}>
-                This conversation is marked for end-to-end encryption, but Matrix device authentication,
-                verification and key recovery are not configured in this deployment.
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460 }}>
-                To prevent an unsafe downgrade, messaging, attachments, search and calls are disabled here.
-                No messages will be sent through the normal plaintext Messenger path.
-              </Typography>
-            </Paper>
+            <SecureChatPanel conversation={activeConv} currentUserId={meId} />
           ) : (
             <>
           {/* Mini-player sits UNDER the user header (avatar + username) */}
@@ -6525,6 +6580,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         groupPublic={groupPublic}
         setGroupPublic={setGroupPublic}
         createGroup={createGroup}
+        secureGroup={secureGroup}
+        setSecureGroup={setSecureGroup}
+        secureGroupMembers={secureGroupMembers}
+        setSecureGroupMembers={setSecureGroupMembers}
         topicDialogOpen={topicDialogOpen}
         setTopicDialogOpen={setTopicDialogOpen}
         topicParentConversation={topicParentConversation}
@@ -6575,6 +6634,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         messagesWithDays={messagesWithDays}
         messages={messages}
         jumpToDayInChat={jumpToDayInChat}
+      />
+      <MatrixRecoveryDialog
+        open={secureRecoveryOpen}
+        onClose={() => setSecureRecoveryOpen(false)}
+        onReady={() => { void runPendingSecureOperation(); }}
       />
     </Box>
     </ThemeProvider>
