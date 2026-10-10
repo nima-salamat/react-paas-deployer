@@ -3863,6 +3863,13 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // configured, encrypted conversations must never fall through to the
   // plaintext Django composer/timeline.
   const isMatrixE2EE = activeConv?.security_mode === "matrix_e2ee";
+  const incomingCallConversation = incomingCall
+    ? (conversations.find((row) => String(row.id) === String(incomingCall.conversation_id))
+      || (String(activeConv?.id) === String(incomingCall.conversation_id) ? activeConv : null))
+    : null;
+  const visibleIncomingCall = incomingCallConversation?.security_mode === "matrix_e2ee"
+    ? null
+    : incomingCall;
   const peer = peerUser(activeConv, meId);
   const role = myRole(activeConv, meId);
 
@@ -5065,10 +5072,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         position: "relative",
       }}
       onContextMenu={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
-      onDragEnter={onChatDragEnter}
-      onDragOver={onChatDragOver}
-      onDragLeave={onChatDragLeave}
-      onDrop={onDropFilesToChat}
+      onDragEnter={isMatrixE2EE ? undefined : onChatDragEnter}
+      onDragOver={isMatrixE2EE ? undefined : onChatDragOver}
+      onDragLeave={isMatrixE2EE ? undefined : onChatDragLeave}
+      onDrop={isMatrixE2EE ? undefined : onDropFilesToChat}
     >
       {chatOpening && isMobile && !messages.length && (
         <Box sx={{
@@ -5100,7 +5107,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         </Box>
       ) : (
         <>
-          {chatFileDrag && (
+          {chatFileDrag && !isMatrixE2EE && (
             <Box
               sx={{
                 position: "absolute",
@@ -5896,10 +5903,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       listTab={listTab} setListTab={setListTab}
       publicGroups={publicGroups} searchPublicGroups={searchPublicGroups}
       onJoinPublicGroup={joinPublicGroup}
-      incomingCall={incomingCall}
-      incomingCallBusy={incomingCallBusy}
-      onAcceptIncomingCall={() => { void joinCall(incomingCall); }}
-      onDeclineIncomingCall={() => { void declineIncomingCall(); }}
+      incomingCall={visibleIncomingCall}
+      incomingCallBusy={Boolean(visibleIncomingCall) && incomingCallBusy}
+      onAcceptIncomingCall={() => { if (visibleIncomingCall) void joinCall(visibleIncomingCall); }}
+      onDeclineIncomingCall={() => { if (visibleIncomingCall) void declineIncomingCall(); }}
       onConfirmJoinPublicGroup={confirmJoinPublicGroup}
       onTogglePin={togglePin}
       onMarkRead={markChatRead}
