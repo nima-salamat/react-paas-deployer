@@ -149,30 +149,25 @@ function fromLocalInputValue(local) {
 }
 
 function applyLocalPreset(name) {
+  // Keep the client presets aligned with services.share_permissions.RULE_PRESETS.
+  // Defaults stay restrictive; in particular Ops does not implicitly grant
+  // session replacement or unrestricted access to other people's deploys.
   const local = {
     viewer: {
       can_view: true,
       can_view_logs: true,
       can_view_deploy_logs: true,
       can_view_metrics: true,
-      can_shell: false,
-      can_shell_replace: false,
-      can_shell_advanced: false,
-      daily_deploy_limit: 0,
     },
     operator: {
       can_view: true,
       can_view_logs: true,
       can_view_deploy_logs: true,
       can_view_metrics: true,
-      can_shell: false,
-      can_shell_replace: false,
-      can_shell_advanced: false,
       can_start: true,
       can_stop: true,
       can_restart: true,
       can_rebuild: true,
-      daily_deploy_limit: 10,
     },
     developer: {
       can_view: true,
@@ -191,15 +186,40 @@ function applyLocalPreset(name) {
       can_deploy_remove: true,
       can_deploy_select: true,
       can_deploy_download: true,
+      can_deploy_edit_others: false,
+      can_deploy_remove_others: false,
       can_volume_attach: true,
       can_volume_detach: true,
       can_change_config: true,
-      daily_deploy_limit: 20,
     },
     ops: {
-      ...Object.fromEntries(Object.keys(DEFAULT_SHARE_RULES).map((k) => [k, k === "daily_deploy_limit" ? 50 : true])),
+      can_view: true,
+      can_view_logs: true,
+      can_view_deploy_logs: true,
+      can_view_metrics: true,
+      can_view_db_credentials: true,
+      can_start: true,
+      can_stop: true,
+      can_restart: true,
+      can_rebuild: true,
+      can_shell: true,
       can_shell_replace: false,
       can_shell_advanced: true,
+      can_purge: true,
+      can_deploy_add: true,
+      can_deploy_edit: true,
+      can_deploy_remove: true,
+      can_deploy_select: true,
+      can_deploy_download: false,
+      can_deploy_edit_others: false,
+      can_deploy_remove_others: false,
+      can_volume_add: true,
+      can_volume_edit: true,
+      can_volume_delete: true,
+      can_volume_attach: true,
+      can_volume_detach: true,
+      can_network_change: true,
+      can_change_config: true,
     },
   };
   return { ...DEFAULT_SHARE_RULES, ...(local[name] || {}) };
