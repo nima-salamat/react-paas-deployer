@@ -538,4 +538,12 @@ test("service owners can manage shares and granular rules from Service Detail", 
   assert.match(shareDialog, /can_shell_advanced/);
   assert.match(shareDialog, /const RULE_GROUPS = \[/);
   assert.match(shareDialog, /<Accordion/);
+  assert.match(
+    shareDialog,
+    /developer: \{[\s\S]*?can_shell_advanced: true,[\s\S]*?can_shell_replace: false,/,
+  );
+  assert.match(
+    shareDialog,
+    /ops: \{[\s\S]*?can_shell_replace: false,[\s\S]*?can_shell_advanced: true,/,
+  );
 });
