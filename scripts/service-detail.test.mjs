@@ -536,6 +536,9 @@ test("service owners can manage shares and granular rules from Service Detail", 
 
   assert.match(shareDialog, /can_shell_replace/);
   assert.match(shareDialog, /can_shell_advanced/);
+  assert.match(shareDialog, /\/services\/services\/shares\/\$\{s\.id\}\/members\//);
+  assert.match(shareDialog, /memberRulesLoadFailed/);
+  assert.match(shareDialog, /avoid overwriting them/);
   assert.match(shareDialog, /const RULE_GROUPS = \[/);
   assert.match(shareDialog, /<Accordion/);
   assert.match(
