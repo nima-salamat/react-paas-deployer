@@ -219,6 +219,25 @@ test("service settings exposes managed database bindings", () => {
   assert.match(settings, /onUnbindDatabase/);
 });
 
+test("service detail forwards fetched database state and handlers into SettingsPanel", () => {
+  const service = read("src/components/service_detail/ServiceDetail.jsx");
+  const start = service.indexOf("<SettingsPanel");
+  const end = service.indexOf("/>", start);
+  assert.ok(start >= 0 && end > start, "SettingsPanel invocation should exist");
+  const invocation = service.slice(start, end);
+
+  for (const prop of [
+    "databaseBindings={databaseBindings}",
+    "databaseResources={databaseResources}",
+    "databaseLoading={databaseLoading}",
+    "databaseActionLoading={databaseActionLoading}",
+    "onBindDatabase={handleBindDatabase}",
+    "onUnbindDatabase={handleUnbindDatabase}",
+  ]) {
+    assert.ok(invocation.includes(prop), `SettingsPanel is missing ${prop}`);
+  }
+});
+
 test("service detail keeps the backend route contract", () => {
   const constants = read("src/components/service_detail/constants.js");
   const service = read("src/components/service_detail/ServiceDetail.jsx");
