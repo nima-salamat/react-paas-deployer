@@ -346,7 +346,7 @@ export async function getRecoveryState(matrixClient) {
       // Continue below and require recovery rather than assuming key backup works.
     }
   }
-  if (secretStatus.defaultKeyId || backupInfo || deviceCount > 1) {
+  if (secretStatus.defaultKeyId || backupInfo) {
     return {
       state: "recovery_required",
       backupInfo,
@@ -355,7 +355,17 @@ export async function getRecoveryState(matrixClient) {
       deviceCount,
     };
   }
-  return { state: "needs_setup", backupInfo: null, crossSigningReady, deviceCount };
+  // Multiple devices without an existing backup are not a reason to overwrite
+  // anything: no backup exists. Let the user verify an existing device first,
+  // or create a new backup while explicitly warning that old history may stay
+  // unreadable without its keys.
+  return {
+    state: "needs_setup",
+    backupInfo: null,
+    crossSigningReady,
+    deviceCount,
+    historyMayBeUnavailable: deviceCount > 1,
+  };
 }
 
 export async function prepareRecoveryKey(matrixClient) {
