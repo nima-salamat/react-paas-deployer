@@ -26,6 +26,8 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
   const verifierRef = useRef(null);
   const requestRef = useRef(null);
   const sasRef = useRef(null);
+  const onVerifiedRef = useRef(onVerified);
+  useEffect(() => { onVerifiedRef.current = onVerified; }, [onVerified]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -49,7 +51,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
         if (cancelled) return;
         setPhase("verified");
         setSuccess(true);
-        onVerified?.();
+        onVerifiedRef.current?.();
       }).catch((err) => {
         if (cancelled) return;
         setPhase("cancelled");
@@ -58,7 +60,11 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
     };
     const onRequestChange = () => {
       if (cancelled || !activeRequest) return;
-      setPhase(activeRequest.phase);
+      setPhase((current) => (
+        sasRef.current && (current === "compare" || current === "comparing")
+          ? current
+          : activeRequest.phase
+      ));
       if (activeRequest.verifier) attachVerifier(activeRequest.verifier);
       if (activeRequest.phase === 5) {
         setError("The other device cancelled verification. No trust change was made.");
@@ -66,7 +72,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
       if (activeRequest.phase === 6) {
         setSuccess(true);
         setPhase("verified");
-        onVerified?.();
+        onVerifiedRef.current?.();
       }
     };
 
@@ -105,7 +111,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
       verifierRef.current = null;
       sasRef.current = null;
     };
-  }, [open, onVerified]);
+  }, [open]);
 
   const beginSas = async () => {
     const activeRequest = requestRef.current;
@@ -124,7 +130,7 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
         void verifier.verify().then(() => {
           setPhase("verified");
           setSuccess(true);
-          onVerified?.();
+          onVerifiedRef.current?.();
         }).catch((err) => {
           setPhase("cancelled");
           setError(err?.message || "Device verification did not complete.");
