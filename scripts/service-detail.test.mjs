@@ -494,6 +494,7 @@ test("regular service database settings offer existing database services and lab
   assert.match(settings, /same private network/);
   assert.match(settings, /binding_status === "configured_unverified"/);
   assert.match(settings, /Database resource or service/);
+  assert.match(settings, /service\?\.source_kind.*catalog/);
   assert.match(
     service,
     /Create a new deployment revision to apply it; live connectivity has not been tested\./,
