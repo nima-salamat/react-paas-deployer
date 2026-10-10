@@ -642,7 +642,7 @@ export function shutdownSecureMatrixClient() {
   try { client?.stopClient(); } catch { /* no-op */ }
   client = null;
   clientPromise = null;
-  currentSession = null;
+  clearSession();
   secretStorageKeyCache.clear();
   recoveryKeyBytesPending?.fill(0);
   recoveryKeyBytesPending = null;
