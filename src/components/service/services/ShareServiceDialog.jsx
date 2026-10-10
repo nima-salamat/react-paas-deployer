@@ -404,6 +404,7 @@ export default function ShareServiceDialog({
   // per-member overrides when sharing to group
   const [memberOverrides, setMemberOverrides] = useState({});
   const [selectedMemberId, setSelectedMemberId] = useState(null);
+  const [memberRulesLoadFailed, setMemberRulesLoadFailed] = useState(false);
 
 
   const loadExistingShares = useCallback(async () => {
@@ -543,8 +544,48 @@ export default function ShareServiceDialog({
       setGroupTitle(s.group_title || "");
       setTargetUserId(s.target_user_id ? String(s.target_user_id) : "");
       setTargetUsername(s.target_username || "");
-      if (s.group_id) loadMembers(s.group_id, 1, "", "all");
+      setMemberOverrides({});
+      setSelectedMemberId(null);
+      setMemberRulesLoadFailed(false);
+      if (s.group_id) {
+        loadMembers(s.group_id, 1, "", "all");
+        (async () => {
+          try {
+            const response = await apiRequest({
+              method: "GET",
+              url: `${API_BASE}/services/services/shares/${s.id}/members/`,
+            });
+            const body = response?.data?.data || response?.data || {};
+            const rows = Array.isArray(body.members) ? body.members : [];
+            setMemberOverrides(
+              Object.fromEntries(
+                rows
+                  .filter((member) => member.has_override)
+                  .map((member) => [
+                    String(member.user_id),
+                    {
+                      user_id: member.user_id,
+                      username: member.username || member.display_name || String(member.user_id),
+                      role: member.role,
+                      rules: { ...DEFAULT_SHARE_RULES, ...(member.rules || {}) },
+                      is_enabled: member.is_enabled !== false,
+                    },
+                  ])
+              )
+            );
+          } catch (loadError) {
+            setMemberRulesLoadFailed(true);
+            setError(
+              friendlyError(loadError) ||
+                "Could not load the existing per-member rules. Reopen this share to retry before editing it."
+            );
+          }
+        })();
+      }
     } else {
+      setMemberOverrides({});
+      setSelectedMemberId(null);
+      setMemberRulesLoadFailed(false);
       setRules({ ...DEFAULT_SHARE_RULES });
       setNote("");
       setPreset("");
@@ -607,6 +648,10 @@ export default function ShareServiceDialog({
   const handleSave = async () => {
     if (viewOnly) {
       onClose?.();
+      return;
+    }
+    if (isEdit && groupId && memberRulesLoadFailed) {
+      setError("Existing member-specific rules could not be loaded, so saving is disabled to avoid overwriting them.");
       return;
     }
     setSaving(true);
@@ -1072,7 +1117,7 @@ export default function ShareServiceDialog({
           variant="contained"
           disableElevation
           onClick={handleSave}
-          disabled={saving || viewOnly}
+          disabled={saving || viewOnly || memberRulesLoadFailed}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <ShareIcon />}
         >
           {viewOnly ? "Close" : isEdit ? "Save" : "Share"}
