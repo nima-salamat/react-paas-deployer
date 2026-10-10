@@ -229,6 +229,7 @@ test("service detail forwards fetched database state and handlers into SettingsP
   for (const prop of [
     "databaseBindings={databaseBindings}",
     "databaseResources={databaseResources}",
+    "catalogDatabaseDependencies={catalogDatabaseDependencies}",
     "databaseLoading={databaseLoading}",
     "databaseActionLoading={databaseActionLoading}",
     "onBindDatabase={handleBindDatabase}",
@@ -236,6 +237,15 @@ test("service detail forwards fetched database state and handlers into SettingsP
   ]) {
     assert.ok(invocation.includes(prop), `SettingsPanel is missing ${prop}`);
   }
+});
+
+test("database settings distinguishes Ready App dependencies from optional managed bindings", () => {
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+  assert.match(settings, /catalogDatabaseDependencies = \[\]/);
+  assert.match(settings, /Database declared by this Ready App/);
+  assert.match(settings, /Ready App dependency/);
+  assert.match(settings, /No separate managed binding is required/);
+  assert.match(settings, /does not test live database connectivity or reveal passwords/);
 });
 
 test("service detail keeps the backend route contract", () => {
