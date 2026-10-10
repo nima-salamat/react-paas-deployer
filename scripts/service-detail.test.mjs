@@ -484,3 +484,18 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(adminServicesPanel, /error: "error"/);
   assert.match(adminServicesPanel, /st === "failed" \|\| st === "error"/);
 });
+
+test("regular service database settings offer existing database services and label bindings unverified", () => {
+  const settings = read("src/components/service_detail/components/SettingsPanel.jsx");
+  const service = read("src/components/service_detail/ServiceDetail.jsx");
+
+  assert.match(settings, /resource\.resource_type === "database_service"/);
+  assert.match(settings, /resource\.connectable === false/);
+  assert.match(settings, /same private network/);
+  assert.match(settings, /binding_status === "configured_unverified"/);
+  assert.match(settings, /Database resource or service/);
+  assert.match(
+    service,
+    /Connection variables will be applied on the next deployment; live connectivity has not been tested\./,
+  );
+});
