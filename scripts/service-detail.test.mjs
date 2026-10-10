@@ -549,7 +549,7 @@ test("service owners can manage shares and granular rules from Service Detail", 
     shareDialog,
     /ops: \{[\s\S]*?can_shell_replace: false,[\s\S]*?can_shell_advanced: true,/,
   );
-  const opsPreset = shareDialog.match(/ops: \{([\s\S]*?)\n    \},\n  \};/);
+  const opsPreset = shareDialog.match(/ops: \{([\s\S]*?)\n {4}\},\n {2}\};/);
   assert.ok(opsPreset, "Ops preset should be present");
   assert.match(opsPreset[1], /can_deploy_edit_others: false/);
   assert.match(opsPreset[1], /can_deploy_remove_others: false/);
