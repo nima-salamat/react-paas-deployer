@@ -20,6 +20,8 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import CloseIcon from "@mui/icons-material/Close";
 import CallIcon from "@mui/icons-material/Call";
 import VideocamIcon from "@mui/icons-material/Videocam";
+import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
+import CheckIcon from "@mui/icons-material/Check";
 import { convAvatar, convTitle } from "../messengerUtils";
 
 export default function ChatHeader(props) {
@@ -59,9 +61,18 @@ export default function ChatHeader(props) {
     setConfirmDelete,
     role,
     setConfirmLeave,
+    onCreateTopic,
+    onSwitchTopic,
   } = props;
 
+  const [topicMenuAnchor, setTopicMenuAnchor] = React.useState(null);
   const title = convTitle(activeConv, meId);
+  const forumRootId = activeConv?.is_forum
+    ? activeConv.id
+    : activeConv?.parent_conversation;
+  const isForumConversation = activeConv?.type === "group"
+    && Boolean(activeConv?.is_forum || activeConv?.parent_conversation);
+  const forumTopics = Array.isArray(activeConv?.topics) ? activeConv.topics : [];
 
   return (
   <Stack
@@ -238,6 +249,19 @@ export default function ChatHeader(props) {
               : "tap for info"}
       </Typography>
     </Box>
+    {isForumConversation && (
+      <Tooltip title={activeConv?.is_forum ? "Choose a topic" : "Switch topic"}>
+        <IconButton
+          size="small"
+          aria-label="Choose topic"
+          onClick={(event) => setTopicMenuAnchor(event.currentTarget)}
+          sx={{ flexShrink: 0, color: "primary.main" }}
+        >
+          <ForumOutlinedIcon fontSize="small" />
+          <KeyboardArrowDownIcon sx={{ ml: -0.4, fontSize: 16 }} />
+        </IconButton>
+      </Tooltip>
+    )}
     {/* Mobile: keep a single call icon → popup with voice/video; rest in ⋮ menu */}
     {isMobile ? (
       <Tooltip title="Call">
@@ -309,6 +333,13 @@ export default function ChatHeader(props) {
           <ListItemIcon><PersonAddIcon fontSize="small" /></ListItemIcon> Add contact
         </MenuItem>
       )}
+      {activeConv?.type === "group" && !activeConv?.parent_conversation
+        && (role === "owner" || role === "admin") && (
+        <MenuItem onClick={() => { onCreateTopic?.(activeConv); setHeaderMenu(null); }}>
+          <ListItemIcon><ForumOutlinedIcon fontSize="small" /></ListItemIcon>
+          {activeConv.is_forum ? "Create topic" : "Organize group into topics"}
+        </MenuItem>
+      )}
       <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
         <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon> Clear messages
       </MenuItem>
@@ -344,6 +375,56 @@ export default function ChatHeader(props) {
         </MenuItem>
       )}
     </Menu>
+    {isForumConversation && (
+      <Menu
+        anchorEl={topicMenuAnchor}
+        open={Boolean(topicMenuAnchor)}
+        onClose={() => setTopicMenuAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{ paper: { sx: { minWidth: 220, maxWidth: 320, borderRadius: 2 } } }}
+      >
+        <MenuItem
+          selected={String(activeConv?.id) === String(forumRootId)}
+          onClick={() => {
+            setTopicMenuAnchor(null);
+            onSwitchTopic?.({
+              id: forumRootId,
+              type: "group",
+              title: activeConv?.is_forum
+                ? activeConv.title
+                : (activeConv?.parent_conversation_title || "General"),
+            });
+          }}
+        >
+          <ListItemIcon><ForumOutlinedIcon fontSize="small" /></ListItemIcon>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography fontWeight={600}>General</Typography>
+            <Typography variant="caption" color="text.secondary">Main group conversation</Typography>
+          </Box>
+          {String(activeConv?.id) === String(forumRootId) && <CheckIcon fontSize="small" color="primary" />}
+        </MenuItem>
+        {forumTopics.map((topic) => (
+          <MenuItem
+            key={topic.id}
+            selected={String(activeConv?.id) === String(topic.id)}
+            onClick={() => {
+              setTopicMenuAnchor(null);
+              onSwitchTopic?.(topic);
+            }}
+          >
+            <ListItemIcon><ForumOutlinedIcon fontSize="small" /></ListItemIcon>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography noWrap fontWeight={600}>{topic.title}</Typography>
+              {topic.description ? (
+                <Typography variant="caption" color="text.secondary" noWrap>{topic.description}</Typography>
+              ) : null}
+            </Box>
+            {String(activeConv?.id) === String(topic.id) && <CheckIcon fontSize="small" color="primary" />}
+          </MenuItem>
+        ))}
+      </Menu>
+    )}
       </>
     ) : (
       /* Mobile search mode: minimal header — search UI is at the bottom */
