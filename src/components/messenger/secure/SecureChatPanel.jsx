@@ -82,6 +82,26 @@ function getRoomMessages(room, ownUserId) {
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function roomHasPendingInvites(room) {
+  try {
+    const events = room?.currentState?.getStateEvents?.("m.room.member");
+    // Fail closed: if the SDK cannot tell us the room membership state, do not
+    // send a Megolm session key only to the current device by mistake.
+    if (!Array.isArray(events)) return true;
+    return events.some((event) => event?.getContent?.()?.membership === "invite");
+  } catch {
+    return true;
+  }
+}
+
+async function nonBlockingRecoveryState(client) {
+  try {
+    return await getRecoveryState(client);
+  } catch {
+    return { state: "needs_setup", statusUnavailable: true };
+  }
+}
+
 function waitForSync(client) {
   if (client.getSyncState?.() === "SYNCING") return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -94,56 +114,23 @@ function waitForSync(client) {
       if (error) reject(error);
       else resolve();
     };
-    const onSync = (state) => {
-      if (state === "SYNCING" || state === "PREPARED") finish();
-      if (state === "ERROR" || state === "STOPPED") {
-        finish(new MatrixSecureError("The Matrix device could not synchronize encrypted rooms.", "sync_failed"));
-      }
-    };
-    const timeout = setTimeout(() => finish(
-      new MatrixSecureError("Matrix synchronization timed out. Secure chat remains unavailable.", "sync_timeout"),
-    ), 20000);
-    client.on("sync", onSync);
-  });
-}
-
-export default function SecureChatPanel({ conversation, currentUserId }) {
-  const roomId = conversation?.matrix_room_id;
-  const [phase, setPhase] = useState("connecting");
-  const [error, setError] = useState("");
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
-  const [devicesOpen, setDevicesOpen] = useState(false);
-  const [recoveryState, setRecoveryState] = useState(null);
-  const [matrixClient, setMatrixClient] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-  const [loadingOlder, setLoadingOlder] = useState(false);
-  const [hasMoreHistory, setHasMoreHistory] = useState(true);
-  const timelineRef = useRef(null);
-  const [revision, setRevision] = useState(0);
-  const [roomDisplayName, setRoomDisplayName] = useState(conversation?.title || "");
-
-  const refreshTimeline = useCallback((client) => {
-    const room = client.getRoom(roomId);
-    if (!room) return;
-    setRoomDisplayName(room.name || conversation?.title || "Secure conversation");
-    setMessages(getRoomMessages(room, client.getUserId()));
-  }, [roomId, conversation?.title]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let activeClient = null;
-    const onTimeline = (event, room) => {
-      if (!room || room.roomId !== roomId) return;
+    const updateRoomMembershipState = () => {
+      const room = activeClient?.getRoom(roomId);
+      if (!room || room.getMyMembership?.() !== "join") return;
+      setPhase(roomHasPendingInvites(room) ? "waiting_for_peer" : "ready");
       refreshTimeline(activeClient);
     };
-    const onDecrypted = () => refreshTimeline(activeClient);
     const onSync = (state) => {
       if (state === "ERROR") {
-        setError("Matrix synchronization failed. Messages are not being sent through the normal Messenger path.");
+        setError("Matrix synchronization failed. No messages are sent through the normal plaintext Messenger path.");
       }
-      if (state === "SYNCING" || state === "PREPARED") refreshTimeline(activeClient);
+      if (state === "SYNCING" || state === "PREPARED") {
+        updateRoomMembershipState();
+      }
+    };
+    const onMembership = (_event, member) => {
+      if (member?.roomId !== roomId) return;
+      updateRoomMembershipState();
     };
 
     async function connect() {
@@ -160,25 +147,15 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         activeClient = client;
         setMatrixClient(client);
         await waitForSync(client);
-        let room = client.getRoom(roomId);
-        if (room?.getMyMembership?.() === "invite") {
-          await client.joinRoom(roomId);
-          room = client.getRoom(roomId);
-        } else if (!room) {
-          try {
-            await client.joinRoom(roomId);
-          } catch {
-            // The next check reports a safe, actionable state. Never use Django
-            // message history as a substitute for a Matrix room.
-          }
-          room = client.getRoom(roomId);
-        }
+
+        const room = client.getRoom(roomId);
         if (!room) {
           throw new MatrixSecureError(
-            "This Matrix room is not available to the current device. Confirm the invitation or ask a group admin to restore membership.",
+            "No Matrix room or pending invitation arrived for this secure conversation. Ask the sender to retry the invitation from Messenger.",
             "room_not_available",
           );
         }
+
         const isEncrypted = await client.getCrypto().isEncryptionEnabledInRoom(roomId);
         if (!isEncrypted) {
           throw new MatrixSecureError(
@@ -186,30 +163,48 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
             "room_not_encrypted",
           );
         }
-        const state = await getRecoveryState(client);
-        if (cancelled) return;
-        setRecoveryState(state);
-        setMatrixClient(client);
+
+        const membership = room.getMyMembership?.();
         setRoomDisplayName(room.name || conversation?.title || "Secure conversation");
         setHasMoreHistory(true);
+
+        if (membership === "invite") {
+          // Match Matrix clients such as Element: opening the chat must not
+          // silently accept an invitation. The recipient explicitly joins it.
+          setRecoveryState(await nonBlockingRecoveryState(client));
+          setMessages([]);
+          setPhase("invited");
+          return;
+        }
+        if (membership !== "join") {
+          throw new MatrixSecureError(
+            "This device is not a joined member of the encrypted room. It may have been removed or the invitation may have been declined.",
+            "not_joined",
+          );
+        }
+
+        const state = await nonBlockingRecoveryState(client);
+        if (cancelled) return;
+        setRecoveryState(state);
         setMessages(getRoomMessages(room, client.getUserId()));
         client.on("Room.timeline", onTimeline);
         client.on("Event.decrypted", onDecrypted);
         client.on("sync", onSync);
-        setPhase(state.state === "ready" ? "ready" : "recovery_required");
+        client.on("RoomMember.membership", onMembership);
+        setPhase(roomHasPendingInvites(room) ? "waiting_for_peer" : "ready");
       } catch (err) {
         if (cancelled) return;
         setError(err?.message || "Could not open this encrypted room.");
         setPhase("error");
       }
-    }
-    void connect();
+    }    void connect();
     return () => {
       cancelled = true;
       if (activeClient) {
         activeClient.off("Room.timeline", onTimeline);
         activeClient.off("Event.decrypted", onDecrypted);
         activeClient.off("sync", onSync);
+        activeClient.off("RoomMember.membership", onMembership);
       }
     };
   }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title]);
@@ -250,15 +245,34 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
     }
   };
 
+  const acceptInvitation = async () => {
+    if (!matrixClient || !roomId || phase !== "invited") return;
+    setPhase("connecting");
+    setError("");
+    try {
+      await matrixClient.joinRoom(roomId);
+      // Reconnect after the join so timeline listeners, membership checks and
+      // the current room state are all re-established from the joined room.
+      setRevision((value) => value + 1);
+    } catch (err) {
+      setError(err?.message || "Could not accept the encrypted-room invitation.");
+      setPhase("invited");
+    }
+  };
+
   const onRecoveryReady = async () => {
     setRecoveryOpen(false);
     if (!matrixClient) return;
     try {
       await assertSecureMessagingReady(matrixClient);
-      setRecoveryState(await getRecoveryState(matrixClient));
+      setRecoveryState(await nonBlockingRecoveryState(matrixClient));
       refreshTimeline(matrixClient);
       setError("");
-      setPhase("ready");
+      const room = matrixClient.getRoom(roomId);
+      if (room?.getMyMembership?.() === "invite") setPhase("invited");
+      else if (room?.getMyMembership?.() === "join") {
+        setPhase(roomHasPendingInvites(room) ? "waiting_for_peer" : "ready");
+      } else setPhase("error");
     } catch (err) {
       setError(err?.message || "Encrypted key backup is not ready.");
       setPhase("recovery_required");
@@ -271,6 +285,17 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
     setSending(true);
     setError("");
     try {
+      const room = matrixClient.getRoom(roomId);
+      if (!room || room.getMyMembership?.() !== "join") {
+        throw new MatrixSecureError("Join the encrypted-room invitation before sending messages.", "not_joined");
+      }
+      if (roomHasPendingInvites(room)) {
+        setPhase("waiting_for_peer");
+        throw new MatrixSecureError(
+          "Secure messaging is paused until all invited participants have accepted and initialized an encrypted device.",
+          "participants_pending",
+        );
+      }
       await assertSecureMessagingReady(matrixClient);
       const isEncrypted = await matrixClient.getCrypto().isEncryptionEnabledInRoom(roomId);
       if (!isEncrypted) {
