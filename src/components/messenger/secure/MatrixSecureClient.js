@@ -169,32 +169,85 @@ async function acquireDeviceLock() {
 }
 
 async function validateStoredSession(session) {
+  let response;
   try {
-    const response = await fetch(
-      `${session.homeserverUrl.replace(/\/+$/, "")}/_matrix/client/v3/account/whoami`,
+    response = await fetch(
+      `${session.homeserverUrl.replace(/\\/+$/, "")}/_matrix/client/v3/account/whoami`,
       { headers: { Authorization: `Bearer ${session.accessToken}` } },
     );
-    if (!response.ok) return false;
-    const data = await response.json();
-    if (data.user_id !== session.userId || data.device_id !== session.deviceId) return false;
+  } catch {
+    throw new MatrixSecureError(
+      "Could not reach the Matrix homeserver to validate this browser's existing device. The saved device session was preserved; retry when the connection is available.",
+      "matrix_session_validation_unavailable",
+    );
+  }
+  if (response.status === 401 || response.status === 403) return false;
+  if (!response.ok) {
+    throw new MatrixSecureError(
+      "The Matrix homeserver could not validate this browser's existing device session. The saved session was preserved; retry later.",
+      "matrix_session_validation_unavailable",
+    );
+  }
 
-    // The Matrix token must also belong to the Django account currently logged
-    // in to this tab. A stale session from a previous app user is never reused.
-    const bindingResponse = await fetch(`${MSG_API}/secure/device-session/`, {
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new MatrixSecureError(
+      "The Matrix homeserver returned an invalid device-session response. The saved session was preserved.",
+      "matrix_session_validation_failed",
+    );
+  }
+  if (data.user_id !== session.userId || data.device_id !== session.deviceId) return false;
+
+  // The Matrix token must also belong to the Django account currently logged
+  // in to this tab. A stale session from a previous app user is never reused.
+  let bindingResponse;
+  try {
+    bindingResponse = await fetch(`${MSG_API}/secure/device-session/`, {
       headers: authHeaders({
         "X-Matrix-Access-Token": session.accessToken,
         "X-Matrix-Device-ID": session.deviceId,
       }),
     });
-    if (!bindingResponse.ok) return false;
-    const bindingBody = await bindingResponse.json();
-    const binding = bindingBody?.data || bindingBody;
-    return bindingBody?.success !== false
-      && binding?.valid === true
-      && binding?.device_id === session.deviceId;
   } catch {
-    return false;
+    throw new MatrixSecureError(
+      "Could not contact Paas Deployer to verify this Matrix device. The saved device session was preserved; retry when connected.",
+      "device_binding_unavailable",
+    );
   }
+  if (bindingResponse.status >= 500 || bindingResponse.status === 429) {
+    throw new MatrixSecureError(
+      "Paas Deployer could not verify this Matrix device right now. The saved session was preserved; retry later.",
+      "device_binding_unavailable",
+    );
+  }
+
+  let bindingBody;
+  try {
+    bindingBody = await bindingResponse.json();
+  } catch {
+    throw new MatrixSecureError(
+      "Paas Deployer returned an invalid Matrix device-binding response. The saved session was preserved.",
+      "device_binding_failed",
+    );
+  }
+  if (!bindingResponse.ok || bindingBody?.success === false) {
+    const reason = String(bindingBody?.message || bindingBody?.detail || "");
+    // An expired/revoked/foreign Matrix device is genuinely invalid. In
+    // contrast, a stale Django session or an unexplained authorization error
+    // must not silently replace the browser's device and its only local keys.
+    if (/matrix (?:access )?token.*(?:invalid|expired)|device.*(?:revoked|belongs to another|different device|not found)/i.test(reason)) {
+      return false;
+    }
+    throw new MatrixSecureError(
+      "Paas Deployer could not verify that the saved Matrix device belongs to the current app session. Sign in again and retry; the saved device session was preserved.",
+      "device_binding_failed",
+    );
+  }
+
+  const binding = bindingBody?.data || bindingBody;
+  return binding?.valid === true && binding?.device_id === session.deviceId;
 }
 
 async function requestNewDeviceSession() {
