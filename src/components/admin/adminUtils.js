@@ -306,6 +306,7 @@ export function isSessionStaff() {
 const TAB_RULES = {
   overview: null, // every authenticated staff member can see the overview
   tickets: ["tickets.view", "tickets.manage", "tickets.delete"],
+  departments: ["departments.manage"],
   users: ["users.view", "users.manage", "users.create", "users.manage_rules"],
   services: [
     "services.view", "services.manage", "services.delete",
