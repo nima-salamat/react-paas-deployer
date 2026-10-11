@@ -63,7 +63,8 @@ test("failed first-time crypto initialization retires only the unusable new devi
 
   assert.match(source, /createdDeviceSession && !deviceMarkerWritten/);
   assert.match(source, /await revokeLostLocalDevice\(session\?\.deviceId\)/);
-  assert.match(source, /Preserve a device[\\s\\S]*local marker/);
+  assert.ok(source.includes("Preserve a device"));
+  assert.ok(source.includes("local marker so a transient failure cannot silently"));
   assert.match(source, /createdDeviceSession = true/);
   assert.match(source, /deviceMarkerWritten = true/);
 });
