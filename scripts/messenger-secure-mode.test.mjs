@@ -83,6 +83,6 @@ test("new secure conversations notify the recipient's live chat list without pla
 
   assert.ok(api.includes('data.type === "conversation.created"'));
   assert.ok(api.includes("loadConversations({ silent: true })"));
-  assert.ok(api.includes("secure-room registration"));
+  assert.ok(api.includes("Secure-room registration"));
   assert.ok(api.includes("never pull E2EE room content"));
 });
