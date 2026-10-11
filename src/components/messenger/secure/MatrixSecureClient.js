@@ -284,7 +284,7 @@ function safeInitializationError(error) {
   const rawMessage = typeof error?.message === "string" ? error.message : "";
   const message = rawMessage
     .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]")
-    .replace(/((?:access_token|refresh_token|password|authorization)\s*[=:]\s*)[^&\s,;]+/gi, "$1[redacted]")
+    .replace(/((?:access_token|refresh_token|token|password|authorization)\s*[=:]\s*)[^&\s,;]+/gi, "$1[redacted]")
     .replace(/([?&](?:access_token|refresh_token|password)=)[^&\s]+/gi, "$1[redacted]")
     .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL]")
     .slice(0, 220);
@@ -294,6 +294,9 @@ function safeInitializationError(error) {
 async function initializeClient() {
   let lockAcquired = false;
   let nextClient = null;
+  let session = null;
+  let createdDeviceSession = false;
+  let deviceMarkerWritten = false;
   let stage = "checking browser crypto-store ownership";
   try {
     lockAcquired = await acquireDeviceLock();
@@ -305,7 +308,7 @@ async function initializeClient() {
     }
 
     stage = "restoring local Matrix device state";
-    let session = readSession();
+    session = readSession();
     if (session) {
       const hasMarker = await hasDeviceMarker(session.deviceId);
       if (!hasMarker) {
@@ -324,7 +327,10 @@ async function initializeClient() {
       clearSession();
       session = null;
     }
-    if (!session) session = await requestNewDeviceSession();
+    if (!session) {
+      session = await requestNewDeviceSession();
+      createdDeviceSession = true;
+    }
 
     stage = "creating the Matrix client";
     nextClient = createClient({
@@ -340,6 +346,7 @@ async function initializeClient() {
 
     stage = "recording local device state";
     await writeDeviceMarker(session.deviceId);
+    deviceMarkerWritten = true;
 
     stage = "starting Matrix synchronization";
     const markInitialSyncPrepared = (state) => {
@@ -354,7 +361,15 @@ async function initializeClient() {
     return client;
   } catch (error) {
     try { nextClient?.stopClient(); } catch { /* no-op */ }
-    if (nextClient && !client) clearSession();
+    // If this initialization created a brand-new server-side Matrix device
+    // but could not establish its local crypto store, retire that unusable
+    // device rather than leaving an orphan on every retry. Preserve a device
+    // that already had a local marker so a transient failure cannot silently
+    // throw away the only working local key store/session binding.
+    if (createdDeviceSession && !deviceMarkerWritten) {
+      await revokeLostLocalDevice(session?.deviceId);
+      clearSession();
+    }
     if (lockAcquired && releaseDeviceLock) releaseDeviceLock();
     if (lockAcquired) releaseDeviceLock = null;
     if (error instanceof MatrixSecureError) throw error;
