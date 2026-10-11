@@ -36,8 +36,8 @@ test("Plans admin exposes the complete Resource Plan policy", () => {
 test("plans.manage is sufficient to reveal the admin Resource Plans navigation item", () => {
   const utils = read("src/components/admin/adminUtils.js");
 
-  assert.match(
-    utils,
-    /if \(tabId === "plans"\) \{[\s\S]*_session\.rules\.includes\("plans\.view"\)[\s\S]*_session\.rules\.includes\("plans\.manage"\)/
-  );
+  // The shared permission map must expose the tab for either read or manage
+  // capability; canSeeNav applies the same array-based rule to every area.
+  assert.match(utils, /plans: \["plans\\.view", "plans\\.manage"\]/);
+  assert.match(utils, /if \(Array\.isArray\(rule\)\) return rule\.some/);
 });
