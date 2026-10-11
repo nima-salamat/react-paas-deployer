@@ -258,9 +258,22 @@ async function revokeLostLocalDevice(deviceId) {
   }
 }
 
+function safeInitializationError(error) {
+  const name = typeof error?.name === "string" ? error.name.slice(0, 60) : "Error";
+  const rawMessage = typeof error?.message === "string" ? error.message : "";
+  const message = rawMessage
+    .replace(/Bearer\\s+[^\\s,;]+/gi, "Bearer [redacted]")
+    .replace(/((?:access_token|refresh_token|password|authorization)\\s*[=:]\\s*)[^&\\s,;]+/gi, "$1[redacted]")
+    .replace(/([?&](?:access_token|refresh_token|password)=)[^&\\s]+/gi, "$1[redacted]")
+    .replace(/https?:\\/\\/[^\\s"'<>]+/gi, "[URL]")
+    .slice(0, 220);
+  return message ? `${name}: ${message}` : name;
+}
+
 async function initializeClient() {
   let lockAcquired = false;
   let nextClient = null;
+  let stage = "checking browser crypto-store ownership";
   try {
     lockAcquired = await acquireDeviceLock();
     if (!lockAcquired) {
@@ -270,6 +283,7 @@ async function initializeClient() {
       );
     }
 
+    stage = "restoring local Matrix device state";
     let session = readSession();
     if (session) {
       const hasMarker = await hasDeviceMarker(session.deviceId);
@@ -282,6 +296,7 @@ async function initializeClient() {
       }
     }
 
+    stage = "validating or creating the Matrix device session";
     if (session && !(await validateStoredSession(session))) {
       // Do not carry a token across Django-account changes. The old device's
       // remote mapping is not trusted under the current logged-in account.
@@ -290,6 +305,7 @@ async function initializeClient() {
     }
     if (!session) session = await requestNewDeviceSession();
 
+    stage = "creating the Matrix client";
     nextClient = createClient({
       baseUrl: session.homeserverUrl,
       accessToken: session.accessToken,
@@ -297,8 +313,14 @@ async function initializeClient() {
       deviceId: session.deviceId,
       cryptoCallbacks: cryptoCallbacks(),
     });
+
+    stage = "initializing Matrix Rust/WASM encryption and IndexedDB";
     await nextClient.initRustCrypto();
+
+    stage = "recording local device state";
     await writeDeviceMarker(session.deviceId);
+
+    stage = "starting Matrix synchronization";
     nextClient.startClient({ initialSyncLimit: 40 });
     client = nextClient;
     currentSession = session;
@@ -310,7 +332,7 @@ async function initializeClient() {
     if (lockAcquired) releaseDeviceLock = null;
     if (error instanceof MatrixSecureError) throw error;
     throw new MatrixSecureError(
-      "Matrix cryptography could not initialize. The device was not enabled for sending messages.",
+      `Matrix cryptography could not initialize while ${stage}. ${safeInitializationError(error)} Device encryption remains disabled; no message was sent.`,
       "crypto_init_failed",
     );
   }
