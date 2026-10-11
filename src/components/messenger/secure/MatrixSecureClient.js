@@ -262,10 +262,10 @@ function safeInitializationError(error) {
   const name = typeof error?.name === "string" ? error.name.slice(0, 60) : "Error";
   const rawMessage = typeof error?.message === "string" ? error.message : "";
   const message = rawMessage
-    .replace(/Bearer\\s+[^\\s,;]+/gi, "Bearer [redacted]")
-    .replace(/((?:access_token|refresh_token|password|authorization)\\s*[=:]\\s*)[^&\\s,;]+/gi, "$1[redacted]")
-    .replace(/([?&](?:access_token|refresh_token|password)=)[^&\\s]+/gi, "$1[redacted]")
-    .replace(/https?:\\/\\/[^\\s"'<>]+/gi, "[URL]")
+    .replace(/Bearer\s+[^\s,;]+/gi, "Bearer [redacted]")
+    .replace(/((?:access_token|refresh_token|password|authorization)\s*[=:]\s*)[^&\s,;]+/gi, "$1[redacted]")
+    .replace(/([?&](?:access_token|refresh_token|password)=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/https?:\/\/[^\s"'<>]+/gi, "[URL]")
     .slice(0, 220);
   return message ? `${name}: ${message}` : name;
 }
