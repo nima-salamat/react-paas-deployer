@@ -316,11 +316,11 @@ test("Departments is an authorized, first-class admin surface", () => {
   const panel = read("src/components/admin/panels/DepartmentsPanel.jsx");
   const permissions = read("src/components/admin/adminUtils.js");
 
-  assert.match(dashboard, /import DepartmentsPanel from "\.\/panels\/DepartmentsPanel\.jsx"/);
-  assert.match(dashboard, /tab === "departments" && canSeeNav\("departments"\)/);
-  assert.match(sidebar, /id: "departments", label: "Departments"/);
-  assert.match(permissions, /departments: \["departments\.manage"\]/);
-  assert.match(panel, /\/api\/tickets\/admin\/departments/);
-  assert.match(panel, /departments\.manage/);
-  assert.match(panel, /membership and manager-role changes remains a superuser-only operation/);
+  assert.ok(dashboard.includes('import DepartmentsPanel from "./panels/DepartmentsPanel.jsx"'));
+  assert.ok(dashboard.includes('tab === "departments" && canSeeNav("departments")'));
+  assert.ok(sidebar.includes('id: "departments", label: "Departments"'));
+  assert.ok(permissions.includes('departments: ["departments.manage"]'));
+  assert.ok(panel.includes("/api/tickets/admin/departments"));
+  assert.ok(panel.includes("departments.manage"));
+  assert.ok(panel.includes("membership and manager-role changes remains a superuser-only operation"));
 });
