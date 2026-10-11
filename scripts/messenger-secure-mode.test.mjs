@@ -48,6 +48,16 @@ test("Matrix crypto initialization reports a sanitized failing stage", () => {
 });
 
 
+test("transient Matrix validation failures preserve the existing device/session", () => {
+  const source = read("src/components/messenger/secure/MatrixSecureClient.js");
+
+  assert.match(source, /matrix_session_validation_unavailable/);
+  assert.match(source, /device_binding_unavailable/);
+  assert.match(source, /The saved device session was preserved/);
+  assert.match(source, /a stale Django session or an unexplained authorization error/);
+  assert.match(source, /if \(createdDeviceSession && !deviceMarkerWritten\)/);
+});
+
 test("failed first-time crypto initialization retires only the unusable new device", () => {
   const source = read("src/components/messenger/secure/MatrixSecureClient.js");
 
