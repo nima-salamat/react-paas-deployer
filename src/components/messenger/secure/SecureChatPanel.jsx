@@ -197,7 +197,8 @@ function waitForSync(client) {
         setError(err?.message || "Could not open this encrypted room.");
         setPhase("error");
       }
-    }    void connect();
+    }
+    void connect();
     return () => {
       cancelled = true;
       if (activeClient) {
@@ -363,21 +364,56 @@ function waitForSync(client) {
         </Box>
       )}
 
-      {phase === "recovery_required" && (
+      {phase === "invited" && (
         <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, p: 4, flex: 1 }}>
-          <KeyIcon color="warning" sx={{ fontSize: 42 }} />
-          <Typography fontWeight={700}>
-            {recoveryState?.state === "needs_setup" ? "Set up encrypted history recovery" : "Restore encrypted history"}
+          <LockOutlinedIcon color="success" sx={{ fontSize: 42 }} />
+          <Typography fontWeight={700}>Encrypted conversation invitation</Typography>
+          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={520}>
+            This is a separate end-to-end encrypted room. Accept the invitation to join it and start secure messaging. Your existing standard conversation and its history will remain unchanged.
           </Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={500}>
-            {recoveryState?.state === "needs_setup"
-              ? "Before sending, create a key backup and save its recovery key somewhere separate from this browser."
-              : "This device does not yet have the trusted key material needed for history. Restore the existing recovery key, or use a trusted existing device. The account password alone cannot unlock older messages."}
-          </Typography>
-          <Button variant="contained" startIcon={<KeyIcon />} onClick={() => setRecoveryOpen(true)}>
-            Configure or restore keys
+          {recoveryState?.state !== "ready" && (
+            <Alert severity="info" sx={{ maxWidth: 540 }}>
+              Key recovery is recommended, but it is not required to accept the invitation or send messages. You can configure recovery from the key button after joining.
+            </Alert>
+          )}
+          <Button variant="contained" onClick={() => void acceptInvitation()}>
+            Accept secure invitation
           </Button>
         </Box>
+      )}
+
+      {phase === "waiting_for_peer" && (
+        <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, p: 4, flex: 1 }}>
+          <LockOutlinedIcon color="warning" sx={{ fontSize: 42 }} />
+          <Typography fontWeight={700}>Waiting for secure-room participants</Typography>
+          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={540}>
+            The encrypted invitation has been created, but one or more participants have not joined with a Matrix device yet. Sending is paused so message keys are not shared only with the sender's device. The other person does not need to create a secure chat manually; they just need to open this invitation and accept it. They can do that when they come online.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={540}>
+            Your normal Messenger conversation and its history are separate and have not been deleted or moved.
+          </Typography>
+          <Button variant="outlined" onClick={() => setRevision((value) => value + 1)}>
+            Check invitation status
+          </Button>
+        </Box>
+      )}
+
+      {phase === "ready" && recoveryState?.state !== "ready" && (
+        <Alert
+          severity="warning"
+          sx={{ mx: 1.5, mt: 1 }}
+          action={(
+            <Button color="inherit" size="small" onClick={() => setRecoveryOpen(true)}>
+              Set up recovery
+            </Button>
+          )}
+        >
+          {recoveryState?.statusUnavailable
+            ? "Encrypted messaging is available, but the recovery status could not be checked. Review key recovery when the connection is restored."
+            : recoveryState?.state === "recovery_required"
+              ? "Encrypted messaging is available, but this device has not verified the existing key backup. Restore the existing recovery key to recover older history; the app will not overwrite it."
+              : "Encrypted messaging is available, but key recovery is not set up. Save a recovery key to reduce the risk of permanently losing history if this device is lost."}
+        </Alert>
       )}
 
       {phase === "ready" && (
