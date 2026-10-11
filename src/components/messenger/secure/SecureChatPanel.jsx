@@ -11,7 +11,7 @@ import MatrixRecoveryDialog from "./MatrixRecoveryDialog";
 import MatrixDevicesDialog from "./MatrixDevicesDialog";
 import {
   assertSecureMessagingReady, getRecoveryState, getSecureMatrixClient,
-  MatrixSecureError,
+  hasSecureMatrixInitialSync, MatrixSecureError,
 } from "./MatrixSecureClient";
 
 function describeEvent(event, ownUserId) {
@@ -85,8 +85,8 @@ function getRoomMessages(room, ownUserId) {
 function roomHasPendingInvites(room) {
   try {
     const events = room?.currentState?.getStateEvents?.("m.room.member");
-    // Fail closed: if the SDK cannot tell us the room membership state, do not
-    // send a Megolm session key only to the current device by mistake.
+    // Fail closed when Matrix membership state cannot be read. The room must
+    // not send its Megolm session only to this browser's device by mistake.
     if (!Array.isArray(events)) return true;
     return events.some((event) => event?.getContent?.()?.membership === "invite");
   } catch {
@@ -103,7 +103,7 @@ async function nonBlockingRecoveryState(client) {
 }
 
 function waitForSync(client) {
-  if (client.getSyncState?.() === "SYNCING") return Promise.resolve();
+  if (hasSecureMatrixInitialSync(client)) return Promise.resolve();
   return new Promise((resolve, reject) => {
     let done = false;
     const finish = (error) => {
@@ -114,6 +114,55 @@ function waitForSync(client) {
       if (error) reject(error);
       else resolve();
     };
+    const onSync = (state) => {
+      // SYNCING can be the first request still in flight. Wait for PREPARED so
+      // the pending invitation and membership state has been hydrated.
+      if (state === "PREPARED") finish();
+      if (state === "ERROR" || state === "STOPPED") {
+        finish(new MatrixSecureError("The Matrix device could not complete its initial synchronization.", "sync_failed"));
+      }
+    };
+    const timeout = setTimeout(() => finish(
+      new MatrixSecureError("Matrix initial synchronization timed out. Secure chat remains unavailable.", "sync_timeout"),
+    ), 20000);
+    client.on("sync", onSync);
+    // Close the race where PREPARED arrives between the initial check and listener registration.
+    if (hasSecureMatrixInitialSync(client)) finish();
+  });
+}
+
+export default function SecureChatPanel({ conversation, currentUserId }) {
+  const roomId = conversation?.matrix_room_id;
+  const [phase, setPhase] = useState("connecting");
+  const [error, setError] = useState("");
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [devicesOpen, setDevicesOpen] = useState(false);
+  const [recoveryState, setRecoveryState] = useState(null);
+  const [matrixClient, setMatrixClient] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const timelineRef = useRef(null);
+  const [revision, setRevision] = useState(0);
+  const [roomDisplayName, setRoomDisplayName] = useState(conversation?.title || "");
+
+  const refreshTimeline = useCallback((client) => {
+    const room = client.getRoom(roomId);
+    if (!room) return;
+    setRoomDisplayName(room.name || conversation?.title || "Secure conversation");
+    setMessages(getRoomMessages(room, client.getUserId()));
+  }, [roomId, conversation?.title]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let activeClient = null;
+    const onTimeline = (event, room) => {
+      if (!room || room.roomId !== roomId) return;
+      refreshTimeline(activeClient);
+    };
+    const onDecrypted = () => refreshTimeline(activeClient);
     const updateRoomMembershipState = () => {
       const room = activeClient?.getRoom(roomId);
       if (!room || room.getMyMembership?.() !== "join") return;
@@ -124,9 +173,7 @@ function waitForSync(client) {
       if (state === "ERROR") {
         setError("Matrix synchronization failed. No messages are sent through the normal plaintext Messenger path.");
       }
-      if (state === "SYNCING" || state === "PREPARED") {
-        updateRoomMembershipState();
-      }
+      if (state === "SYNCING" || state === "PREPARED") updateRoomMembershipState();
     };
     const onMembership = (_event, member) => {
       if (member?.roomId !== roomId) return;
@@ -169,8 +216,7 @@ function waitForSync(client) {
         setHasMoreHistory(true);
 
         if (membership === "invite") {
-          // Match Matrix clients such as Element: opening the chat must not
-          // silently accept an invitation. The recipient explicitly joins it.
+          // Match Element: opening the room must not silently accept an invite.
           setRecoveryState(await nonBlockingRecoveryState(client));
           setMessages([]);
           setPhase("invited");
@@ -183,9 +229,8 @@ function waitForSync(client) {
           );
         }
 
-        const state = await nonBlockingRecoveryState(client);
+        setRecoveryState(await nonBlockingRecoveryState(client));
         if (cancelled) return;
-        setRecoveryState(state);
         setMessages(getRoomMessages(room, client.getUserId()));
         client.on("Room.timeline", onTimeline);
         client.on("Event.decrypted", onDecrypted);
@@ -252,8 +297,7 @@ function waitForSync(client) {
     setError("");
     try {
       await matrixClient.joinRoom(roomId);
-      // Reconnect after the join so timeline listeners, membership checks and
-      // the current room state are all re-established from the joined room.
+      // Reconnect after joining so room state and event listeners are fresh.
       setRevision((value) => value + 1);
     } catch (err) {
       setError(err?.message || "Could not accept the encrypted-room invitation.");
