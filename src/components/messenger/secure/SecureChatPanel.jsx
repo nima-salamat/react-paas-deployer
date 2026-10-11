@@ -158,14 +158,35 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
   useEffect(() => {
     let cancelled = false;
     let activeClient = null;
+    let roomListenersAttached = false;
+    let waitingForInviteAcceptance = false;
     const onTimeline = (event, room) => {
       if (!room || room.roomId !== roomId) return;
       refreshTimeline(activeClient);
     };
     const onDecrypted = () => refreshTimeline(activeClient);
+    const attachRoomListeners = () => {
+      if (roomListenersAttached || !activeClient) return;
+      activeClient.on("Room.timeline", onTimeline);
+      activeClient.on("Event.decrypted", onDecrypted);
+      roomListenersAttached = true;
+    };
     const updateRoomMembershipState = () => {
       const room = activeClient?.getRoom(roomId);
-      if (!room || room.getMyMembership?.() !== "join") return;
+      if (!room) return;
+      const membership = room.getMyMembership?.();
+      if (membership === "invite") {
+        setPhase("invited");
+        return;
+      }
+      if (membership !== "join") return;
+      attachRoomListeners();
+      if (waitingForInviteAcceptance) {
+        waitingForInviteAcceptance = false;
+        void nonBlockingRecoveryState(activeClient).then((state) => {
+          if (!cancelled) setRecoveryState(state);
+        });
+      }
       setPhase(roomHasPendingInvites(room) ? "waiting_for_peer" : "ready");
       refreshTimeline(activeClient);
     };
@@ -220,6 +241,11 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
           setRecoveryState(await nonBlockingRecoveryState(client));
           setMessages([]);
           setPhase("invited");
+          waitingForInviteAcceptance = true;
+          // If the invite is accepted from another trusted Matrix client, watch
+          // membership changes and open the timeline without requiring reload.
+          client.on("sync", onSync);
+          client.on("RoomMember.membership", onMembership);
           return;
         }
         if (membership !== "join") {
@@ -232,8 +258,7 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         setRecoveryState(await nonBlockingRecoveryState(client));
         if (cancelled) return;
         setMessages(getRoomMessages(room, client.getUserId()));
-        client.on("Room.timeline", onTimeline);
-        client.on("Event.decrypted", onDecrypted);
+        attachRoomListeners();
         client.on("sync", onSync);
         client.on("RoomMember.membership", onMembership);
         setPhase(roomHasPendingInvites(room) ? "waiting_for_peer" : "ready");
