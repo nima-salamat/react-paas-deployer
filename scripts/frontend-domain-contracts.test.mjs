@@ -321,3 +321,25 @@ test("service share API helpers cover success and backend-error contracts", asyn
   globalThis.fetch = async () => jsonResponse({ result: "error", detail: "Denied" }, true);
   await assert.rejects(() => unshare("/api", {}, "s3"), /Denied/);
 });
+
+
+test("admin navigation accepts every role's supported view or manage permission", () => {
+  clearSessionPermissions();
+  setSessionPermissions({
+    isStaff: true,
+    rules: ["services.delete", "deploys.manage", "volumes.manage", "networks.manage", "login_settings.manage", "auth_codes.manage", "tables.manage"],
+  });
+  for (const tab of ["services", "login", "codes", "tables"]) {
+    assert.equal(canSeeNav(tab), true, "manage-only permission should expose " + tab);
+  }
+  assert.equal(canSeeNav("plans"), false);
+  assert.equal(canSeeNav("docs"), false, "docs.view is not yet a read-only editor");
+
+  setSessionPermissions({ isStaff: true, rules: ["users.manage_rules"] });
+  assert.equal(canSeeNav("users"), true);
+
+  setSessionPermissions({ isStaff: true, rules: ["auth_codes.view"] });
+  assert.equal(canSeeNav("codes"), true);
+
+  clearSessionPermissions();
+});
