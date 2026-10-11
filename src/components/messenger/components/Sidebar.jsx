@@ -743,9 +743,19 @@ export default function Sidebar({
                         <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
                           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
                             {pinned && <PushPinIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />}
+                            {c.security_mode === "matrix_e2ee" && (
+                              <LockOutlinedIcon
+                                aria-label="End-to-end encrypted conversation"
+                                titleAccess="End-to-end encrypted"
+                                sx={{ fontSize: 15, color: "success.main", flexShrink: 0 }}
+                              />
+                            )}
                             <Typography noWrap fontWeight={Number(c.unread_count) > 0 ? 700 : 600} fontSize={14.5}>
                               {convTitle(c, meId)}
                             </Typography>
+                            {c.security_mode === "matrix_e2ee" && (
+                              <Typography variant="caption" color="success.main" sx={{ flexShrink: 0 }}>E2EE</Typography>
+                            )}
                           </Stack>
                           <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
                             {formatTime(c.last_message_at)}
@@ -756,7 +766,11 @@ export default function Sidebar({
                         <Typography noWrap variant="body2" color="text.secondary" fontSize={13}
                           sx={c.draft_text ? { fontStyle: "italic", color: "warning.main" } : undefined}
                         >
-                          {c.draft_text ? `Draft: ${String(c.draft_text).slice(0, 80)}` : formatLastMessagePreview(c.last_message)}
+                          {c.draft_text
+                            ? `Draft: ${String(c.draft_text).slice(0, 80)}`
+                            : c.security_mode === "matrix_e2ee" && !c.last_message
+                              ? "End-to-end encrypted"
+                              : formatLastMessagePreview(c.last_message)}
                         </Typography>
                       }
                     />
