@@ -33,6 +33,7 @@ const tdSx = {
  */
 export default function AuthCodesPanel({
   codes = [],
+  canManage = false,
   codeCount = 0,
   codePage,
   setCodePage,
@@ -75,14 +76,16 @@ export default function AuthCodesPanel({
               Refresh
             </Button>
           )}
-          <Button
-            color="warning"
-            variant="outlined"
-            onClick={() => setConfirmPurge(true)}
-            sx={{ textTransform: "none", borderRadius: 1 }}
-          >
-            Purge expired
-          </Button>
+          {canManage && (
+            <Button
+              color="warning"
+              variant="outlined"
+              onClick={() => setConfirmPurge(true)}
+              sx={{ textTransform: "none", borderRadius: 1 }}
+            >
+              Purge expired
+            </Button>
+          )}
         </Stack>
       </Stack>
 
@@ -151,11 +154,13 @@ export default function AuthCodesPanel({
                     <Chip size="small" color="success" label="valid" sx={{ height: 20, fontSize: 11, borderRadius: 1 }} />
                   )}
                 </Box>
-                <Box component="td" sx={{ ...tdSx, textAlign: "right" }}>
-                  <IconButton size="small" color="error" onClick={() => setDeleteId(c.id)}>
-                    <DeleteOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Box>
+                {canManage && (
+                  <Box component="td" sx={{ ...tdSx, textAlign: "right" }}>
+                    <IconButton size="small" color="error" onClick={() => setDeleteId(c.id)}>
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
             ))}
             {!codes.length && (
@@ -182,31 +187,33 @@ export default function AuthCodesPanel({
         </Box>
       )}
 
-      <ConfirmDialog
-        open={deleteId != null}
-        title="Delete auth code?"
-        message="This one-time code will be removed. The user may need a new code to continue."
-        confirmLabel="Delete"
-        confirmColor="error"
-        onCancel={() => setDeleteId(null)}
-        onConfirm={() => {
-          const id = deleteId;
-          setDeleteId(null);
-          if (id != null) onDelete?.(id);
-        }}
-      />
-      <ConfirmDialog
-        open={confirmPurge}
-        title="Purge expired codes?"
-        message="All expired OTP codes will be permanently removed from the database."
-        confirmLabel="Purge expired"
-        confirmColor="warning"
-        onCancel={() => setConfirmPurge(false)}
-        onConfirm={() => {
-          setConfirmPurge(false);
-          onPurge?.();
-        }}
-      />
+      {canManage && (
+        <ConfirmDialog
+          open={deleteId != null}
+          title="Delete auth code?"
+          message="This one-time code will be removed. The user may need a new code to continue."
+          confirmLabel="Delete"
+          confirmColor="error"
+          onCancel={() => setDeleteId(null)}
+          onConfirm={() => {
+            const id = deleteId;
+            setDeleteId(null);
+            if (id != null) onDelete?.(id);
+          }}
+        />
+        <ConfirmDialog
+          open={confirmPurge}
+          title="Purge expired codes?"
+          message="All expired OTP codes will be permanently removed from the database."
+          confirmLabel="Purge expired"
+          confirmColor="warning"
+          onCancel={() => setConfirmPurge(false)}
+          onConfirm={() => {
+            setConfirmPurge(false);
+            onPurge?.();
+          }}
+        />
+      )}
     </Stack>
   );
 }
