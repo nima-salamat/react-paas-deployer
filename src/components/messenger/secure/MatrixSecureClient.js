@@ -172,7 +172,7 @@ async function validateStoredSession(session) {
   let response;
   try {
     response = await fetch(
-      `${session.homeserverUrl.replace(/\\/+$/, "")}/_matrix/client/v3/account/whoami`,
+      `${session.homeserverUrl.replace(/\/+$/, "")}/_matrix/client/v3/account/whoami`,
       { headers: { Authorization: `Bearer ${session.accessToken}` } },
     );
   } catch {
