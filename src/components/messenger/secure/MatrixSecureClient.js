@@ -117,31 +117,51 @@ async function acquireDeviceLock() {
   }
   let release;
   let resolveReady;
-  const ready = new Promise((resolve) => { resolveReady = resolve; });
+  let rejectReady;
+  const ready = new Promise((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
+  });
   const hold = new Promise((resolve) => { release = resolve; });
   // matrix-js-sdk's Rust crypto storage is profile-scoped. Use one exclusive
   // profile-wide lock, not one per Matrix device ID, so two different devices
   // cannot initialize concurrently against the same IndexedDB crypto store.
-  const lockTask = globalThis.navigator.locks.request(
-    "pd-matrix-crypto-store",
-    { mode: "exclusive", ifAvailable: true },
-    async (lock) => {
-      if (!lock) {
-        resolveReady(false);
-        return false;
-      }
-      releaseDeviceLock = release;
-      resolveReady(true);
-      await hold;
-      return true;
-    },
-  );
+  // Always settle the readiness promise if the browser rejects the lock request.
+  let lockTask;
+  try {
+    lockTask = globalThis.navigator.locks.request(
+      "pd-matrix-crypto-store",
+      { mode: "exclusive", ifAvailable: true },
+      async (lock) => {
+        if (!lock) {
+          resolveReady(false);
+          return false;
+        }
+        releaseDeviceLock = release;
+        resolveReady(true);
+        await hold;
+        return true;
+      },
+    ).catch(() => {
+      rejectReady(new MatrixSecureError(
+        "The browser could not lock the local Matrix encryption store. Close other Messenger tabs and retry.",
+        "web_locks_failed",
+      ));
+      return undefined;
+    });
+  } catch {
+    rejectReady(new MatrixSecureError(
+      "The browser could not lock the local Matrix encryption store. Check browser privacy/storage settings and retry.",
+      "web_locks_failed",
+    ));
+  }
   const acquired = await ready;
   if (!acquired) {
-    lockTask.catch(() => {});
+    await lockTask;
     return false;
   }
-  lockTask.catch(() => {
+  // The lock request stays pending until the release callback is called.
+  lockTask?.catch(() => {
     releaseDeviceLock = null;
   });
   return true;
@@ -523,16 +543,27 @@ export async function restoreRecoveryKey(matrixClient, rawRecoveryKey) {
 }
 
 export async function assertSecureMessagingReady(matrixClient) {
-  const state = await getRecoveryState(matrixClient);
-  if (state.state !== "ready") {
+  let crypto;
+  try {
+    crypto = matrixClient?.getCrypto?.();
+  } catch {
+    crypto = null;
+  }
+  if (!crypto) {
     throw new MatrixSecureError(
-      state.state === "recovery_required"
-        ? "This device needs the existing Matrix recovery key before it can send secure messages."
-        : "Set up and verify an encrypted key backup before starting a secure chat.",
-      state.state,
+      "Matrix end-to-end encryption is not initialized on this device. Retry secure-device setup before sending.",
+      "crypto_not_initialized",
     );
   }
-  return state;
+
+  // Like Element, recovery is strongly recommended but not a prerequisite for
+  // using an otherwise initialized encrypted room. A missing/untrusted backup
+  // must produce a visible warning, not block first-time users from secure chat.
+  try {
+    return await getRecoveryState(matrixClient);
+  } catch {
+    return { state: "needs_setup", statusUnavailable: true };
+  }
 }
 
 async function matrixPost(path, data, session, extraHeaders = {}) {
@@ -610,7 +641,15 @@ export async function createEncryptedConversation({ type, title = "", descriptio
       visibility: "private",
       preset: "private_chat",
       invite: invites,
-      initial_state: [encryptionState, parentState],
+      initial_state: [
+        encryptionState,
+        {
+          type: "m.room.history_visibility",
+          state_key: "",
+          content: { history_visibility: "invited" },
+        },
+        parentState,
+      ],
     });
     const roomId = generalResult?.room_id;
     if (!roomId) throw new MatrixSecureError("Matrix did not create the encrypted General room.", "room_creation_failed");
@@ -636,7 +675,14 @@ export async function createEncryptedConversation({ type, title = "", descriptio
     visibility: "private",
     preset: "private_chat",
     invite: invites,
-    initial_state: [encryptionState],
+    initial_state: [
+      encryptionState,
+      {
+        type: "m.room.history_visibility",
+        state_key: "",
+        content: { history_visibility: "invited" },
+      },
+    ],
   });
   if (!roomResult?.room_id) throw new MatrixSecureError("Matrix did not create the encrypted direct room.", "room_creation_failed");
   return mapEncryptedConversation({
@@ -676,6 +722,11 @@ export async function createEncryptedTopic({ conversation, title, description = 
         type: "m.room.encryption",
         state_key: "",
         content: { algorithm: "m.megolm.v1.aes-sha2" },
+      },
+      {
+        type: "m.room.history_visibility",
+        state_key: "",
+        content: { history_visibility: "invited" },
       },
       {
         type: "m.space.parent",
