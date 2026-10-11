@@ -7,6 +7,7 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
 import EmailIcon from "@mui/icons-material/Email";
 import PeopleIcon from "@mui/icons-material/People";
+import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import LinkIcon from "@mui/icons-material/Link";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
@@ -24,6 +25,7 @@ import { canSeeNav, isSessionSuperuser, isSessionStaff, authMediaSrc } from "../
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: <DashboardIcon fontSize="small" />, shortcut: "1" },
   { id: "tickets", label: "Tickets", icon: <ConfirmationNumberIcon fontSize="small" />, shortcut: "2" },
+  { id: "departments", label: "Departments", icon: <AccountTreeIcon fontSize="small" /> },
   { id: "users", label: "Users & access", icon: <PeopleIcon fontSize="small" />, shortcut: "3" },
   { id: "services", label: "Services", icon: <DnsIcon fontSize="small" />, shortcut: "4" },
   { id: "plans", label: "Plans", icon: <StorageIcon fontSize="small" />, shortcut: "5" },
