@@ -43,10 +43,20 @@ test("Matrix crypto initialization reports a sanitized failing stage", () => {
 
   assert.match(source, /initializing Matrix Rust\/WASM encryption and IndexedDB/);
   assert.match(source, /safeInitializationError/);
-  assert.match(source, /access_token\|refresh_token\|password\|authorization/);
+  assert.match(source, /access_token\|refresh_token\|token\|password\|authorization/);
   assert.match(source, /Device encryption remains disabled; no message was sent/);
 });
 
+
+test("failed first-time crypto initialization retires only the unusable new device", () => {
+  const source = read("src/components/messenger/secure/MatrixSecureClient.js");
+
+  assert.match(source, /createdDeviceSession && !deviceMarkerWritten/);
+  assert.match(source, /await revokeLostLocalDevice\(session\?\.deviceId\)/);
+  assert.match(source, /Preserve a device[\\s\\S]*local marker/);
+  assert.match(source, /createdDeviceSession = true/);
+  assert.match(source, /deviceMarkerWritten = true/);
+});
 
 test("secure chats preserve a distinct plaintext conversation and use explicit invitations", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
