@@ -35,3 +35,13 @@ test("encrypted-room fallback explains missing Matrix device authentication and 
   assert.match(app, /verification and key recovery are not configured/);
   assert.match(app, /To prevent an unsafe downgrade/);
 });
+
+
+test("Matrix crypto initialization reports a sanitized failing stage", () => {
+  const source = read("src/components/messenger/secure/MatrixSecureClient.js");
+
+  assert.match(source, /initializing Matrix Rust\/WASM encryption and IndexedDB/);
+  assert.match(source, /safeInitializationError/);
+  assert.match(source, /access_token\|refresh_token\|password\|authorization/);
+  assert.match(source, /Device encryption remains disabled; no message was sent/);
+});
