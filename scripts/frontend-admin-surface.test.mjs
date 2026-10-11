@@ -287,3 +287,24 @@ test("admin user profile photos use crop and robust reorder interaction", () => 
   assert.match(profile, /useSensor\(TouchSensor/);
   assert.match(profile, /useSensor\(KeyboardSensor/);
 });
+
+
+test("user creation does not imply browsing the existing user directory", () => {
+  const users = read("src/components/admin/panels/UsersPanel.jsx");
+  const backendContract = read("src/components/admin/adminUtils.js");
+
+  assert.match(users, /const canBrowseUsers = hasAnyRule\("users\\.view"\) \|\| canManage \|\| canManageRules/);
+  assert.match(users, /This role can create basic user accounts, but it cannot browse existing users/);
+  assert.match(users, /adminApiErrorMessage/);
+  assert.match(users, /creatingUser/);
+  assert.match(backendContract, /_session\.rules\.includes\("users\.manage_rules"\)/);
+});
+
+test("admin OTP actions are hidden unless the operator has auth_codes.manage", () => {
+  const dashboard = read("src/components/admin/AdminDashboard.jsx");
+  const panel = read("src/components/admin/panels/AuthCodesPanel.jsx");
+
+  assert.match(dashboard, /canManage=\{hasAnyRule\("auth_codes\\.manage"\)\}/);
+  assert.match(panel, /canManage = false/);
+  assert.match(panel, /\{canManage && \(/);
+});
