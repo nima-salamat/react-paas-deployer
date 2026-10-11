@@ -6,7 +6,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ToastProvider } from "./components/ToastContext.jsx";
 import ConfirmDialog from "./components/ConfirmDialog.jsx";
-import { clearSessionPermissions, canSeeNav, adminMeUrl } from "./adminUtils";
+import { clearSessionPermissions, canSeeNav, hasAnyRule, adminMeUrl } from "./adminUtils";
 import apiRequest from "../customHooks/apiRequest";
 import { useAdminIdentity } from "./hooks/useAdminIdentity.js";
 import { useTicketsData } from "./hooks/useTicketsData.js";
@@ -136,7 +136,11 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
     createInvite, deactivateInvite, loadInvites,
     codes, codeCount, codePage, setCodePage, codeSearch, setCodeSearch,
     codeLoading, deleteCode, purgeCodes, loadCodes,
-  } = useInvitesAndCodes();
+  } = useInvitesAndCodes({
+    enabledInvites: canSeeNav("invites"),
+    enabledCodes: canSeeNav("codes"),
+    autoLoad: false,
+  });
 
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -210,17 +214,17 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
   }, []);
 
   useEffect(() => {
-    if (tab === "tickets" || tab === "overview") {
+    if (meLoading) return;
+    if (tab === "overview" || (tab === "tickets" && canSeeNav("tickets"))) {
       loadTickets({ silent: true });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, meLoading, loadTickets]);
 
   useEffect(() => {
+    if (meLoading) return;
     if (tab === "invites" && canSeeNav("invites")) loadInvites();
     if (tab === "codes" && canSeeNav("codes")) loadCodes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, meLoading, loadInvites, loadCodes]);
 
   const doLogout = useCallback(() => {
     try {
@@ -243,6 +247,14 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
     setSearchParams(id === "overview" ? {} : { tab: id });
     setMobileNavOpen(false);
   }, [setSearchParams]);
+ 
+  // Do not render a panel just because a staff member changed ?tab= manually.
+  // API checks remain authoritative, but the UI should not expose inaccessible
+  // screens or make the user stumble into a predictable 403.
+  useEffect(() => {
+    if (meLoading || tab === "profile") return;
+    if (!canSeeNav(tab)) setTabAndUrl("overview");
+  }, [meLoading, tab, setTabAndUrl]);
 
   // Keyboard shortcuts: Alt+1..0, Alt+P, Alt+[
   useEffect(() => {
@@ -366,7 +378,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
             />
           )}
 
-          {tab === "tickets" && (
+          {tab === "tickets" && canSeeNav("tickets") && (
             <TicketsPanel
               tickets={tickets}
               count={count}
@@ -387,7 +399,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
             />
           )}
 
-          {tab === "users" && <UsersPanel />}
+          {tab === "users" && canSeeNav("users") && <UsersPanel />}
 
           {tab === "profile" && (
             <ProfilePanel
@@ -417,6 +429,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
               codeSearch={codeSearch}
               setCodeSearch={setCodeSearch}
               codeLoading={codeLoading}
+              canManage={hasAnyRule("auth_codes.manage")}
               onPurge={purgeCodes}
               onDelete={deleteCode}
               onRefresh={loadCodes}
