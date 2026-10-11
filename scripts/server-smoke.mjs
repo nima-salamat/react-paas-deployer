@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 const port = 34123;
 const child = spawn(process.execPath, ["server.js"], {
@@ -31,6 +33,20 @@ function extractRoot(html) {
     }
   }
   throw new Error("Could not locate closing #root");
+}
+
+function findWasmAsset(dir) {
+  if (!fs.existsSync(dir)) return null;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const nested = findWasmAsset(fullPath);
+      if (nested) return nested;
+    } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".wasm")) {
+      return fullPath;
+    }
+  }
+  return null;
 }
 
 async function waitForServer(url) {
@@ -74,7 +90,20 @@ try {
     throw new Error("Expected public SEO fallback content is missing.");
   }
 
-  console.log("Server shell smoke test passed for /.");
+  const wasmAsset = findWasmAsset(path.join(process.cwd(), "dist"));
+  if (!wasmAsset) {
+    throw new Error("Built frontend does not contain the Matrix crypto WASM asset.");
+  }
+  const wasmPath = `/${path.relative(path.join(process.cwd(), "dist"), wasmAsset).split(path.sep).join("/")}`;
+  const wasmResponse = await fetch(`http://127.0.0.1:${port}${wasmPath}`);
+  const wasmContentType = (wasmResponse.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  if (!wasmResponse.ok || wasmContentType !== "application/wasm") {
+    throw new Error(
+      `Matrix crypto WASM asset was not served with application/wasm (status=${wasmResponse.status}, content-type=${wasmContentType || "missing"}).`,
+    );
+  }
+
+  console.log("Server shell smoke test passed for / and Matrix crypto WASM MIME.");
 } finally {
   child.kill("SIGTERM");
 }
