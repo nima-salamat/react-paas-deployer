@@ -294,8 +294,8 @@ export default function UsersPanel({ setToast: setToastProp }) {
               </Select>
             </FormControl>
           </Stack>
-        </Paper>
-  
+        </DryPanel>
+
         {/* Table */}
         <DryPanel sx={{ overflow: "hidden" }}>
           {userLoading ? (
