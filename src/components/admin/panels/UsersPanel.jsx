@@ -27,6 +27,7 @@ import { useNavigate } from "react-router-dom";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import AdminUserSessionsDialog from "../components/AdminUserSessionsDialog.jsx";
+import { DryPanel } from "../components/DryTable";
 
 
 const PAGE_SIZE = 20;
@@ -247,9 +248,13 @@ export default function UsersPanel({ setToast: setToastProp }) {
           <Typography variant="body2" color="text.secondary">
             {canManage
               ? "Manage accounts, staff flags, and permission rules"
+              : canManageRules
+              ? "Browse users and manage access rules only"
               : canCreate
-              ? "Create and edit basic user accounts (rules and staff flag are read-only)"
-              : "Browse user accounts"}
+                ? (canBrowseUsers
+                  ? "Create and edit basic user accounts (rules and staff flag are read-only)"
+                  : "Create basic accounts without browsing the existing user directory")
+                : "Browse user accounts"}
           </Typography>
         </Box>
         {canCreate && (
@@ -262,7 +267,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
       {canBrowseUsers ? (
         <>
         {/* Filter card */}
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+        <DryPanel sx={{ p: 2 }}>
           <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
             <TextField
               size="small"
@@ -292,7 +297,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
         </Paper>
   
         {/* Table */}
-        <Paper variant="outlined" sx={{ borderRadius: 1.5, overflow: "hidden" }}>
+        <DryPanel sx={{ overflow: "hidden" }}>
           {userLoading ? (
             <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
           ) : (
@@ -422,7 +427,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
               />
             </Box>
           )}
-        </Paper>
+        </DryPanel>
         </>
       ) : (
         <Alert severity="info" variant="outlined">
@@ -504,7 +509,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
                       <> You have <code>users.manage_rules</code> only — you can edit rules but not other fields.</>
                     )}
                   </Typography>
-                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, maxHeight: 320, overflow: "auto" }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 0, maxHeight: 320, overflow: "auto" }}>
                     <Stack gap={1.5}>
                       {grouped.map((group) => (
                         <Box key={group.group}>
@@ -543,7 +548,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
                   </Paper>
                 </Box>
               ) : (
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "action.hover" }}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 0, bgcolor: "action.hover" }}>
                   <Stack direction="row" gap={1.5} alignItems="flex-start">
                     <LockIcon color="action" sx={{ mt: 0.5 }} />
                     <Box>
@@ -612,6 +617,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
               label="Email"
               type="email"
               value={newUser.email}
+              helperText="Optional; must be unique when provided."
               onChange={(e) => setNewUser((s) => ({ ...s, email: e.target.value }))}
               fullWidth
             />
@@ -621,6 +627,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
               label="Password"
               value={newUser.password}
               onChange={(e) => setNewUser((s) => ({ ...s, password: e.target.value }))}
+              helperText="Optional; the configured login flow may establish credentials later."
               fullWidth
             />
             {canManage && (
