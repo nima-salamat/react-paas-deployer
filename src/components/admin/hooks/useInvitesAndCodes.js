@@ -10,7 +10,11 @@ const AUTH = () => `${hostBase()}/auth/api`;
  *
  * Returns state + action callbacks used by InvitesPanel and AuthCodesPanel.
  */
-export function useInvitesAndCodes() {
+export function useInvitesAndCodes({
+  enabledInvites = true,
+  enabledCodes = true,
+  autoLoad = true,
+} = {}) {
   const pushToast = useToast();
 
   // invites
@@ -100,9 +104,14 @@ export function useInvitesAndCodes() {
     }
   }, [loadCodes, pushToast]);
 
-  // Initial loads
-  useEffect(() => { loadInvites(); }, [loadInvites]);
-  useEffect(() => { loadCodes(); }, [loadCodes]);
+  // Only fetch surfaces this operator is allowed to view. The admin shell
+  // can opt out of eager loading and fetch when a tab is actually opened.
+  useEffect(() => {
+    if (autoLoad && enabledInvites) loadInvites();
+  }, [autoLoad, enabledInvites, loadInvites]);
+  useEffect(() => {
+    if (autoLoad && enabledCodes) loadCodes();
+  }, [autoLoad, enabledCodes, loadCodes]);
 
   return {
     // invites
