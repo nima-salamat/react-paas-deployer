@@ -1034,6 +1034,7 @@ function getContentType(filePath) {
     '.ttf': 'font/ttf',
     '.otf': 'font/otf',
 
+    '.wasm': 'application/wasm',
     '.map': 'application/json; charset=utf-8',
   };
 
