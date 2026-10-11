@@ -1677,6 +1677,18 @@ const server = http.createServer(
         return;
       }
 
+      // A missing WASM bundle is a deployment/build error, not a React route.
+      // Never disguise it as an HTML SPA response, which obscures the real cause.
+      if (pathname.toLowerCase().endsWith(".wasm")) {
+        res.writeHead(404, {
+          ...securityHeaders,
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+        });
+        res.end("WebAssembly asset not found");
+        return;
+      }
+
       /*
        * Resolve public page metadata.
        */

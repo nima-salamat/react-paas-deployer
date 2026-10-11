@@ -35,18 +35,30 @@ function extractRoot(html) {
   throw new Error("Could not locate closing #root");
 }
 
-function findWasmAsset(dir) {
-  if (!fs.existsSync(dir)) return null;
+function findFiles(dir, predicate, results = []) {
+  if (!fs.existsSync(dir)) return results;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      const nested = findWasmAsset(fullPath);
-      if (nested) return nested;
-    } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".wasm")) {
-      return fullPath;
+      findFiles(fullPath, predicate, results);
+    } else if (entry.isFile() && predicate(fullPath)) {
+      results.push(fullPath);
     }
   }
-  return null;
+  return results;
+}
+
+function findWasmAssets(dir) {
+  return findFiles(dir, (filePath) => path.extname(filePath).toLowerCase() === ".wasm");
+}
+
+function isReferencedByBuiltJavaScript(distDir, assetPath) {
+  const basename = path.basename(assetPath);
+  const bundles = findFiles(
+    distDir,
+    (filePath) => [".js", ".mjs"].includes(path.extname(filePath).toLowerCase()),
+  );
+  return bundles.some((bundlePath) => fs.readFileSync(bundlePath, "utf8").includes(basename));
 }
 
 async function waitForServer(url) {
@@ -90,23 +102,54 @@ try {
     throw new Error("Expected public SEO fallback content is missing.");
   }
 
-  const wasmAsset = findWasmAsset(path.join(process.cwd(), "dist"));
-  if (!wasmAsset) {
+  const distDir = path.join(process.cwd(), "dist");
+  const wasmAssets = findWasmAssets(distDir);
+  if (!wasmAssets.length) {
     throw new Error("Built frontend does not contain the Matrix crypto WASM asset.");
   }
-  const wasmPath = `/${path.relative(path.join(process.cwd(), "dist"), wasmAsset).split(path.sep).join("/")}`;
-  const wasmResponse = await fetch(`http://127.0.0.1:${port}${wasmPath}`);
-  const wasmContentType = (wasmResponse.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-  if (!wasmResponse.ok || wasmContentType !== "application/wasm") {
-    throw new Error(
-      `Matrix crypto WASM asset was not served with application/wasm (status=${wasmResponse.status}, content-type=${wasmContentType || "missing"}).`,
-    );
-  }
-  if (!(wasmResponse.headers.get("cache-control") || "").toLowerCase().includes("no-cache")) {
-    throw new Error("Matrix crypto WASM must revalidate to avoid retaining stale MIME headers.");
+
+  // Verify that the actual WASM URL referenced by the production JS bundle
+  // resolves to the emitted binary; an unrelated file in dist is not enough.
+  const referencedWasmAssets = wasmAssets.filter((assetPath) =>
+    isReferencedByBuiltJavaScript(distDir, assetPath),
+  );
+  if (!referencedWasmAssets.length) {
+    throw new Error("No emitted Matrix crypto WASM asset is referenced by a built JavaScript bundle.");
   }
 
-  console.log("Server shell smoke test passed for / and Matrix crypto WASM MIME.");
+  for (const wasmAsset of referencedWasmAssets) {
+    const wasmPath = `/${path.relative(distDir, wasmAsset).split(path.sep).join("/")}`;
+    const wasmResponse = await fetch(`http://127.0.0.1:${port}${wasmPath}`);
+    const wasmContentType = (wasmResponse.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!wasmResponse.ok || wasmContentType !== "application/wasm") {
+      throw new Error(
+        `Matrix crypto WASM asset was not served with application/wasm (path=${wasmPath}, status=${wasmResponse.status}, content-type=${wasmContentType || "missing"}).`,
+      );
+    }
+    if (!(wasmResponse.headers.get("cache-control") || "").toLowerCase().includes("no-cache")) {
+      throw new Error(`Matrix crypto WASM must revalidate to avoid retaining stale MIME headers: ${wasmPath}`);
+    }
+
+    const wasmMagic = Buffer.from(await wasmResponse.arrayBuffer()).subarray(0, 4);
+    if (!wasmMagic.equals(Buffer.from([0x00, 0x61, 0x73, 0x6d]))) {
+      throw new Error(`Matrix crypto WASM URL returned a non-WASM body: ${wasmPath}`);
+    }
+  }
+
+  // Missing WASM files must not fall through to an HTML SPA/SEO response.
+  const missingWasmResponse = await fetch(
+    `http://127.0.0.1:${port}/assets/__paasdeployer_missing_${Date.now()}.wasm`,
+  );
+  const missingWasmType = (missingWasmResponse.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+  if (
+    missingWasmResponse.status !== 404 ||
+    missingWasmType !== "text/plain" ||
+    !(missingWasmResponse.headers.get("cache-control") || "").toLowerCase().includes("no-store")
+  ) {
+    throw new Error("Missing WASM paths must return a no-store 404, not an HTML SPA fallback.");
+  }
+
+  console.log("Server shell smoke test passed for referenced Matrix WASM assets, MIME, body signature and cache policy.");
 } finally {
   child.kill("SIGTERM");
 }

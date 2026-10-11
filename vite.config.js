@@ -8,6 +8,18 @@ import { PRERENDERABLE_PUBLIC_ROUTES } from "./src/seo-config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// The crypto WASM URL is derived from the bundled module URL. Give the WASM
+// artifact a per-build URL so a CDN/browser cannot reuse stale MIME headers.
+const wasmBuildLabel = String(
+  process.env.VITE_WASM_ASSET_BUILD_ID ||
+    process.env.GITHUB_SHA ||
+    process.env.PASSDEPLOYER_GIT_SHA ||
+    "local",
+)
+  .replace(/[^a-zA-Z0-9_-]/g, "")
+  .slice(0, 12) || "local";
+const wasmBuildId = `${wasmBuildLabel}-${Date.now().toString(36)}`;
+
 function emitSpaTemplate() {
   return {
     name: "paasdeployer-spa-template",
@@ -62,6 +74,14 @@ export default defineConfig({
     sourcemap: false,
     cssCodeSplit: true,
     minify: "esbuild",
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) =>
+          String(assetInfo.name || "").toLowerCase().endsWith(".wasm")
+            ? `assets/[name]-[hash]-${wasmBuildId}[extname]`
+            : "assets/[name]-[hash][extname]",
+      },
+    },
     modulePreload: {
       resolveDependencies: (_filename, deps) =>
         deps.filter((dep) => !/(?:^|\/)prerender-[^/]+\.js$/.test(dep)),
