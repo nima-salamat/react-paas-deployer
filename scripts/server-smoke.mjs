@@ -102,6 +102,9 @@ try {
       `Matrix crypto WASM asset was not served with application/wasm (status=${wasmResponse.status}, content-type=${wasmContentType || "missing"}).`,
     );
   }
+  if (!(wasmResponse.headers.get("cache-control") || "").toLowerCase().includes("no-cache")) {
+    throw new Error("Matrix crypto WASM must revalidate to avoid retaining stale MIME headers.");
+  }
 
   console.log("Server shell smoke test passed for / and Matrix crypto WASM MIME.");
 } finally {
