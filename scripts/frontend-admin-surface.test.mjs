@@ -308,3 +308,19 @@ test("admin OTP actions are hidden unless the operator has auth_codes.manage", (
   assert.match(panel, /canManage = false/);
   assert.match(panel, /\{canManage && \(/);
 });
+
+
+test("Departments is an authorized, first-class admin surface", () => {
+  const dashboard = read("src/components/admin/AdminDashboard.jsx");
+  const sidebar = read("src/components/admin/layout/AdminSidebar.jsx");
+  const panel = read("src/components/admin/panels/DepartmentsPanel.jsx");
+  const permissions = read("src/components/admin/adminUtils.js");
+
+  assert.match(dashboard, /import DepartmentsPanel from "\.\/panels\/DepartmentsPanel\.jsx"/);
+  assert.match(dashboard, /tab === "departments" && canSeeNav\("departments"\)/);
+  assert.match(sidebar, /id: "departments", label: "Departments"/);
+  assert.match(permissions, /departments: \["departments\.manage"\]/);
+  assert.match(panel, /\/api\/tickets\/admin\/departments/);
+  assert.match(panel, /departments\.manage/);
+  assert.match(panel, /membership and manager-role changes remains a superuser-only operation/);
+});
