@@ -47,6 +47,9 @@ jobs:
       - name: Frontend source integrity tests
         run: npm run test:source-integrity
 
+      - name: Matrix secure Messenger regression tests
+        run: npm run test:messenger-secure-mode
+
       - name: Frontend domain contract tests
         run: npm run test:domain-contracts
 
