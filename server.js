@@ -1159,12 +1159,17 @@ function serveStatic(req, res, pathname) {
       filePath,
     );
 
+  const isWasmAsset =
+    path.extname(filePath).toLowerCase() === '.wasm';
+
   const isHashedAsset =
-    relativePath.startsWith(
-      `assets${path.sep}`,
-    ) ||
-    /[.-][a-f0-9]{8,}\./i.test(
-      path.basename(filePath),
+    !isWasmAsset && (
+      relativePath.startsWith(
+        `assets${path.sep}`,
+      ) ||
+      /[.-][a-f0-9]{8,}\./i.test(
+        path.basename(filePath),
+      )
     );
 
   /*
@@ -1192,12 +1197,14 @@ function serveStatic(req, res, pathname) {
       getContentType(filePath),
 
     'Cache-Control':
-      isHashedAsset
-        ? 'public, max-age=31536000, immutable'
-        : getContentType(filePath) ===
-            'text/html; charset=utf-8'
-          ? 'public, max-age=300, must-revalidate'
-          : 'public, max-age=3600',
+      isWasmAsset
+        ? 'no-cache'
+        : isHashedAsset
+          ? 'public, max-age=31536000, immutable'
+          : getContentType(filePath) ===
+              'text/html; charset=utf-8'
+            ? 'public, max-age=300, must-revalidate'
+            : 'public, max-age=3600',
 
     'Content-Length':
       String(stat.size),
