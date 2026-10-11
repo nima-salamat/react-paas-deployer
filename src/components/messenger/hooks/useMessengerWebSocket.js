@@ -119,6 +119,13 @@ useEffect(() => {
   const handleOnMessage = (ev) => {
     let data;
     try { data = JSON.parse(ev.data); } catch { return; }
+    if (data.type === "conversation.created") {
+      // Secure-room registration commits a new participant row on the backend.
+      // Refresh only the conversation metadata; never pull E2EE room content
+      // through the plaintext Messenger endpoints.
+      loadConversations({ silent: true });
+      return;
+    }
     if (data.type === "message.deleted") {
       const mid = data.message_id || data.id;
       const cid = String(data.conversation_id || "");
