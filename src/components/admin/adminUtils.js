@@ -333,7 +333,8 @@ export function canSeeNav(tabId) {
     return (
       _session.rules.includes("users.view") ||
       _session.rules.includes("users.manage") ||
-      _session.rules.includes("users.create")
+      _session.rules.includes("users.create") ||
+      _session.rules.includes("users.manage_rules")
     );
   }
   if (tabId === "plans") {
