@@ -38,6 +38,6 @@ test("plans.manage is sufficient to reveal the admin Resource Plans navigation i
 
   // The shared permission map must expose the tab for either read or manage
   // capability; canSeeNav applies the same array-based rule to every area.
-  assert.match(utils, /plans: \["plans\\.view", "plans\\.manage"\]/);
-  assert.match(utils, /if \(Array\.isArray\(rule\)\) return rule\.some/);
+  assert.ok(utils.includes('plans: ["plans.view", "plans.manage"]'));
+  assert.ok(utils.includes("if (Array.isArray(rule)) return rule.some((code) => _session.rules.includes(code));"));
 });
