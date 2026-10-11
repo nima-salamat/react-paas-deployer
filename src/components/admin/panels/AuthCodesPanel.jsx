@@ -165,7 +165,7 @@ export default function AuthCodesPanel({
             ))}
             {!codes.length && (
               <Box component="tr">
-                <Box component="td" colSpan={7} sx={{ p: 3, textAlign: "center" }}>
+                <Box component="td" colSpan={canManage ? 7 : 6} sx={{ p: 3, textAlign: "center" }}>
                   <Typography color="text.secondary">
                     {codeLoading ? "Loading…" : "No codes"}
                   </Typography>
@@ -188,7 +188,8 @@ export default function AuthCodesPanel({
       )}
 
       {canManage && (
-        <ConfirmDialog
+        <>
+          <ConfirmDialog
           open={deleteId != null}
           title="Delete auth code?"
           message="This one-time code will be removed. The user may need a new code to continue."
