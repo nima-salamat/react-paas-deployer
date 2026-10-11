@@ -190,30 +190,31 @@ export default function AuthCodesPanel({
       {canManage && (
         <>
           <ConfirmDialog
-          open={deleteId != null}
-          title="Delete auth code?"
-          message="This one-time code will be removed. The user may need a new code to continue."
-          confirmLabel="Delete"
-          confirmColor="error"
-          onCancel={() => setDeleteId(null)}
-          onConfirm={() => {
-            const id = deleteId;
-            setDeleteId(null);
-            if (id != null) onDelete?.(id);
-          }}
-        />
-        <ConfirmDialog
-          open={confirmPurge}
-          title="Purge expired codes?"
-          message="All expired OTP codes will be permanently removed from the database."
-          confirmLabel="Purge expired"
-          confirmColor="warning"
-          onCancel={() => setConfirmPurge(false)}
-          onConfirm={() => {
-            setConfirmPurge(false);
-            onPurge?.();
-          }}
-        />
+            open={deleteId != null}
+            title="Delete auth code?"
+            message="This one-time code will be removed. The user may need a new code to continue."
+            confirmLabel="Delete"
+            confirmColor="error"
+            onCancel={() => setDeleteId(null)}
+            onConfirm={() => {
+              const id = deleteId;
+              setDeleteId(null);
+              if (id != null) onDelete?.(id);
+            }}
+          />
+          <ConfirmDialog
+            open={confirmPurge}
+            title="Purge expired codes?"
+            message="All expired OTP codes will be permanently removed from the database."
+            confirmLabel="Purge expired"
+            confirmColor="warning"
+            onCancel={() => setConfirmPurge(false)}
+            onConfirm={() => {
+              setConfirmPurge(false);
+              onPurge?.();
+            }}
+          />
+        </>
       )}
     </Stack>
   );
