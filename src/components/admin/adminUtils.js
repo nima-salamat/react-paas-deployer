@@ -304,53 +304,32 @@ export function isSessionStaff() {
  * in one place. Superuser sees everything.
  */
 const TAB_RULES = {
-  overview: null,           // every staff sees overview
-  tickets: "tickets.view",  // also tickets.manage / tickets.delete accepted below
-  users: null,              // gated manually (users.view / users.manage / users.create)
-  services: "services.view",
-  plans: "plans.view",
-  login: "login_settings.view",
-  invites: null,            // superuser only
-  codes: "auth_codes.view",
-  emails: "emails.manage",
-  tables: "tables.view",
-  docs: "docs.manage",
+  overview: null, // every authenticated staff member can see the overview
+  tickets: ["tickets.view", "tickets.manage", "tickets.delete"],
+  users: ["users.view", "users.manage", "users.create", "users.manage_rules"],
+  services: [
+    "services.view", "services.manage", "services.delete",
+    "deploys.manage", "volumes.manage", "networks.manage",
+  ],
+  plans: ["plans.view", "plans.manage"],
+  login: ["login_settings.view", "login_settings.manage"],
+  invites: ["invites.manage"],
+  codes: ["auth_codes.view", "auth_codes.manage"],
+  emails: ["emails.manage"],
+  tables: ["tables.view", "tables.manage"],
+  // Docs currently has a write-only UI; do not expose docs.view until a
+  // genuinely read-only mode exists in the editor.
+  docs: ["docs.manage"],
 };
 
 export function canSeeNav(tabId) {
   if (_session.isSuperuser) return true;
   if (!_session.isStaff) return false;
 
-  // Special cases that accept multiple rules
-  if (tabId === "tickets") {
-    return (
-      _session.rules.includes("tickets.view") ||
-      _session.rules.includes("tickets.manage") ||
-      _session.rules.includes("tickets.delete")
-    );
-  }
-  if (tabId === "users") {
-    return (
-      _session.rules.includes("users.view") ||
-      _session.rules.includes("users.manage") ||
-      _session.rules.includes("users.create") ||
-      _session.rules.includes("users.manage_rules")
-    );
-  }
-  if (tabId === "plans") {
-    return (
-      _session.rules.includes("plans.view") ||
-      _session.rules.includes("plans.manage")
-    );
-  }
-  if (tabId === "invites") {
-    // invites.manage is the only meaningful rule; for clarity only superuser + invites.manage
-    return _session.rules.includes("invites.manage");
-  }
-
   const rule = TAB_RULES[tabId];
   if (rule === null) return true;
-  return _session.rules.includes(rule);
+  if (Array.isArray(rule)) return rule.some((code) => _session.rules.includes(code));
+  return typeof rule === "string" && _session.rules.includes(rule);
 }
 
 /** Returns the full catalog of all permission codes (for the rule editor). */
