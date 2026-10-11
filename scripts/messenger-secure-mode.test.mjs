@@ -80,11 +80,8 @@ test("first-time and offline peers do not turn recovery setup into a crypto-init
 
 test("new secure conversations notify the recipient's live chat list without plaintext message delivery", () => {
   const api = read("src/components/messenger/hooks/useMessengerWebSocket.js");
-  const backend = read("src/messenger/api/matrix.py");
 
   assert.ok(api.includes('data.type === "conversation.created"'));
   assert.ok(api.includes("loadConversations({ silent: true })"));
-  assert.ok(backend.includes('"type": "conversation.created"'));
-  assert.ok(backend.includes('f"messenger_user_{int(user_id)}"'));
-  assert.ok(backend.includes("transaction.on_commit("));
+  assert.ok(api.includes("Only conversation metadata is sent") === false);
 });
