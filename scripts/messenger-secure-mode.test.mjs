@@ -16,7 +16,7 @@ test("encrypted conversations never render the plaintext Messenger timeline or c
   const securePanel = read("src/components/messenger/secure/SecureChatPanel.jsx");
   assert.match(securePanel, /Secure room unavailable/);
   assert.match(securePanel, /phase === "error"/);
-  assert.match(securePanel, /No fallback to ordinary plaintext messaging is allowed/);
+  assert.match(securePanel, /The normal Messenger timeline is intentionally not shown/);
 });
 
 test("encrypted conversations disable plaintext upload and call affordances", () => {
