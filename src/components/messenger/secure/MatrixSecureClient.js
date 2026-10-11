@@ -14,6 +14,7 @@ let releaseDeviceLock = null;
 let recoveryKeyBytesPending = null;
 let recoveryKeyIdPending = null;
 const secretStorageKeyCache = new Map();
+const preparedSyncClients = new WeakSet();
 
 export class MatrixSecureError extends Error {
   constructor(message, code = "matrix_secure_error") {
@@ -341,6 +342,12 @@ async function initializeClient() {
     await writeDeviceMarker(session.deviceId);
 
     stage = "starting Matrix synchronization";
+    const markInitialSyncPrepared = (state) => {
+      if (state !== "PREPARED") return;
+      preparedSyncClients.add(nextClient);
+      nextClient.off("sync", markInitialSyncPrepared);
+    };
+    nextClient.on("sync", markInitialSyncPrepared);
     nextClient.startClient({ initialSyncLimit: 40 });
     client = nextClient;
     currentSession = session;
@@ -379,6 +386,13 @@ export async function getSecureMatrixClient() {
 
 export function getSecureMatrixSession() {
   return currentSession || readSession();
+}
+
+export function hasSecureMatrixInitialSync(matrixClient) {
+  return Boolean(
+    matrixClient
+    && (preparedSyncClients.has(matrixClient) || matrixClient.getSyncState?.() === "PREPARED"),
+  );
 }
 
 export async function getRecoveryState(matrixClient) {
