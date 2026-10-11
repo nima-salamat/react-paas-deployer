@@ -57,7 +57,8 @@ export default function ServicesPanel({ setToast: setToastProp }) {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
-  const canManage = hasAnyRule("services.manage") || hasAnyRule("services.delete");
+  const canManage = hasAnyRule("services.manage");
+  const canDelete = hasAnyRule("services.delete") || canManage;
 
   const [svcList, setSvcList] = useState([]);
   const [svcPage, setSvcPage] = useState(1);
@@ -125,8 +126,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
   };
 
   const svcAction = async (action, serviceId) => {
-    if (!canManage && action !== "delete") return;
-    if (action === "delete" && !hasAnyRule("services.delete") && !hasAnyRule("services.manage")) return;
+    if (action === "delete" ? !canDelete : !canManage) return;
     setSvcActionBusy(`${action}-${serviceId}`);
     try {
       if (action === "start") {
@@ -267,7 +267,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         <Box>
           <Typography variant="h5" fontWeight={800}>Services</Typography>
           <Typography variant="body2" color="text.secondary">
-            Inspect and operate any user's service. {canManage ? "You can create, start, stop, purge, and delete." : "Read-only — no services.manage rule."}
+            Inspect any user's services. {canManage ? "You can manage runtime and configuration." : canDelete ? "You can delete services, but runtime and configuration changes are disabled." : "Read-only access."}
           </Typography>
         </Box>
         <Stack direction="row" gap={1}>
@@ -407,7 +407,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
                             <CloudUploadIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        {canManage && (
+                        {canDelete && (
                           <Tooltip title="Delete">
                             <IconButton size="small" color="error" disabled={!!svcActionBusy} onClick={() => svcAction("delete", s.id)}>
                               <DeleteOutlineIcon fontSize="small" />
@@ -455,7 +455,13 @@ export default function ServicesPanel({ setToast: setToastProp }) {
                     <IconButton size="small" disabled={!!svcActionBusy} onClick={() => svcAction("stop", s.id)}><StopIcon fontSize="small" color="error" /></IconButton>
                     <IconButton size="small" disabled={!!svcActionBusy} onClick={() => svcAction("restart", s.id)}><RestartAltIcon fontSize="small" /></IconButton>
                     <IconButton size="small" disabled={!!svcActionBusy} onClick={() => svcAction("purge", s.id)}><CleaningServicesIcon fontSize="small" /></IconButton>
-                    <IconButton size="small" color="error" disabled={!!svcActionBusy} onClick={() => svcAction("delete", s.id)}><DeleteOutlineIcon fontSize="small" /></IconButton>
+                  </Stack>
+                )}
+                {canDelete && (
+                  <Stack direction="row" spacing={0.5} mt={1} onClick={(e) => e.stopPropagation()}>
+                    <IconButton size="small" color="error" disabled={!!svcActionBusy} onClick={() => svcAction("delete", s.id)} aria-label="Delete service">
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
                   </Stack>
                 )}
               </Box>
@@ -484,6 +490,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         onRefresh={() => svcDetail && openSvcDetail(svcDetail)}
         setToast={setToast}
         canManage={canManage}
+        canDelete={canDelete}
       />
 
       {/* Create service dialog — hard edge */}
