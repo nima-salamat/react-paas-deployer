@@ -82,6 +82,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
   const canManage = hasAnyRule("users.manage");
   const canCreate = canManage || hasAnyRule("users.create");
   const canManageRules = hasAnyRule("users.manage_rules");
+  const canBrowseUsers = hasAnyRule("users.view") || canManage || canManageRules;
   // Rules section visible if user can manage rules OR full manage
   const canEditRules = canManage || canManageRules;
   const canDelete = canManage;
@@ -119,8 +120,8 @@ export default function UsersPanel({ setToast: setToastProp }) {
     }
   }, []);
 
-  useEffect(() => { loadUsers(); }, [loadUsers]);
-  useEffect(() => { loadPerms(); }, [loadPerms]);
+  useEffect(() => { if (canBrowseUsers) loadUsers(); }, [loadUsers, canBrowseUsers]);
+  useEffect(() => { if (canBrowseUsers) loadPerms(); }, [loadPerms, canBrowseUsers]);
 
   const pages = Math.max(1, Math.ceil((userCount || 0) / PAGE_SIZE));
 
@@ -177,8 +178,10 @@ export default function UsersPanel({ setToast: setToastProp }) {
       setToast("User created");
       setCreateOpen(false);
       setNewUser({ username: "", email: "", password: "", is_staff: false });
-      setUserPage(1);
-      await loadUsers();
+      if (canBrowseUsers) {
+        if (userPage !== 1) setUserPage(1);
+        else await loadUsers();
+      }
     } catch (e) {
       setToast?.(adminApiErrorMessage(e, "Create failed"));
     } finally {
@@ -256,168 +259,176 @@ export default function UsersPanel({ setToast: setToastProp }) {
         )}
       </Stack>
 
-      {/* Filter card */}
-      <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
-          <TextField
-            size="small"
-            placeholder="Search username / email"
-            value={userSearch}
-            onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
-            sx={{ flex: 1 }}
-            InputProps={{
-              startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: "text.secondary" }} />,
-            }}
-          />
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <Select value={userStaffOnly} onChange={(e) => { setUserStaffOnly(e.target.value); setUserPage(1); }}>
-              <MenuItem value="">All types</MenuItem>
-              <MenuItem value="1">Staff</MenuItem>
-              <MenuItem value="0">Users</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl size="small" sx={{ minWidth: 130 }}>
-            <Select value={userActive} onChange={(e) => { setUserActive(e.target.value); setUserPage(1); }}>
-              <MenuItem value="">Any status</MenuItem>
-              <MenuItem value="1">Active</MenuItem>
-              <MenuItem value="0">Inactive</MenuItem>
-            </Select>
-          </FormControl>
-        </Stack>
-      </Paper>
-
-      {/* Table */}
-      <Paper variant="outlined" sx={{ borderRadius: 1.5, overflow: "hidden" }}>
-        {userLoading ? (
-          <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
-        ) : (
-          <Box sx={{ overflowX: "auto" }}>
-            <Table size="small" sx={{ minWidth: 640 }}>
-              <TableHead>
-                <TableRow sx={{ bgcolor: "action.hover" }}>
-                  <TableCell>User</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Flags</TableCell>
-                  <TableCell>Rules</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id} hover>
-                    <TableCell>
-                      <Stack direction="row" alignItems="center" gap={1.25}>
-                        <Avatar
-                          src={profileThumb(u) || undefined}
-                          onClick={() => setViewUser(u)}
-                          sx={{
-                            width: 32, height: 32, bgcolor: "primary.main", fontSize: 13, fontWeight: 700,
-                            cursor: "pointer",
-                            "&:hover": { outline: "2px solid", outlineColor: "primary.main" },
-                          }}
-                        >
-                          {(u.username || "?").charAt(0).toUpperCase()}
-                        </Avatar>
-                        <Box>
-                          <Typography fontWeight={600} fontSize={14}>{u.username}</Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Joined {u.date_joined ? new Date(u.date_joined).toLocaleDateString() : "—"}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>{u.email || "—"}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
-                        {u.is_superuser && (
-                          <Tooltip title="Superuser — bypasses all permission checks">
-                            <Chip size="small" color="error" icon={<ShieldIcon sx={{ fontSize: 13 }} />} label="super" sx={{ height: 22, fontSize: 11 }} />
-                          </Tooltip>
-                        )}
-                        {u.is_staff && (
-                          <Tooltip title="Staff">
-                            <Chip size="small" color="primary" icon={<VerifiedUserIcon sx={{ fontSize: 13 }} />} label="staff" sx={{ height: 22, fontSize: 11 }} />
-                          </Tooltip>
-                        )}
-                        {!u.is_active && (
-                          <Chip size="small" color="default" icon={<LockIcon sx={{ fontSize: 13 }} />} label="inactive" sx={{ height: 22, fontSize: 11 }} />
-                        )}
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      {(u.rules || []).length === 0 ? (
-                        <Typography variant="caption" color="text.secondary">—</Typography>
-                      ) : (
+      {canBrowseUsers ? (
+        <>
+        {/* Filter card */}
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+            <TextField
+              size="small"
+              placeholder="Search username / email"
+              value={userSearch}
+              onChange={(e) => { setUserSearch(e.target.value); setUserPage(1); }}
+              sx={{ flex: 1 }}
+              InputProps={{
+                startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: "text.secondary" }} />,
+              }}
+            />
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <Select value={userStaffOnly} onChange={(e) => { setUserStaffOnly(e.target.value); setUserPage(1); }}>
+                <MenuItem value="">All types</MenuItem>
+                <MenuItem value="1">Staff</MenuItem>
+                <MenuItem value="0">Users</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <Select value={userActive} onChange={(e) => { setUserActive(e.target.value); setUserPage(1); }}>
+                <MenuItem value="">Any status</MenuItem>
+                <MenuItem value="1">Active</MenuItem>
+                <MenuItem value="0">Inactive</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </Paper>
+  
+        {/* Table */}
+        <Paper variant="outlined" sx={{ borderRadius: 1.5, overflow: "hidden" }}>
+          {userLoading ? (
+            <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
+          ) : (
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 640 }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "action.hover" }}>
+                    <TableCell>User</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Flags</TableCell>
+                    <TableCell>Rules</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id} hover>
+                      <TableCell>
+                        <Stack direction="row" alignItems="center" gap={1.25}>
+                          <Avatar
+                            src={profileThumb(u) || undefined}
+                            onClick={() => setViewUser(u)}
+                            sx={{
+                              width: 32, height: 32, bgcolor: "primary.main", fontSize: 13, fontWeight: 700,
+                              cursor: "pointer",
+                              "&:hover": { outline: "2px solid", outlineColor: "primary.main" },
+                            }}
+                          >
+                            {(u.username || "?").charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Box>
+                            <Typography fontWeight={600} fontSize={14}>{u.username}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Joined {u.date_joined ? new Date(u.date_joined).toLocaleDateString() : "—"}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>{u.email || "—"}</Typography>
+                      </TableCell>
+                      <TableCell>
                         <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
-                          {(u.rules || []).slice(0, 4).map((r) => (
-                            <Chip key={r} size="small" variant="outlined" label={r.split(".").pop()} sx={{ height: 22, fontSize: 11 }} />
-                          ))}
-                          {(u.rules || []).length > 4 && (
-                            <Chip size="small" label={`+${u.rules.length - 4}`} sx={{ height: 22, fontSize: 11 }} />
+                          {u.is_superuser && (
+                            <Tooltip title="Superuser — bypasses all permission checks">
+                              <Chip size="small" color="error" icon={<ShieldIcon sx={{ fontSize: 13 }} />} label="super" sx={{ height: 22, fontSize: 11 }} />
+                            </Tooltip>
+                          )}
+                          {u.is_staff && (
+                            <Tooltip title="Staff">
+                              <Chip size="small" color="primary" icon={<VerifiedUserIcon sx={{ fontSize: 13 }} />} label="staff" sx={{ height: 22, fontSize: 11 }} />
+                            </Tooltip>
+                          )}
+                          {!u.is_active && (
+                            <Chip size="small" color="default" icon={<LockIcon sx={{ fontSize: 13 }} />} label="inactive" sx={{ height: 22, fontSize: 11 }} />
                           )}
                         </Stack>
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" justifyContent="flex-end" gap={0.5}>
-                        <Tooltip title={`Open chat with ${u.username}`}>
-                          <IconButton size="small" onClick={() => goToUserChat(u.username)}>
-                            <ChatBubbleOutlineIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        {canViewSessions && (
-                          <Tooltip title="View active sessions">
-                            <IconButton size="small" onClick={() => setSessionUser(u)}>
-                              <DevicesOutlinedIcon fontSize="small" />
+                      </TableCell>
+                      <TableCell>
+                        {(u.rules || []).length === 0 ? (
+                          <Typography variant="caption" color="text.secondary">—</Typography>
+                        ) : (
+                          <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
+                            {(u.rules || []).slice(0, 4).map((r) => (
+                              <Chip key={r} size="small" variant="outlined" label={r.split(".").pop()} sx={{ height: 22, fontSize: 11 }} />
+                            ))}
+                            {(u.rules || []).length > 4 && (
+                              <Chip size="small" label={`+${u.rules.length - 4}`} sx={{ height: 22, fontSize: 11 }} />
+                            )}
+                          </Stack>
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" justifyContent="flex-end" gap={0.5}>
+                          <Tooltip title={`Open chat with ${u.username}`}>
+                            <IconButton size="small" onClick={() => goToUserChat(u.username)}>
+                              <ChatBubbleOutlineIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                        )}
-                        {(canCreate || canManageRules) && (
-                          <Tooltip title="Edit user">
-                            <IconButton size="small" onClick={() => setEditUser({ ...u, rules: u.rules || [], password: "" })}>
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {canDelete && u.id !== (editUser?.id || -1) && (
-                          <Tooltip title="Deactivate">
-                            <IconButton size="small" color="error" disabled={deleting === u.id} onClick={() => deactivateUser(u.id)}>
-                              <DeleteOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!users.length && (
-                  <TableRow>
-                    <TableCell colSpan={5}>
-                      <Typography color="text.secondary" align="center" py={4}>No users found</Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </Box>
-        )}
-        {pages > 1 && (
-          <Box display="flex" justifyContent="center" p={2}>
-            <Pagination
-              page={userPage}
-              count={pages}
-              onChange={(_, v) => setUserPage(v)}
-              showFirstButton
-              showLastButton
-              color="primary"
-              siblingCount={1}
-              boundaryCount={1}
-            />
-          </Box>
-        )}
-      </Paper>
+                          {canViewSessions && (
+                            <Tooltip title="View active sessions">
+                              <IconButton size="small" onClick={() => setSessionUser(u)}>
+                                <DevicesOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {(canCreate || canManageRules) && (
+                            <Tooltip title="Edit user">
+                              <IconButton size="small" onClick={() => setEditUser({ ...u, rules: u.rules || [], password: "" })}>
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {canDelete && u.id !== (editUser?.id || -1) && (
+                            <Tooltip title="Deactivate">
+                              <IconButton size="small" color="error" disabled={deleting === u.id} onClick={() => deactivateUser(u.id)}>
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!users.length && (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <Typography color="text.secondary" align="center" py={4}>No users found</Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
+          {pages > 1 && (
+            <Box display="flex" justifyContent="center" p={2}>
+              <Pagination
+                page={userPage}
+                count={pages}
+                onChange={(_, v) => setUserPage(v)}
+                showFirstButton
+                showLastButton
+                color="primary"
+                siblingCount={1}
+                boundaryCount={1}
+              />
+            </Box>
+          )}
+        </Paper>
+        </>
+      ) : (
+        <Alert severity="info" variant="outlined">
+          This role can create basic user accounts, but it cannot browse existing users. Grant <code>users.view</code> separately if this operator should be able to view the user directory.
+        </Alert>
+      )}
 
       {/* Edit user dialog */}
       <Dialog open={Boolean(editUser)} onClose={() => setEditUser(null)} maxWidth="md" fullWidth fullScreen={!isDesktop}>
