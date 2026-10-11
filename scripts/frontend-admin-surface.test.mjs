@@ -322,5 +322,5 @@ test("Departments is an authorized, first-class admin surface", () => {
   assert.ok(permissions.includes('departments: ["departments.manage"]'));
   assert.ok(panel.includes("/api/tickets/admin/departments"));
   assert.ok(panel.includes("departments.manage"));
-  assert.ok(panel.includes("membership and manager-role changes remains a superuser-only operation"));
+  assert.ok(panel.includes("Adding or removing department members and changing manager roles remains a superuser-only operation"));
 });
