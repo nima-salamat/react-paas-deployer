@@ -20,6 +20,7 @@ import TicketDetailDrawer from "./components/TicketDetailDrawer.jsx";
 import OverviewPanel from "./panels/OverviewPanel.jsx";
 import TicketsPanel from "./panels/TicketsPanel.jsx";
 import UsersPanel from "./panels/UsersPanel.jsx";
+import DepartmentsPanel from "./panels/DepartmentsPanel.jsx";
 import ServicesPanel from "./panels/ServicesPanel.jsx";
 import PlansPanel from "./panels/PlansPanel.jsx";
 import TablesPanel from "./panels/TablesPanel.jsx";
@@ -33,6 +34,7 @@ import DocsPanel from "./panels/docs/DocsPanel.jsx";
 const PAGE_TITLES = {
   overview: "Overview",
   tickets: "Tickets",
+  departments: "Departments",
   users: "Users & access",
   services: "Services",
   plans: "Plans",
@@ -398,6 +400,8 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
               onRefresh={() => loadTickets()}
             />
           )}
+
+          {tab === "departments" && canSeeNav("departments") && <DepartmentsPanel />}
 
           {tab === "users" && canSeeNav("users") && <UsersPanel />}
 
