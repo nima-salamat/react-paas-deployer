@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Box, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions,
+  Alert, Box, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControl, FormControlLabel,
   Grid, IconButton, InputLabel, MenuItem, Pagination, Paper, Select, Stack,
   Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField,
@@ -28,7 +28,35 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import AdminUserSessionsDialog from "../components/AdminUserSessionsDialog.jsx";
 
+
 const PAGE_SIZE = 20;
+
+function adminApiErrorMessage(error, fallback) {
+  const data = error?.response?.data;
+  for (const value of [data?.message, data?.detail, data?.error]) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const fields = Object.entries(data)
+      .filter(([key]) => !["success", "status", "code"].includes(key))
+      .map(([key, value]) => {
+        const message = Array.isArray(value)
+          ? value.filter((item) => typeof item === "string").join(" ")
+          : typeof value === "string"
+            ? value
+            : Array.isArray(value?.non_field_errors)
+              ? value.non_field_errors.join(" ")
+              : "";
+        return message ? key + ": " + message : "";
+      })
+      .filter(Boolean);
+    if (fields.length) return fields.join(" · ");
+  }
+  if (error?.response?.status === 403) {
+    return "You do not have permission for this action. Check your Users permissions.";
+  }
+  return fallback;
+}
 
 export default function UsersPanel({ setToast: setToastProp }) {
   const pushToast = useToast();
@@ -43,6 +71,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
   const [editUser, setEditUser] = useState(null);
   const [, setPermCatalog] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [creatingUser, setCreatingUser] = useState(false);
   const [newUser, setNewUser] = useState({ username: "", email: "", password: "", is_staff: false });
   const [deleting, setDeleting] = useState(null);
   const [sessionUser, setSessionUser] = useState(null);
@@ -97,59 +126,63 @@ export default function UsersPanel({ setToast: setToastProp }) {
 
   const saveUser = async () => {
     if (!editUser) return;
-    try {
-      const payload = {
-        email: editUser.email,
-        is_active: editUser.is_active,
-      };
-      // only include fields the user is allowed to change
-      if (canManage) {
-        payload.is_staff = editUser.is_staff;
-        if (isSuperuser && editUser.is_superuser !== undefined) {
-          payload.is_superuser = editUser.is_superuser;
-        }
-        if (editUser.rules) payload.rules = editUser.rules;
-      } else if (canManageRules && editUser.rules) {
-        // manage_rules-only path: only rules are sent (backend enforces this too)
-        payload.rules = editUser.rules;
-        // Strip other fields so the backend's manage_rules branch accepts it
-        delete payload.email;
-        delete payload.is_active;
-      }
-      if (editUser.password) payload.password = editUser.password;
+    const payload = {};
 
+    // users.manage_rules by itself is deliberately a rules-only operation.
+    if (canCreate) {
+      payload.email = editUser.email || null;
+      payload.is_active = editUser.is_active;
+      if (editUser.password) payload.password = editUser.password;
+    }
+    if (canManage) {
+      payload.is_staff = editUser.is_staff;
+      if (isSuperuser && editUser.is_superuser !== undefined) {
+        payload.is_superuser = editUser.is_superuser;
+      }
+    }
+    if ((canManage || canManageRules) && Array.isArray(editUser.rules)) {
+      payload.rules = editUser.rules;
+    }
+
+    try {
       await apiRequest({
         method: "PATCH",
-        url: `${adminUsersApi()}/${editUser.id}/`,
+        url: adminUsersApi() + "/" + editUser.id + "/",
         data: payload,
       });
       setToast("User updated");
       setEditUser(null);
       loadUsers();
     } catch (e) {
-      const detail = e?.response?.data?.detail || e?.response?.data?.message;
       const forbidden = e?.response?.data?.forbidden;
-      setToast?.(detail || (forbidden ? `Cannot grant: ${forbidden.join(", ")}` : "Update failed"));
+      setToast?.(
+        forbidden?.length
+          ? "Cannot grant: " + forbidden.join(", ")
+          : adminApiErrorMessage(e, "Update failed"),
+      );
     }
   };
 
   const createUser = async () => {
+    if (creatingUser || !newUser.username.trim()) return;
+    setCreatingUser(true);
     try {
       const payload = {
-        username: newUser.username,
-        email: newUser.email || undefined,
+        username: newUser.username.trim(),
+        email: newUser.email.trim() || undefined,
         password: newUser.password || undefined,
       };
-      if (canManage) {
-        payload.is_staff = newUser.is_staff;
-      }
+      if (canManage) payload.is_staff = newUser.is_staff;
       await apiRequest({ method: "POST", url: adminUsersApi(), data: payload });
       setToast("User created");
       setCreateOpen(false);
       setNewUser({ username: "", email: "", password: "", is_staff: false });
-      loadUsers();
+      setUserPage(1);
+      await loadUsers();
     } catch (e) {
-      setToast(e?.response?.data?.message || e?.response?.data?.detail || "Create failed");
+      setToast?.(adminApiErrorMessage(e, "Create failed"));
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -341,8 +374,8 @@ export default function UsersPanel({ setToast: setToastProp }) {
                             </IconButton>
                           </Tooltip>
                         )}
-                        {canCreate && (
-                          <Tooltip title="Edit">
+                        {(canCreate || canManageRules) && (
+                          <Tooltip title="Edit user">
                             <IconButton size="small" onClick={() => setEditUser({ ...u, rules: u.rules || [], password: "" })}>
                               <EditIcon fontSize="small" />
                             </IconButton>
@@ -400,6 +433,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
         <DialogContent dividers>
           {editUser && (
             <Stack gap={2.5}>
+              {canCreate ? (
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
@@ -443,6 +477,11 @@ export default function UsersPanel({ setToast: setToastProp }) {
                   </Grid>
                 )}
               </Grid>
+              ) : (
+                <Alert severity="info" variant="outlined">
+                  This role can manage access rules only. Account details, password, account status and staff flags are read-only for your permission set.
+                </Alert>
+              )}
 
               {canEditRules ? (
                 <Box>
@@ -544,7 +583,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
       </Dialog>
 
       {/* Create user dialog */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="xs" fullWidth fullScreen={!isDesktop}>
+      <Dialog open={createOpen} onClose={() => { if (!creatingUser) setCreateOpen(false); }} maxWidth="xs" fullWidth fullScreen={!isDesktop}>
         <DialogTitle>Create user</DialogTitle>
         <DialogContent dividers>
           <Stack gap={2} mt={1}>
@@ -552,6 +591,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
               size="small"
               label="Username"
               value={newUser.username}
+              inputProps={{ maxLength: 32 }}
               onChange={(e) => setNewUser((s) => ({ ...s, username: e.target.value }))}
               required
               fullWidth
@@ -559,6 +599,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
             <TextField
               size="small"
               label="Email"
+              type="email"
               value={newUser.email}
               onChange={(e) => setNewUser((s) => ({ ...s, email: e.target.value }))}
               fullWidth
@@ -586,8 +627,10 @@ export default function UsersPanel({ setToast: setToastProp }) {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={createUser} disabled={!newUser.username.trim()}>Create</Button>
+          <Button onClick={() => setCreateOpen(false)} disabled={creatingUser}>Cancel</Button>
+          <Button variant="contained" onClick={createUser} disabled={!newUser.username.trim() || creatingUser}>
+            {creatingUser ? "Creating…" : "Create user"}
+          </Button>
         </DialogActions>
       </Dialog>
 
