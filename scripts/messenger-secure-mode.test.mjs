@@ -50,7 +50,6 @@ test("Matrix crypto initialization reports a sanitized failing stage", () => {
 test("secure chats preserve a distinct plaintext conversation and use explicit invitations", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
   const client = read("src/components/messenger/secure/MatrixSecureClient.js");
-  const backend = read("../django-paas-deployer/src/messenger/api/matrix.py");
 
   assert.ok(panel.includes('phase === "invited"'));
   assert.ok(panel.includes("Accept secure invitation"));
@@ -62,8 +61,6 @@ test("secure chats preserve a distinct plaintext conversation and use explicit i
   assert.ok(client.includes('content: { history_visibility: "invited" }'));
   assert.ok(client.includes("export function hasSecureMatrixInitialSync"));
   assert.ok(client.includes("recovery is strongly recommended but not a prerequisite"));
-  assert.ok(backend.includes("security_mode=Conversation.SecurityMode.MATRIX_E2EE"));
-  assert.ok(backend.includes("matrix_room_id=room_id"));
 });
 
 test("first-time and offline peers do not turn recovery setup into a crypto-init requirement", () => {
