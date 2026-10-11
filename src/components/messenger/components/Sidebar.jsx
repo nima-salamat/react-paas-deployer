@@ -9,6 +9,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import ChatIcon from "@mui/icons-material/Chat";
+import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import PublicIcon from "@mui/icons-material/Public";
 import LinkIcon from "@mui/icons-material/Link";
@@ -456,15 +457,33 @@ export default function Sidebar({
                         <ListItemText
                           primary={
                             <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
-                              <Typography noWrap fontWeight={c.unread_count ? 700 : 600} fontSize={14.5}>
-                                {convTitle(c, meId)}
-                              </Typography>
+                              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
+                                {c.security_mode === "matrix_e2ee" && (
+                                  <LockOutlinedIcon
+                                    aria-label="End-to-end encrypted conversation"
+                                    titleAccess="End-to-end encrypted"
+                                    sx={{ fontSize: 15, color: "success.main", flexShrink: 0 }}
+                                  />
+                                )}
+                                <Typography noWrap fontWeight={c.unread_count ? 700 : 600} fontSize={14.5}>
+                                  {convTitle(c, meId)}
+                                </Typography>
+                                {c.security_mode === "matrix_e2ee" && (
+                                  <Typography variant="caption" color="success.main" sx={{ flexShrink: 0 }}>
+                                    E2EE
+                                  </Typography>
+                                )}
+                              </Stack>
                               <Typography variant="caption" color="text.secondary">{formatTime(c.last_message_at)}</Typography>
                             </Stack>
                           }
                           secondary={
                             <Typography noWrap variant="body2" color="text.secondary" fontSize={13}>
-                              {c.draft_text ? `Draft: ${String(c.draft_text).slice(0, 70)}` : formatLastMessagePreview(c.last_message)}
+                              {c.security_mode === "matrix_e2ee" && !c.last_message
+                                ? "End-to-end encrypted"
+                                : c.draft_text
+                                  ? `Draft: ${String(c.draft_text).slice(0, 70)}`
+                                  : formatLastMessagePreview(c.last_message)}
                             </Typography>
                           }
                         />
