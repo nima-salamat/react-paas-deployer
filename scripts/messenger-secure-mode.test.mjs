@@ -180,3 +180,14 @@ test("secure recovery is global and dismissible; standard Messenger APIs do not 
   assert.doesNotMatch(panel, /MatrixRecoveryDialog|Set up recovery/);
   assert.match(client, /return \{ state: "not_checked" \}/);
 });
+
+
+test("Messenger startup never provisions a Matrix device merely to show a recovery notice", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  assert.match(app, /hasRecoverableLocalMatrixDevice\(\)/);
+  assert.match(client, /export async function hasRecoverableLocalMatrixDevice\(\)/);
+  assert.match(client, /if \(!remembered\.createdNewDeviceId\)/);
+  assert.match(client, /markerExists = await hasDeviceMarker\(remembered\.deviceId\)/);
+  assert.match(client, /The existing device ID was not reused/);
+});

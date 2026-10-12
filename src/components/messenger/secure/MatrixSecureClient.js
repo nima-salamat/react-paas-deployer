@@ -100,6 +100,32 @@ export function forgetPersistentMatrixDeviceId(deviceId) {
   } catch { /* browser storage may be disabled */ }
 }
 
+/**
+ * Checks only local state; never creates or logs into a Matrix device.
+ * Messenger startup uses this to avoid provisioning a new device merely to
+ * display a recovery notice when this browser has no recoverable crypto store.
+ */
+export async function hasRecoverableLocalMatrixDevice() {
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace) return false;
+  const session = readSession();
+  let deviceId = session?.deviceId || "";
+  if (!deviceId) {
+    try {
+      deviceId = localStorage.getItem(`${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`) || "";
+    } catch {
+      return false;
+    }
+  }
+  if (!deviceId) return false;
+  try {
+    return await hasDeviceMarker(deviceId);
+  } catch {
+    // Unknown local state is not enough to risk reusing a device ID.
+    return false;
+  }
+}
+
 function openMarkerDatabase() {
   if (!globalThis.indexedDB) {
     return Promise.reject(new MatrixSecureError(
@@ -292,7 +318,25 @@ async function validateStoredSession(session) {
 }
 
 async function requestNewDeviceSession() {
-  const remembered = getOrCreatePersistentDeviceId();
+  let remembered = getOrCreatePersistentDeviceId();
+  // A persistent browser ID is reusable only while its matching IndexedDB
+  // crypto marker still exists. Otherwise retire it and allocate a new ID;
+  // never initialize empty crypto storage under an old remote Matrix device.
+  if (!remembered.createdNewDeviceId) {
+    let markerExists;
+    try {
+      markerExists = await hasDeviceMarker(remembered.deviceId);
+    } catch {
+      throw new MatrixSecureError(
+        "Could not verify this browser's saved Matrix encryption state. The existing device ID was not reused.",
+        "indexeddb_error",
+      );
+    }
+    if (!markerExists) {
+      await revokeLostLocalDevice(remembered.deviceId);
+      remembered = getOrCreatePersistentDeviceId();
+    }
+  }
   const { deviceId } = remembered;
   let response;
   try {

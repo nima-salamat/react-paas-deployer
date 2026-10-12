@@ -57,6 +57,7 @@ import MatrixRecoveryDialog from "./secure/MatrixRecoveryDialog";
 import MatrixDevicesDialog from "./secure/MatrixDevicesDialog";
 import {
   createEncryptedConversation, createEncryptedTopic, getSecureMatrixClient, getRecoveryState,
+  hasRecoverableLocalMatrixDevice,
 } from "./secure/MatrixSecureClient";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
@@ -517,26 +518,23 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   useEffect(() => {
     if (!meId) return undefined;
     let cancelled = false;
-    const inspectExistingSecureDevices = async () => {
+    const inspectLocalSecureDevice = async () => {
       try {
-        const response = await fetch(`${MSG_API}/secure/devices/`, { headers: authHeaders() });
-        if (!response.ok) return;
-        const body = await response.json();
-        const data = body?.data || body;
-        if (cancelled || !Array.isArray(data?.results)) return;
-        const hasActiveDevice = data.results.some((device) => !device.revoked_at);
-        if (hasActiveDevice) {
+        const exists = await hasRecoverableLocalMatrixDevice();
+        if (cancelled) return;
+        if (exists) {
           void refreshSecureRecoveryState();
         } else {
-          setMatrixRecoveryState({ state: "not_configured", deviceCount: 0 });
+          // No recoverable device on this browser means there is no local key
+          // backup state to warn about. Don't create a phantom remote device.
+          setMatrixRecoveryState({ state: "not_configured", deviceCount: null });
           setMatrixNotice(null);
         }
       } catch {
-        // Do not create Matrix identities/devices just to show a recovery notice.
-        // Opening a secure room or Secure settings retries the authoritative check.
+        // Unknown local state is never permission to provision or replace a device.
       }
     };
-    void inspectExistingSecureDevices();
+    void inspectLocalSecureDevice();
     return () => {
       cancelled = true;
       matrixStatusRequestRef.current += 1;
@@ -5411,7 +5409,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             <SecureChatPanel
               conversation={activeConv}
               currentUserId={meId}
-              onOpenSecuritySettings={() => pushPanel("secure-settings")}
+              onOpenSecuritySettings={() => {
+                pushPanel("secure-settings");
+                void refreshSecureRecoveryState();
+              }}
               onSecureClientReady={() => refreshSecureRecoveryState()}
             />
           ) : (
@@ -6255,7 +6256,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             onClose={closePanel}
             onOpenMyProfile={() => pushPanel("my-profile")}
             onOpenSessions={() => pushPanel("sessions")}
-            onOpenSecureSettings={() => pushPanel("secure-settings")}
+            onOpenSecureSettings={() => {
+              pushPanel("secure-settings");
+              void refreshSecureRecoveryState();
+            }}
             onOpenSecureRecovery={() => setSecureRecoveryOpen(true)}
             onOpenSecureDevices={() => setSecureDevicesOpen(true)}
             onRefreshSecureRecoveryState={() => { void refreshSecureRecoveryState(); }}
