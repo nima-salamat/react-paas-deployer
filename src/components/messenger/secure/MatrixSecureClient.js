@@ -118,12 +118,9 @@ function rememberValidatedPersistentDeviceId(deviceId) {
     const existing = localStorage.getItem(storageKey);
     if (existing && existing !== deviceId) return;
     localStorage.setItem(storageKey, deviceId);
-    if (localStorage.getItem(storageKey) !== deviceId) {
-      throw new MatrixSecureError("Could not persist the existing Matrix device ID.", "persistent_device_id_unavailable");
-    }
-  } catch (error) {
-    if (error instanceof MatrixSecureError) throw error;
-    throw new MatrixSecureError("Could not persist the existing Matrix device ID for this Messenger account.", "persistent_device_id_unavailable");
+  } catch {
+    // This is a migration of an already authenticated session, not device creation.
+    // Keep the existing local crypto session usable if the browser blocks storage.
   }
 }
 export function forgetPersistentMatrixDeviceId(deviceId) {

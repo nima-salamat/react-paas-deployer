@@ -242,3 +242,11 @@ test("recovery preflight is scoped to the current Messenger account's persistent
   assert.match(preflight, /session && session\.deviceId !== deviceId\) return false/);
   assert.doesNotMatch(preflight, /let deviceId = session\?\.deviceId/);
 });
+
+
+test("validated legacy Matrix sessions migrate to a stable account-scoped device ID", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  assert.match(client, /function rememberValidatedPersistentDeviceId\(deviceId\)/);
+  assert.match(client, /else if \(session\) \{[\s\S]*?rememberValidatedPersistentDeviceId\(session\.deviceId\)/);
+  assert.match(client, /if \(existing && existing !== deviceId\) return/);
+});
