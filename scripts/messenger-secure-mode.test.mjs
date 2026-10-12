@@ -193,3 +193,12 @@ test("Messenger startup never provisions a Matrix device merely to show a recove
   assert.match(client, /markerExists = await hasDeviceMarker\(remembered\.deviceId\)/);
   assert.match(client, /The existing device ID was not reused/);
 });
+
+
+test("secure attachments accept arbitrary file types and voice recording has an explicit stop action", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  assert.match(panel, /sendEncryptedMedia/);
+  assert.match(panel, /recordingVoice \? <StopIcon \/> : <MicIcon \/>/);
+  assert.doesNotMatch(panel, /accept="image\/\*,audio\/\*,video\/\*/);
+  assert.match(panel, /setRecordingVoice\(false\);\s*const blob = new Blob/);
+});

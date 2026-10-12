@@ -9,6 +9,7 @@ import SettingsIcon from "@mui/icons-material/Settings";
 import SendIcon from "@mui/icons-material/Send";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import StopIcon from "@mui/icons-material/Stop";
 import {
   assertSecureMessagingReady, getSecureMatrixClient, getSecureMatrixSession,
   hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
@@ -518,6 +519,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
       };
       recorder.onstop = () => {
         const mimeType = recorder.mimeType || "audio/webm";
+        setRecordingVoice(false);
         const blob = new Blob(mediaChunksRef.current, { type: mimeType });
         mediaChunksRef.current = [];
         mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
@@ -751,7 +753,6 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
             <input
               ref={mediaInputRef}
               type="file"
-              accept="image/*,audio/*,video/*,.pdf,.txt,.zip,.doc,.docx"
               hidden
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -762,7 +763,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
               <AttachFileIcon />
             </IconButton>
             <IconButton aria-label={recordingVoice ? "Stop and send voice message" : "Record voice message"} title={recordingVoice ? "Stop and send voice message" : "Record voice message"} color={recordingVoice ? "error" : "default"} disabled={mediaBusy || sending || phase !== "ready"} onClick={() => void toggleVoiceRecording()}>
-              {recordingVoice ? <CircularProgress size={20} color="inherit" /> : <MicIcon />}
+              {recordingVoice ? <StopIcon /> : <MicIcon />}
             </IconButton>
             <TextField
               fullWidth multiline minRows={1} maxRows={5}
