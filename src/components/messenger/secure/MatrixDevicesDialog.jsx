@@ -9,7 +9,7 @@ import SmartphoneIcon from "@mui/icons-material/Smartphone";
 import BlockIcon from "@mui/icons-material/Block";
 import { MSG_API, authHeaders } from "../api";
 import {
-  getSecureMatrixSession, shutdownSecureMatrixClient,
+  forgetPersistentMatrixDeviceId, getSecureMatrixSession, shutdownSecureMatrixClient,
 } from "./MatrixSecureClient";
 
 async function parseApiResponse(response) {
@@ -74,6 +74,7 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
       const session = getSecureMatrixSession();
       const isCurrent = device.is_current || session?.deviceId === device.device_id;
       if (isCurrent) {
+        forgetPersistentMatrixDeviceId(device.device_id);
         shutdownSecureMatrixClient();
         onCurrentDeviceRevoked?.();
       }
@@ -99,6 +100,11 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
           </Alert>
           {error && <Alert severity="error">{error}</Alert>}
           {message && <Alert severity="success">{message}</Alert>}
+          {!loading && !error && (
+            <Alert severity="info">
+              {devices.filter((device) => !device.revoked_at).length} active Matrix device(s) · {devices.filter((device) => Boolean(device.revoked_at)).length} revoked historical device(s).
+            </Alert>
+          )}
           {loading && <Box sx={{ py: 2, display: "flex", justifyContent: "center" }}><CircularProgress size={22} /></Box>}
           {!loading && devices.length === 0 && (
             <Typography color="text.secondary" variant="body2">
@@ -149,6 +155,9 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
                         </Typography>
                         <Typography component="span" variant="caption" sx={{ display: "block" }}>
                           Registered: {device.created_at ? new Date(device.created_at).toLocaleString() : "Unknown"}
+                        </Typography>
+                        <Typography component="span" variant="caption" sx={{ display: "block" }}>
+                          Last active: {device.last_seen_known && device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : "Unknown"}
                         </Typography>
                       </>
                     )}

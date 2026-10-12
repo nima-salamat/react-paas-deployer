@@ -1,79 +1,98 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, Box, Button, CircularProgress, Divider, IconButton, Paper,
+  Alert, Avatar, Box, Button, CircularProgress, Divider, IconButton, Paper,
   Stack, TextField, Typography,
 } from "@mui/material";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import MicIcon from "@mui/icons-material/Mic";
+import SettingsIcon from "@mui/icons-material/Settings";
 import SendIcon from "@mui/icons-material/Send";
-import KeyIcon from "@mui/icons-material/Key";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import MatrixRecoveryDialog from "./MatrixRecoveryDialog";
-import MatrixDevicesDialog from "./MatrixDevicesDialog";
 import {
-  assertSecureMessagingReady, getRecoveryState, getSecureMatrixClient,
-  hasSecureMatrixInitialSync, MatrixSecureError,
+  assertSecureMessagingReady, getSecureMatrixClient, getSecureMatrixSession,
+  hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
+  sendEncryptedMedia, decryptEncryptedMedia,
 } from "./MatrixSecureClient";
 
-function describeEvent(event, ownUserId) {
+function appNameForParticipant(participant) {
+  const user = participant?.user || participant || {};
+  return String(user.display_name || user.full_name || user.name || user.username || "").trim();
+}
+
+function appConversationTitle(conversation, currentUserId) {
+  const explicit = String(conversation?.title || "").trim();
+  if (explicit) return explicit;
+  const peer = (conversation?.participants || []).find((participant) => {
+    const user = participant?.user || participant;
+    return String(user?.id ?? participant?.user_id ?? "") !== String(currentUserId ?? "");
+  });
+  return appNameForParticipant(peer) || "Secure conversation";
+}
+
+function describeEvent(event, ownUserId, profilesByMatrixId = {}) {
   const type = event.getType();
   const wireType = event.getWireType?.() || type;
   const content = event.getContent?.() || {};
-  const sender = event.getSender?.() || "";
+  const senderId = event.getSender?.() || "";
+  const profile = profilesByMatrixId[senderId] || null;
+  const sender = senderId === ownUserId ? "You" : (profile?.displayName || "Member");
   const timestamp = Number(event.getTs?.() || Date.now());
-  const eventId = event.getId?.() || `${sender}:${timestamp}`;
+  const eventId = event.getId?.() || `${senderId}:${timestamp}`;
 
   if (type === "m.room.message" && wireType !== "m.room.encrypted") {
-    // E2EE room membership and a room-level encryption state are not enough:
-    // a buggy/malicious client can still submit an unencrypted m.room.message.
-    // Never show its body in a UI that claims this room is end-to-end encrypted.
+    // Fail closed: an encrypted-room label cannot make a plaintext event safe.
     return {
-      id: eventId,
-      sender,
-      timestamp,
-      isOwn: sender === ownUserId,
+      id: eventId, sender, senderId, senderAvatar: profile?.avatar || null,
+      timestamp, isOwn: senderId === ownUserId,
       body: "Unencrypted event rejected. Its content is hidden because it did not arrive through Matrix E2EE.",
-      undecryptable: true,
-      unencrypted: true,
+      undecryptable: true, unencrypted: true,
     };
   }
-
   if (type === "m.room.encrypted") {
     return {
-      id: eventId,
-      sender,
-      timestamp,
-      isOwn: sender === ownUserId,
-      body: "This message cannot be decrypted on this device. Verify another device or restore the existing recovery key.",
+      id: eventId, sender, senderId, senderAvatar: profile?.avatar || null,
+      timestamp, isOwn: senderId === ownUserId,
+      body: "This message cannot be decrypted on this device. Open Secure chat settings to recover its keys.",
       undecryptable: true,
     };
   }
-
   if (type !== "m.room.message") return null;
-  let body;
-  if (content.msgtype === "m.text" || content.msgtype === "m.notice") {
-    body = typeof content.body === "string" ? content.body : "";
-  } else if (content.msgtype === "m.emote") {
-    body = typeof content.body === "string" ? `• ${content.body}` : "Encrypted message";
-  } else {
-    body = "Encrypted media or a message type not supported in this first secure-chat release.";
-  }
 
+  const msgtype = content.msgtype || "m.text";
+  const media = ["m.image", "m.audio", "m.video", "m.file"].includes(msgtype)
+    && Boolean(content.file && content.file.url?.startsWith("mxc://"));
+  let body;
+  if (msgtype === "m.text" || msgtype === "m.notice") {
+    body = typeof content.body === "string" ? content.body : "";
+  } else if (msgtype === "m.emote") {
+    body = typeof content.body === "string" ? `• ${content.body}` : "Encrypted message";
+  } else if (media) {
+    body = typeof content.body === "string" ? content.body : "Encrypted attachment";
+  } else if (["m.image", "m.audio", "m.video", "m.file"].includes(msgtype)) {
+    body = "This attachment is not encrypted correctly and was not opened.";
+  } else {
+    body = "Encrypted message type not supported in this version.";
+  }
   return {
-    id: eventId,
-    sender,
-    timestamp,
-    isOwn: sender === ownUserId,
+    id: eventId, sender, senderId, senderAvatar: profile?.avatar || null,
+    timestamp, isOwn: senderId === ownUserId,
     body: body || "Encrypted message",
-    undecryptable: content.msgtype === "m.bad.encrypted",
+    undecryptable: msgtype === "m.bad.encrypted",
+    mediaType: media ? msgtype : null,
+    file: media ? content.file : null,
+    info: media ? content.info : null,
+    filename: media ? (content.filename || content.body || "Encrypted attachment") : null,
+    msgtype,
   };
 }
 
-function getRoomMessages(room, ownUserId) {
+function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
   if (!room) return [];
   const events = room.getLiveTimeline?.().getEvents?.() || [];
   const seen = new Set();
   return events
-    .map((event) => describeEvent(event, ownUserId))
+    .map((event) => describeEvent(event, ownUserId, profilesByMatrixId))
     .filter((row) => {
       if (!row || seen.has(row.id)) return false;
       seen.add(row.id);
@@ -91,14 +110,6 @@ function roomHasPendingInvites(room) {
     return events.some((event) => event?.getContent?.()?.membership === "invite");
   } catch {
     return true;
-  }
-}
-
-async function nonBlockingRecoveryState(client) {
-  try {
-    return await getRecoveryState(client);
-  } catch {
-    return { state: "needs_setup", statusUnavailable: true };
   }
 }
 
@@ -162,14 +173,21 @@ function waitForSync(client) {
   });
 }
 
-export default function SecureChatPanel({ conversation, currentUserId }) {
+export default function SecureChatPanel({ conversation, currentUserId, onOpenSecuritySettings }) {
   const roomId = conversation?.matrix_room_id;
   const [phase, setPhase] = useState("connecting");
   const [error, setError] = useState("");
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
-  const [devicesOpen, setDevicesOpen] = useState(false);
-  const [recoveryState, setRecoveryState] = useState(null);
   const [matrixClient, setMatrixClient] = useState(null);
+  const profilesByMatrixIdRef = useRef({});
+  const mediaObjectUrlsRef = useRef(new Set());
+  const [loadedMedia, setLoadedMedia] = useState({});
+  const [loadingMedia, setLoadingMedia] = useState({});
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const mediaInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const mediaChunksRef = useRef([]);
+  const [recordingVoice, setRecordingVoice] = useState(false);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -183,9 +201,9 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
   const refreshTimeline = useCallback((client) => {
     const room = client.getRoom(roomId);
     if (!room) return;
-    setRoomDisplayName(room.name || conversation?.title || "Secure conversation");
-    setMessages(getRoomMessages(room, client.getUserId()));
-  }, [roomId, conversation?.title]);
+    setRoomDisplayName(appConversationTitle(conversation, currentUserId));
+    setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
+  }, [roomId, conversation?.title, conversation?.participants, currentUserId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -266,8 +284,35 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         }
 
         const membership = room.getMyMembership?.();
-        setRoomDisplayName(room.name || conversation?.title || "Secure conversation");
+        setRoomDisplayName(appConversationTitle(conversation, currentUserId));
         setHasMoreHistory(true);
+
+        const participants = conversation?.participants || [];
+        const localUserIds = [...new Set([
+          Number(currentUserId),
+          ...participants.map((participant) => Number(participant?.user?.id ?? participant?.user_id ?? participant?.id)),
+        ].filter((id) => Number.isInteger(id) && id > 0))];
+        try {
+          const identities = await resolveMatrixUsers(localUserIds, getSecureMatrixSession());
+          const mappedProfiles = {};
+          for (const identity of identities) {
+            const participant = participants.find((candidate) => String(candidate?.user?.id ?? candidate?.user_id ?? candidate?.id) === String(identity.user_id));
+            const user = participant?.user || participant || {};
+            if (identity?.matrix_user_id) {
+              mappedProfiles[identity.matrix_user_id] = {
+                displayName: appNameForParticipant(user) || "Member",
+                avatar: user.avatar || user.avatar_url || null,
+                userId: identity.user_id,
+              };
+            }
+          }
+          profilesByMatrixIdRef.current = mappedProfiles;
+          if (!cancelled) setMessages(getRoomMessages(room, client.getUserId(), mappedProfiles));
+        } catch {
+          profilesByMatrixIdRef.current = {};
+          // If profile metadata is unavailable, do not use raw Matrix IDs as names.
+        }
+        if (cancelled) return;
 
         if (membership === "invite") {
           // An invitee's Rust crypto store may not yet know the room is encrypted:
@@ -275,7 +320,6 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
           // unknown. The backend already verified this immutable room mapping.
           // Joining sends no chat content; encryption is rechecked after membership
           // becomes "join", and outgoing messages remain blocked until then.
-          setRecoveryState(await nonBlockingRecoveryState(client));
           setMessages([]);
           setPhase("invited");
           waitingForInviteAcceptance = true;
@@ -302,9 +346,8 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
           );
         }
 
-        setRecoveryState(await nonBlockingRecoveryState(client));
         if (cancelled) return;
-        setMessages(getRoomMessages(room, client.getUserId()));
+        setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
         attachRoomListeners();
         client.on("sync", onSync);
         client.on("RoomMember.membership", onMembership);
@@ -325,7 +368,7 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         activeClient.off("RoomMember.membership", onMembership);
       }
     };
-  }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title]);
+  }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title, conversation?.participants]);
 
   const loadOlderHistory = useCallback(async () => {
     if (!matrixClient || !roomId || loadingOlder || !hasMoreHistory) return;
@@ -391,24 +434,121 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
     }
   };
 
-  const onRecoveryReady = async () => {
-    setRecoveryOpen(false);
-    if (!matrixClient) return;
+
+  const openEncryptedMedia = async (message, { download = false } = {}) => {
+    if (!matrixClient || !message?.file || loadingMedia[message.id] || mediaBusy) return;
+    setLoadingMedia((prev) => ({ ...prev, [message.id]: true }));
+    setError("");
     try {
-      await assertSecureMessagingReady(matrixClient);
-      setRecoveryState(await nonBlockingRecoveryState(matrixClient));
-      refreshTimeline(matrixClient);
-      setError("");
-      const room = matrixClient.getRoom(roomId);
-      if (room?.getMyMembership?.() === "invite") setPhase("invited");
-      else if (room?.getMyMembership?.() === "join") {
-        setPhase(roomHasPendingInvites(room) ? "waiting_for_peer" : "ready");
-      } else setPhase("error");
+      const blob = await decryptEncryptedMedia(matrixClient, message);
+      const url = URL.createObjectURL(blob);
+      mediaObjectUrlsRef.current.add(url);
+      if (download || message.mediaType === "m.file") {
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = String(message.filename || "encrypted-attachment").replace(/[\\/\\0-\\x1f]/g, "_");
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => {
+          URL.revokeObjectURL(url);
+          mediaObjectUrlsRef.current.delete(url);
+        }, 30000);
+      } else {
+        setLoadedMedia((prev) => ({ ...prev, [message.id]: { url, mimeType: blob.type, filename: message.filename } }));
+      }
     } catch (err) {
-      setError(err?.message || "Encrypted key backup is not ready.");
-      setPhase("recovery_required");
+      setError(err?.message || "Could not verify and decrypt this attachment.");
+    } finally {
+      setLoadingMedia((prev) => ({ ...prev, [message.id]: false }));
     }
   };
+
+  const sendMediaFile = async (file, options = {}) => {
+    if (!file || !matrixClient || !roomId || mediaBusy || phase !== "ready") return;
+    setMediaBusy(true);
+    setError("");
+    try {
+      const room = matrixClient.getRoom(roomId);
+      if (!room || room.getMyMembership?.() !== "join") {
+        throw new MatrixSecureError("Join the encrypted room before sending media.", "not_joined");
+      }
+      if (roomHasPendingInvites(room)) {
+        setPhase("waiting_for_peer");
+        throw new MatrixSecureError("Secure media sending is paused until every invited participant has joined.", "participants_pending");
+      }
+      await sendEncryptedMedia(matrixClient, roomId, file, options);
+      refreshTimeline(matrixClient);
+    } catch (err) {
+      setError(err?.message || "Encrypted attachment could not be sent.");
+    } finally {
+      setMediaBusy(false);
+      if (mediaInputRef.current) mediaInputRef.current.value = "";
+    }
+  };
+
+  const toggleVoiceRecording = async () => {
+    if (recordingVoice) {
+      try { mediaRecorderRef.current?.stop(); } catch { /* no-op */ }
+      setRecordingVoice(false);
+      return;
+    }
+    if (phase !== "ready" || mediaBusy) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("Voice messages are unavailable in this browser. Choose an audio file instead.");
+      return;
+    }
+    try {
+      setError("");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      mediaChunksRef.current = [];
+      const supportedType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]
+        .find((type) => MediaRecorder.isTypeSupported?.(type));
+      const recorder = supportedType ? new MediaRecorder(stream, { mimeType: supportedType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size) mediaChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        setError("Voice recording failed. Check microphone permissions and try again.");
+        setRecordingVoice(false);
+      };
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(mediaChunksRef.current, { type: mimeType });
+        mediaChunksRef.current = [];
+        mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        if (blob.size > 0) {
+          const extension = mimeType.includes("mp4") ? "m4a" : "webm";
+          const file = new File([blob], `voice-message-${Date.now()}.${extension}`, { type: mimeType });
+          void sendMediaFile(file, { msgtype: "m.audio", caption: "Voice message" });
+        } else {
+          setError("The recording was empty and was not sent.");
+        }
+      };
+      recorder.start();
+      setRecordingVoice(true);
+    } catch (err) {
+      mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+      setError(err?.message || "Microphone access was denied.");
+    }
+  };
+
+  useEffect(() => () => {
+    try {
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.onstop = null;
+        if (mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop();
+      }
+    } catch { /* no-op */ }
+    mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    for (const url of mediaObjectUrlsRef.current) URL.revokeObjectURL(url);
+    mediaObjectUrlsRef.current.clear();
+  }, []);
 
   const send = async () => {
     const body = draft.trim();
@@ -442,10 +582,9 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
     }
   };
 
-  const title = roomDisplayName || conversation?.title || "Secure conversation";
-  const currentMatrixUser = matrixClient?.getUserId?.() || "";
+  const title = roomDisplayName || appConversationTitle(conversation, currentUserId);
   const secureFeatureNotice = useMemo(
-    () => "This first secure-chat release supports encrypted text messages and Element-style key recovery. Server search, ordinary Messenger file upload, forwarding, reactions, scheduled messages and Jitsi calls are intentionally unavailable in this room.",
+    () => "Messages and attachments in this room use Matrix end-to-end encryption. Standard Messenger server-side search, forwarding, reactions, scheduled delivery and live calls remain separate features.",
     [],
   );
 
@@ -456,17 +595,14 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography fontWeight={750} noWrap>{title}</Typography>
           <Typography variant="caption" color="text.secondary">
-            End-to-end encrypted · {currentMatrixUser || "connecting device"}
+            End-to-end encrypted
           </Typography>
         </Box>
         <IconButton aria-label="Reconnect secure chat" onClick={() => setRevision((value) => value + 1)} disabled={phase === "connecting"}>
           <RefreshIcon />
         </IconButton>
-        <Button size="small" onClick={() => setDevicesOpen(true)}>
-          Devices
-        </Button>
-        <Button size="small" startIcon={<KeyIcon />} onClick={() => setRecoveryOpen(true)}>
-          Recovery
+        <Button size="small" startIcon={<SettingsIcon />} onClick={() => onOpenSecuritySettings?.()}>
+          Security settings
         </Button>
       </Paper>
 
@@ -501,11 +637,6 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
           <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={520}>
             This is a separate end-to-end encrypted room. Accept the invitation to join it and start secure messaging. Your existing standard conversation and its history will remain unchanged.
           </Typography>
-          {recoveryState?.state !== "ready" && (
-            <Alert severity="info" sx={{ maxWidth: 540 }}>
-              Key recovery is recommended, but it is not required to accept the invitation or send messages. You can configure recovery from the key button after joining.
-            </Alert>
-          )}
           <Button variant="contained" onClick={() => void acceptInvitation()}>
             Accept secure invitation
           </Button>
@@ -526,24 +657,6 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
             Check invitation status
           </Button>
         </Box>
-      )}
-
-      {phase === "ready" && recoveryState?.state !== "ready" && (
-        <Alert
-          severity="warning"
-          sx={{ mx: 1.5, mt: 1 }}
-          action={(
-            <Button color="inherit" size="small" onClick={() => setRecoveryOpen(true)}>
-              Set up recovery
-            </Button>
-          )}
-        >
-          {recoveryState?.statusUnavailable
-            ? "Encrypted messaging is available, but the recovery status could not be checked. Review key recovery when the connection is restored."
-            : recoveryState?.state === "recovery_required"
-              ? "Encrypted messaging is available, but this device has not verified the existing key backup. Restore the existing recovery key to recover older history; the app will not overwrite it."
-              : "Encrypted messaging is available, but key recovery is not set up. Save a recovery key to reduce the risk of permanently losing history if this device is lost."}
-        </Alert>
       )}
 
       {phase === "ready" && (
@@ -579,13 +692,46 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
                     }}
                   >
                     {!message.isOwn && (
-                      <Typography variant="caption" fontWeight={700} color="primary.main">
-                        {message.sender}
+                      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.35 }}>
+                        <Avatar src={message.senderAvatar || undefined} sx={{ width: 22, height: 22, fontSize: 11 }}>
+                          {(message.sender || "M").slice(0, 1).toUpperCase()}
+                        </Avatar>
+                        <Typography variant="caption" fontWeight={700} color="primary.main">
+                          {message.sender}
+                        </Typography>
+                      </Stack>
+                    )}
+                    {message.mediaType && (
+                      <Box sx={{ display: "grid", gap: 1, my: 0.5, minWidth: 150 }}>
+                        {loadedMedia[message.id] && message.mediaType === "m.image" && (
+                          <img src={loadedMedia[message.id].url} alt={message.filename || "Encrypted image"} style={{ display: "block", maxWidth: "min(65vw, 420px)", maxHeight: 420, objectFit: "contain", borderRadius: 8 }} />
+                        )}
+                        {loadedMedia[message.id] && message.mediaType === "m.audio" && (
+                          <audio controls preload="none" src={loadedMedia[message.id].url} style={{ maxWidth: "min(65vw, 360px)" }} />
+                        )}
+                        {loadedMedia[message.id] && message.mediaType === "m.video" && (
+                          <video controls preload="none" src={loadedMedia[message.id].url} style={{ maxWidth: "min(65vw, 420px)", maxHeight: 420, borderRadius: 8 }} />
+                        )}
+                        {!loadedMedia[message.id] && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            disabled={Boolean(loadingMedia[message.id])}
+                            onClick={() => void openEncryptedMedia(message, { download: message.mediaType === "m.file" })}
+                          >
+                            {loadingMedia[message.id] ? "Verifying and decrypting…" : message.mediaType === "m.image" ? "Load encrypted image" : message.mediaType === "m.audio" ? "Load encrypted voice message" : message.mediaType === "m.video" ? "Load encrypted video" : "Decrypt and download file"}
+                          </Button>
+                        )}
+                        <Typography variant="caption" color="text.secondary">
+                          {message.filename || message.body} · E2EE
+                        </Typography>
+                      </Box>
+                    )}
+                    {(!message.mediaType || !["m.image", "m.video", "m.file"].includes(message.mediaType)) && (
+                      <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                        {message.mediaType === "m.audio" ? (message.body === message.filename ? "Voice message" : message.body) : message.body}
                       </Typography>
                     )}
-                    <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                      {message.body}
-                    </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "right", mt: 0.5 }}>
                       {new Date(message.timestamp).toLocaleString()}
                     </Typography>
@@ -600,17 +746,39 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
             onSubmit={(event) => { event.preventDefault(); void send(); }}
             sx={{ p: 1.25, display: "flex", gap: 1, maxWidth: 960, mx: "auto", width: "100%" }}
           >
+            <input
+              ref={mediaInputRef}
+              type="file"
+              accept="image/*,audio/*,video/*,.pdf,.txt,.zip,.doc,.docx"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void sendMediaFile(file);
+              }}
+            />
+            <IconButton aria-label="Attach encrypted file" title="Attach an encrypted image, voice, video, or file" disabled={mediaBusy || sending || phase !== "ready"} onClick={() => mediaInputRef.current?.click()}>
+              <AttachFileIcon />
+            </IconButton>
+            <IconButton aria-label={recordingVoice ? "Stop and send voice message" : "Record voice message"} title={recordingVoice ? "Stop and send voice message" : "Record voice message"} color={recordingVoice ? "error" : "default"} disabled={mediaBusy || sending || phase !== "ready"} onClick={() => void toggleVoiceRecording()}>
+              {recordingVoice ? <CircularProgress size={20} color="inherit" /> : <MicIcon />}
+            </IconButton>
             <TextField
-              fullWidth multiline maxRows={5}
-              placeholder="Write an end-to-end encrypted message…"
+              fullWidth multiline minRows={1} maxRows={5}
+              placeholder={recordingVoice ? "Recording voice message…" : "Write an end-to-end encrypted message…"}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              disabled={sending || phase !== "ready"}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void send();
+                }
+              }}
+              disabled={sending || mediaBusy || recordingVoice || phase !== "ready"}
               inputProps={{ "aria-label": "Encrypted message" }}
             />
             <Button
               type="submit" variant="contained" aria-label="Send encrypted message"
-              disabled={!draft.trim() || sending || phase !== "ready"}
+              disabled={!draft.trim() || sending || mediaBusy || recordingVoice || phase !== "ready"}
               sx={{ minWidth: 52, alignSelf: "stretch" }}
             >
               {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
@@ -619,22 +787,6 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         </>
       )}
 
-      <MatrixRecoveryDialog
-        open={recoveryOpen}
-        onClose={() => setRecoveryOpen(false)}
-        onReady={onRecoveryReady}
-      />
-      <MatrixDevicesDialog
-        open={devicesOpen}
-        onClose={() => setDevicesOpen(false)}
-        onCurrentDeviceRevoked={() => {
-          setDevicesOpen(false);
-          setError("This Matrix device was revoked. Reopen secure chat only after creating a new device and completing the key-recovery flow.");
-          setPhase("error");
-          setMatrixClient(null);
-          setMessages([]);
-        }}
-      />
     </Box>
   );
 }

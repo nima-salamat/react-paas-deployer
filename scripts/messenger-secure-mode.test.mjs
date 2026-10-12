@@ -140,3 +140,24 @@ test("new secure conversations notify the recipient's live chat list without pla
   assert.ok(api.includes("Secure-room registration"));
   assert.ok(api.includes("never pull E2EE room content"));
 });
+
+
+test("secure chat uses Messenger profiles, Matrix encrypted media, Enter-to-send, and no per-room recovery prompt", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const devices = read("src/components/messenger/secure/MatrixDevicesDialog.jsx");
+
+  assert.match(panel, /resolveMatrixUsers\(localUserIds/);
+  assert.match(panel, /appConversationTitle\(conversation, currentUserId\)/);
+  assert.match(panel, /sendEncryptedMedia/);
+  assert.match(panel, /decryptEncryptedMedia/);
+  assert.match(panel, /event\.key === "Enter" && !event\.shiftKey/);
+  assert.doesNotMatch(panel, /MatrixRecoveryDialog|Set up recovery/);
+  assert.match(client, /export async function sendEncryptedMedia/);
+  assert.match(client, /uploadContent\(encryptedBlob/);
+  assert.match(client, /hashes: \{ sha256: encodeUnpaddedBase64\(hash\) \}/);
+  assert.match(client, /media_hash_mismatch/);
+  assert.match(client, /getOrCreatePersistentDeviceId/);
+  assert.match(client, /deviceInventoryUnavailable/);
+  assert.match(devices, /active Matrix device\(s\)/);
+});
