@@ -102,6 +102,37 @@ async function nonBlockingRecoveryState(client) {
   }
 }
 
+function waitForRoomMembership(client, roomId, expectedMembership, timeoutMs = 20000) {
+  const readMembership = () => client.getRoom(roomId)?.getMyMembership?.();
+  if (readMembership() === expectedMembership) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    let timeout;
+    const finish = (error) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      client.off("RoomMember.membership", onMembership);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onMembership = (_event, member) => {
+      if (member?.roomId !== roomId) return;
+      if (readMembership() === expectedMembership) finish();
+    };
+
+    client.on("RoomMember.membership", onMembership);
+    timeout = setTimeout(() => finish(new MatrixSecureError(
+      "Matrix accepted the join request but has not synchronized the joined room state yet. Secure messaging remains blocked; retry after synchronization.",
+      "join_sync_timeout",
+    )), timeoutMs);
+
+    // Close the race where membership changed just before listener registration.
+    if (readMembership() === expectedMembership) finish();
+  });
+}
+
 function waitForSync(client) {
   if (hasSecureMatrixInitialSync(client)) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -339,8 +370,10 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
     setError("");
     try {
       await matrixClient.joinRoom(roomId);
-      // The SDK's join promise completes before we re-check the local room's
-      // encryption marker. Membership events during join must not race this.
+      // joinRoom() can return a local Room before the next /sync has updated
+      // membership and encryption state. Wait for the local joined state before
+      // rerunning connect() and checking Rust crypto.
+      await waitForRoomMembership(matrixClient, roomId, "join");
       inviteJoinInProgressRef.current = false;
       setRevision((value) => value + 1);
     } catch (err) {
