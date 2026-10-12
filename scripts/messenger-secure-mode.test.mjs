@@ -221,9 +221,11 @@ test("the recovery notification Settings action dismisses the toast and refreshe
 
 test("Matrix profile lookup cannot block invitation acceptance or initial room validation", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
-  const profileLookup = panel.indexOf("void resolveMatrixUsers(localUserIds");
-  const inviteBranch = panel.indexOf('if (membership === "invite")');
-  assert.ok(profileLookup >= 0);
+  const connectStart = panel.indexOf("async function connect()");
+  const profileLookup = panel.indexOf("void resolveMatrixUsers(localUserIds", connectStart);
+  const inviteBranch = panel.indexOf('if (membership === "invite")', profileLookup);
+  assert.ok(connectStart >= 0);
+  assert.ok(profileLookup > connectStart);
   assert.ok(inviteBranch > profileLookup);
   assert.match(panel, /Profile API failure must not block invite acceptance or secure chat/);
   assert.match(panel, /roomReadyForTimeline && refreshTimeline\(client\)/);
