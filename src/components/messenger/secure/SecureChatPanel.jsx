@@ -160,6 +160,7 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
     let activeClient = null;
     let roomListenersAttached = false;
     let waitingForInviteAcceptance = false;
+    let inviteTransitionRevalidationRequested = false;
     const onTimeline = (event, room) => {
       if (!room || room.roomId !== roomId) return;
       refreshTimeline(activeClient);
@@ -180,13 +181,18 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
         return;
       }
       if (membership !== "join") return;
-      attachRoomListeners();
       if (waitingForInviteAcceptance) {
-        waitingForInviteAcceptance = false;
-        void nonBlockingRecoveryState(activeClient).then((state) => {
-          if (!cancelled) setRecoveryState(state);
-        });
+        // Re-enter connect() and apply the same joined-room encryption check used
+        // for a fresh session. Do not briefly present the room as send-ready
+        // just because membership changed from invite to join.
+        if (!inviteTransitionRevalidationRequested) {
+          inviteTransitionRevalidationRequested = true;
+          setPhase("connecting");
+          setRevision((value) => value + 1);
+        }
+        return;
       }
+      attachRoomListeners();
       setPhase(roomHasPendingInvites(room) ? "waiting_for_peer" : "ready");
       refreshTimeline(activeClient);
     };
