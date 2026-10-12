@@ -145,6 +145,7 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const timelineRef = useRef(null);
+  const inviteJoinInProgressRef = useRef(false);
   const [revision, setRevision] = useState(0);
   const [roomDisplayName, setRoomDisplayName] = useState(conversation?.title || "");
 
@@ -177,14 +178,17 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
       if (!room) return;
       const membership = room.getMyMembership?.();
       if (membership === "invite") {
-        setPhase("invited");
+        // Keep the accept action from reappearing while joinRoom() is still
+        // synchronizing the newly joined room and its encryption state.
+        if (!inviteJoinInProgressRef.current) setPhase("invited");
         return;
       }
       if (membership !== "join") return;
       if (waitingForInviteAcceptance) {
-        // Re-enter connect() and apply the same joined-room encryption check used
-        // for a fresh session. Do not briefly present the room as send-ready
-        // just because membership changed from invite to join.
+        // A locally initiated join must finish syncing before connect() checks
+        // Rust crypto's room marker. For a join accepted in another Matrix
+        // client, re-enter connect() and apply the same post-join validation.
+        if (inviteJoinInProgressRef.current) return;
         if (!inviteTransitionRevalidationRequested) {
           inviteTransitionRevalidationRequested = true;
           setPhase("connecting");
@@ -329,16 +333,28 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
   };
 
   const acceptInvitation = async () => {
-    if (!matrixClient || !roomId || phase !== "invited") return;
+    if (!matrixClient || !roomId || phase !== "invited" || inviteJoinInProgressRef.current) return;
+    inviteJoinInProgressRef.current = true;
     setPhase("connecting");
     setError("");
     try {
       await matrixClient.joinRoom(roomId);
-      // Reconnect after joining so room state and event listeners are fresh.
+      // The SDK's join promise completes before we re-check the local room's
+      // encryption marker. Membership events during join must not race this.
+      inviteJoinInProgressRef.current = false;
       setRevision((value) => value + 1);
     } catch (err) {
-      setError(err?.message || "Could not accept the encrypted-room invitation.");
-      setPhase("invited");
+      inviteJoinInProgressRef.current = false;
+      const currentRoom = matrixClient.getRoom(roomId);
+      if (currentRoom?.getMyMembership?.() === "join") {
+        // Joining may have succeeded even if follow-up sync failed; validate the
+        // joined room instead of restoring a stale invitation action.
+        setRevision((value) => value + 1);
+        setPhase("connecting");
+      } else {
+        setError(err?.message || "Could not accept the encrypted-room invitation.");
+        setPhase("invited");
+      }
     }
   };
 
