@@ -273,3 +273,12 @@ test("invalid saved Matrix sessions retire the old device ID before provisioning
   assert.match(invalidSession, /await revokeLostLocalDevice\(session\.deviceId\)/);
   assert.match(invalidSession, /clearSession\(\)/);
 });
+
+
+test("opening Messenger shows a dismissible recovery warning without provisioning a Matrix device", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  assert.match(app, /void refreshSecureRecoveryState\(\);/);
+  assert.match(app, /if \(!hasLocalDevice\) \{/);
+  assert.match(app, /status = \{ state: "not_configured", deviceCount: null \}/);
+  assert.match(app, /Recovery status must not provision a new Matrix device/);
+});

@@ -485,8 +485,15 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const requestId = ++matrixStatusRequestRef.current;
     let status;
     try {
-      const matrixClient = await getSecureMatrixClient();
-      status = await getRecoveryState(matrixClient);
+      const hasLocalDevice = await hasRecoverableLocalMatrixDevice();
+      if (!hasLocalDevice) {
+        // Recovery status must not provision a new Matrix device. The user can
+        // explicitly create one from the Recovery key action in Settings.
+        status = { state: "not_configured", deviceCount: null };
+      } else {
+        const matrixClient = await getSecureMatrixClient();
+        status = await getRecoveryState(matrixClient);
+      }
     } catch (err) {
       status = { state: "error", statusUnavailable: true, errorMessage: err?.message || "Secure chat status could not be verified." };
     }
@@ -517,28 +524,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   useEffect(() => {
     if (!meId) return undefined;
-    let cancelled = false;
-    const inspectLocalSecureDevice = async () => {
-      try {
-        const exists = await hasRecoverableLocalMatrixDevice();
-        if (cancelled) return;
-        if (exists) {
-          void refreshSecureRecoveryState();
-        } else {
-          // No recoverable device on this browser means there is no local key
-          // backup state to warn about. Don't create a phantom remote device.
-          setMatrixRecoveryState({ state: "not_configured", deviceCount: null });
-          setMatrixNotice(null);
-        }
-      } catch {
-        // Unknown local state is never permission to provision or replace a device.
-      }
-    };
-    void inspectLocalSecureDevice();
-    return () => {
-      cancelled = true;
-      matrixStatusRequestRef.current += 1;
-    };
+    // This status check is read-only when no local Matrix crypto store exists;
+    // a first device is created only if the user opens Recovery from Settings.
+    void refreshSecureRecoveryState();
+    return () => { matrixStatusRequestRef.current += 1; };
   }, [meId, refreshSecureRecoveryState]);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [topicParentConversation, setTopicParentConversation] = useState(null);
