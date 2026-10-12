@@ -2,7 +2,7 @@ import { createClient } from "matrix-js-sdk";
 import { decodeRecoveryKey } from "matrix-js-sdk/lib/crypto-api/recovery-key";
 
 import { MSG_API, authHeaders } from "../api";
-import { getSessionBoundAccessToken } from "../../../customHooks/authSession.js";
+import { getSessionBoundAccessToken } from "../../customHooks/authSession.js";
 
 const SESSION_KEY = "pd.matrix.secure-session.v1";
 const PERSISTENT_DEVICE_KEY_PREFIX = "pd.matrix.device-id.v1:";
