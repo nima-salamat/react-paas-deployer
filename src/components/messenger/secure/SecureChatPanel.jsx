@@ -299,6 +299,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
         // Profile metadata is presentation-only. Never wait on the Django profile
         // API before showing the accept-invitation action or validating encryption.
         void resolveMatrixUsers(localUserIds, getSecureMatrixSession()).then((identities) => {
+          if (cancelled) return;
           const mappedProfiles = {};
           for (const identity of identities) {
             const participant = participants.find((candidate) => String(candidate?.user?.id ?? candidate?.user_id ?? candidate?.id) === String(identity.user_id));
@@ -314,6 +315,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
           profilesByMatrixIdRef.current = mappedProfiles;
           if (!cancelled && roomReadyForTimeline) refreshTimeline(client);
         }).catch(() => {
+          if (cancelled) return;
           // Profile API failure must not block invite acceptance or secure chat.
           profilesByMatrixIdRef.current = {};
         });
