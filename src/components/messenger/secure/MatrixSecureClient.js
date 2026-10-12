@@ -106,6 +106,26 @@ function getOrCreatePersistentDeviceId() {
   }
 }
 
+/**
+ * Migrate an already validated tab session to the stable per-account browser ID.
+ * This is called only after the backend confirms the Matrix token/device binding.
+ */
+function rememberValidatedPersistentDeviceId(deviceId) {
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace || !deviceId) return;
+  const storageKey = `${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`;
+  try {
+    const existing = localStorage.getItem(storageKey);
+    if (existing && existing !== deviceId) return;
+    localStorage.setItem(storageKey, deviceId);
+    if (localStorage.getItem(storageKey) !== deviceId) {
+      throw new MatrixSecureError("Could not persist the existing Matrix device ID.", "persistent_device_id_unavailable");
+    }
+  } catch (error) {
+    if (error instanceof MatrixSecureError) throw error;
+    throw new MatrixSecureError("Could not persist the existing Matrix device ID for this Messenger account.", "persistent_device_id_unavailable");
+  }
+}
 export function forgetPersistentMatrixDeviceId(deviceId) {
   const namespace = currentDjangoUserNamespace();
   if (!namespace || !deviceId) return;
@@ -490,6 +510,11 @@ async function initializeClient() {
       // remote mapping is not trusted under the current logged-in account.
       clearSession();
       session = null;
+    } else if (session) {
+      // Legacy tabs may already have a valid device session and IndexedDB
+      // marker from before persistent IDs were introduced. Seed the current
+      // account-scoped ID only after the backend has validated that binding.
+      rememberValidatedPersistentDeviceId(session.deviceId);
     }
     if (!session) {
       session = await requestNewDeviceSession();
