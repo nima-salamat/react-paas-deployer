@@ -12,7 +12,7 @@ test("encrypted conversations never render the plaintext Messenger timeline or c
 
   assert.match(app, /const isMatrixE2EE = activeConv\?\.security_mode === "matrix_e2ee"/);
   assert.match(app, /\{isMatrixE2EE \? \(/);
-  assert.match(app, /<SecureChatPanel conversation=\{activeConv\} currentUserId=\{meId\} \/>/);
+  assert.match(app, /<SecureChatPanel[\s\S]*?conversation=\{activeConv\}[\s\S]*?currentUserId=\{meId\}[\s\S]*?onOpenSecuritySettings=/);
   const securePanel = read("src/components/messenger/secure/SecureChatPanel.jsx");
   assert.match(securePanel, /Secure room unavailable/);
   assert.match(securePanel, /phase === "error"/);
@@ -65,7 +65,7 @@ test("failed first-time crypto initialization retires only the unusable new devi
   assert.match(source, /await revokeLostLocalDevice\(session\?\.deviceId\)/);
   assert.ok(source.includes("Preserve a device"));
   assert.ok(source.includes("local marker so a transient failure cannot silently"));
-  assert.match(source, /createdDeviceSession = true/);
+  assert.match(source, /createdDeviceSession = session\.createdNewDeviceId !== false/);
   assert.match(source, /deviceMarkerWritten = true/);
 });
 
@@ -82,7 +82,7 @@ test("secure chats preserve a distinct plaintext conversation and use explicit i
   assert.ok(!panel.includes("await client.joinRoom(roomId)"));
   assert.ok(client.includes('content: { history_visibility: "invited" }'));
   assert.ok(client.includes("export function hasSecureMatrixInitialSync"));
-  assert.ok(client.includes("recovery is strongly recommended but not a prerequisite"));
+  assert.ok(client.includes("Recovery is checked globally when Messenger opens and on demand in Settings."));
 });
 
 test("first-time and offline peers do not turn recovery setup into a crypto-init requirement", () => {
@@ -94,7 +94,9 @@ test("first-time and offline peers do not turn recovery setup into a crypto-init
   assert.ok(client.includes("export async function assertSecureMessagingReady"));
   assert.ok(!client.includes("Set up and verify an encrypted key backup before starting a secure chat."));
   assert.ok(panel.includes("They can do that when they come online."));
-  assert.ok(panel.includes("Set up recovery"));
+  assert.ok(panel.includes("onOpenSecuritySettings"));
+  assert.ok(!panel.includes("Set up recovery"));
+  assert.ok(!panel.includes("MatrixRecoveryDialog"));
   assert.ok(!panel.includes('phase === "recovery_required"'));
 });
 
