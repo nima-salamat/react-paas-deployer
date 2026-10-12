@@ -586,7 +586,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
 
   const title = roomDisplayName || appConversationTitle(conversation, currentUserId);
   const secureFeatureNotice = useMemo(
-    () => "Messages and attachments in this room use Matrix end-to-end encryption. Standard Messenger server-side search, forwarding, reactions, scheduled delivery and live calls remain separate features.",
+    () => "Text, photos, voice notes, videos and files are end-to-end encrypted. Search, replies, edits/deletes, reactions, forwarding, read receipts, scheduled messages and live calls are not enabled in this secure room yet.",
     [],
   );
 

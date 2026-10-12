@@ -4076,14 +4076,15 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // Until the Matrix client, device verification and key-recovery flow are
   // configured, encrypted conversations must never fall through to the
   // plaintext Django composer/timeline.
-  const isMatrixE2EE = activeConv?.security_mode === "matrix_e2ee";
+  const isMatrixE2EE = activeConv?.security_mode === "matrix_e2ee" || Boolean(activeConv?.matrix_room_id);
   const incomingCallConversation = incomingCall
     ? (conversations.find((row) => String(row.id) === String(incomingCall.conversation_id))
       || (String(activeConv?.id) === String(incomingCall.conversation_id) ? activeConv : null))
     : null;
-  const visibleIncomingCall = incomingCallConversation?.security_mode === "matrix_e2ee"
-    ? null
-    : incomingCall;
+  const visibleIncomingCall = (
+    incomingCallConversation?.security_mode === "matrix_e2ee"
+    || Boolean(incomingCallConversation?.matrix_room_id)
+  ) ? null : incomingCall;
   const peer = peerUser(activeConv, meId);
   const role = myRole(activeConv, meId);
 

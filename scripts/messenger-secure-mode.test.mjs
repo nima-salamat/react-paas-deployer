@@ -10,7 +10,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), "u
 test("encrypted conversations never render the plaintext Messenger timeline or composer", () => {
   const app = read("src/components/messenger/MessengerApp.jsx");
 
-  assert.match(app, /const isMatrixE2EE = activeConv\?\.security_mode === "matrix_e2ee"/);
+  assert.match(app, /const isMatrixE2EE = activeConv\?\.security_mode === "matrix_e2ee" \|\| Boolean\(activeConv\?\.matrix_room_id\)/);
   assert.match(app, /\{isMatrixE2EE \? \(/);
   assert.match(app, /<SecureChatPanel[\s\S]*?conversation=\{activeConv\}[\s\S]*?currentUserId=\{meId\}[\s\S]*?onOpenSecuritySettings=/);
   const securePanel = read("src/components/messenger/secure/SecureChatPanel.jsx");
@@ -25,7 +25,8 @@ test("encrypted conversations disable plaintext upload and call affordances", ()
   assert.match(app, /onDragEnter=\{isMatrixE2EE \? undefined : onChatDragEnter\}/);
   assert.match(app, /onDragOver=\{isMatrixE2EE \? undefined : onChatDragOver\}/);
   assert.match(app, /onDrop=\{isMatrixE2EE \? undefined : onDropFilesToChat\}/);
-  assert.match(app, /const visibleIncomingCall = incomingCallConversation\?\.security_mode === "matrix_e2ee"/);
+  assert.match(app, /incomingCallConversation\?\.security_mode === "matrix_e2ee"/);
+  assert.match(app, /Boolean\(incomingCallConversation\?\.matrix_room_id\)/);
   assert.match(app, /incomingCall=\{visibleIncomingCall\}/);
 });
 
@@ -34,7 +35,8 @@ test("encrypted-room fallback explains missing Matrix device authentication and 
 
   assert.match(app, /device verification and key-recovery flow are/);
   assert.match(app, /encrypted conversations must never fall through to the/);
-  assert.match(app, /const visibleIncomingCall = incomingCallConversation\?\.security_mode === "matrix_e2ee"/);
+  assert.match(app, /incomingCallConversation\?\.security_mode === "matrix_e2ee"/);
+  assert.match(app, /Boolean\(incomingCallConversation\?\.matrix_room_id\)/);
 });
 
 
