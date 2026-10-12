@@ -6236,7 +6236,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             onOpenSecureDevices={() => setSecureDevicesOpen(true)}
             onRefreshSecureRecoveryState={() => { void refreshSecureRecoveryState(); }}
             matrixRecoveryState={matrixRecoveryState}
-            onOpenChatInfo={() => {}
+            onOpenChatInfo={() => {
               // From peer profile → open this chat's info panel
               setPanelHistory(["info"]);
             }}
