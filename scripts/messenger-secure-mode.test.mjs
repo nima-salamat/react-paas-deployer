@@ -99,6 +99,21 @@ test("first-time and offline peers do not turn recovery setup into a crypto-init
 });
 
 
+test("invited Matrix devices can reach explicit invitation acceptance before Rust crypto room confirmation", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const inviteBranch = panel.indexOf('if (membership === "invite")');
+  const encryptionCheck = panel.indexOf('await client.getCrypto().isEncryptionEnabledInRoom(roomId)');
+  const joinedMembershipCheck = panel.indexOf('if (membership !== "join")');
+  const acceptAction = panel.indexOf('await matrixClient.joinRoom(roomId)');
+
+  assert.ok(inviteBranch >= 0, "the invited membership branch must exist");
+  assert.ok(acceptAction >= 0, "the explicit invitation accept action must exist");
+  assert.ok(encryptionCheck > inviteBranch, "invites must be rendered before requiring the local Rust crypto marker");
+  assert.ok(encryptionCheck > joinedMembershipCheck, "Rust crypto room confirmation must only be required after the device joined");
+  assert.match(panel, /if \(\!body \|\| !matrixClient \|\| !roomId \|\| sending \|\| phase !== "ready"\) return/);
+  assert.match(panel, /if \(roomHasPendingInvites\(room\)\)/);
+});
+
 test("new secure conversations notify the recipient's live chat list without plaintext message delivery", () => {
   const api = read("src/components/messenger/hooks/useMessengerWebSocket.js");
 

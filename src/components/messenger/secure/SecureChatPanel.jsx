@@ -224,20 +224,16 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
           );
         }
 
-        const isEncrypted = await client.getCrypto().isEncryptionEnabledInRoom(roomId);
-        if (!isEncrypted) {
-          throw new MatrixSecureError(
-            "The mapped Matrix room is not confirmed as end-to-end encrypted. Sending is blocked.",
-            "room_not_encrypted",
-          );
-        }
-
         const membership = room.getMyMembership?.();
         setRoomDisplayName(room.name || conversation?.title || "Secure conversation");
         setHasMoreHistory(true);
 
         if (membership === "invite") {
-          // Match Element: opening the room must not silently accept an invite.
+          // An invitee's Rust crypto store may not yet know the room is encrypted:
+          // isEncryptionEnabledInRoom() can return false for a room it considers
+          // unknown. The backend already verified this immutable room mapping.
+          // Joining sends no chat content; encryption is rechecked after membership
+          // becomes "join", and outgoing messages remain blocked until then.
           setRecoveryState(await nonBlockingRecoveryState(client));
           setMessages([]);
           setPhase("invited");
@@ -252,6 +248,16 @@ export default function SecureChatPanel({ conversation, currentUserId }) {
           throw new MatrixSecureError(
             "This device is not a joined member of the encrypted room. It may have been removed or the invitation may have been declined.",
             "not_joined",
+          );
+        }
+
+        // Only require Rust crypto's persistent encryption marker once this
+        // device has joined. Never relax the check on the send path below.
+        const isEncrypted = await client.getCrypto().isEncryptionEnabledInRoom(roomId);
+        if (!isEncrypted) {
+          throw new MatrixSecureError(
+            "The mapped Matrix room is not confirmed as end-to-end encrypted. Sending is blocked.",
+            "room_not_encrypted",
           );
         }
 
