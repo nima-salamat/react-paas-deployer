@@ -228,6 +228,6 @@ test("Matrix profile lookup cannot block invitation acceptance or initial room v
   assert.ok(profileLookup > connectStart);
   assert.ok(inviteBranch > profileLookup);
   assert.match(panel, /Profile API failure must not block invite acceptance or secure chat/);
-  assert.match(panel, /roomReadyForTimeline && refreshTimeline\(client\)/);
+  assert.match(panel, /if \(!cancelled && roomReadyForTimeline\) refreshTimeline\(client\)/);
   assert.doesNotMatch(panel, /const identities = await resolveMatrixUsers\(localUserIds/);
 });
