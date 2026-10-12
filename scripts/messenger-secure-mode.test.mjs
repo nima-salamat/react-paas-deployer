@@ -110,8 +110,20 @@ test("invited Matrix devices can reach explicit invitation acceptance before Rus
   assert.ok(acceptAction >= 0, "the explicit invitation accept action must exist");
   assert.ok(encryptionCheck > inviteBranch, "invites must be rendered before requiring the local Rust crypto marker");
   assert.ok(encryptionCheck > joinedMembershipCheck, "Rust crypto room confirmation must only be required after the device joined");
-  assert.match(panel, /if \(\!body \|\| !matrixClient \|\| !roomId \|\| sending \|\| phase !== "ready"\) return/);
+  assert.match(panel, /if \(!body \|\| !matrixClient \|\| !roomId \|\| sending \|\| phase !== "ready"\) return/);
   assert.match(panel, /if \(roomHasPendingInvites\(room\)\)/);
+
+  const membershipUpdate = panel.slice(
+    panel.indexOf("const updateRoomMembershipState"),
+    panel.indexOf("const onSync"),
+  );
+  const revalidationBranch = membershipUpdate.slice(
+    membershipUpdate.indexOf("if (waitingForInviteAcceptance)"),
+    membershipUpdate.indexOf("attachRoomListeners();"),
+  );
+  assert.match(revalidationBranch, /setPhase\("connecting"\)/);
+  assert.match(revalidationBranch, /setRevision\(\(value\) => value \+ 1\)/);
+  assert.match(revalidationBranch, /return;/);
 });
 
 test("new secure conversations notify the recipient's live chat list without plaintext message delivery", () => {
