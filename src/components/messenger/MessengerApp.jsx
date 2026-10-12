@@ -6778,7 +6778,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             sx={{ width: "100%", boxShadow: 4, bgcolor: "background.paper", alignItems: "flex-start" }}
             action={(
               <Stack direction="row" spacing={0.5} alignItems="center">
-                <Button color="inherit" size="small" onClick={() => { setMatrixNotice(null); pushPanel("secure-settings"); }} sx={{ whiteSpace: "nowrap" }}>Settings</Button>
+                <Button color="inherit" size="small" onClick={() => { dismissMatrixNotice(); pushPanel("secure-settings"); void refreshSecureRecoveryState(); }} sx={{ whiteSpace: "nowrap" }}>Settings</Button>
                 <IconButton aria-label="Dismiss secure chat notice" size="small" color="inherit" onClick={dismissMatrixNotice}><CloseIcon fontSize="small" /></IconButton>
               </Stack>
             )}

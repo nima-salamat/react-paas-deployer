@@ -211,3 +211,9 @@ test("Matrix device setup fails closed when a stable account-scoped browser ID c
   assert.match(client, /localStorage\.getItem\(storageKey\) !== deviceId/);
   assert.doesNotMatch(client, /if \(!namespace\) return \{ deviceId: newDeviceId\(\), createdNewDeviceId: true \}/);
 });
+
+
+test("the recovery notification Settings action dismisses the toast and refreshes security state", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  assert.match(app, /dismissMatrixNotice\(\); pushPanel\("secure-settings"\); void refreshSecureRecoveryState\(\)/);
+});
