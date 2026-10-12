@@ -172,7 +172,7 @@ test("secure recovery is global and dismissible; standard Messenger APIs do not 
   const client = read("src/components/messenger/secure/MatrixSecureClient.js");
   assert.match(app, /messenger\.matrix-recovery-notice\.v1/);
   assert.match(app, /anchorOrigin=\{\{ vertical: "top", horizontal: "left" \}\}/);
-  assert.match(app, /onOpenSecureSettings=\{\(\) => pushPanel\("secure-settings"\)\}/);
+  assert.match(app, /onOpenSecureSettings=\{\(\) => \{[\s\S]*?pushPanel\("secure-settings"\)/);
   assert.match(app, /if \(!cid \|\| isMatrixConversationId\(cid\)\) return/);
   assert.doesNotMatch(app, /\+ \(token \? `&token=\$\{encodeURIComponent\(token\)\}` : ""\)/);
   assert.match(settings, /kind === "secure-settings"/);
