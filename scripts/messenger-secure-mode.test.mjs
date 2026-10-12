@@ -161,3 +161,20 @@ test("secure chat uses Messenger profiles, Matrix encrypted media, Enter-to-send
   assert.match(client, /deviceInventoryUnavailable/);
   assert.match(devices, /active Matrix device\(s\)/);
 });
+
+
+test("secure recovery is global and dismissible; standard Messenger APIs do not receive Matrix room history", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  const settings = read("src/components/messenger/components/RightPanel.jsx");
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  assert.match(app, /messenger\.matrix-recovery-notice\.v1/);
+  assert.match(app, /anchorOrigin=\{\{ vertical: "top", horizontal: "left" \}\}/);
+  assert.match(app, /onOpenSecureSettings=\{\(\) => pushPanel\("secure-settings"\)\}/);
+  assert.match(app, /if \(!cid \|\| isMatrixConversationId\(cid\)\) return/);
+  assert.doesNotMatch(app, /\+ \(token \? `&token=\$\{encodeURIComponent\(token\)\}` : ""\)/);
+  assert.match(settings, /kind === "secure-settings"/);
+  assert.match(panel, /onOpenSecuritySettings/);
+  assert.doesNotMatch(panel, /MatrixRecoveryDialog|Set up recovery/);
+  assert.match(client, /return \{ state: "not_checked" \}/);
+});

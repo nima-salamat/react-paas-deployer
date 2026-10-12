@@ -236,6 +236,10 @@ export default function useMessengerCalls({
     if (!activeId) return;
     const activeConversation =
       activeDetail || conversationsRef.current.find((c) => String(c.id) === String(activeId));
+    if (activeConversation?.security_mode === "matrix_e2ee" || activeConversation?.matrix_room_id) {
+      flash("Live calls are not yet available in encrypted rooms. Voice messages remain end-to-end encrypted.");
+      return;
+    }
     const activePeer = activeConversation?.type === "private" ? peerUser(activeConversation, meId) : null;
     if (activePeer?.id != null && meId != null && String(activePeer.id) === String(meId)) {
       flash("You can't call yourself.");
@@ -409,6 +413,11 @@ export default function useMessengerCalls({
     let cancelled = false;
     const check = async () => {
       try {
+        const activeConversation = activeDetail || conversationsRef.current.find((conversation) => String(conversation.id) === String(activeId));
+        if (activeConversation?.security_mode === "matrix_e2ee" || activeConversation?.matrix_room_id) {
+          setActiveCallInfo(null);
+          return;
+        }
         const res = await apiRequest({
           method: "GET",
           url: `${MSG_API}/conversations/${activeId}/call/active/`,
@@ -456,7 +465,7 @@ export default function useMessengerCalls({
       if (wsRef?.current?.readyState === 1) return;
 
       const candidates = (conversationsRef.current || [])
-        .filter((c) => String(c.id) !== String(activeIdRef.current))
+        .filter((c) => String(c.id) !== String(activeIdRef.current) && c?.security_mode !== "matrix_e2ee" && !c?.matrix_room_id)
         .slice(0, 50);
 
       for (const c of candidates) {

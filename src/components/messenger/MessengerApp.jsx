@@ -25,7 +25,7 @@ import React, {
 import { useNavigate } from "react-router-dom";
 import {
   Box, Typography, IconButton, CircularProgress, Menu, MenuItem, ListItemIcon,
-  Stack, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
+  Stack, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, Alert, Snackbar,
   Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
   ListItemText, Divider, Fade, Popover, useMediaQuery, LinearProgress, Paper,
 } from "@mui/material";
@@ -54,7 +54,10 @@ import apiRequest, { refreshAccessToken } from "../customHooks/apiRequest.jsx";
 import { MSG_API, unwrapData, unwrapList, authHeaders } from "./api";
 import SecureChatPanel from "./secure/SecureChatPanel";
 import MatrixRecoveryDialog from "./secure/MatrixRecoveryDialog";
-import { createEncryptedConversation, createEncryptedTopic } from "./secure/MatrixSecureClient";
+import MatrixDevicesDialog from "./secure/MatrixDevicesDialog";
+import {
+  createEncryptedConversation, createEncryptedTopic, getSecureMatrixClient, getRecoveryState,
+} from "./secure/MatrixSecureClient";
 import {
   useAuthUserId, formatDay, convTitle, convAvatar, peerUser, myRole,
   copyText, parseHash, setHash, attachmentKind, isVoiceAttachment, withTokenQuery, REACTIONS, PAGE_SIZE, LOAD_OLDER_SIZE,
@@ -111,6 +114,21 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [activeId, setActiveId] = useState(null);
   const [chatOpening, setChatOpening] = useState(false);
   const [activeDetail, setActiveDetail] = useState(null);
+  const secureConversationIds = useMemo(() => {
+    const all = [
+      ...(conversations || []),
+      ...(activeDetail ? [activeDetail] : []),
+      ...((conversations || []).flatMap((conversation) => conversation?.topics || [])),
+      ...(activeDetail?.topics || []),
+    ];
+    return new Set(all.filter((conversation) =>
+      conversation?.security_mode === "matrix_e2ee" || Boolean(conversation?.matrix_room_id)
+    ).map((conversation) => String(conversation.id)));
+  }, [conversations, activeDetail]);
+  const secureConversationIdsRef = useRef(secureConversationIds);
+  secureConversationIdsRef.current = secureConversationIds;
+  const isMatrixConversationId = useCallback((conversationId) =>
+    secureConversationIdsRef.current.has(String(conversationId ?? "")), []);
   const [messages, setMessages] = useState([]);
   const messagesRef = useRef([]);
   const [hasMoreMsgs, setHasMoreMsgs] = useState(false);
@@ -207,6 +225,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const cid = String(convId);
     const payload = text == null ? "" : String(text);
     try { writeComposerDraft(cid, payload); } catch { /* */ }
+    if (isMatrixConversationId(cid)) return;
     if (updateList) {
       setConversations((prev) => {
         let changed = false;
@@ -446,7 +465,60 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [secureGroup, setSecureGroup] = useState(false);
   const [secureGroupMembers, setSecureGroupMembers] = useState([]);
   const [secureRecoveryOpen, setSecureRecoveryOpen] = useState(false);
+  const [secureDevicesOpen, setSecureDevicesOpen] = useState(false);
+  const [matrixRecoveryState, setMatrixRecoveryState] = useState(null);
+  const [matrixNotice, setMatrixNotice] = useState(null);
+  const matrixStatusRequestRef = useRef(0);
   const pendingSecureOperationRef = useRef(null);
+
+  const dismissMatrixNotice = useCallback(() => {
+    const key = matrixNotice?.dismissKey;
+    if (key) {
+      try { localStorage.setItem(key, "dismissed"); } catch { /* optional storage */ }
+    }
+    setMatrixNotice(null);
+  }, [matrixNotice]);
+
+  const refreshSecureRecoveryState = useCallback(async () => {
+    if (!meId) return null;
+    const requestId = ++matrixStatusRequestRef.current;
+    let status;
+    try {
+      const matrixClient = await getSecureMatrixClient();
+      status = await getRecoveryState(matrixClient);
+    } catch (err) {
+      status = { state: "error", statusUnavailable: true, errorMessage: err?.message || "Secure chat status could not be verified." };
+    }
+    if (requestId !== matrixStatusRequestRef.current) return status;
+    setMatrixRecoveryState(status);
+    if (status.state === "ready" && !status.statusUnavailable) {
+      setMatrixNotice(null);
+      return status;
+    }
+    const key = `messenger.matrix-recovery-notice.v1:${meId}:${status.state || "error"}:${status.historyMayBeUnavailable ? "history" : "default"}`;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(key) === "dismissed"; } catch { /* optional storage */ }
+    if (dismissed) {
+      setMatrixNotice(null);
+      return status;
+    }
+    const needsRestore = status.state === "recovery_required";
+    setMatrixNotice({
+      dismissKey: key,
+      severity: status.state === "error" ? "error" : "warning",
+      title: status.state === "error" ? "Could not verify secure chat" : needsRestore ? "Encrypted history needs recovery" : "Protect your encrypted history",
+      body: status.errorMessage || (needsRestore
+        ? "An encrypted backup already exists. Restore its existing recovery key or verify a trusted device from Secure chat settings."
+        : "Set up an encrypted key backup in Secure chat settings so you can recover messages if this browser is lost."),
+    });
+    return status;
+  }, [meId]);
+
+  useEffect(() => {
+    if (!meId) return undefined;
+    void refreshSecureRecoveryState();
+    return () => { matrixStatusRequestRef.current += 1; };
+  }, [meId, refreshSecureRecoveryState]);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [topicParentConversation, setTopicParentConversation] = useState(null);
   const [topicTitle, setTopicTitle] = useState("");
@@ -715,6 +787,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // is invoked during render; otherwise the websocket hook sees a TDZ error.
   const loadPinnedMessages = useCallback(async (convId) => {
     if (!convId) return;
+    if (isMatrixConversationId(convId)) {
+      setPinnedMessages([]);
+      setCurrentPinIndex(0);
+      return;
+    }
     try {
       const res = await apiRequest({ method: "GET", url: `${MSG_API}/conversations/${convId}/pinned-messages/` });
       const data = unwrapData(res);
@@ -1053,7 +1130,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   }, []);
 
   const loadMessages = useCallback(async (cid, { silent = false, preserveOlder = false, replace = false } = {}) => {
-    if (!cid) return;
+    if (!cid || isMatrixConversationId(cid)) return;
     const key = String(cid);
     const cached = messagesCacheRef.current.get(key);
     const hasCachedMsgs = Boolean(cached?.messages?.length);
@@ -1068,9 +1145,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     }
 
     try {
-      const token = localStorage.getItem("access") || "";
-      const url = `${MSG_API}/conversations/${cid}/messages/?limit=${PAGE_SIZE}`
-        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const url = `${MSG_API}/conversations/${cid}/messages/?limit=${PAGE_SIZE}`;
       const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const items = data?.results || [];
@@ -1182,7 +1257,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const loadOlder = useCallback(async () => {
     const cid = activeIdRef.current;
-    if (!cid || loadingMoreRef.current) return;
+    if (!cid || loadingMoreRef.current || isMatrixConversationId(cid)) return;
     // Resolve cursor: prefer ref/state, fall back to oldest loaded message id
     let cursor = nextBeforeRef.current || nextBefore;
     if (!cursor) {
@@ -1205,9 +1280,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       olderScrollPinRef.current = { el, prevH, prevTop };
     }
     try {
-      const token = localStorage.getItem("access") || "";
-      const url = `${MSG_API}/conversations/${cid}/messages/?limit=${LOAD_OLDER_SIZE}&before_id=${cursor}`
-        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const url = `${MSG_API}/conversations/${cid}/messages/?limit=${LOAD_OLDER_SIZE}&before_id=${cursor}`;
       const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const older = data?.results || [];
@@ -1264,13 +1337,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
    * focusId = original id if still present, else closest neighbour.
    */
   const loadAroundMessage = useCallback(async (cid, aroundId) => {
-    if (!cid || aroundId == null) {
+    if (!cid || aroundId == null || isMatrixConversationId(cid)) {
       return { ok: false, exactFound: false, focusId: null };
     }
     try {
-      const token = localStorage.getItem("access") || "";
-      const url = `${MSG_API}/conversations/${cid}/messages/?around_id=${encodeURIComponent(aroundId)}&limit=50`
-        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const url = `${MSG_API}/conversations/${cid}/messages/?around_id=${encodeURIComponent(aroundId)}&limit=50`;
       const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const items = normalizeMessages(data?.results || []);
@@ -1350,7 +1421,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   /** Append newer messages when the user scrolls down through a mid-history window. */
   const loadNewer = useCallback(async () => {
     const cid = activeIdRef.current;
-    if (!cid || loadingMoreRef.current) return;
+    if (!cid || loadingMoreRef.current || isMatrixConversationId(cid)) return;
     if (!hasMoreNewerRef.current) return;
     let cursor = nextAfterRef.current;
     if (!cursor) {
@@ -1361,9 +1432,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     loadingMoreRef.current = true;
     setLoadingMore(true);
     try {
-      const token = localStorage.getItem("access") || "";
-      const url = `${MSG_API}/conversations/${cid}/messages/?after_id=${encodeURIComponent(cursor)}&limit=${LOAD_OLDER_SIZE}`
-        + (token ? `&token=${encodeURIComponent(token)}` : "");
+      const url = `${MSG_API}/conversations/${cid}/messages/?after_id=${encodeURIComponent(cursor)}&limit=${LOAD_OLDER_SIZE}`;
       const res = await apiRequest({ method: "GET", url });
       const data = unwrapData(res);
       const newer = normalizeMessages(data?.results || []);
@@ -2565,6 +2634,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const sendOrEdit = async () => {
     if (!activeId) return;
+    if (isMatrixConversationId(activeId)) {
+      setError("Encrypted rooms use Matrix-only sending. The normal Messenger upload/message endpoint is disabled here.");
+      return;
+    }
     const originalBody = String(textRef.current || "");
     const body = originalBody.trim();
     const originalFiles = [...files];
@@ -4045,7 +4118,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
 
   const flushSeenReceipts = useCallback((cid) => {
-    if (!cid) return;
+    if (!cid || isMatrixConversationId(cid)) return;
     // Only POST ids not yet acknowledged in this session.
     const pending = Array.from(seenQueuedRef.current)
       .filter((id) => !flushedSeenRef.current.has(String(id)));
@@ -5312,7 +5385,11 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
           )}
 
           {isMatrixE2EE ? (
-            <SecureChatPanel conversation={activeConv} currentUserId={meId} />
+            <SecureChatPanel
+              conversation={activeConv}
+              currentUserId={meId}
+              onOpenSecuritySettings={() => pushPanel("secure-settings")}
+            />
           ) : (
             <>
           {/* Mini-player sits UNDER the user header (avatar + username) */}
@@ -6154,7 +6231,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             onClose={closePanel}
             onOpenMyProfile={() => pushPanel("my-profile")}
             onOpenSessions={() => pushPanel("sessions")}
-            onOpenChatInfo={() => {
+            onOpenSecureSettings={() => pushPanel("secure-settings")}
+            onOpenSecureRecovery={() => setSecureRecoveryOpen(true)}
+            onOpenSecureDevices={() => setSecureDevicesOpen(true)}
+            onRefreshSecureRecoveryState={() => { void refreshSecureRecoveryState(); }}
+            matrixRecoveryState={matrixRecoveryState}
+            onOpenChatInfo={() => {}
               // From peer profile → open this chat's info panel
               setPanelHistory(["info"]);
             }}
@@ -6638,8 +6720,45 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       <MatrixRecoveryDialog
         open={secureRecoveryOpen}
         onClose={() => setSecureRecoveryOpen(false)}
-        onReady={() => { void runPendingSecureOperation(); }}
+        onReady={() => {
+          void runPendingSecureOperation();
+          void refreshSecureRecoveryState();
+        }}
       />
+      <MatrixDevicesDialog
+        open={secureDevicesOpen}
+        onClose={() => setSecureDevicesOpen(false)}
+        onCurrentDeviceRevoked={() => {
+          setSecureDevicesOpen(false);
+          setMatrixRecoveryState(null);
+          setMatrixNotice({
+            severity: "warning",
+            title: "Secure device revoked",
+            body: "This browser device was revoked. Secure chat must initialize a new device and restore its existing recovery key before old history can be decrypted.",
+            dismissKey: meId ? `messenger.matrix-recovery-notice.v1:${meId}:device-revoked` : null,
+          });
+        }}
+      />
+      <Snackbar
+        open={Boolean(matrixNotice)}
+        anchorOrigin={{ vertical: "top", horizontal: "left" }}
+        sx={{ mt: 1, ml: 1, maxWidth: { xs: "calc(100vw - 16px)", sm: 520 } }}
+      >
+        {matrixNotice ? (
+          <Alert severity={matrixNotice.severity || "warning"} variant="outlined"
+            sx={{ width: "100%", boxShadow: 4, bgcolor: "background.paper", alignItems: "flex-start" }}
+            action={(
+              <Stack direction="row" spacing={0.5} alignItems="center">
+                <Button color="inherit" size="small" onClick={() => { setMatrixNotice(null); pushPanel("secure-settings"); }} sx={{ whiteSpace: "nowrap" }}>Settings</Button>
+                <IconButton aria-label="Dismiss secure chat notice" size="small" color="inherit" onClick={dismissMatrixNotice}><CloseIcon fontSize="small" /></IconButton>
+              </Stack>
+            )}
+          >
+            <Typography fontWeight={750} variant="subtitle2">{matrixNotice.title}</Typography>
+            <Typography variant="body2">{matrixNotice.body}</Typography>
+          </Alert>
+        ) : <span />}
+      </Snackbar>
     </Box>
     </ThemeProvider>
   );

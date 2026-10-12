@@ -694,14 +694,9 @@ export async function assertSecureMessagingReady(matrixClient) {
     );
   }
 
-  // Like Element, recovery is strongly recommended but not a prerequisite for
-  // using an otherwise initialized encrypted room. A missing/untrusted backup
-  // must produce a visible warning, not block first-time users from secure chat.
-  try {
-    return await getRecoveryState(matrixClient);
-  } catch {
-    return { state: "needs_setup", statusUnavailable: true };
-  }
+  // Recovery is checked globally when Messenger opens and on demand in Settings.
+  // A missing backup never blocks otherwise safe E2EE text/media messages.
+  return { state: "not_checked" };
 }
 
 

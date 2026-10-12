@@ -47,6 +47,8 @@ import CursorPreferencePicker from "../../layout/CursorPreferencePicker.jsx";
 import { useTheme } from "@mui/material/styles";
 import { getPalette } from "../modules/appearance";
 import SessionManager from "../../security/SessionManager.jsx";
+import SecurityIcon from "@mui/icons-material/Security";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
 
 /**
  * Right panel — settings menu / contacts / blocked / info / profile / join-requests.
@@ -74,6 +76,8 @@ import SessionManager from "../../security/SessionManager.jsx";
 export default function RightPanel({
   kind, meId, activeConv, profileData,
   contacts, blocks, inviteLinks,
+  matrixRecoveryState,
+  onOpenSecureSettings, onOpenSecureRecovery, onOpenSecureDevices, onRefreshSecureRecoveryState,
   onlineUsers,
   myJoinRequests, convJoinRequests,
   canGoBack, onBack, onClose,
@@ -121,6 +125,7 @@ export default function RightPanel({
       case "blocks": return "Blocked users";
       case "profile": return "Profile";
       case "sessions": return "Devices & sessions";
+      case "secure-settings": return "Secure chat & recovery";
       case "my-requests": return "My join requests";
       case "conv-requests": return "Join requests";
       default: return activeConv?.type === "group" ? "Group info" : "Chat info";
@@ -187,6 +192,12 @@ export default function RightPanel({
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
             </ListItemButton>
+            <ListItemButton onClick={onOpenSecureSettings} sx={itemSx}>
+              <ListItemIcon><SecurityIcon fontSize="small" /></ListItemIcon>
+              <ListItemText primary="Secure chat & recovery" secondary="Encrypted history, recovery key and Matrix devices"
+                primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
+                secondaryTypographyProps={{ fontSize: 12 }} />
+            </ListItemButton>
             <ListItemButton onClick={onOpenContacts} sx={itemSx}>
               <ListItemIcon><ContactsIcon fontSize="small" /></ListItemIcon>
               <ListItemText primary="Contacts" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
@@ -252,6 +263,37 @@ export default function RightPanel({
     );
   }
 
+
+
+  if (kind === "secure-settings") {
+    const recoveryReady = matrixRecoveryState?.state === "ready" && !matrixRecoveryState?.statusUnavailable;
+    const recoveryError = matrixRecoveryState?.state === "error" || matrixRecoveryState?.statusUnavailable;
+    return (
+      <Box sx={{ width: "100%", height: "100%", bgcolor: "background.default", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}>{header}</Box>
+        <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
+          <Stack spacing={1.5}>
+            <Alert severity={recoveryReady ? "success" : recoveryError ? "error" : "warning"}>
+              {recoveryReady
+                ? "Encrypted key backup is verified for this device."
+                : matrixRecoveryState?.state === "recovery_required"
+                  ? "An encrypted backup already exists. Restore its existing recovery key or verify a trusted device; do not replace it."
+                  : recoveryError
+                    ? "Recovery status could not be verified. Retry before relying on this device for encrypted history."
+                    : "Set up an encrypted key backup to help restore message history if this browser or device is lost."}
+              {Number.isFinite(matrixRecoveryState?.deviceCount) ? ` Active Matrix devices: ${matrixRecoveryState.deviceCount}.` : ""}
+            </Alert>
+            <Button fullWidth variant="contained" startIcon={<VpnKeyIcon />} onClick={onOpenSecureRecovery}>Recovery key & encrypted backup</Button>
+            <Button fullWidth variant="outlined" startIcon={<SecurityIcon />} onClick={onOpenSecureDevices}>Manage secure devices</Button>
+            <Button fullWidth variant="text" onClick={onRefreshSecureRecoveryState}>Refresh security status</Button>
+            <Typography variant="caption" color="text.secondary">
+              Recovery keys stay on your device. The Messenger backend does not receive the recovery key or encrypted message content.
+            </Typography>
+          </Stack>
+        </Box>
+      </Box>
+    );
+  }
 
   if (kind === "sessions") {
     return (
