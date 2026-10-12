@@ -231,3 +231,14 @@ test("Matrix profile lookup cannot block invitation acceptance or initial room v
   assert.match(panel, /if \(!cancelled && roomReadyForTimeline\) refreshTimeline\(client\)/);
   assert.doesNotMatch(panel, /const identities = await resolveMatrixUsers\(localUserIds/);
 });
+
+
+test("recovery preflight is scoped to the current Messenger account's persistent device ID", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const start = client.indexOf("export async function hasRecoverableLocalMatrixDevice");
+  const end = client.indexOf("function openMarkerDatabase", start);
+  const preflight = client.slice(start, end);
+  assert.match(preflight, /PERSISTENT_DEVICE_KEY_PREFIX.*namespace/);
+  assert.match(preflight, /session && session\.deviceId !== deviceId\) return false/);
+  assert.doesNotMatch(preflight, /let deviceId = session\?\.deviceId/);
+});
