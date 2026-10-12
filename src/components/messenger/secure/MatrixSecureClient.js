@@ -2,8 +2,10 @@ import { createClient } from "matrix-js-sdk";
 import { decodeRecoveryKey } from "matrix-js-sdk/lib/crypto-api/recovery-key";
 
 import { MSG_API, authHeaders } from "../api";
+import { getSessionBoundAccessToken } from "../../../customHooks/authSession.js";
 
 const SESSION_KEY = "pd.matrix.secure-session.v1";
+const PERSISTENT_DEVICE_KEY_PREFIX = "pd.matrix.device-id.v1:";
 const DEVICE_MARKER_DB = "pd-messenger-matrix-device-marker";
 const DEVICE_MARKER_STORE = "devices";
 
@@ -57,6 +59,45 @@ function newDeviceId() {
   const bytes = new Uint8Array(18);
   globalThis.crypto.getRandomValues(bytes);
   return `PD${Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+
+function currentDjangoUserNamespace() {
+  try {
+    const token = getSessionBoundAccessToken(localStorage);
+    const encoded = token?.split(".")?.[1];
+    if (!encoded) return "";
+    const payload = JSON.parse(atob(encoded.replace(/-/g, "+").replace(/_/g, "/")));
+    const id = payload.user_id ?? payload.user;
+    return id == null ? "" : String(id);
+  } catch {
+    return "";
+  }
+}
+
+function getOrCreatePersistentDeviceId() {
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace) return { deviceId: newDeviceId(), createdNewDeviceId: true };
+  const storageKey = `${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`;
+  try {
+    const existing = localStorage.getItem(storageKey);
+    if (typeof existing === "string" && /^[A-Z0-9._=-]{4,255}$/.test(existing)) {
+      return { deviceId: existing, createdNewDeviceId: false, storageKey };
+    }
+    const deviceId = newDeviceId();
+    localStorage.setItem(storageKey, deviceId);
+    return { deviceId, createdNewDeviceId: true, storageKey };
+  } catch {
+    return { deviceId: newDeviceId(), createdNewDeviceId: true };
+  }
+}
+
+export function forgetPersistentMatrixDeviceId(deviceId) {
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace || !deviceId) return;
+  const storageKey = `${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`;
+  try {
+    if (localStorage.getItem(storageKey) === deviceId) localStorage.removeItem(storageKey);
+  } catch { /* browser storage may be disabled */ }
 }
 
 function openMarkerDatabase() {
@@ -251,7 +292,8 @@ async function validateStoredSession(session) {
 }
 
 async function requestNewDeviceSession() {
-  const deviceId = newDeviceId();
+  const remembered = getOrCreatePersistentDeviceId();
+  const { deviceId } = remembered;
   let response;
   try {
     response = await fetch(`${MSG_API}/secure/device-session/`, {
@@ -288,9 +330,18 @@ async function requestNewDeviceSession() {
     userId: session.user_id,
     accessToken: session.access_token,
     homeserverUrl: session.homeserver_url,
+    createdNewDeviceId: remembered.createdNewDeviceId,
   };
-  storeSession(result);
-  currentSession = result;
+  // Do not persist the "new ID" bookkeeping inside the reusable session; it is
+  // only needed to decide whether a first-time failed device should be revoked.
+  const stored = {
+    deviceId: result.deviceId,
+    userId: result.userId,
+    accessToken: result.accessToken,
+    homeserverUrl: result.homeserverUrl,
+  };
+  storeSession(stored);
+  currentSession = stored;
   return result;
 }
 
@@ -320,6 +371,7 @@ function cryptoCallbacks() {
 
 async function revokeLostLocalDevice(deviceId) {
   if (!deviceId) return;
+  forgetPersistentMatrixDeviceId(deviceId);
   try {
     await fetch(`${MSG_API}/secure/devices/${encodeURIComponent(deviceId)}/revoke/`, {
       method: "POST",
@@ -382,7 +434,7 @@ async function initializeClient() {
     }
     if (!session) {
       session = await requestNewDeviceSession();
-      createdDeviceSession = true;
+      createdDeviceSession = session.createdNewDeviceId !== false;
     }
 
     stage = "creating the Matrix client";
@@ -470,7 +522,8 @@ export async function getRecoveryState(matrixClient) {
     crypto.getKeyBackupInfo().catch(() => null),
     crypto.isCrossSigningReady().catch(() => false),
   ]);
-  let deviceCount = 0;
+  let deviceCount = null;
+  let deviceInventoryUnavailable = false;
   try {
     const response = await fetch(`${MSG_API}/secure/devices/`, {
       headers: authHeaders({
@@ -479,12 +532,14 @@ export async function getRecoveryState(matrixClient) {
     });
     const body = await response.json();
     const data = body?.data || body;
-    if (response.ok) {
-      deviceCount = (data?.results || []).filter((row) => !row.revoked_at).length;
+    if (response.ok && Array.isArray(data?.results)) {
+      deviceCount = data.results.filter((row) => !row.revoked_at).length;
+    } else {
+      deviceInventoryUnavailable = true;
     }
   } catch {
-    // If device inventory cannot be read, do not assume this is the first device.
-    deviceCount = 2;
+    // Unknown inventory is not the same as an actual count. Never fabricate it.
+    deviceInventoryUnavailable = true;
   }
 
   if (secretStatus.ready && backupInfo) {
@@ -494,7 +549,7 @@ export async function getRecoveryState(matrixClient) {
         checked?.trustInfo?.trusted === true
         && checked?.trustInfo?.matchesDecryptionKey === true
       ) {
-        return { state: "ready", backupInfo, crossSigningReady, deviceCount };
+        return { state: "ready", backupInfo, crossSigningReady, deviceCount, deviceInventoryUnavailable };
       }
     } catch {
       // Continue below and require recovery rather than assuming key backup works.
@@ -507,6 +562,7 @@ export async function getRecoveryState(matrixClient) {
       defaultKeyId: secretStatus.defaultKeyId,
       crossSigningReady,
       deviceCount,
+      deviceInventoryUnavailable,
     };
   }
   // Multiple devices without an existing backup are not a reason to overwrite
@@ -646,6 +702,157 @@ export async function assertSecureMessagingReady(matrixClient) {
   } catch {
     return { state: "needs_setup", statusUnavailable: true };
   }
+}
+
+
+
+function encodeUnpaddedBase64(value) {
+  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+  }
+  return btoa(binary).replace(/=+$/g, "");
+}
+
+function encodeBase64Url(value) {
+  return encodeUnpaddedBase64(value).replace(/\+/g, "-").replace(/\//g, "_");
+}
+
+function decodeUnpaddedBase64(value, { urlSafe = false } = {}) {
+  if (typeof value !== "string" || !value) throw new MatrixSecureError("Encrypted attachment metadata is incomplete.", "invalid_encrypted_media");
+  const normalized = urlSafe ? value.replace(/-/g, "+").replace(/_/g, "/") : value;
+  const binary = atob(normalized + "=".repeat((4 - (normalized.length % 4)) % 4));
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function assertMatrixRoomReadyForMedia(matrixClient, roomId) {
+  const room = matrixClient?.getRoom?.(roomId);
+  if (!room || room.getMyMembership?.() !== "join") {
+    throw new MatrixSecureError("Join the encrypted room before sending media.", "not_joined");
+  }
+  let events;
+  try { events = room.currentState?.getStateEvents?.("m.room.member"); } catch { events = null; }
+  if (!Array.isArray(events) || events.some((event) => event?.getContent?.()?.membership === "invite")) {
+    throw new MatrixSecureError("Media sending is paused until all invited participants have joined the encrypted room.", "participants_pending");
+  }
+  return room;
+}
+
+/** Encrypt locally and upload ciphertext only, then send the descriptor through Matrix E2EE. */
+export async function sendEncryptedMedia(matrixClient, roomId, file, options = {}) {
+  if (!file || typeof file.arrayBuffer !== "function" || Number(file.size || 0) <= 0) {
+    throw new MatrixSecureError("Choose a non-empty file to send.", "empty_media");
+  }
+  if (Number(file.size || 0) > 100 * 1024 * 1024) {
+    throw new MatrixSecureError("Encrypted attachments are limited to 100 MiB per file.", "media_too_large");
+  }
+  assertMatrixRoomReadyForMedia(matrixClient, roomId);
+  const crypto = matrixClient?.getCrypto?.();
+  if (!crypto) throw new MatrixSecureError("Matrix encryption is not initialized.", "crypto_not_initialized");
+  await assertSecureMessagingReady(matrixClient);
+  if (!(await crypto.isEncryptionEnabledInRoom(roomId))) {
+    throw new MatrixSecureError("Room encryption is not confirmed. Media sending has been stopped.", "encryption_lost");
+  }
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle || !globalThis.crypto?.getRandomValues) {
+    throw new MatrixSecureError("This browser does not provide the cryptography required for encrypted attachments.", "crypto_unavailable");
+  }
+
+  const plainBytes = await file.arrayBuffer();
+  const keyBytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  try {
+    const key = await subtle.importKey("raw", keyBytes, { name: "AES-CTR" }, false, ["encrypt"]);
+    const ciphertext = await subtle.encrypt({ name: "AES-CTR", counter: iv, length: 64 }, key, plainBytes);
+    const hash = await subtle.digest("SHA-256", ciphertext);
+    const encryptedBlob = new Blob([ciphertext], { type: "application/octet-stream" });
+    const uploaded = await matrixClient.uploadContent(encryptedBlob, {
+      name: "encrypted-attachment.bin",
+      type: "application/octet-stream",
+      includeFilename: false,
+    });
+    const mxcUrl = uploaded?.content_uri || uploaded?.contentUri;
+    if (typeof mxcUrl !== "string" || !mxcUrl.startsWith("mxc://")) {
+      throw new MatrixSecureError("Matrix did not return a media content URI.", "media_upload_failed");
+    }
+
+    const mimeType = String(file.type || "application/octet-stream").slice(0, 255);
+    const fallbackName = mimeType.startsWith("image/") ? "Image"
+      : mimeType.startsWith("audio/") ? "Voice message"
+        : mimeType.startsWith("video/") ? "Video" : "Attachment";
+    const filename = String(file.name || options.filename || fallbackName).slice(0, 255);
+    const msgtype = options.msgtype || (mimeType.startsWith("image/") ? "m.image"
+      : mimeType.startsWith("audio/") ? "m.audio"
+        : mimeType.startsWith("video/") ? "m.video" : "m.file");
+    const info = { mimetype: mimeType, size: Number(file.size || plainBytes.byteLength) };
+    const duration = Number(options.durationMs);
+    if (Number.isFinite(duration) && duration >= 0 && (msgtype === "m.audio" || msgtype === "m.video")) {
+      info.duration = Math.round(duration);
+    }
+    const content = {
+      msgtype,
+      body: String(options.caption || filename).slice(0, 1000),
+      filename,
+      info,
+      file: {
+        url: mxcUrl,
+        key: {
+          kty: "oct",
+          key_ops: ["encrypt", "decrypt"],
+          alg: "A256CTR",
+          k: encodeBase64Url(keyBytes),
+          ext: true,
+        },
+        iv: encodeUnpaddedBase64(iv),
+        hashes: { sha256: encodeUnpaddedBase64(hash) },
+        v: "v2",
+      },
+    };
+    assertMatrixRoomReadyForMedia(matrixClient, roomId);
+    if (!(await crypto.isEncryptionEnabledInRoom(roomId))) {
+      throw new MatrixSecureError("Room encryption changed during upload. The media event was not sent.", "encryption_lost");
+    }
+    return await matrixClient.sendEvent(roomId, "m.room.message", content);
+  } finally {
+    keyBytes.fill(0);
+    iv.fill(0);
+  }
+}
+
+/** Download and authenticate ciphertext before decrypting an E2EE attachment. */
+export async function decryptEncryptedMedia(matrixClient, message) {
+  const encryptedFile = message?.file;
+  if (!encryptedFile || encryptedFile.v !== "v2" || encryptedFile.key?.alg !== "A256CTR" || !encryptedFile.url?.startsWith("mxc://")) {
+    throw new MatrixSecureError("The message does not contain a supported encrypted attachment.", "invalid_encrypted_media");
+  }
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) throw new MatrixSecureError("This browser cannot decrypt encrypted attachments.", "crypto_unavailable");
+  const url = matrixClient.mxcUrlToHttp(encryptedFile.url, undefined, undefined, undefined, false, true, true);
+  if (!url) throw new MatrixSecureError("Matrix returned an invalid media URL.", "invalid_media_url");
+  const mediaUrl = new URL(url);
+  const homeserverUrl = new URL(matrixClient.getHomeserverUrl());
+  if (mediaUrl.origin !== homeserverUrl.origin) {
+    throw new MatrixSecureError("Encrypted media URL did not match the configured homeserver.", "media_origin_mismatch");
+  }
+  const token = matrixClient.getAccessToken?.();
+  const response = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "omit",
+    redirect: "error",
+  });
+  if (!response.ok) throw new MatrixSecureError("Could not download the encrypted Matrix attachment.", "media_download_failed");
+  const ciphertext = await response.arrayBuffer();
+  const expectedHash = decodeUnpaddedBase64(encryptedFile.hashes?.sha256);
+  const actualHash = new Uint8Array(await subtle.digest("SHA-256", ciphertext));
+  if (expectedHash.length !== actualHash.length || expectedHash.some((byte, index) => byte !== actualHash[index])) {
+    throw new MatrixSecureError("Encrypted media integrity verification failed; the file was not opened.", "media_hash_mismatch");
+  }
+  const iv = decodeUnpaddedBase64(encryptedFile.iv);
+  if (iv.length !== 16) throw new MatrixSecureError("Encrypted media counter is invalid.", "invalid_media_iv");
+  const key = await subtle.importKey("jwk", encryptedFile.key, { name: "AES-CTR" }, false, ["decrypt"]);
+  const plaintext = await subtle.decrypt({ name: "AES-CTR", counter: iv, length: 64 }, key, ciphertext);
+  return new Blob([plaintext], { type: String(message.info?.mimetype || "application/octet-stream") });
 }
 
 async function matrixPost(path, data, session, extraHeaders = {}) {
