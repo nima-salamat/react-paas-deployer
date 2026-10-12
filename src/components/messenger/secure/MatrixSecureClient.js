@@ -123,16 +123,17 @@ export function forgetPersistentMatrixDeviceId(deviceId) {
 export async function hasRecoverableLocalMatrixDevice() {
   const namespace = currentDjangoUserNamespace();
   if (!namespace) return false;
-  const session = readSession();
-  let deviceId = session?.deviceId || "";
-  if (!deviceId) {
-    try {
-      deviceId = localStorage.getItem(`${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`) || "";
-    } catch {
-      return false;
-    }
+  let deviceId = "";
+  try {
+    deviceId = localStorage.getItem(`${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`) || "";
+  } catch {
+    return false;
   }
   if (!deviceId) return false;
+  const session = readSession();
+  // sessionStorage can outlive an app-account switch in the same tab.
+  // Do not treat another account installation ID as this account's crypto store.
+  if (session && session.deviceId !== deviceId) return false;
   try {
     return await hasDeviceMarker(deviceId);
   } catch {
@@ -140,7 +141,6 @@ export async function hasRecoverableLocalMatrixDevice() {
     return false;
   }
 }
-
 function openMarkerDatabase() {
   if (!globalThis.indexedDB) {
     return Promise.reject(new MatrixSecureError(
