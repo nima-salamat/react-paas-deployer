@@ -128,6 +128,8 @@ test("invited Matrix devices can reach explicit invitation acceptance before Rus
   assert.match(revalidationBranch, /return;/);
   assert.match(panel, /inviteJoinInProgressRef\.current = true/);
   assert.match(panel, /await matrixClient\.joinRoom\(roomId\)/);
+  assert.match(panel, /await waitForRoomMembership\(matrixClient, roomId, "join"\)/);
+  assert.match(panel, /join_sync_timeout/);
 });
 
 test("new secure conversations notify the recipient's live chat list without plaintext message delivery", () => {
