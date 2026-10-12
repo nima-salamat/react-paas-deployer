@@ -250,3 +250,15 @@ test("validated legacy Matrix sessions migrate to a stable account-scoped device
   assert.match(client, /else if \(session\) \{[\s\S]*?rememberValidatedPersistentDeviceId\(session\.deviceId\)/);
   assert.match(client, /if \(existing && existing !== deviceId\) return/);
 });
+
+
+test("legacy Matrix recovery preflight validates ownership before migrating tab-only sessions", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const start = client.indexOf("export async function hasRecoverableLocalMatrixDevice");
+  const end = client.indexOf("function openMarkerDatabase", start);
+  const preflight = client.slice(start, end);
+  assert.match(preflight, /valid = await validateStoredSession\(session\)/);
+  assert.match(preflight, /hasDeviceMarker\(session\.deviceId\)/);
+  assert.match(preflight, /rememberValidatedPersistentDeviceId\(session\.deviceId\)/);
+  assert.match(preflight, /session && session\.deviceId !== deviceId/);
+});
