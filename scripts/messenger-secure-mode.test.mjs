@@ -202,3 +202,12 @@ test("secure attachments accept arbitrary file types and voice recording has an 
   assert.doesNotMatch(panel, /accept="image\/\*,audio\/\*,video\/\*/);
   assert.match(panel, /setRecordingVoice\(false\);\s*const blob = new Blob/);
 });
+
+
+test("Matrix device setup fails closed when a stable account-scoped browser ID cannot be persisted", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  assert.match(client, /device_owner_unavailable/);
+  assert.match(client, /persistent_device_id_unavailable/);
+  assert.match(client, /localStorage\.getItem\(storageKey\) !== deviceId/);
+  assert.doesNotMatch(client, /if \(!namespace\) return \{ deviceId: newDeviceId\(\), createdNewDeviceId: true \}/);
+});

@@ -76,7 +76,12 @@ function currentDjangoUserNamespace() {
 
 function getOrCreatePersistentDeviceId() {
   const namespace = currentDjangoUserNamespace();
-  if (!namespace) return { deviceId: newDeviceId(), createdNewDeviceId: true };
+  if (!namespace) {
+    throw new MatrixSecureError(
+      "Could not bind a stable Matrix device ID to the current Messenger account. Sign in again and retry.",
+      "device_owner_unavailable",
+    );
+  }
   const storageKey = `${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`;
   try {
     const existing = localStorage.getItem(storageKey);
@@ -85,9 +90,19 @@ function getOrCreatePersistentDeviceId() {
     }
     const deviceId = newDeviceId();
     localStorage.setItem(storageKey, deviceId);
+    if (localStorage.getItem(storageKey) !== deviceId) {
+      throw new MatrixSecureError(
+        "The browser did not persist the Matrix device ID.",
+        "persistent_device_id_unavailable",
+      );
+    }
     return { deviceId, createdNewDeviceId: true, storageKey };
-  } catch {
-    return { deviceId: newDeviceId(), createdNewDeviceId: true };
+  } catch (error) {
+    if (error instanceof MatrixSecureError) throw error;
+    throw new MatrixSecureError(
+      "This browser cannot persist a stable Matrix device identity. Enable site storage and retry; no new device was created.",
+      "persistent_device_id_unavailable",
+    );
   }
 }
 
