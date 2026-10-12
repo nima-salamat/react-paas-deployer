@@ -14,6 +14,7 @@ import {
   hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
   sendEncryptedMedia, decryptEncryptedMedia,
 } from "./MatrixSecureClient";
+import { withTokenQuery } from "../messengerUtils";
 
 function appNameForParticipant(participant) {
   const user = participant?.user || participant || {};
@@ -173,7 +174,7 @@ function waitForSync(client) {
   });
 }
 
-export default function SecureChatPanel({ conversation, currentUserId, onOpenSecuritySettings }) {
+export default function SecureChatPanel({ conversation, currentUserId, onOpenSecuritySettings, onSecureClientReady }) {
   const roomId = conversation?.matrix_room_id;
   const [phase, setPhase] = useState("connecting");
   const [error, setError] = useState("");
@@ -274,6 +275,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
         activeClient = client;
         setMatrixClient(client);
         await waitForSync(client);
+        try { Promise.resolve(onSecureClientReady?.()).catch(() => {}); } catch { /* non-blocking notification */ }
 
         const room = client.getRoom(roomId);
         if (!room) {
@@ -301,7 +303,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
             if (identity?.matrix_user_id) {
               mappedProfiles[identity.matrix_user_id] = {
                 displayName: appNameForParticipant(user) || "Member",
-                avatar: user.avatar || user.avatar_url || null,
+                avatar: withTokenQuery(user.avatar || user.avatar_url) || null,
                 userId: identity.user_id,
               };
             }
@@ -368,7 +370,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
         activeClient.off("RoomMember.membership", onMembership);
       }
     };
-  }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title, conversation?.participants]);
+  }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title, conversation?.participants, onSecureClientReady]);
 
   const loadOlderHistory = useCallback(async () => {
     if (!matrixClient || !roomId || loadingOlder || !hasMoreHistory) return;

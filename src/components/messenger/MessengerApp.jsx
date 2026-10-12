@@ -516,8 +516,31 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   useEffect(() => {
     if (!meId) return undefined;
-    void refreshSecureRecoveryState();
-    return () => { matrixStatusRequestRef.current += 1; };
+    let cancelled = false;
+    const inspectExistingSecureDevices = async () => {
+      try {
+        const response = await fetch(`${MSG_API}/secure/devices/`, { headers: authHeaders() });
+        if (!response.ok) return;
+        const body = await response.json();
+        const data = body?.data || body;
+        if (cancelled || !Array.isArray(data?.results)) return;
+        const hasActiveDevice = data.results.some((device) => !device.revoked_at);
+        if (hasActiveDevice) {
+          void refreshSecureRecoveryState();
+        } else {
+          setMatrixRecoveryState({ state: "not_configured", deviceCount: 0 });
+          setMatrixNotice(null);
+        }
+      } catch {
+        // Do not create Matrix identities/devices just to show a recovery notice.
+        // Opening a secure room or Secure settings retries the authoritative check.
+      }
+    };
+    void inspectExistingSecureDevices();
+    return () => {
+      cancelled = true;
+      matrixStatusRequestRef.current += 1;
+    };
   }, [meId, refreshSecureRecoveryState]);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [topicParentConversation, setTopicParentConversation] = useState(null);
@@ -5389,6 +5412,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               conversation={activeConv}
               currentUserId={meId}
               onOpenSecuritySettings={() => pushPanel("secure-settings")}
+              onSecureClientReady={() => refreshSecureRecoveryState()}
             />
           ) : (
             <>
