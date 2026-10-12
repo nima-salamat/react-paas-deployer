@@ -155,7 +155,7 @@ test("secure chat uses Messenger profiles, Matrix encrypted media, Enter-to-send
   assert.match(panel, /appConversationTitle\(conversation, currentUserId\)/);
   assert.match(panel, /sendEncryptedMedia/);
   assert.match(panel, /decryptEncryptedMedia/);
-  assert.match(panel, /event\.key === "Enter" && !event\.shiftKey/);
+  assert.match(panel, /event\.key === "Enter" && !event\.shiftKey && !event\.nativeEvent\?\.isComposing/);
   assert.doesNotMatch(panel, /MatrixRecoveryDialog|Set up recovery/);
   assert.match(client, /export async function sendEncryptedMedia/);
   assert.match(client, /uploadContent\(encryptedBlob/);
