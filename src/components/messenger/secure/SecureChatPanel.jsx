@@ -295,8 +295,10 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
           Number(currentUserId),
           ...participants.map((participant) => Number(participant?.user?.id ?? participant?.user_id ?? participant?.id)),
         ].filter((id) => Number.isInteger(id) && id > 0))];
-        try {
-          const identities = await resolveMatrixUsers(localUserIds, getSecureMatrixSession());
+        let roomReadyForTimeline = false;
+        // Profile metadata is presentation-only. Never wait on the Django profile
+        // API before showing the accept-invitation action or validating encryption.
+        void resolveMatrixUsers(localUserIds, getSecureMatrixSession()).then((identities) => {
           const mappedProfiles = {};
           for (const identity of identities) {
             const participant = participants.find((candidate) => String(candidate?.user?.id ?? candidate?.user_id ?? candidate?.id) === String(identity.user_id));
@@ -310,11 +312,11 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
             }
           }
           profilesByMatrixIdRef.current = mappedProfiles;
-          if (!cancelled) setMessages(getRoomMessages(room, client.getUserId(), mappedProfiles));
-        } catch {
+          if (!cancelled && roomReadyForTimeline) refreshTimeline(client);
+        }).catch(() => {
+          // Profile API failure must not block invite acceptance or secure chat.
           profilesByMatrixIdRef.current = {};
-          // If profile metadata is unavailable, do not use raw Matrix IDs as names.
-        }
+        });
         if (cancelled) return;
 
         if (membership === "invite") {
@@ -350,6 +352,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
         }
 
         if (cancelled) return;
+        roomReadyForTimeline = true;
         setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
         attachRoomListeners();
         client.on("sync", onSync);
