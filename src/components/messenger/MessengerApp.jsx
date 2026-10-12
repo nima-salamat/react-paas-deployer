@@ -5413,7 +5413,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
                 pushPanel("secure-settings");
                 void refreshSecureRecoveryState();
               }}
-              onSecureClientReady={() => refreshSecureRecoveryState()}
+              onSecureClientReady={refreshSecureRecoveryState}
             />
           ) : (
             <>
