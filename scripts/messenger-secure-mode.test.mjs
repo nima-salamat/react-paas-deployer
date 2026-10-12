@@ -268,7 +268,7 @@ test("invalid saved Matrix sessions retire the old device ID before provisioning
   const client = read("src/components/messenger/secure/MatrixSecureClient.js");
   const invalidSession = client.slice(
     client.indexOf("if (session && !(await validateStoredSession(session)))"),
-    client.indexOf("} else if (session)", client.indexOf("if (session && !(await validateStoredSession(session)))"),
+    client.indexOf("} else if (session)", client.indexOf("if (session && !(await validateStoredSession(session)))")),
   );
   assert.match(invalidSession, /await revokeLostLocalDevice\(session\.deviceId\)/);
   assert.match(invalidSession, /clearSession\(\)/);
