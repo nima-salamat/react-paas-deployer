@@ -262,3 +262,14 @@ test("legacy Matrix recovery preflight validates ownership before migrating tab-
   assert.match(preflight, /rememberValidatedPersistentDeviceId\(session\.deviceId\)/);
   assert.match(preflight, /session && session\.deviceId !== deviceId/);
 });
+
+
+test("invalid saved Matrix sessions retire the old device ID before provisioning a replacement", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const invalidSession = client.slice(
+    client.indexOf("if (session && !(await validateStoredSession(session)))"),
+    client.indexOf("} else if (session)", client.indexOf("if (session && !(await validateStoredSession(session)))"),
+  );
+  assert.match(invalidSession, /await revokeLostLocalDevice\(session\.deviceId\)/);
+  assert.match(invalidSession, /clearSession\(\)/);
+});

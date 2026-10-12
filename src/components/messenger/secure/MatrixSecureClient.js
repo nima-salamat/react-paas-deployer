@@ -505,8 +505,10 @@ async function initializeClient() {
 
     stage = "validating or creating the Matrix device session";
     if (session && !(await validateStoredSession(session))) {
-      // Do not carry a token across Django-account changes. The old device's
-      // remote mapping is not trusted under the current logged-in account.
+      // Do not reuse a persistent ID after its Matrix token/device binding fails.
+      // Revoke the account-scoped device record where possible, forget the ID
+      // only if it belongs to this Django account, and establish a fresh device.
+      await revokeLostLocalDevice(session.deviceId);
       clearSession();
       session = null;
     } else if (session) {
