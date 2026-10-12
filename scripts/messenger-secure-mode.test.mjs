@@ -113,9 +113,10 @@ test("invited Matrix devices can reach explicit invitation acceptance before Rus
   assert.match(panel, /if \(!body \|\| !matrixClient \|\| !roomId \|\| sending \|\| phase !== "ready"\) return/);
   assert.match(panel, /if \(roomHasPendingInvites\(room\)\)/);
 
+  const membershipUpdateStart = panel.indexOf("const updateRoomMembershipState");
   const membershipUpdate = panel.slice(
-    panel.indexOf("const updateRoomMembershipState"),
-    panel.indexOf("const onSync"),
+    membershipUpdateStart,
+    panel.indexOf("const onSync", membershipUpdateStart),
   );
   const revalidationBranch = membershipUpdate.slice(
     membershipUpdate.indexOf("if (waitingForInviteAcceptance)"),
