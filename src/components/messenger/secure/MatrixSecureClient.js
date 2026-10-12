@@ -513,9 +513,39 @@ async function initializeClient() {
       session = null;
     } else if (session) {
       // Legacy tabs may already have a valid device session and IndexedDB
-      // marker from before persistent IDs were introduced. Seed the current
-      // account-scoped ID only after the backend has validated that binding.
-      rememberValidatedPersistentDeviceId(session.deviceId);
+      // marker from before persistent IDs were introduced. Prefer a persisted
+      // account-scoped ID only when its local crypto marker still exists.
+      const namespace = currentDjangoUserNamespace();
+      let persistentDeviceId = "";
+      if (namespace) {
+        try {
+          persistentDeviceId = localStorage.getItem(`${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`) || "";
+        } catch {
+          throw new MatrixSecureError("Could not read the saved Matrix device ID.", "persistent_device_id_unavailable");
+        }
+      }
+      if (persistentDeviceId && persistentDeviceId !== session.deviceId) {
+        let persistentMarkerExists;
+        try {
+          persistentMarkerExists = await hasDeviceMarker(persistentDeviceId);
+        } catch {
+          throw new MatrixSecureError("Could not verify the saved Matrix encryption store.", "indexeddb_error");
+        }
+        if (persistentMarkerExists) {
+          // The current tab has an older duplicate ID. Keep the stable device
+          // and retire the stale remote login before reopening that device.
+          await revokeLostLocalDevice(session.deviceId);
+          clearSession();
+          session = null;
+        } else {
+          // Persistent ID points at a crypto store that no longer exists.
+          // Retire it and migrate the validated, marker-backed session instead.
+          await revokeLostLocalDevice(persistentDeviceId);
+          rememberValidatedPersistentDeviceId(session.deviceId);
+        }
+      } else {
+        rememberValidatedPersistentDeviceId(session.deviceId);
+      }
     }
     if (!session) {
       session = await requestNewDeviceSession();

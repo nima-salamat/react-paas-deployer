@@ -282,3 +282,16 @@ test("opening Messenger shows a dismissible recovery warning without provisionin
   assert.match(app, /status = \{ state: "not_configured", deviceCount: null \}/);
   assert.match(app, /Recovery status must not provision a new Matrix device/);
 });
+
+
+test("Matrix initialization resolves a stale tab ID against the persisted local crypto store", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const migrate = client.slice(
+    client.indexOf("} else if (session) {", client.indexOf("async function initializeClient")),
+    client.indexOf("if (!session) {", client.indexOf("} else if (session) {", client.indexOf("async function initializeClient"))),
+  );
+  assert.match(migrate, /persistentDeviceId !== session\.deviceId/);
+  assert.match(migrate, /persistentMarkerExists = await hasDeviceMarker\(persistentDeviceId\)/);
+  assert.match(migrate, /await revokeLostLocalDevice\(session\.deviceId\)/);
+  assert.match(migrate, /await revokeLostLocalDevice\(persistentDeviceId\)/);
+});
