@@ -140,23 +140,25 @@ export function forgetPersistentMatrixDeviceId(deviceId) {
 export async function hasRecoverableLocalMatrixDevice() {
   const namespace = currentDjangoUserNamespace();
   if (!namespace) return false;
+  const storageKey = `${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`;
   let deviceId = "";
-  try {
-    deviceId = localStorage.getItem(`${PERSISTENT_DEVICE_KEY_PREFIX}${namespace}`) || "";
-  } catch {
-    return false;
+  try { deviceId = localStorage.getItem(storageKey) || ""; } catch { return false; }
+  const session = readSession();
+  if (!deviceId && session?.deviceId) {
+    // Migrate older tabs only after the current Django login proves ownership
+    // of the pre-existing Matrix token. This never creates a device/session.
+    let valid = false;
+    try { valid = await validateStoredSession(session); } catch { return false; }
+    if (!valid) return false;
+    try { if (!(await hasDeviceMarker(session.deviceId))) return false; } catch { return false; }
+    rememberValidatedPersistentDeviceId(session.deviceId);
+    deviceId = session.deviceId;
   }
   if (!deviceId) return false;
-  const session = readSession();
-  // sessionStorage can outlive an app-account switch in the same tab.
-  // Do not treat another account installation ID as this account's crypto store.
+  // A tab session can outlive an app-account switch; never let a different ID
+  // trigger a recovery warning for the wrong account installation.
   if (session && session.deviceId !== deviceId) return false;
-  try {
-    return await hasDeviceMarker(deviceId);
-  } catch {
-    // Unknown local state is not enough to risk reusing a device ID.
-    return false;
-  }
+  try { return await hasDeviceMarker(deviceId); } catch { return false; }
 }
 function openMarkerDatabase() {
   if (!globalThis.indexedDB) {
