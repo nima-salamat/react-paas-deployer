@@ -122,9 +122,12 @@ test("invited Matrix devices can reach explicit invitation acceptance before Rus
     membershipUpdate.indexOf("if (waitingForInviteAcceptance)"),
     membershipUpdate.indexOf("attachRoomListeners();"),
   );
+  assert.match(revalidationBranch, /if \(inviteJoinInProgressRef\.current\) return/);
   assert.match(revalidationBranch, /setPhase\("connecting"\)/);
   assert.match(revalidationBranch, /setRevision\(\(value\) => value \+ 1\)/);
   assert.match(revalidationBranch, /return;/);
+  assert.match(panel, /inviteJoinInProgressRef\.current = true/);
+  assert.match(panel, /await matrixClient\.joinRoom\(roomId\)/);
 });
 
 test("new secure conversations notify the recipient's live chat list without plaintext message delivery", () => {
