@@ -240,7 +240,8 @@ export default function UsersPanel({ setToast: setToastProp }) {
 
   const grouped = useMemo(() => getGroupedPermissions(), []);
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2.5}>
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} gap={1.5}>
@@ -522,7 +523,6 @@ export default function UsersPanel({ setToast: setToastProp }) {
                               const allowed = canGrantRule(code);
                               const checked = (editUser.rules || []).includes(code);
                               return (
-    <TranslatedTextTree>
                                 <FormControlLabel
                                   key={code}
                                   sx={{ m: 0, alignItems: "center", mr: 1 }}
