@@ -332,7 +332,7 @@ export default function AgentDetail() {
                       </Button>
                     </Stack>
                   </Paper>
-                )) : <Typography color="text.secondary">No credentials have been issued.</Typography>}
+                )) : <Typography color="text.secondary">{tr("No credentials have been issued.")}</Typography>}
               </Stack>
 
               {credentialsCount > 10 ? (
@@ -371,7 +371,7 @@ export default function AgentDetail() {
                       <Stack direction="row" spacing={0.7} alignItems="center"><Chip size="small" label={tr(event.success ? "success" : "failed")} color={event.success ? "success" : "error"} /><Typography variant="caption" color="text.secondary">{event.http_status || "—"}</Typography></Stack>
                     </Stack>
                   </Paper>
-                )) : <Typography color="text.secondary">No audit events yet.</Typography>}
+                )) : <Typography color="text.secondary">{tr("No audit events yet.")}</Typography>}
               </Stack>
 
               {auditCount > 10 ? (
@@ -434,7 +434,7 @@ export default function AgentDetail() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 2.5, py: 1.75, gap: 1 }}>
-          <Button onClick={() => setDeleteTarget(null)} disabled={saving}>Cancel</Button>
+          <Button onClick={() => setDeleteTarget(null)} disabled={saving}>{tr("Cancel")}</Button>
           <Button
             variant="contained"
             color="error"
@@ -454,7 +454,7 @@ export default function AgentDetail() {
         fullWidth
         maxWidth="lg"
       >
-        <DialogTitle sx={{ fontWeight: 850 }}>AGENT.md</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 850 }}>{tr("AGENT.md")}</DialogTitle>
         <DialogContent dividers>
           <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
             This generated file contains a short-lived, single-use enrollment token. Copy or save it only where the automation client can use it, and do not publish it.
@@ -512,11 +512,11 @@ export default function AgentDetail() {
       </Dialog>
 
       <Dialog open={issueOpen} onClose={() => !saving && setIssueOpen(false)} fullWidth maxWidth="xs">
-        <DialogTitle sx={{ fontWeight: 850 }}>Issue Agent access token</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 850 }}>{tr("Issue Agent access token")}</DialogTitle>
         <DialogContent dividers>
-          <TextField type="number" label="Expires in days" value={expiresDays} onChange={(e) => setExpiresDays(e.target.value)} inputProps={{ min: 1, max: 3650 }} helperText="1–3650 days. The server default is used only when no value is supplied." fullWidth />
+          <TextField type="number" label={tr("Expires in days")} value={expiresDays} onChange={(e) => setExpiresDays(e.target.value)} inputProps={{ min: 1, max: 3650 }} helperText={tr("1–3650 days. The server default is used only when no value is supplied.")} fullWidth />
         </DialogContent>
-        <DialogActions><Button onClick={() => setIssueOpen(false)} disabled={saving}>Cancel</Button><Button variant="contained" onClick={issue} disabled={saving || Number(expiresDays) < 1 || Number(expiresDays) > 3650}>{saving ? "Issuing…" : "Issue token"}</Button></DialogActions>
+        <DialogActions><Button onClick={() => setIssueOpen(false)} disabled={saving}>Cancel</Button><Button variant="contained" onClick={issue} disabled={saving || Number(expiresDays) < 1 || Number(expiresDays) > 3650}>{tr(saving ? "Issuing…" : "Issue token")}</Button></DialogActions>
       </Dialog>
 
       <Dialog open={tokenDialog.open} onClose={() => setTokenDialog({ open: false, token: "", title: "", warning: "" })} fullWidth maxWidth="md">
@@ -525,7 +525,7 @@ export default function AgentDetail() {
           <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{tokenDialog.warning}</Alert>
           <Box sx={{ p: 1.5, border: "1px solid", borderColor: "divider", borderRadius: 1.5, bgcolor: "action.hover", fontFamily: "ui-monospace, monospace", wordBreak: "break-all" }}>{tokenDialog.token || "Token unavailable"}</Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}><Button startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />} onClick={copyToken} disabled={!tokenDialog.token}>{copied ? "Copied" : "Copy token"}</Button><Button variant="contained" onClick={() => setTokenDialog({ open: false, token: "", title: "", warning: "" })}>Done</Button></DialogActions>
+        <DialogActions sx={{ px: 3, py: 2 }}><Button startIcon={copied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />} onClick={copyToken} disabled={!tokenDialog.token}>{tr(copied ? "Copied" : "Copy token")}</Button><Button variant="contained" onClick={() => setTokenDialog({ open: false, token: "", title: "", warning: "" })}>{tr("Done")}</Button></DialogActions>
       </Dialog>
     </Container>
   );
