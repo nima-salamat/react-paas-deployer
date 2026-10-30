@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, CircularProgress, Drawer, FormControl, IconButton,
   MenuItem, Select, Stack, Tooltip, Typography, Chip, alpha, Divider,
@@ -83,6 +84,7 @@ export default function TicketDetailDrawer({
   };
 
   return (
+    <TranslatedTextTree>
     <>
       <Drawer
         anchor="right"
@@ -343,5 +345,6 @@ export default function TicketDetailDrawer({
         }}
       />
     </>
+    </TranslatedTextTree>
   );
 }
