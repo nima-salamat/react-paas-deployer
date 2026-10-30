@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, FormControl, InputLabel, MenuItem, Pagination, Select, Stack,
@@ -182,6 +183,7 @@ export default function PlansPanel() {
   const numPages = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE));
 
   return (
+    <TranslatedTextTree>
     <PermissionGate anyOf={["plans.view", "plans.manage"]}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} gap={1.5} mb={2}>
         <Box>
@@ -382,6 +384,7 @@ export default function PlansPanel() {
         </DialogActions>
       </Dialog>
     </PermissionGate>
+    </TranslatedTextTree>
   );
 }
 
