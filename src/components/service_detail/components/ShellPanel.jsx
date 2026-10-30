@@ -1,4 +1,5 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import { useMediaQuery } from "@mui/material";
 import {
   Box,
@@ -262,6 +263,7 @@ const TerminalHistory = React.memo(function TerminalHistory({ history }) {
 });
 
 export default function ShellPanel({ service, enabled = true, onError }) {
+  const { t: tr } = useLocale();
   const [session, setSession] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [shellMode, setShellMode] = useState("restricted");
@@ -1500,7 +1502,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.25 }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
           <TerminalRoundedIcon color="disabled" />
-          <Box><Typography fontWeight={800}>Shell unavailable</Typography><Typography variant="body2" color="text.secondary">You do not have permission to use the restricted service shell.</Typography></Box>
+          <Box><Typography fontWeight={800}>{tr("Shell unavailable")}</Typography><Typography variant="body2" color="text.secondary">{tr("You do not have permission to use the restricted service shell.")}</Typography></Box>
         </Stack>
       </Paper>
     );
@@ -1586,7 +1588,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     <Typography sx={{ color: "#6f7d8b", fontSize: 10.5, fontWeight: 800, letterSpacing: ".08em", flex: 1, minWidth: 0 }}>
                       PROJECT
                     </Typography>
-                    <Tooltip title="Refresh">
+                    <Tooltip title={tr("Refresh")}>
                       <span style={{ display: "inline-flex", flexShrink: 0 }}>
                         <IconButton
                           size="small"
@@ -1716,7 +1718,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 </Box>
                 <Divider sx={{ borderColor: "rgba(148,163,184,.1)" }} />
                 <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", py: .5 }}>
-                  {!session ? <Typography sx={{ p: 1.3, color: "#5e6d7c", fontSize: 11.5 }}>Open a shell to browse files.</Typography> : explorerEntries.map((item) => {
+                  {!session ? <Typography sx={{ p: 1.3, color: "#5e6d7c", fontSize: 11.5 }}>{tr("Open a shell to browse files.")}</Typography> : explorerEntries.map((item) => {
                     const itemPath = item.path || joinPath(currentCwd, item.name);
                     const selected = selectedPaths.includes(itemPath);
                     return (
@@ -1748,10 +1750,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   flexShrink: 0,
                 }}
               >
-                <Tooltip title={sidebarOpen ? "Hide project" : "Show project"}>
+                <Tooltip title={tr(sidebarOpen ? "Hide project" : "Show project")}>
                   <IconButton
                     size="small"
-                    aria-label={sidebarOpen ? "Hide project explorer" : "Show project explorer"}
+                    aria-label={tr(sidebarOpen ? "Hide project explorer" : "Show project explorer")}
                     onClick={(e) => { e.stopPropagation(); setSidebarOpen((v) => !v); }}
                     sx={{ color: "#8291a0", width: 32, height: 32, flexShrink: 0 }}
                   >
@@ -1778,7 +1780,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     }}
                   />
                 ) : (
-                  <Chip size="small" label="Disconnected" sx={{ height: 23, color: "#7f8b97", bgcolor: "rgba(148,163,184,.06)", maxWidth: { xs: 125, sm: "none" } }} />
+                  <Chip size="small" label={tr("Disconnected")} sx={{ height: 23, color: "#7f8b97", bgcolor: "rgba(148,163,184,.06)", maxWidth: { xs: 125, sm: "none" } }} />
                 )}
 
                 <Box sx={{ flex: 1, minWidth: 0 }} />
@@ -1786,13 +1788,13 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 {session ? (
                   <>
                     <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: .2, minWidth: 0 }}>
-                      <Tooltip title={dryRun ? "Dry-run ON (commands are planned only)" : "Dry-run OFF"}>
+                      <Tooltip title={tr(dryRun ? "Dry-run ON (commands are planned only)" : "Dry-run OFF")}>
                         <Chip size="small" onClick={(e) => { e.stopPropagation(); setDryRun((v) => !v); }} label={dryRun ? "dry-run" : "live"} sx={{ height: 22, cursor: "pointer", color: dryRun ? "#e9bd69" : "#8fa0b0", bgcolor: dryRun ? "rgba(246,199,108,.1)" : "rgba(148,163,184,.06)" }} />
                       </Tooltip>
-                      <Tooltip title="Snippets"><Button size="small" onClick={(e) => { e.stopPropagation(); setSnippetsOpen(true); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Snippets</Button></Tooltip>
-                      <Tooltip title="Environment (masked)"><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Env</Button></Tooltip>
-                      <Tooltip title="Activity / audit log"><Button size="small" onClick={(e) => { e.stopPropagation(); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>Audit</Button></Tooltip>
-                      {health?.container?.running ? <Chip size="small" label="healthy" sx={{ height: 22, color: "#73c9a0", bgcolor: "rgba(53,211,153,.08)" }} /> : session ? <Chip size="small" label="check" onClick={(e) => { e.stopPropagation(); loadHealth(); }} sx={{ height: 22, cursor: "pointer", color: "#9ab0c4" }} /> : null}
+                      <Tooltip title={tr("Snippets")}><Button size="small" onClick={(e) => { e.stopPropagation(); setSnippetsOpen(true); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Snippets")}</Button></Tooltip>
+                      <Tooltip title={tr("Environment (masked")})}><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Env")}</Button></Tooltip>
+                      <Tooltip title={tr("Activity / audit log")}><Button size="small" onClick={(e) => { e.stopPropagation(); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Audit")}</Button></Tooltip>
+                      {health?.container?.running ? <Chip size="small" label={tr("healthy")} sx={{ height: 22, color: "#73c9a0", bgcolor: "rgba(53,211,153,.08)" }} /> : session ? <Chip size="small" label={tr("check")} onClick={(e) => { e.stopPropagation(); loadHealth(); }} sx={{ height: 22, cursor: "pointer", color: "#9ab0c4" }} /> : null}
                       <Tooltip title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
                         <IconButton size="small" aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={(e) => { e.stopPropagation(); setFullscreen((value) => !value); }} sx={{ color: fullscreen ? "#b7d5f0" : "#9ab0c4", width: 32, height: 32, flexShrink: 0 }}>
                           {fullscreen ? <FullscreenExitRoundedIcon sx={{ fontSize: 18 }} /> : <FullscreenRoundedIcon sx={{ fontSize: 18 }} />}
@@ -1800,14 +1802,14 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                       </Tooltip>
                     </Box>
                     <Box sx={{ display: { xs: "flex", sm: "none" }, alignItems: "center", flexShrink: 0 }}>
-                      <Tooltip title="Shell options">
-                        <IconButton size="small" aria-label="Shell options" onClick={(e) => { e.stopPropagation(); setMobileOptionsAnchorEl(e.currentTarget); }} sx={{ color: "#9ab0c4", width: 32, height: 32 }}>
+                      <Tooltip title={tr("Shell options")}>
+                        <IconButton size="small" aria-label={tr("Shell options")} onClick={(e) => { e.stopPropagation(); setMobileOptionsAnchorEl(e.currentTarget); }} sx={{ color: "#9ab0c4", width: 32, height: 32 }}>
                           <MoreVertRoundedIcon sx={{ fontSize: 19 }} />
                         </IconButton>
                       </Tooltip>
                     </Box>
-                    <Tooltip title="Close session">
-                      <IconButton size="small" aria-label="Close shell session" onClick={(e) => { e.stopPropagation(); closeSession(); }} sx={{ color: "#cc7f7f", width: 32, height: 32, flexShrink: 0 }}>
+                    <Tooltip title={tr("Close session")}>
+                      <IconButton size="small" aria-label={tr("Close shell session")} onClick={(e) => { e.stopPropagation(); closeSession(); }} sx={{ color: "#cc7f7f", width: 32, height: 32, flexShrink: 0 }}>
                         <StopCircleOutlinedIcon sx={{ fontSize: 18 }} />
                       </IconButton>
                     </Tooltip>
@@ -1825,10 +1827,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     </Button>
                     <Menu anchorEl={shellModeAnchorEl} open={Boolean(shellModeAnchorEl)} onClose={() => setShellModeAnchorEl(null)} slotProps={{ paper: { sx: { minWidth: 230 } } }}>
                       <MenuItem onClick={() => { setShellMode("restricted"); setShellModeAnchorEl(null); }}>
-                        <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>Restricted</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>Policy-enforced workspace shell</Typography></Stack>
+                        <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>{tr("Restricted")}</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>{tr("Policy-enforced workspace shell")}</Typography></Stack>
                       </MenuItem>
                       <MenuItem disabled={!shellAdvanced} onClick={() => { setShellMode("developer"); setShellModeAnchorEl(null); }}>
-                        <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>Developer</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>{shellAdvanced ? "Real /bin/sh inside the hardened container" : "Requires advanced shell permission"}</Typography></Stack>
+                        <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>{tr("Developer")}</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>{tr(shellAdvanced ? "Real /bin/sh inside the hardened container" : "Requires advanced shell permission")}</Typography></Stack>
                       </MenuItem>
                     </Menu>
                     <Button
@@ -1885,7 +1887,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                       suppressContentEditableWarning
                       spellCheck={false}
                       role="textbox"
-                      aria-label={interactiveRunning ? "Interactive process input" : "Shell command line"}
+                      aria-label={tr(interactiveRunning ? "Interactive process input" : "Shell command line")}
                       tabIndex={0}
                       onClick={() => requestAnimationFrame(() => terminalInputRef.current?.focus())}
                       onTouchEnd={() => requestAnimationFrame(() => terminalInputRef.current?.focus())}
@@ -1895,7 +1897,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                         else setCommand(text);
                         setCommandHistoryIndex(null);
                       }}
-                      data-placeholder={interactiveRunning ? (interactiveSecret ? "password…" : "") : (commandRunning ? "running…" : "type a command…")}
+                      data-placeholder={interactiveRunning ? (interactiveSecret ? tr("password…") : "") : (commandRunning ? tr("running…") : tr("type a command…"))}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
@@ -1997,13 +1999,13 @@ export default function ShellPanel({ service, enabled = true, onError }) {
               {completionOpen && completionSuggestions.length > 0 ? (
                 <Box ref={helperRef} sx={{ position: "fixed", left: helperRect.left, top: helperRect.top, width: { xs: "calc(100vw - 16px)", md: 560 }, maxWidth: "calc(100vw - 16px)", maxHeight: "min(46vh, 420px)", overflowY: "auto", bgcolor: "#111922", border: "1px solid rgba(128,151,174,.3)", boxShadow: "0 16px 40px rgba(0,0,0,.45)", borderRadius: .8, zIndex: 1600 }}>
                   <Box sx={{ px: 1.1, py: .65, display: "flex", alignItems: "center", gap: .7, borderBottom: "1px solid rgba(148,163,184,.1)" }}>
-                    <Typography sx={{ color: "#93a6ba", fontSize: 10.5, fontWeight: 800, letterSpacing: ".05em", flex: 1 }}>{helperMode === "paths" ? "PATH COMPLETION" : "COMMAND COMPLETION"}</Typography>
+                    <Typography sx={{ color: "#93a6ba", fontSize: 10.5, fontWeight: 800, letterSpacing: ".05em", flex: 1 }}>{tr(helperMode === "paths" ? "PATH COMPLETION" : "COMMAND COMPLETION")}</Typography>
                     <Typography sx={{ color: "#617285", fontSize: 9.5 }}>Tab ↹ · ↑↓ · Enter · Esc</Typography>
                   </Box>
                   {completionSuggestions.map((item, index) => (
                     <Box key={`${item.command}-${index}`} ref={index === completionIndex ? completionActiveRef : null} onMouseDown={(event) => { event.preventDefault(); setCompletionIndex(index); applyCompletion(index); }} sx={{ px: 1.1, py: .65, display: "flex", alignItems: "center", gap: .8, bgcolor: index === completionIndex ? "rgba(96,165,250,.14)" : "transparent", cursor: "pointer" }}>
                       <Typography sx={{ flex: 1, color: index === completionIndex ? "#e9f2fb" : "#c0ccd8", fontFamily: MONO, fontSize: 11.7 }}>{item.display || item.command}</Typography>
-                      <Typography sx={{ color: "#627589", fontSize: 9.5 }}>{item.label || (item.dangerous ? "confirm" : "command")}</Typography>
+                      <Typography sx={{ color: "#627589", fontSize: 9.5 }}>{tr(item.label || (item.dangerous ? "confirm" : "command"))}</Typography>
                     </Box>
                   ))}
                 </Box>
@@ -2015,12 +2017,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
             <Box sx={{ height: 38, px: 1.2, display: "flex", alignItems: "center", gap: .7, bgcolor: "#0e151d", borderBottom: "1px solid rgba(148,163,184,.12)" }}>
               <Typography sx={{ flex: 1, color: "#cbd6e0", fontFamily: MONO, fontSize: 11.8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{activeFile}</Typography>
               <Chip size="small" label={langLabel(activeLanguage || "text")} sx={{ height: 21, bgcolor: "rgba(96,165,250,.08)", color: "#91aac2" }} />
-              {openFiles[activeFile]?.writable === false ? <Chip size="small" icon={<WarningAmberRoundedIcon sx={{ fontSize: "14px !important" }} />} label="read-only" sx={{ height: 21, color: "#ffb19f", bgcolor: "rgba(255,143,143,.07)" }} /> : null}
-              {openFiles[activeFile]?.dirty ? <Chip size="small" label="modified" sx={{ height: 21, color: "#e9bd69", bgcolor: "rgba(246,199,108,.07)" }} /> : null}
-              <Tooltip title="New file"><span><IconButton size="small" onClick={createNewFile} disabled={!session} sx={{ color: "#7e8e9f" }}><AddRoundedIcon sx={{ fontSize: 17 }} /></IconButton></span></Tooltip>
-              <Tooltip title="Delete file"><span><IconButton size="small" onClick={deleteActiveFile} disabled={!activeFile || fileLoading} sx={{ color: "#c77f7f" }}><DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} /></IconButton></span></Tooltip>
-              <Tooltip title="Copy"><span><IconButton size="small" onClick={copyFile} disabled={!activeContent} sx={{ color: "#7e8e9f" }}><ContentCopyRoundedIcon sx={{ fontSize: 16 }} /></IconButton></span></Tooltip>
-              <Button size="small" variant="contained" startIcon={<SaveRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => writeOpenFile(activeFile)} disabled={fileLoading || !openFiles[activeFile]?.dirty || openFiles[activeFile]?.writable === false} sx={{ textTransform: "none", fontSize: 11 }}>Save</Button>
+              {openFiles[activeFile]?.writable === false ? <Chip size="small" icon={<WarningAmberRoundedIcon sx={{ fontSize: "14px !important" }} />} label={tr("read-only")} sx={{ height: 21, color: "#ffb19f", bgcolor: "rgba(255,143,143,.07)" }} /> : null}
+              {openFiles[activeFile]?.dirty ? <Chip size="small" label={tr("modified")} sx={{ height: 21, color: "#e9bd69", bgcolor: "rgba(246,199,108,.07)" }} /> : null}
+              <Tooltip title={tr("New file")}><span><IconButton size="small" onClick={createNewFile} disabled={!session} sx={{ color: "#7e8e9f" }}><AddRoundedIcon sx={{ fontSize: 17 }} /></IconButton></span></Tooltip>
+              <Tooltip title={tr("Delete file")}><span><IconButton size="small" onClick={deleteActiveFile} disabled={!activeFile || fileLoading} sx={{ color: "#c77f7f" }}><DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} /></IconButton></span></Tooltip>
+              <Tooltip title={tr("Copy")}><span><IconButton size="small" onClick={copyFile} disabled={!activeContent} sx={{ color: "#7e8e9f" }}><ContentCopyRoundedIcon sx={{ fontSize: 16 }} /></IconButton></span></Tooltip>
+              <Button size="small" variant="contained" startIcon={<SaveRoundedIcon sx={{ fontSize: 15 }} />} onClick={() => writeOpenFile(activeFile)} disabled={fileLoading || !openFiles[activeFile]?.dirty || openFiles[activeFile]?.writable === false} sx={{ textTransform: "none", fontSize: 11 }}>{tr("Save")}</Button>
             </Box>
             <Box sx={{ position: "relative", flex: 1, minHeight: 0, bgcolor: "#0b1016", display: "flex", overflow: "hidden" }}>
               <Box sx={{ width: 52, flexShrink: 0, bgcolor: "#0e141b", borderRight: "1px solid rgba(148,163,184,.10)", overflow: "hidden", position: "relative" }}>
@@ -2075,18 +2077,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
             >
               <IconButton
                 size="small"
-                aria-label="Scroll editor left"
+                aria-label={tr("Scroll editor left")}
                 onClick={() => scrollEditorHorizontally(-1)}
                 sx={{ width: 32, height: 32, color: "#9ab0c4", border: "1px solid rgba(148,163,184,.14)" }}
               >
                 <KeyboardArrowLeftRoundedIcon sx={{ fontSize: 20 }} />
               </IconButton>
               <Typography sx={{ flex: 1, minWidth: 0, textAlign: "center", color: "#647689", fontSize: 10.5, fontFamily: MONO }}>
-                Horizontal scroll
+                {tr("Horizontal scroll")}
               </Typography>
               <IconButton
                 size="small"
-                aria-label="Scroll editor right"
+                aria-label={tr("Scroll editor right")}
                 onClick={() => scrollEditorHorizontally(1)}
                 sx={{ width: 32, height: 32, color: "#9ab0c4", border: "1px solid rgba(148,163,184,.14)" }}
               >
@@ -2111,19 +2113,19 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           {fullscreen ? "Exit fullscreen" : "Fullscreen"}
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setDryRun((value) => !value); }}>
-          {dryRun ? "Disable dry-run" : "Enable dry-run"}
+          {tr(dryRun ? "Disable dry-run" : "Enable dry-run")}
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setSnippetsOpen(true); }}>
           Snippets
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); loadEnv(); }}>
-          Environment
+          {tr("Environment")}
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }}>
-          Audit log
+          {tr("Audit log")}
         </MenuItem>
         <MenuItem disabled={!session} onClick={() => { setMobileOptionsAnchorEl(null); loadHealth(); }}>
-          Refresh health
+          {tr("Refresh health")}
         </MenuItem>
       </Menu>
 
@@ -2135,21 +2137,21 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         slotProps={{ paper: { sx: { minWidth: 190 } } }}
       >
         {contextMenu.item?.directory && !contextMenu.item?.parent ? (
-          <MenuItem onClick={contextNewFile}><AddRoundedIcon sx={{ mr: 1, fontSize: 18 }} />New file here</MenuItem>
+          <MenuItem onClick={contextNewFile}><AddRoundedIcon sx={{ mr: 1, fontSize: 18 }} />{tr("New file here")}</MenuItem>
         ) : null}
         {!contextMenu.item?.directory ? (
-          <MenuItem onClick={contextEdit}><EditRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Edit</MenuItem>
+          <MenuItem onClick={contextEdit}><EditRoundedIcon sx={{ mr: 1, fontSize: 18 }} />{tr("Edit")}</MenuItem>
         ) : (
-          <MenuItem onClick={() => { const item = contextMenu.item; closeContextMenu(); if (item) runCommand(item.parent ? "cd .." : `cd ${quoteShellArg(item.path || joinPath(currentCwd, item.name))}`); }}><FolderRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Open directory</MenuItem>
+          <MenuItem onClick={() => { const item = contextMenu.item; closeContextMenu(); if (item) runCommand(item.parent ? "cd .." : `cd ${quoteShellArg(item.path || joinPath(currentCwd, item.name))}`); }}><FolderRoundedIcon sx={{ mr: 1, fontSize: 18 }} />{tr("Open directory")}</MenuItem>
         )}
-        {contextMenu.item?.parent ? null : <MenuItem onClick={contextRename}><DriveFileRenameOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Rename</MenuItem>}
-        <MenuItem onClick={async () => { await navigator.clipboard?.writeText(contextMenu.item?.path || ""); closeContextMenu(); }}><ContentCopyRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Copy path</MenuItem>
-        {contextMenu.item?.parent ? null : <MenuItem onClick={async () => { const item = contextMenu.item; closeContextMenu(); if (item) await downloadSelection([item]); }}><DownloadRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Download</MenuItem>}
-        {contextMenu.item?.parent ? null : <MenuItem onClick={contextDelete} sx={{ color: "#f18b82" }}><DeleteOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />Delete</MenuItem>}
+        {contextMenu.item?.parent ? null : <MenuItem onClick={contextRename}><DriveFileRenameOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />{tr("Rename")}</MenuItem>}
+        <MenuItem onClick={async () => { await navigator.clipboard?.writeText(contextMenu.item?.path || ""); closeContextMenu(); }}><ContentCopyRoundedIcon sx={{ mr: 1, fontSize: 18 }} />{tr("Copy path")}</MenuItem>
+        {contextMenu.item?.parent ? null : <MenuItem onClick={async () => { const item = contextMenu.item; closeContextMenu(); if (item) await downloadSelection([item]); }}><DownloadRoundedIcon sx={{ mr: 1, fontSize: 18 }} />{tr("Download")}</MenuItem>}
+        {contextMenu.item?.parent ? null : <MenuItem onClick={contextDelete} sx={{ color: "#f18b82" }}><DeleteOutlineRoundedIcon sx={{ mr: 1, fontSize: 18 }} />{tr("Delete")}</MenuItem>}
       </Menu>
 
       <Dialog open={replaceDialog.open} onClose={() => !replaceDialog.loading && setReplaceDialog((prev) => ({ ...prev, open: false }))} maxWidth="xs" fullWidth>
-        <DialogTitle>Active shell session</DialogTitle>
+        <DialogTitle>{tr("Active shell session")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             This service already has an active shell session{replaceDialog.activeUser?.username ? ` by ${replaceDialog.activeUser.username}` : ""}.
@@ -2157,32 +2159,32 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setReplaceDialog((prev) => ({ ...prev, open: false }))} disabled={replaceDialog.loading}>Cancel</Button>
-          {replaceDialog.canReplace ? <Button color="error" variant="contained" onClick={replaceActiveSession} disabled={replaceDialog.loading}>{replaceDialog.loading ? <CircularProgress size={16} color="inherit" /> : "Terminate & open new shell"}</Button> : null}
+          <Button onClick={() => setReplaceDialog((prev) => ({ ...prev, open: false }))} disabled={replaceDialog.loading}>{tr("Cancel")}</Button>
+          {replaceDialog.canReplace ? <Button color="error" variant="contained" onClick={replaceActiveSession} disabled={replaceDialog.loading}>{replaceDialog.loading ? <CircularProgress size={16} color="inherit" /> : tr("Terminate & open new shell")}</Button> : null}
         </DialogActions>
       </Dialog>
 
       <Dialog open={Boolean(confirmCommand)} onClose={() => setConfirmCommand(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Confirm command</DialogTitle>
+        <DialogTitle>{tr("Confirm command")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            This command changes application state. Run it anyway?
+            {tr("This command changes application state. Run it anyway?")}
           </DialogContentText>
           <Box sx={{ mt: 1.2, p: 1, bgcolor: "#0b1016", borderRadius: .6, fontFamily: MONO, fontSize: 12, color: "#cbd6e0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
             {confirmCommand || ""}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmCommand(null)}>Cancel</Button>
-          <Button variant="contained" color="warning" onClick={() => { const cmd = confirmCommand; setConfirmCommand(null); if (cmd) runCommand(cmd, { confirm: true }); }}>Run</Button>
+          <Button onClick={() => setConfirmCommand(null)}>{tr("Cancel")}</Button>
+          <Button variant="contained" color="warning" onClick={() => { const cmd = confirmCommand; setConfirmCommand(null); if (cmd) runCommand(cmd, { confirm: true }); }}>{tr("Run")}</Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={auditOpen} onClose={() => setAuditOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-          <span>Shell activity log</span>
+          <span>{tr("Shell activity log")}</span>
           <Typography component="span" sx={{ fontSize: 12, color: "text.secondary", fontWeight: 400 }}>
-            {auditTotal} event{auditTotal === 1 ? "" : "s"}
+            {auditTotal} {tr(auditTotal === 1 ? "event" : "events")}
           </Typography>
         </DialogTitle>
         <DialogContent dividers>
@@ -2190,7 +2192,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
             component="input"
             value={auditSearchInput}
             onChange={(e) => setAuditSearchInput(e.target.value)}
-            placeholder="Search command, path, user, detail…"
+            placeholder={tr("Search command, path, user, detail…")}
             sx={{
               width: "100%",
               mb: 1.5,
@@ -2207,12 +2209,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           />
           <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: "wrap" }}>
             {[
-              { key: "", label: "All" },
-              { key: "command", label: "Commands" },
-              { key: "file_write", label: "File writes" },
-              { key: "file_delete", label: "Deletes" },
-              { key: "interactive_start", label: "Interactive" },
-              { key: "session_open", label: "Sessions" },
+              { key: "", label: tr("All") },
+              { key: "command", label: tr("Commands") },
+              { key: "file_write", label: tr("File writes") },
+              { key: "file_delete", label: tr("Deletes") },
+              { key: "interactive_start", label: tr("Interactive") },
+              { key: "session_open", label: tr("Sessions") },
             ].map((f) => (
               <Chip
                 key={f.key || "all"}
@@ -2237,13 +2239,13 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           ) : (
             <Box sx={{ fontFamily: MONO, fontSize: 12, maxHeight: 420, overflow: "auto" }}>
               {auditEvents.length === 0 ? (
-                <Typography color="text.secondary">No events on this page.</Typography>
+                <Typography color="text.secondary">{tr("No events on this page.")}</Typography>
               ) : auditEvents.map((ev) => (
                 <Box key={ev.id} sx={{ py: .7, borderBottom: "1px solid rgba(148,163,184,.12)" }}>
                   <Typography sx={{ fontSize: 11, color: "#8fa0b0" }}>
                     {ev.created_at} · {ev.action} · {ev.user_email || ev.user_id || "—"}
                     {ev.exit_code != null ? ` · exit=${ev.exit_code}` : ""}
-                    {ev.success === false ? " · failed" : ""}
+                    {ev.success === false ? " · " + tr("failed") : ""}
                   </Typography>
                   <Typography sx={{ fontFamily: MONO, fontSize: 12.5, color: ev.success ? "#dce6ef" : "#ff9b8f", whiteSpace: "pre-wrap" }}>
                     {ev.command || ev.path || ev.detail || "—"}
@@ -2265,7 +2267,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
               disabled={auditLoading || auditPage <= 1}
               onClick={() => { const p = auditPage - 1; setAuditPage(p); loadAudit(p, auditFilter, auditSearch); }}
             >
-              Previous
+              {tr("Previous")}
             </Button>
             <Typography sx={{ fontSize: 12, color: "text.secondary", minWidth: 90, textAlign: "center" }}>
               Page {auditPage} / {auditTotalPages}
@@ -2275,20 +2277,20 @@ export default function ShellPanel({ service, enabled = true, onError }) {
               disabled={auditLoading || auditPage >= auditTotalPages}
               onClick={() => { const p = auditPage + 1; setAuditPage(p); loadAudit(p, auditFilter, auditSearch); }}
             >
-              Next
+              {tr("Next")}
             </Button>
           </Stack>
           <Stack direction="row" spacing={1} flexWrap="wrap">
-            <Button size="small" onClick={() => downloadAudit("csv")}>Download CSV</Button>
-            <Button size="small" onClick={() => downloadAudit("json")}>Download JSON</Button>
-            <Button onClick={() => loadAudit(auditPage, auditFilter, auditSearch)}>Refresh</Button>
-            <Button onClick={() => setAuditOpen(false)}>Close</Button>
+            <Button size="small" onClick={() => downloadAudit("csv")}>{tr("Download CSV")}</Button>
+            <Button size="small" onClick={() => downloadAudit("json")}>{tr("Download JSON")}</Button>
+            <Button onClick={() => loadAudit(auditPage, auditFilter, auditSearch)}>{tr("Refresh")}</Button>
+            <Button onClick={() => setAuditOpen(false)}>{tr("Close")}</Button>
           </Stack>
         </DialogActions>
       </Dialog>
 
       <Dialog open={envOpen} onClose={() => setEnvOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Container environment (secrets masked)</DialogTitle>
+        <DialogTitle>{tr("Container environment (secrets masked)")}</DialogTitle>
         <DialogContent dividers>
           <Box sx={{ fontFamily: MONO, fontSize: 12, maxHeight: 480, overflow: "auto" }}>
             {envItems.map((item) => (
@@ -2299,11 +2301,11 @@ export default function ShellPanel({ service, enabled = true, onError }) {
             ))}
           </Box>
         </DialogContent>
-        <DialogActions><Button onClick={() => setEnvOpen(false)}>Close</Button></DialogActions>
+        <DialogActions><Button onClick={() => setEnvOpen(false)}>{tr("Close")}</Button></DialogActions>
       </Dialog>
 
       <Dialog open={snippetsOpen} onClose={() => setSnippetsOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Command snippets</DialogTitle>
+        <DialogTitle>{tr("Command snippets")}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={.5}>
             {getShellSnippets(platform, session).map((s) => (
@@ -2318,7 +2320,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
             ))}
           </Stack>
         </DialogContent>
-        <DialogActions><Button onClick={() => setSnippetsOpen(false)}>Close</Button></DialogActions>
+        <DialogActions><Button onClick={() => setSnippetsOpen(false)}>{tr("Close")}</Button></DialogActions>
       </Dialog>
 
     </>
