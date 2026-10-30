@@ -69,7 +69,7 @@ function localizeJsxTextPlugin() {
                   const element = t.jsxElement(
                     t.jsxOpeningElement(
                       t.jsxIdentifier("LocalizedText"),
-                      [t.jsxAttribute(t.jsxIdentifier("value"), t.stringLiteral(value))],
+                      [t.jsxAttribute(t.jsxIdentifier("value"), t.jsxExpressionContainer(t.stringLiteral(value)))],
                       true,
                     ),
                     null,
