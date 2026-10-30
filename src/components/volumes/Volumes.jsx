@@ -549,12 +549,12 @@ export default function Volumes() {
                     },
                   }}
                 >
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Name</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Bind path</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Mode</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Size</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Service</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Name")}</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Bind path")}</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Mode")}</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Size")}</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Service")}</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Status")}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700, fontSize: 13 }}>
                     Actions
                   </TableCell>
