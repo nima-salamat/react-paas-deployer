@@ -75,7 +75,8 @@ function StatusIcon({ status, deleting }) {
 }
 
 function AppMark({ app, installation }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <Box
       sx={(theme) => ({
         width: 54,
@@ -97,6 +98,7 @@ function AppMark({ app, installation }) {
     >
       <ReadyAppBrandMark app={app || { id: installation?.catalog_id, name: installation?.catalog_id || "Application" }} size={36} />
     </Box>
+    </TranslatedTextTree>
   );
 }
 
@@ -112,8 +114,8 @@ function InstallationCard({ installation, app }) {
 
   const tone = statusTone(status, deleting);
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Card
       variant="outlined"
       sx={(theme) => ({
@@ -282,8 +284,8 @@ export default function ReadyAppInstallations() {
     return () => window.clearTimeout(timer);
   }, [error, appsWarning, loading, refreshing, load]);
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
       <Stack spacing={3}>
         <Stack
