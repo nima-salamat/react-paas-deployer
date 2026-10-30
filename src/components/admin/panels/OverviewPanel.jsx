@@ -45,8 +45,8 @@ export default function OverviewPanel({
     (hasAnyRule("tables.view") || hasAnyRule("tables.manage")) && "DB tables",
   ].filter(Boolean);
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2.5}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
         <Box>
