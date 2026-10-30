@@ -1,5 +1,6 @@
 import React, { memo, useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import { Link as RouterLink } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 import {
@@ -54,6 +55,7 @@ function ServiceItem({
   onRestart = null,
   onLeaveShare = null,
 }) {
+  const { t } = useLocale();
   const planIsObj = s.plan && typeof s.plan === "object";
   const netIsObj = s.network && typeof s.network === "object";
   const planId = planIsObj ? s.plan.id ?? s.plan.pk : s.plan;
@@ -210,7 +212,7 @@ function ServiceItem({
         }}
         sx={actionBtnSx}
       >
-        {isUpdating ? "…" : isRunning ? "Stop" : "Start"}
+        {isUpdating ? "…" : isRunning ? t("Stop") : t("Start")}
       </Button>
       )}
       <Button
