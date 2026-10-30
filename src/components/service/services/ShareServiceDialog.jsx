@@ -270,7 +270,8 @@ const RULE_GROUPS = [
 ];
 
 function RulesGrid({ rules, onChange }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <Stack spacing={1.25}>
       <Alert severity="info" variant="outlined" sx={{ borderRadius: 1.5 }}>
         Start with a preset, then grant only the actions this recipient needs. Service deletion and ownership transfer are never shared.
@@ -368,6 +369,7 @@ function RulesGrid({ rules, onChange }) {
         fullWidth
       />
     </Stack>
+    </TranslatedTextTree>
   );
 }
 
@@ -767,7 +769,8 @@ export default function ShareServiceDialog({
     }));
   };
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Dialog open={open} onClose={() => !saving && onClose?.()} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: 2.5 } }}>
       <DialogTitle sx={{ fontWeight: 800 }}>
         {isEdit ? "Edit share" : "Share service"}
@@ -965,7 +968,6 @@ export default function ShareServiceDialog({
                     const uid = String(m.user_id);
                     const ov = memberOverrides[uid];
                     return (
-    <TranslatedTextTree>
                       <ListItemButton key={uid} selected={selectedMemberId === uid} onClick={() => editMemberRules(m)}>
                         <ListItemAvatar>
                           <Avatar sx={{ width: 28, height: 28 }}>
