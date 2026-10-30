@@ -2,6 +2,7 @@
  * Share service — group (member of) or contact user, with rules + per-member limits.
  * Paginated groups / contacts / group members. Role chips for members.
  */
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Accordion,
