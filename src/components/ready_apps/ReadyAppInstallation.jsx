@@ -347,7 +347,8 @@ export default function ReadyAppInstallation() {
     );
   }
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 } }}>
       <Button
         startIcon={<ArrowBackRoundedIcon />}
@@ -513,7 +514,6 @@ export default function ReadyAppInstallation() {
                         const liveCpu = metrics.cpu == null ? null : Number(metrics.cpu);
                         const liveRam = metrics.ram == null ? null : Number(metrics.ram);
                         return (
-    <TranslatedTextTree>
                           <Box sx={{ mt: 1.1 }}>
                             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                               <Metric
@@ -666,8 +666,8 @@ export default function ReadyAppInstallation() {
 
 function LiveUsage({ label, value }) {
   const percent = Math.max(0, Math.min(100, Number(value) || 0));
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Box sx={{ minWidth: { sm: 180 }, flex: 1 }}>
       <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mb: 0.35 }}>
         <Typography variant="caption" sx={{ fontWeight: 700 }}>
@@ -688,8 +688,8 @@ function LiveUsage({ label, value }) {
 }
 
 function Metric({ icon, label, value }) {
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack direction="row" spacing={1} alignItems="center">
       <Box sx={{ color: "primary.main", display: "grid", placeItems: "center" }}>{icon}</Box>
       <Typography variant="body2">
@@ -706,8 +706,8 @@ function LinearDeploymentState({ stage }) {
   const current = String(stage || "queued").toLowerCase();
   const index = current.includes("health") ? 4 : states.findIndex((item) => current.includes(item));
   const percent = Math.max(8, Math.min(95, ((index < 0 ? 0 : index + 1) / states.length) * 100));
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack spacing={0.6}>
       <LinearProgress variant="determinate" value={percent} />
       <Typography variant="caption" color="text.secondary">
