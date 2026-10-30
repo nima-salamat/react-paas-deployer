@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Alert,
   Box,
@@ -512,6 +513,7 @@ export default function ReadyAppInstallation() {
                         const liveCpu = metrics.cpu == null ? null : Number(metrics.cpu);
                         const liveRam = metrics.ram == null ? null : Number(metrics.ram);
                         return (
+    <TranslatedTextTree>
                           <Box sx={{ mt: 1.1 }}>
                             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                               <Metric
@@ -658,6 +660,7 @@ export default function ReadyAppInstallation() {
         </Dialog>
       </Stack>
     </Container>
+    </TranslatedTextTree>
   );
 }
 
