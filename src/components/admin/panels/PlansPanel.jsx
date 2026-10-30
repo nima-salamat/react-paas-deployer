@@ -182,8 +182,8 @@ export default function PlansPanel() {
 
   const numPages = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE));
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <PermissionGate anyOf={["plans.view", "plans.manage"]}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} gap={1.5} mb={2}>
         <Box>
@@ -397,7 +397,8 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
       </Box>
     );
   }
-  return (
+  return (    <TranslatedTextTree>
+
     <Box sx={{ border: 1, borderColor: "divider", overflow: "auto" }}>
       <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 1120 }}>
         <Box component="thead" sx={{ bgcolor: "action.hover" }}>
@@ -419,7 +420,6 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
           {rows.map((r) => {
             const priceDay = Number(r.price_per_hour || 0) * 24;
             return (
-    <TranslatedTextTree>
               <tr key={r.id} style={{ borderTop: "1px solid", borderTopColor: "rgba(127,127,127,0.18)" }}>
                 <Td>
                   <Chip
@@ -470,17 +470,20 @@ function LoggingSummary({ plan }) {
   const persistent = plan.persistent_logging == null ? "inherit" : plan.persistent_logging ? "persist" : "no persist";
   const realtime = plan.realtime_logging == null ? "inherit" : plan.realtime_logging ? "realtime" : "no realtime";
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Typography variant="caption" color="text.secondary" component="span">
       {retention} · {storage} · {ingest}
       <br />
       {persistent} · {realtime} · {plan.log_quota_behavior || "inherit"}
     </Typography>
+    </TranslatedTextTree>
   );
 }
 
 function Th({ children, align = "left" }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <Box
       component="th"
       sx={{
@@ -498,11 +501,13 @@ function Th({ children, align = "left" }) {
     >
       {children}
     </Box>
+    </TranslatedTextTree>
   );
 }
 
 function Td({ children, align = "left" }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <Box
       component="td"
       sx={{
@@ -515,5 +520,6 @@ function Td({ children, align = "left" }) {
     >
       {children}
     </Box>
+    </TranslatedTextTree>
   );
 }
