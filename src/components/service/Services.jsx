@@ -3,6 +3,7 @@
  * Submodules live in ./services/
  */
 import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import React, {
   useCallback,
   useEffect,
@@ -82,6 +83,7 @@ export default function ServicesListMui({
   extraQueryParams = {},
   onOpen = null,
 }) {
+  const { t } = useLocale();
   const navigate = useNavigate();
 
   const extraQueryParamsStr = JSON.stringify(extraQueryParams);
@@ -633,7 +635,7 @@ export default function ServicesListMui({
               : s
           )
         );
-        showAlert("success", running ? "Stop requested." : "Start requested.");
+        showAlert("success", running ? t("Stop requested.") : t("Start requested."));
         setTimeout(() => {
           if (mountedRef.current && !editingOpenRef.current) {
             fetchServices(true);
@@ -942,7 +944,7 @@ export default function ServicesListMui({
           isOwnerShare: shareScope === "shared_by_me",
           isReceived: shareScope === "shared_with_me",
           permissions: share.my_permissions || share.rules || {},
-          label: shareScope === "shared_with_me" ? "Shared with me" : "I shared",
+          label: shareScope === "shared_with_me" ? t("Shared with me") : t("I shared"),
           raw: share,
         },
       };
@@ -1151,9 +1153,9 @@ export default function ServicesListMui({
               <Typography color="text.secondary">
                 {displayEntries.length === 0
                   ? shareScope === "mine"
-                    ? "No services found."
-                    : "No shared services."
-                  : "No services match this filter."}
+                    ? t("No services found.")
+                    : t("No shared services.")
+                  : t("No services match this filter.")}
               </Typography>
             </Paper>
           ) : viewMode === "rows" ? (
@@ -1256,7 +1258,7 @@ export default function ServicesListMui({
               px: 3,
             }}
           >
-            {loadingMore ? "Loading…" : "Load more"}
+            {t(loadingMore ? "Loading…" : "Load more")}
           </Button>
         </Box>
       )}
