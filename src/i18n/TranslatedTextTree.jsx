@@ -45,8 +45,8 @@ function translateTree(node, t) {
   for (const [key, value] of Object.entries(node.props || {})) {
     if (key === "children") {
       nextProps.children = translateTree(value, t);
-    } else if (TRANSLATABLE_PROPS.has(key) && typeof value === "string") {
-      nextProps[key] = translateTextNode(value, t);
+    } else if (TRANSLATABLE_PROPS.has(key)) {
+      nextProps[key] = translateTree(value, t);
     } else {
       nextProps[key] = value;
     }
