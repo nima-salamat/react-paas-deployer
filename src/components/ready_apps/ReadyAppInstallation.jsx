@@ -707,11 +707,13 @@ function LinearDeploymentState({ stage }) {
   const index = current.includes("health") ? 4 : states.findIndex((item) => current.includes(item));
   const percent = Math.max(8, Math.min(95, ((index < 0 ? 0 : index + 1) / states.length) * 100));
   return (
+    <TranslatedTextTree>
     <Stack spacing={0.6}>
       <LinearProgress variant="determinate" value={percent} />
       <Typography variant="caption" color="text.secondary">
         {pretty(stage || "queued")} · status refreshes automatically
       </Typography>
     </Stack>
+    </TranslatedTextTree>
   );
 }
