@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   Divider, Drawer, IconButton, Stack, TextField, Toolbar, Typography,
@@ -159,6 +160,7 @@ export default function ServiceAdminDrawer({
   ];
 
   return (
+    <TranslatedTextTree>
     <>
       <Drawer
         anchor="right"
@@ -533,6 +535,7 @@ export default function ServiceAdminDrawer({
         </DialogActions>
       </Dialog>
     </>
+    </TranslatedTextTree>
   );
 }
 
