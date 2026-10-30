@@ -1,5 +1,6 @@
 import React from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
@@ -69,10 +70,10 @@ export default function ServicesToolbar({
             sx={{ letterSpacing: "-0.025em", lineHeight: 1.15 }}
           >
             {shareScope === "shared_with_me"
-              ? "Shared with me"
+              ? t("Shared with me")
               : shareScope === "shared_by_me"
-              ? "Shared by me"
-              : "My Services"}
+              ? t("Shared by me")
+              : t("My Services")}
           </Typography>
           {shareScope === "mine" && (
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.35 }}>
