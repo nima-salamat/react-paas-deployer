@@ -5,6 +5,7 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import apiRequest from "../customHooks/apiRequest";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { TICKETS_API, unwrapData } from "./api";
 import { useTicketNotify } from "./TicketNotifyContext";
 import MessageBubble from "./MessageBubble";
@@ -17,6 +18,7 @@ const STATUS_COLOR = {
 };
 
 export default function TicketDetail() {
+  const { t: tr } = useLocale();
   const { id } = useParams();
   const navigate = useNavigate();
   const { subscribe, send, connected, userId } = useTicketNotify();
@@ -189,7 +191,7 @@ export default function TicketDetail() {
   if (error && !ticket) {
     return (
       <Box p={3}>
-        <Alert severity="error">{error}</Alert>
+        <Alert severity="error">{tr(error)}</Alert>
       </Box>
     );
   }
@@ -236,11 +238,11 @@ export default function TicketDetail() {
             {refreshing ? " · updating…" : connected ? " · live" : " · offline"}
           </Typography>
         </Box>
-        <Chip size="small" label={ticket.status} color={STATUS_COLOR[ticket.status] || "default"} />
+        <Chip size="small" label={tr(ticket.status)} color={STATUS_COLOR[ticket.status] || "default"} />
       </Stack>
 
       {error && (
-        <Alert severity="warning" sx={{ borderRadius: 0 }} onClose={() => setError("")}>{error}</Alert>
+        <Alert severity="warning" sx={{ borderRadius: 0 }} onClose={() => setError("")}>{tr(error)}</Alert>
       )}
 
       {/* Messages */}
