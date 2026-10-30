@@ -453,8 +453,8 @@ function ServiceItem({
   }
 
   /* ─── Card layout ─── */
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <>
       {myPermsDialog}
       <Paper elevation={0} onMouseEnter={() => onPrefetch?.(s)} onFocus={() => onPrefetch?.(s)}
