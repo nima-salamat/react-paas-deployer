@@ -283,6 +283,7 @@ export default function ReadyAppInstallations() {
   }, [error, appsWarning, loading, refreshing, load]);
 
   return (
+    <TranslatedTextTree>
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
       <Stack spacing={3}>
         <Stack
@@ -420,5 +421,6 @@ export default function ReadyAppInstallations() {
         )}
       </Stack>
     </Container>
+    </TranslatedTextTree>
   );
 }
