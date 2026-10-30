@@ -25,6 +25,7 @@ import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
 import PhoneAndroidOutlinedIcon from "@mui/icons-material/PhoneAndroidOutlined";
 import TabletMacOutlinedIcon from "@mui/icons-material/TabletMacOutlined";
 import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   fetchMySessions,
   logoutAllMySessions,
@@ -72,6 +73,7 @@ function DeviceIcon({ type }) {
 }
 
 function DeviceDetails({ session, referenceNow }) {
+  const { t } = useLocale();
   const device = session?.device || {};
   const browser = [device.browser, device.browser_version].filter(Boolean).join(" ");
   const os = [device.os, device.os_version].filter(Boolean).join(" ");
@@ -86,15 +88,15 @@ function DeviceDetails({ session, referenceNow }) {
         {[browser, os, model].filter(Boolean).join(" · ") || client || "Browser session"}
       </Typography>
       <Typography component="span" variant="caption" color="text.secondary">
-        {location ? `IP ${location}` : "IP unavailable"}
+        {location ? `IP ${location}` : t("IP unavailable")}
         {meta.timezone ? ` · ${meta.timezone}` : ""}
         {meta.locale ? ` · ${meta.locale}` : ""}
       </Typography>
       <Typography component="span" variant="caption" color="text.secondary">
-        Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at, referenceNow)}
+        {t("Created")} {formatDate(session?.created_at)} · {t("Last active")} {formatRelative(session?.last_seen_at, referenceNow)}
       </Typography>
       <Typography component="span" variant="caption" color="text.secondary">
-        Expires {formatDate(session?.expires_at)}
+        {t("Expires")} {formatDate(session?.expires_at)}
       </Typography>
       {device.user_agent && (
         <Tooltip title={device.user_agent} placement="bottom-start">
@@ -113,6 +115,7 @@ function DeviceDetails({ session, referenceNow }) {
 }
 
 function SessionRow({ session, canManageOthers, onRevoke, loadingId, referenceNow }) {
+  const { t } = useLocale();
   const isCurrent = Boolean(session?.current);
   const disabled = !isCurrent && (!canManageOthers || loadingId === session?.id);
 
@@ -135,14 +138,14 @@ function SessionRow({ session, canManageOthers, onRevoke, loadingId, referenceNo
             disabled={loadingId === session?.id}
             sx={{ textTransform: "none", whiteSpace: "nowrap" }}
           >
-            {loadingId === session?.id ? "Signing out…" : "Sign out"}
+            {t(loadingId === session?.id ? "Signing out…" : "Sign out")}
           </Button>
         ) : (
           <Tooltip
             title={
               canManageOthers
-                ? "Sign out this session"
-                : "You can manage other sessions after your current session is 2 hours old."
+                ? t("Sign out this session")
+                : t("You can manage other sessions after your current session is 2 hours old.")
             }
           >
             <span>
@@ -157,7 +160,7 @@ function SessionRow({ session, canManageOthers, onRevoke, loadingId, referenceNo
                 disabled={disabled}
                 sx={{ textTransform: "none", whiteSpace: "nowrap" }}
               >
-                {loadingId === session?.id ? "Signing out…" : "Sign out"}
+                {t(loadingId === session?.id ? "Signing out…" : "Sign out")}
               </Button>
             </span>
           </Tooltip>
@@ -183,6 +186,7 @@ function SessionRow({ session, canManageOthers, onRevoke, loadingId, referenceNo
 }
 
 export default function SessionManager({ title = "Devices & sessions", compact = false }) {
+  const { t } = useLocale();
   const [sessions, setSessions] = useState([]);
   const [management, setManagement] = useState({
     minimum_age_seconds: 7200,
@@ -345,10 +349,10 @@ export default function SessionManager({ title = "Devices & sessions", compact =
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
         <ShieldOutlinedIcon color="primary" />
         <Typography variant={compact ? "subtitle1" : "h6"} fontWeight={800}>
-          {title}
+          {t(title)}
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <Tooltip title="Refresh sessions">
+        <Tooltip title={t("Refresh sessions")}>
           <span>
             <IconButton
               size="small"
@@ -362,7 +366,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
       </Stack>
 
       <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-        <Chip size="small" label={`${activeCount} active`} />
+        <Chip size="small" label={`${activeCount} ${t("active")}`} />
         {maxActiveSessions != null && (
           <Chip size="small" variant="outlined" label={`Limit ${maxActiveSessions}`} />
         )}
@@ -370,7 +374,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
 
       {!hasSessionContext && sessions.length > 0 && (
         <Alert severity="warning" icon={<ShieldOutlinedIcon />} sx={{ mb: 1.5 }}>
-          This login token is not bound to a managed session. Sign in again to manage your devices and sessions.
+          {t("This login token is not bound to a managed session. Sign in again to manage your devices and sessions.")}
         </Alert>
       )}
 
@@ -380,14 +384,14 @@ export default function SessionManager({ title = "Devices & sessions", compact =
           icon={<LockClockOutlinedIcon />}
           sx={{ mb: 1.5 }}
         >
-          Your current session becomes eligible to manage other sessions in{" "}
+          {t("Your current session becomes eligible to manage other sessions in")}{" "}
           <strong>{formatDuration(remainingSeconds)}</strong>.
         </Alert>
       )}
 
       {actionError && (
         <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setActionError("")}>
-          {actionError}
+          {t(actionError)}
         </Alert>
       )}
 
@@ -409,7 +413,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
           ))}
         </List>
       ) : (
-        <Alert severity="warning">No active session record was returned for this login.</Alert>
+        <Alert severity="warning">{t("No active session record was returned for this login.")}</Alert>
       )}
 
       <Divider sx={{ my: 2 }} />
@@ -423,11 +427,11 @@ export default function SessionManager({ title = "Devices & sessions", compact =
           disabled={!canLogoutAll || loading}
           sx={{ textTransform: "none", fontWeight: 700 }}
         >
-          Sign out all sessions
+          {t("Sign out all sessions")}
         </Button>
         {!management.can_revoke_others && hasOtherSessions && (
           <Typography variant="caption" color="text.secondary">
-            Available in {formatDuration(remainingSeconds)}.
+            {t("Available in")} {formatDuration(remainingSeconds)}.
           </Typography>
         )}
       </Stack>
