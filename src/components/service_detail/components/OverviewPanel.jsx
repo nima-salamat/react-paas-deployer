@@ -167,7 +167,7 @@ function CredentialRow({ label, value, mono = false, sensitive = false, tooltip 
         )}
         {value != null && value !== "" && (
           <Tooltip title={t(copied ? "Copied!" : "Copy")}>
-            <IconButton size="small" onClick={handleCopy} aria-label={t("Copy")} ${label}>
+            <IconButton size="small" onClick={handleCopy} aria-label={`${t("Copy")} ${label}`}>
               <ContentCopy fontSize="small" color={copied ? "success" : "inherit"} />
             </IconButton>
           </Tooltip>
