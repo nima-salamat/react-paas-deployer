@@ -95,7 +95,8 @@ export default function InvitesPanel({
     if (ok !== false) setCreateOpen(false);
   };
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
@@ -150,7 +151,6 @@ export default function InvitesPanel({
                 {slice.map((inv) => {
                   const publicUrl = invitePublicUrl(inv);
                   return (
-    <TranslatedTextTree>
                     <tr key={inv.id || inv.token} style={{ borderTop: DRY_BORDER_LIGHT }}>
                       <DryTd>{inv.label || "—"}</DryTd>
                       <DryTd>
