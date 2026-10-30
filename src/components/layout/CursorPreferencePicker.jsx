@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Box, ButtonBase, Paper, Typography } from "@mui/material";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import NearMeIcon from "@mui/icons-material/NearMe";
 import GpsFixedIcon from "@mui/icons-material/GpsFixed";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./cursorSettings";
 
 export default function CursorPreferencePicker({ compact = false }) {
+  const { t } = useLocale();
   const [cursorPreference, setCursorPreference] = useState(() => readCursorPreference());
 
   useEffect(() => {
@@ -47,7 +49,7 @@ export default function CursorPreferencePicker({ compact = false }) {
             <ButtonBase
               key={option.id}
               onClick={() => setCursorPreference(writeCursorPreference(option.id))}
-              aria-label={option.label}
+              aria-label={t(option.label)}
               aria-pressed={selected}
               sx={{ display: "block", width: "100%", borderRadius: 2, textAlign: "left" }}
             >
@@ -112,14 +114,14 @@ export default function CursorPreferencePicker({ compact = false }) {
                   )}
                 </Box>
                 <Typography variant="body2" sx={{ fontWeight: 800, lineHeight: 1.25 }}>
-                  {option.label}
+                  {t(option.label)}
                 </Typography>
                 <Typography
                   variant="caption"
                   color={selected ? "primary.main" : "text.secondary"}
                   sx={{ display: "block", mt: 0.65, lineHeight: 1.35 }}
                 >
-                  {selected ? "Selected" : "Choose cursor"}
+                  {t(selected ? "Selected" : "Choose cursor")}
                 </Typography>
               </Paper>
             </ButtonBase>
@@ -127,8 +129,8 @@ export default function CursorPreferencePicker({ compact = false }) {
         })}
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.25, lineHeight: 1.5 }}>
-        {CURSOR_OPTIONS.find((option) => option.id === cursorPreference)?.description}
-        {" "}Your choice is applied immediately and saved in this browser.
+        {t(CURSOR_OPTIONS.find((option) => option.id === cursorPreference)?.description)}
+        {" "}{t("Your choice is applied immediately and saved in this browser.")}
       </Typography>
     </>
   );
