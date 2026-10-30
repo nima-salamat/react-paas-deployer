@@ -351,31 +351,36 @@ function Reveal({
 
 /** SVG curtain — only on desktop + when motion is allowed */
 function CurtainPanel({ side, progress, dark, enabled }) {
-  const { isRTL } = useLocale();
-  const visualSide = isRTL ? (side === "left" ? "right" : "left") : side;
-  const uid = `${visualSide}-${dark ? "d" : "l"}`;
+  // "side" is a physical screen edge, not a logical writing-direction edge.
+  // Keep the reveal motion identical in LTR and RTL.
+  const uid = `${side}-${dark ? "d" : "l"}`;
   const tx = useTransform(
     progress,
     [0, 0.18, 0.35, 0.65, 0.82, 1],
-    visualSide === "left"
+    side === "left"
       ? ["0%", "0%", "-102%", "-102%", "0%", "0%"]
       : ["0%", "0%", "102%", "102%", "0%", "0%"]
   );
   if (!enabled) return null;
-  const c0 = dark ? (visualSide === "left" ? "#070f1c" : "#120a1c") : visualSide === "left" ? "#e8eef8" : "#efe8f8";
-  const c1 = dark ? (visualSide === "left" ? "#0f1c32" : "#1c1430") : visualSide === "left" ? "#d0dceb" : "#ddd0f0";
+  const c0 = dark ? (side === "left" ? "#070f1c" : "#120a1c") : side === "left" ? "#e8eef8" : "#efe8f8";
+  const c1 = dark ? (side === "left" ? "#0f1c32" : "#1c1430") : side === "left" ? "#d0dceb" : "#ddd0f0";
   const fold = dark ? "#7dd3fc" : "#3b82f6";
 
   return (
     <Box
       component={motion.div}
       aria-hidden="true"
-      style={{ x: tx }}
+      style={{
+        x: tx,
+        // Inline physical offsets are intentionally not mirrored by MUI's RTL
+        // Stylis plugin. Each curtain stays attached to its own screen edge.
+        left: side === "left" ? 0 : "auto",
+        right: side === "right" ? 0 : "auto",
+      }}
       sx={{
         position: "absolute",
         top: 0,
         bottom: 0,
-        [visualSide]: 0,
         width: "50%",
         zIndex: 8,
         pointerEvents: "none",
@@ -1328,7 +1333,7 @@ export default function Home() {
               component="p"
               sx={{ fontWeight: 900, letterSpacing: ".16em", color: "primary.main" }}
             >
-              A calmer way to operate
+              {t("A calmer way to operate")}
             </Typography>
             <Typography
               component="h2"
@@ -1341,14 +1346,13 @@ export default function Home() {
                 maxWidth: 820,
               }}
             >
-              Less infrastructure assembly. More time shipping.
+              {t("Less infrastructure assembly. More time shipping.")}
             </Typography>
             <Typography
               sx={{ mt: 1.75, maxWidth: 700, lineHeight: 1.75, fontSize: { xs: "0.95rem", md: "1.05rem" } }}
               color="text.secondary"
             >
-              PaaSDeployer keeps the operational surface area small: one place to create services, ship releases, read
-              logs and manage the runtime boundary around your workloads.
+              {t("PaaSDeployer keeps the operational surface area small: one place to create services, ship releases, read logs and manage the runtime boundary around your workloads.")}
             </Typography>
           </Reveal>
 
