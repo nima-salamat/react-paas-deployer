@@ -655,6 +655,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                   const id = String(plan.id ?? plan.pk ?? plan.uuid);
                   const selected = id === String(planId);
                   return (
+    <TranslatedTextTree>
                     <Box
                       key={id}
                       onClick={() => {
@@ -938,6 +939,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
         )}
       </DialogActions>
     </Dialog>
+    </TranslatedTextTree>
   );
 
 }
