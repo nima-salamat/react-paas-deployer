@@ -319,8 +319,8 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
     />
   );
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       {isDesktop && (
         <Box
@@ -484,9 +484,11 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
 }
 
 export default function AdminDashboard({ themeMode, onThemeModeChange }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <ToastProvider>
       <AdminDashboardInner themeMode={themeMode} onThemeModeChange={onThemeModeChange} />
     </ToastProvider>
+    </TranslatedTextTree>
   );
 }
