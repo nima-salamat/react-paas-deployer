@@ -49,8 +49,8 @@ export default function ServicesToolbar({
   setShareScope = null,
   shareCounts = { mine: 0, shared_with_me: 0, shared_by_me: 0 },
 }) {
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <>
       <Box
         sx={{
