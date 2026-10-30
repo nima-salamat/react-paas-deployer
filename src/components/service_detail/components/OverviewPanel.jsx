@@ -383,6 +383,7 @@ export default function OverviewPanel({
   attachedVolumes = [],
 }) {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const serviceHost = service?.service_host || null;
 
   return (
