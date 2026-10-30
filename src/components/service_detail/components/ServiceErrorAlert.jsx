@@ -12,6 +12,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import { getApiErrorMeta } from "../errorUtils";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 export default function ServiceErrorAlert({
   error,
@@ -19,6 +20,7 @@ export default function ServiceErrorAlert({
   onClose,
   title = "Action failed",
 }) {
+  const { t } = useLocale();
   if (!error) return null;
 
   const meta = getApiErrorMeta(
@@ -53,7 +55,7 @@ export default function ServiceErrorAlert({
                 onClick={onRetry}
                 sx={{ fontWeight: 800 }}
               >
-                Retry
+                {t("Retry")}
               </Button>
             ) : null}
             {onClose ? (
@@ -64,7 +66,7 @@ export default function ServiceErrorAlert({
                 onClick={onClose}
                 sx={{ fontWeight: 800 }}
               >
-                Dismiss
+                {t("Dismiss")}
               </Button>
             ) : null}
           </Stack>
@@ -72,7 +74,7 @@ export default function ServiceErrorAlert({
       >
         <Stack spacing={0.75}>
           <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Typography sx={{ fontWeight: 850 }}>{title}</Typography>
+            <Typography sx={{ fontWeight: 850 }}>{t(title)}</Typography>
             {meta.status ? (
               <Chip
                 size="small"
@@ -84,11 +86,11 @@ export default function ServiceErrorAlert({
             ) : null}
           </Stack>
           <Box sx={{ color: "text.primary", lineHeight: 1.55, wordBreak: "break-word" }}>
-            {meta.message}
+            {t(meta.message)}
           </Box>
           {meta.statusMessage && meta.statusMessage !== meta.message ? (
             <Typography variant="caption" color="text.secondary">
-              {meta.statusMessage}
+              {t(meta.statusMessage)}
             </Typography>
           ) : null}
         </Stack>
