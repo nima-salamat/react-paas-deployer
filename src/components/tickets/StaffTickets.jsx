@@ -8,6 +8,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API } from "./api";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { useTicketNotify } from "./TicketNotifyContext";
 import MessageBubble from "./MessageBubble";
 import { htmlToPlain } from "./SimpleHtmlEditor";
@@ -20,6 +21,7 @@ const STATUS_COLOR = {
 const PRIORITY_COLOR = { low: "default", normal: "info", high: "warning", urgent: "error" };
 
 export default function StaffTickets() {
+  const { t: tr } = useLocale();
   const { subscribe, connected } = useTicketNotify();
   const selectedIdRef = useRef(null);
   const openDetailRef = useRef(async () => {});
@@ -248,7 +250,7 @@ export default function StaffTickets() {
         </FormControl>
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{tr(error)}</Alert>}
 
       {loading ? (
         <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
@@ -273,8 +275,8 @@ export default function StaffTickets() {
                     <TableCell>{t.public_id}</TableCell>
                     <TableCell>{t.subject}</TableCell>
                     <TableCell>{t.user?.username || "—"}</TableCell>
-                    <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
-                    <TableCell><Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
+                    <TableCell><Chip size="small" label={tr(t.status)} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
+                    <TableCell><Chip size="small" label={tr(t.priority)} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
                     <TableCell>
                       <Typography variant="caption">
                         {t.last_message_at || t.updated_at ? new Date(t.last_message_at || t.updated_at).toLocaleString() : "—"}
@@ -309,8 +311,8 @@ export default function StaffTickets() {
                 <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5, wordBreak: "break-word" }}>{t.subject}</Typography>
                 <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>{t.user?.username || "—"}</Typography>
                 <Stack direction="row" gap={0.75} flexWrap="wrap">
-                  <Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} />
-                  <Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
+                  <Chip size="small" label={tr(t.status)} color={STATUS_COLOR[t.status] || "default"} />
+                  <Chip size="small" label={tr(t.priority)} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
                 </Stack>
               </Box>
             ))}
@@ -347,7 +349,7 @@ export default function StaffTickets() {
           {detailLoading && !detail && (
             <Box display="flex" justifyContent="center" py={4} flex={1}><CircularProgress /></Box>
           )}
-          {actionError && <Alert severity="error" sx={{ mx: 2, mt: 1 }}>{actionError}</Alert>}
+          {actionError && <Alert severity="error" sx={{ mx: 2, mt: 1 }}>{tr(actionError)}</Alert>}
           {detail && (
             <Box
               sx={{
