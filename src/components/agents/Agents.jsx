@@ -8,6 +8,7 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { createAgent, deleteAgent, listAgents, listScopes } from "./agentApi";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 function provisioningLabel(value) {
   if (value === "dashboard") return "Dashboard";
@@ -16,6 +17,7 @@ function provisioningLabel(value) {
 }
 
 export default function Agents() {
+  const { t: tr } = useLocale();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const serviceContext = searchParams.get("service");
@@ -111,38 +113,38 @@ export default function Agents() {
           <Box>
             <Stack direction="row" spacing={1} alignItems="center">
               <SmartToyOutlinedIcon color="primary" />
-              <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: "-0.03em" }}>Agents</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: "-0.03em" }}>{tr("Agents")}</Typography>
             </Stack>
             <Typography color="text.secondary" sx={{ mt: 0.75, maxWidth: 720 }}>
-              Manage scoped machine access to your PaaSDeployer control plane for automation clients and AI agents.
+              {tr("Manage scoped machine access to your PaaSDeployer control plane for automation clients and AI agents.")}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>
-            <Tooltip title="Refresh">
+            <Tooltip title={tr("Refresh")}>
               <IconButton onClick={() => refresh(agentPage)} disabled={loading} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
                 <RefreshRoundedIcon />
               </IconButton>
             </Tooltip>
             <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openCreate} sx={{ borderRadius: 1.5, fontWeight: 800 }}>
-              Create agent
+              {tr("Create agent")}
             </Button>
           </Stack>
         </Stack>
 
         {serviceContext ? <Alert severity="info" sx={{ borderRadius: 2 }}>
-          You arrived here from a service. Agents remain account-level resources; the service is only navigation context.
+          {tr("You arrived here from a service. Agents remain account-level resources; the service is only navigation context.")}
         </Alert> : null}
 
-        {error ? <Alert severity="error" sx={{ borderRadius: 2 }} action={<IconButton color="inherit" onClick={() => refresh(agentPage)}><RefreshRoundedIcon /></IconButton>}>{error}</Alert> : null}
+        {error ? <Alert severity="error" sx={{ borderRadius: 2 }} action={<IconButton color="inherit" onClick={() => refresh(agentPage)}><RefreshRoundedIcon /></IconButton>}>{tr(error)}</Alert> : null}
 
         {loading ? <Box sx={{ py: 10, display: "flex", justifyContent: "center" }}><CircularProgress /></Box> : agents.length === 0 ? (
           <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, borderRadius: 2.5, textAlign: "center" }}>
             <SmartToyOutlinedIcon sx={{ fontSize: 42, color: "primary.main" }} />
-            <Typography variant="h6" sx={{ mt: 1.2, fontWeight: 850 }}>No Agents yet</Typography>
+            <Typography variant="h6" sx={{ mt: 1.2, fontWeight: 850 }}>{tr("No Agents yet")}</Typography>
             <Typography color="text.secondary" sx={{ mt: 0.5, maxWidth: 560, mx: "auto" }}>
-              Create an Agent, grant only the scopes it needs, then issue a short-lived credential for your automation client.
+              {tr("Create an Agent, grant only the scopes it needs, then issue a short-lived credential for your automation client.")}
             </Typography>
-            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openCreate} sx={{ mt: 2, borderRadius: 1.5 }}>Create your first agent</Button>
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openCreate} sx={{ mt: 2, borderRadius: 1.5 }}>{tr("Create your first agent")}</Button>
           </Paper>
         ) : (
           <Stack spacing={1.25}>
@@ -152,21 +154,21 @@ export default function Agents() {
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack direction="row" spacing={0.8} alignItems="center" flexWrap="wrap" useFlexGap>
                       <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>{agent.name}</Typography>
-                      <Chip size="small" label={agent.status} color={agent.status === "active" ? "success" : agent.status === "disabled" ? "warning" : "default"} sx={{ height: 23, fontWeight: 700 }} />
+                      <Chip size="small" label={tr(agent.status)} color={agent.status === "active" ? "success" : agent.status === "disabled" ? "warning" : "default"} sx={{ height: 23, fontWeight: 700 }} />
                     </Stack>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>{agent.description || "No description"}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>{agent.description || tr("No description")}</Typography>
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                      <Chip size="small" variant="outlined" label={agent.scope_count + " scopes"} />
-                      <Chip size="small" variant="outlined" label={agent.active_credential_count + " active credentials"} />
-                      <Chip size="small" variant="outlined" label={"Provisioned via " + provisioningLabel(agent.provisioning_source)} />
+                      <Chip size="small" variant="outlined" label={agent.scope_count + " " + tr("scopes")} />
+                      <Chip size="small" variant="outlined" label={agent.active_credential_count + " " + tr("active credentials")} />
+                      <Chip size="small" variant="outlined" label={tr("Provisioned via") + " " + tr(provisioningLabel(agent.provisioning_source))} />
                       <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
-                        Last used {agent.last_used_at ? new Date(agent.last_used_at).toLocaleString() : "never"}
+                        {tr("Last used")} {agent.last_used_at ? new Date(agent.last_used_at).toLocaleString() : tr("never")}
                       </Typography>
                     </Stack>
                   </Box>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignSelf: { xs: "stretch", md: "center" } }}>
                     <Button variant="outlined" endIcon={<ArrowForwardRoundedIcon />} onClick={() => navigate("/dashboard/agents/" + agent.id)} sx={{ borderRadius: 1.5, fontWeight: 750 }}>
-                      Manage
+                      {tr("Manage")}
                     </Button>
                     <Button
                       variant="outlined"
@@ -176,7 +178,7 @@ export default function Agents() {
                       disabled={saving}
                       sx={{ borderRadius: 1.5, fontWeight: 750 }}
                     >
-                      Delete
+                      {tr("Delete")}
                     </Button>
                   </Stack>
                 </Stack>
@@ -196,7 +198,7 @@ export default function Agents() {
               color="primary"
             />
             <Typography variant="caption" color="text.secondary">
-              Page {agentPage} of {Math.max(1, Math.ceil(agentCount / 5))} · {agentCount} Agents
+              {tr("Page")} {agentPage} {tr("of")} {Math.max(1, Math.ceil(agentCount / 5))} · {agentCount} {tr("Agents")}
             </Typography>
           </Stack>
         ) : null}
@@ -210,7 +212,7 @@ export default function Agents() {
         PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
       >
         <DialogTitle sx={{ pb: 1.2, fontWeight: 900, letterSpacing: "-0.02em" }}>
-          Delete Agent
+          {tr("Delete Agent")}
         </DialogTitle>
         <DialogContent dividers sx={{ py: 2.25 }}>
           <Stack spacing={1.5}>
@@ -229,17 +231,17 @@ export default function Agents() {
             </Box>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>
-                Delete {deleteTarget?.name || "this Agent"} permanently?
+                {tr("Delete")} {deleteTarget?.name || tr("this Agent")} {tr("permanently?")}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.55, lineHeight: 1.65 }}>
-                This cannot be undone. All credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted.
+                {tr("This cannot be undone. All credentials, enrollment tokens and idempotency records belonging to this Agent will be deleted.")}
               </Typography>
             </Box>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 2.5, py: 1.75, gap: 1 }}>
           <Button onClick={() => setDeleteTarget(null)} disabled={saving}>
-            Cancel
+            {tr("Cancel")}
           </Button>
           <Button
             variant="contained"
@@ -249,21 +251,21 @@ export default function Agents() {
             disabled={saving}
             sx={{ borderRadius: 1.5, fontWeight: 800 }}
           >
-            {saving ? "Deleting…" : "Delete permanently"}
+            {tr(saving ? "Deleting…" : "Delete permanently")}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle sx={{ fontWeight: 850 }}>Create Agent</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 850 }}>{tr("Create Agent")}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
-            <TextField autoFocus fullWidth label="Name" value={draft.name} onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))} helperText="Use a stable name such as claude-prod or ci-deployer." disabled={saving} />
-            <TextField fullWidth multiline minRows={2} label="Description" value={draft.description} onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))} disabled={saving} />
+            <TextField autoFocus fullWidth label={tr("Name")} value={draft.name} onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))} helperText={tr("Use a stable name such as claude-prod or ci-deployer.")} disabled={saving} />
+            <TextField fullWidth multiline minRows={2} label={tr("Description")} value={draft.description} onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))} disabled={saving} />
             <Divider />
             <Stack spacing={1}>
               <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap>
-                <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>Initial scopes</Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>{tr("Initial scopes")}</Typography>
                 <Stack direction="row" spacing={0.75}>
                   <Button
                     size="small"
@@ -288,7 +290,7 @@ export default function Agents() {
                     disabled={saving || catalogLoading || !(scopeCatalog.scopes || []).length}
                     sx={{ borderRadius: 1.25, fontWeight: 750 }}
                   >
-                    All
+                    {tr("All")}
                   </Button>
                   <Button
                     size="small"
@@ -300,7 +302,7 @@ export default function Agents() {
                     disabled={saving || catalogLoading}
                     sx={{ borderRadius: 1.25, fontWeight: 750 }}
                   >
-                    Reset
+                    {tr("Reset")}
                   </Button>
                 </Stack>
               </Stack>
@@ -310,18 +312,18 @@ export default function Agents() {
                   <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap sx={{ mt: 0.65 }}>
                     {scopes.map((scope) => {
                       const selected = draft.scopes.includes(scope.name);
-                      return <Chip key={scope.name} label={scope.label} size="small" color={selected ? "primary" : "default"} variant={selected ? "filled" : "outlined"} onClick={() => toggleScope(scope.name)} sx={{ fontWeight: 650, height: 28 }} />;
+                      return <Chip key={scope.name} label={tr(scope.label)} size="small" color={selected ? "primary" : "default"} variant={selected ? "filled" : "outlined"} onClick={() => toggleScope(scope.name)} sx={{ fontWeight: 650, height: 28 }} />;
                     })}
                   </Stack>
                 </Box>
               ))}
-              {!catalogLoading && !(scopeCatalog.scopes || []).length ? <Typography color="text.secondary">No scope metadata available.</Typography> : null}
+              {!catalogLoading && !(scopeCatalog.scopes || []).length ? <Typography color="text.secondary">{tr("No scope metadata available.")}</Typography> : null}
             </Stack>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
-          <Button variant="contained" onClick={submitCreate} disabled={saving || !draft.name.trim()}>{saving ? "Creating…" : "Create agent"}</Button>
+          <Button onClick={() => setDialogOpen(false)} disabled={saving}>{tr("Cancel")}</Button>
+          <Button variant="contained" onClick={submitCreate} disabled={saving || !draft.name.trim()}>{tr(saving ? "Creating…" : "Create agent")}</Button>
         </DialogActions>
       </Dialog>
     </Container>
