@@ -322,9 +322,9 @@ test("revoked stable Matrix device IDs rotate once instead of leaving the accoun
   const client = read("src/components/messenger/secure/MatrixSecureClient.js");
 
   assert.match(client, /requestNewDeviceSession\(retryRevokedDevice = true\)/);
-  assert.match(client, /retryRevokedDevice[\\s\\S]*?response\\.status === 410[\\s\\S]*?forgetPersistentMatrixDeviceId\\(deviceId\\)/);
+  assert.match(client, /retryRevokedDevice[\s\S]*?response\.status === 410[\s\S]*?forgetPersistentMatrixDeviceId\(deviceId\)/);
   assert.match(client, /forgetPersistentMatrixDeviceId\(deviceId\);\s*return requestNewDeviceSession\(false\)/);
-  assert.match(client, /Network\/5xx errors must never trigger a new device/);
+  assert.match(client, /timeout, 429 and 5xx failures must never trigger a new device/);
 });
 
 test("direct Messenger API fetches carry the selected language to Django", () => {
