@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Chip, Grid, Paper, Stack, Typography, Divider, alpha, useTheme,
 } from "@mui/material";
@@ -45,6 +46,7 @@ export default function OverviewPanel({
   ].filter(Boolean);
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.5}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
         <Box>
@@ -189,5 +191,6 @@ export default function OverviewPanel({
         </Grid>
       </Grid>
     </Stack>
+    </TranslatedTextTree>
   );
 }
