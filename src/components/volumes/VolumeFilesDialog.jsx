@@ -15,6 +15,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 // Shared file tree, normalization and dialog UI for Volume lists and Service Settings.
 function formatBytes(n) {
@@ -302,6 +303,7 @@ function TreeRow({ node, depth, expanded, onToggle }) {
 }
 
 export default function VolumeFilesDialog({ open, onClose, volumeName, files, loading, error }) {
+  const { t: tr } = useLocale();
   const entries = React.useMemo(() => normalizeVolumeFiles(files), [files]);
   const tree = React.useMemo(() => buildFileTree(entries), [entries]);
 
@@ -346,21 +348,21 @@ export default function VolumeFilesDialog({ open, onClose, volumeName, files, lo
         <FolderOpenIcon color="primary" sx={{ mt: 0.3 }} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-            {volumeName || "volume"}
+            {volumeName || tr("volume")}
           </Typography>
           {!loading && !error ? (
             <Typography variant="caption" color="text.secondary">
-              {dirCount} folders · {fileCount} files · {formatBytes(totalBytes)}
+              {dirCount} {tr("folders")} · {fileCount} {tr("files")} · {formatBytes(totalBytes)}
             </Typography>
           ) : null}
         </Box>
         {!loading && !error && tree.length > 0 ? (
           <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
             <Button size="small" onClick={expandAll} sx={{ textTransform: "none", fontWeight: 600 }}>
-              Expand
+              {tr("Expand")}
             </Button>
             <Button size="small" onClick={collapseAll} sx={{ textTransform: "none", fontWeight: 600 }}>
-              Collapse
+              {tr("Collapse")}
             </Button>
           </Stack>
         ) : null}
@@ -374,13 +376,13 @@ export default function VolumeFilesDialog({ open, onClose, volumeName, files, lo
         ) : error ? (
           <Box sx={{ p: 2 }}>
             <Alert severity="error" sx={{ borderRadius: 2 }}>
-              {error}
+              {tr(error)}
             </Alert>
           </Box>
         ) : tree.length === 0 ? (
           <Box sx={{ py: 5, textAlign: "center" }}>
             <InsertDriveFileIcon sx={{ fontSize: 40, color: "text.disabled", mb: 1 }} />
-            <Typography color="text.secondary">No files in this volume.</Typography>
+            <Typography color="text.secondary">{tr("No files in this volume.")}</Typography>
           </Box>
         ) : (
           <Box sx={{ maxHeight: { xs: "55vh", sm: "62vh" }, overflow: "auto" }}>
@@ -399,7 +401,7 @@ export default function VolumeFilesDialog({ open, onClose, volumeName, files, lo
 
       <DialogActions sx={{ px: 3, py: 1.5 }}>
         <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 600 }}>
-          Close
+          {tr("Close")}
         </Button>
       </DialogActions>
     </Dialog>
