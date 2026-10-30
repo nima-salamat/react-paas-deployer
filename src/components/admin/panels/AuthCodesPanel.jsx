@@ -49,8 +49,8 @@ export default function AuthCodesPanel({
   const [deleteId, setDeleteId] = useState(null);
   const [confirmPurge, setConfirmPurge] = useState(false);
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
