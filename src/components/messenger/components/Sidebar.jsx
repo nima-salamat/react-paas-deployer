@@ -320,7 +320,7 @@ export default function Sidebar({
           </MenuItem>
           <MenuItem onClick={() => { setListMenuAnchor(null); onOpenSettings?.(); }}>
             <ListItemIcon><SettingsOutlinedIcon fontSize="small" /></ListItemIcon>
-            Settings
+            {t("Settings")}
           </MenuItem>
           <MenuItem onClick={() => { setListMenuAnchor(null); onNavigateHome?.(); }}>
             <ListItemIcon><HomeOutlinedIcon fontSize="small" /></ListItemIcon>
@@ -347,7 +347,7 @@ export default function Sidebar({
         <TextField
           fullWidth
           size="small"
-          placeholder={listTab === 1 ? "Search public groups…" : "Search conversations or people…"}
+          placeholder={t(listTab === 1 ? "Search public groups…" : "Search conversations or people…")}
           value={listTab === 1 ? publicSearchQ : searchQ}
           onChange={(e) => {
             if (listTab === 1) {
@@ -620,7 +620,7 @@ export default function Sidebar({
             ].map(([value, label]) => (
               <Chip
                 key={value}
-                label={label}
+                label={t(label)}
                 size="small"
                 variant={chatFilter === value ? "filled" : "outlined"}
                 color={chatFilter === value ? "primary" : "default"}
@@ -675,7 +675,7 @@ export default function Sidebar({
                 return (
                   <Box sx={{ px: 2, py: 5, textAlign: "center" }}>
                     <Typography variant="body2" color="text.secondary">
-                      {chatFilter === "unread" ? "You're all caught up." : "No pinned conversations."}
+                      {t(chatFilter === "unread" ? "You're all caught up." : "No pinned conversations.")}
                     </Typography>
                   </Box>
                 );
@@ -936,19 +936,19 @@ export default function Sidebar({
                   ? <PushPinOutlinedIcon fontSize="small" />
                   : <PushPinIcon fontSize="small" />}
               </ListItemIcon>
-              {ctx.conv.is_pinned ? "Unpin" : "Pin"}
+              {t(ctx.conv.is_pinned ? "Unpin" : "Pin")}
             </MenuItem>
             <MenuItem onClick={() => { onMarkRead(ctx.conv); setCtx(null); }}>
               <ListItemIcon><MarkChatReadIcon fontSize="small" /></ListItemIcon>
-              Mark as read
+              {t("Mark as read")}
             </MenuItem>
             <MenuItem onClick={() => { onCleanupChat(ctx.conv); setCtx(null); }} sx={{ color: "warning.main" }}>
               <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon>
-              Clear messages
+              {t("Clear messages")}
             </MenuItem>
             {ctx.peer && (
               <MenuItem onClick={() => { onBlockPeer(ctx.peer); setCtx(null); }} sx={{ color: "warning.main" }}>
-                <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon> Block user
+                <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon> {t("Block user")}
               </MenuItem>
             )}
             {ctx.conv.type === "private" && (
@@ -957,7 +957,7 @@ export default function Sidebar({
                 sx={{ color: "error.main" }}
               >
                 <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon>
-                Delete chat (both sides)
+                {t("Delete chat (both sides)")}
               </MenuItem>
             )}
             {ctx.conv.type === "group" && (
@@ -967,7 +967,7 @@ export default function Sidebar({
                   sx={{ color: "warning.main" }}
                 >
                   <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
-                  Leave group
+                  {t("Leave group")}
                 </MenuItem>
                 {(ctx.role === "owner" || ctx.role === "admin") && (
                   <MenuItem
@@ -975,7 +975,7 @@ export default function Sidebar({
                     sx={{ color: "error.main" }}
                   >
                     <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon>
-                    Delete group
+                    {t("Delete group")}
                   </MenuItem>
                 )}
               </>
