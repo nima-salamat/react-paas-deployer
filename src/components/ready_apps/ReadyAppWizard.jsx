@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   Alert,
   Box,
@@ -215,6 +216,7 @@ function DynamicField({ field, value, onChange, config }) {
 }
 
 export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation }) {
+  const { t } = useLocale();
   const variants = app?.variants || [];
   const defaultVariant = variants.find((item) => item.availability === "supported") || variants[0];
   const [variantId, setVariantId] = useState(defaultVariant?.id || "");
@@ -753,7 +755,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
 
               {!isSuccessful && (
                 <Typography variant="body2" color="text.secondary" sx={{ mt: .45 }}>
-                  {prettyStage(installation?.stage || "pending")}
+                  {t(prettyStage(installation?.stage || "pending"))}
                 </Typography>
               )}
             </Box>
@@ -800,7 +802,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                                 : "text.secondary",
                         }}
                       >
-                        {prettyStage(service.status)}
+                        {t(prettyStage(service.status))}
                       </Typography>
                     </Stack>
                   </Box>
