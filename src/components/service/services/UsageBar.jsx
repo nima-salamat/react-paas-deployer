@@ -9,8 +9,8 @@ export default function UsageBar({ label, value, loading = false, error = false,
   const barColor = pct == null ? "text.disabled" : pct >= 90 ? "error.main" : pct >= 70 ? "warning.main" : pct >= 40 ? "success.main" : "primary.main";
   const title = loading ? label + " usage is being fetched" : error ? label + " live usage is currently unavailable" : hasValue ? label + " live usage" : label + " usage is not available";
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Box sx={{ minWidth: dense ? 90 : 120, flex: 1 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.4, minHeight: 18 }}>
         <Typography variant="caption" color="text.secondary" fontWeight={700}>{label}</Typography>
