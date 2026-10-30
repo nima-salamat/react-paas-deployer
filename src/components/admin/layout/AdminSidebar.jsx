@@ -75,7 +75,8 @@ export default function AdminSidebar({
 
   const initial = (me?.username || "A").charAt(0).toUpperCase();
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Box
       sx={{
         height: "100%",
@@ -230,7 +231,6 @@ export default function AdminSidebar({
             ? `${n.label}${n.shortcut ? ` (Alt+${n.shortcut})` : ""}`
             : "";
           return (
-    <TranslatedTextTree>
             <ListItem key={n.id} disablePadding sx={{ mb: 0.3 }}>
               <Tooltip title={tip} placement="right" disableHoverListener={!collapsed}>
                 <ListItemButton
