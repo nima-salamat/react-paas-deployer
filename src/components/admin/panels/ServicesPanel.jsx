@@ -262,7 +262,6 @@ export default function ServicesPanel({ setToast: setToastProp }) {
   }, [svcList, svcCount]);
 
   return (
-    <TranslatedTextTree>
     <Stack spacing={2.5}>
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} gap={1.5}>
@@ -586,6 +585,5 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         </DialogActions>
       </Dialog>
     </Stack>
-    </TranslatedTextTree>
   );
 }
