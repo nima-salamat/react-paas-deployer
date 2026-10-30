@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   Alert,
   Box,
@@ -74,6 +75,7 @@ function Meta({ label, value }) {
 }
 
 export default function ReadyAppDetail() {
+  const { t } = useLocale();
   const { id } = useParams();
   const navigate = useNavigate();
   const [app, setApp] = useState(null);
@@ -208,7 +210,7 @@ export default function ReadyAppDetail() {
                     )}
                   </Stack>
                   <Typography color="text.secondary" sx={{ mt: 1.2, maxWidth: 680, lineHeight: 1.65 }}>
-                    {app.description || "A curated app, ready to deploy."}
+                    {t(app.description || "A curated app, ready to deploy.")}
                   </Typography>
                 </Box>
 
@@ -273,7 +275,7 @@ export default function ReadyAppDetail() {
                         <Typography sx={{ fontWeight: 850 }}>{component.label}</Typography>
                         {component.role && (
                           <Typography variant="caption" color="text.secondary">
-                            {component.role}
+                            {component.role ? t(component.role) : ""}
                           </Typography>
                         )}
                       </Box>
@@ -292,7 +294,7 @@ export default function ReadyAppDetail() {
             <Card variant="outlined" sx={{ borderRadius: 4, p: { xs: 2.2, md: 2.8 } }}>
               <Typography sx={{ fontWeight: 900 }}>At a glance</Typography>
               <Stack direction="row" spacing={4} sx={{ mt: 2.2 }}>
-                <Meta label="Category" value={app.category} />
+                <Meta label="Category" value={t(app.category || "other")} />
                 <Meta label="Version" value={app.software_version ? "v" + app.software_version : null} />
               </Stack>
 
