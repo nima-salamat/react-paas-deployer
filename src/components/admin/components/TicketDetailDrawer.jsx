@@ -83,8 +83,8 @@ export default function TicketDetailDrawer({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <>
       <Drawer
         anchor="right"
