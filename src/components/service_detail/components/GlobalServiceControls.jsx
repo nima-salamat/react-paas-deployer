@@ -28,6 +28,8 @@ import CancelIcon from "@mui/icons-material/Cancel";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ServicePlatformBadge from "../../service/ServicePlatformBadge.jsx";
 import VolumeIcon from "../../VolumeIcon.jsx";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 function useCopy() {
   const [copied, setCopied] = useState(null);
@@ -45,14 +47,15 @@ function useCopy() {
 }
 
 function CopyBtn({ value, k, title, copied, onCopy }) {
+  const { t } = useLocale();
   if (!value) return null;
   return (
-    <Tooltip title={copied === k ? "Copied!" : title}>
+    <Tooltip title={t(copied === k ? "Copied!" : title)}>
       <IconButton
         size="small"
         onClick={() => onCopy(value, k)}
         sx={{ p: 0.35 }}
-        aria-label={title}
+        aria-label={t(title)}
       >
         {copied === k ? (
           <CheckIcon sx={{ fontSize: 16, color: "success.main" }} />
@@ -128,6 +131,7 @@ export default function GlobalServiceControls({
   managedAppLabel = "Ready App",
   onOpenManagedApplication,
 }) {
+  const { t } = useLocale();
   const theme = useTheme();
   const {
     startService,
@@ -209,6 +213,7 @@ export default function GlobalServiceControls({
       : "Application";
 
   return (
+    <TranslatedTextTree>
     <Paper
       elevation={0}
       sx={{
@@ -466,28 +471,28 @@ export default function GlobalServiceControls({
       <Stack direction="row" spacing={1} sx={{ mb: 2.5 }} flexWrap="wrap" useFlexGap>
             <Chip
               icon={<Inventory2Icon sx={{ fontSize: 16 }} />}
-              label={`Deploys: ${deployCount}`}
+              label={`${t("Deploys")}: ${deployCount}`}
               size="small"
               variant="outlined"
               sx={{ borderRadius: 1.5 }}
             />
             <Chip
               icon={<VolumeIcon size={16} />}
-              label={`Volumes: ${volumeCount}`}
+              label={`${t("Volumes")}: ${volumeCount}`}
               size="small"
               variant="outlined"
               sx={{ borderRadius: 1.5 }}
             />
             <Chip
               icon={<HubIcon sx={{ fontSize: 16 }} />}
-              label={`Network: ${networkName}`}
+              label={`${t("Network")}: ${networkName}`}
               size="small"
               variant="outlined"
               sx={{ borderRadius: 1.5 }}
             />
             {selectedDeploy ? (
               <Chip
-                label={`Selected: ${selectedDeploy.name || selectedDeploy.id}`}
+                label={`${t("Selected")}: ${selectedDeploy.name || selectedDeploy.id}`}
                 size="small"
                 color="success"
                 sx={{ borderRadius: 1.5, fontWeight: 600 }}
@@ -495,7 +500,7 @@ export default function GlobalServiceControls({
             ) : null}
             {selectedPlatform ? (
               <Chip
-                label={`${selectedIsDb ? "DB" : "App"} · ${selectedPlatform}`}
+                label={`${t(selectedIsDb ? "DB" : "App")} · ${selectedPlatform}`}
                 size="small"
                 color={selectedIsDb ? "info" : "default"}
                 variant="outlined"
@@ -566,5 +571,6 @@ export default function GlobalServiceControls({
         </Box>
       </Stack>
     </Paper>
+    </TranslatedTextTree>
   );
 }

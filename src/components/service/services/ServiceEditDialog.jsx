@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Alert,
   Box,
@@ -120,6 +121,7 @@ function EditBody({
   purgeRuntimeLoading = false,
   onDeleteVolume,
 }) {
+  const { t } = useLocale();
   const svc = draft.service;
   const platform =
     svc.plan && typeof svc.plan === "object"
@@ -339,7 +341,7 @@ function EditBody({
                 </Button>
               }
             >
-              {networksFetchError}
+              {t(networksFetchError)}
             </Alert>
           )}
 
@@ -546,7 +548,7 @@ function EditBody({
                 </Button>
               }
             >
-              {plansForPlatformErrors[platform]}
+              {t(plansForPlatformErrors[platform])}
             </Alert>
           ) : availablePlans.length === 0 ? (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
@@ -724,8 +726,8 @@ function EditBody({
                 ) : null
               }
             >
-              {volumeMutateReason ||
-                "Stop service and remove container & image before changing volumes."}
+              {t(volumeMutateReason ||
+                "Stop service and remove container & image before changing volumes.")}
             </Alert>
           )}
           <StorageBar quotaMb={quotaMb} usedMb={usedBySelection} />
@@ -735,7 +737,7 @@ function EditBody({
               sx={{ mb: 1.5, borderRadius: 1.5 }}
               onClose={() => setVolumeError(null)}
             >
-              {volumeError}
+              {t(volumeError)}
             </Alert>
           )}
           {volumeMsg && (
@@ -744,7 +746,7 @@ function EditBody({
               sx={{ mb: 1.5, borderRadius: 1.5 }}
               onClose={() => setVolumeMsg(null)}
             >
-              {volumeMsg}
+              {t(volumeMsg)}
             </Alert>
           )}
 

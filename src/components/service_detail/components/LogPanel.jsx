@@ -1,4 +1,5 @@
 import React, { useRef, useMemo, useCallback, useEffect, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Paper,
   Box,
@@ -202,6 +203,7 @@ export default function LogPanel({
     : "Offline";
 
   return (
+    <TranslatedTextTree>
     <Paper
       elevation={0}
       sx={{
@@ -601,5 +603,6 @@ export default function LogPanel({
         </DialogActions>
       </Dialog>
     </Paper>
+    </TranslatedTextTree>
   );
 }

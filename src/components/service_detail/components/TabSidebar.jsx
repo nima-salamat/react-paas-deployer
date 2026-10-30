@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Paper,
   Box,
@@ -45,6 +46,7 @@ export default function TabSidebar({
     : ALL_TABS;
 
   return (
+    <TranslatedTextTree>
     <Paper
       elevation={0}
       sx={{
@@ -214,5 +216,6 @@ export default function TabSidebar({
         </Stack>
       </Box>
     </Paper>
+    </TranslatedTextTree>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Accordion,
   AccordionDetails,
@@ -346,6 +347,7 @@ function ConfigField({ field, config, updateField, removeField, disabled = false
               : [];
 
   return (
+    <TranslatedTextTree>
     <Grid item xs={12} md={6} key={key}>
       <Stack direction="row" spacing={1} alignItems="flex-start">
         <TextField
@@ -388,6 +390,7 @@ function ConfigField({ field, config, updateField, removeField, disabled = false
         </Tooltip>
       </Stack>
     </Grid>
+    </TranslatedTextTree>
   );
 }
 
@@ -413,6 +416,7 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
     detected.middleware?.length || detected.websockets || detected.lifespan
   );
   return (
+    <TranslatedTextTree>
     <Stack spacing={1.5}>
       <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }}>
@@ -480,6 +484,7 @@ function FastApiRuntimePanel({ config, updateConfig, disabled, inspectResult }) 
         </Typography>
       </Paper>
     </Stack>
+    </TranslatedTextTree>
   );
 }
 export default function ConfigBuilder({
@@ -636,6 +641,7 @@ export default function ConfigBuilder({
     platform === "fastapi";
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={1.5}>
       <Paper
         variant="outlined"
@@ -924,5 +930,6 @@ export default function ConfigBuilder({
         is required.
       </Typography>
     </Stack>
+    </TranslatedTextTree>
   );
 }

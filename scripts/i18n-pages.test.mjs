@@ -86,6 +86,17 @@ test("Persian locale covers the requested public, dashboard, service and Messeng
     "Manage account, photos & security",
     "Upload photo",
     "Screen share",
+    "Developer knowledge base",
+    "Search docs…",
+    "PaaS Docs",
+    "Back to app",
+    "Documentation page not found",
+    "Browse documentation",
+    "Service name is required.",
+    "Please select or create a network.",
+    "Volume added to this wizard. It will be created and attached after the Service is created.",
+    "The backend reports that volume changes are unavailable until the service is idle.",
+    "No deploy history available. Start a deploy to see live events.",
   ];
 
   for (const source of samples) {
@@ -184,4 +195,40 @@ test("dynamic page data and non-JSX labels are connected to the active locale", 
     const source = await readFile(new URL(page, import.meta.url), "utf8");
     assert.match(source, /useLocale/, `${page} should translate dynamic UI copy`);
   }
+});
+
+test("documentation, plan service creation, service editing and Service Detail panels localize UI chrome", async () => {
+  const surfaces = [
+    "../src/components/docs/DocumentationWorkspace.jsx",
+    "../src/components/admin/panels/DocumentationPanel.jsx",
+    "../src/components/plans/CreateDeploymentModal.jsx",
+    "../src/components/service/services/ServiceEditDialog.jsx",
+    "../src/components/service_detail/ServiceDetail.jsx",
+    "../src/components/service_detail/components/OverviewPanel.jsx",
+    "../src/components/service_detail/components/CreateDeployPanel.jsx",
+    "../src/components/service_detail/components/ConfigBuilder.jsx",
+    "../src/components/service_detail/components/DeployCard.jsx",
+    "../src/components/service_detail/components/GlobalServiceControls.jsx",
+    "../src/components/service_detail/components/LogsPanel.jsx",
+    "../src/components/service_detail/components/LogPanel.jsx",
+    "../src/components/service_detail/components/LogRow.jsx",
+    "../src/components/service_detail/components/MobileServiceHeader.jsx",
+    "../src/components/service_detail/components/MobileNavFab.jsx",
+    "../src/components/service_detail/components/ServiceSharingPanel.jsx",
+    "../src/components/service_detail/components/ServiceToolbar.jsx",
+    "../src/components/service_detail/components/SettingsPanel.jsx",
+    "../src/components/service_detail/components/TabSidebar.jsx",
+    "../src/components/service_detail/components/ShellPanel.jsx",
+  ];
+  for (const page of surfaces) {
+    const source = await readFile(new URL(page, import.meta.url), "utf8");
+    assert.match(source, /TranslatedTextTree/, page + " should translate text-bearing UI props");
+  }
+  const workspace = await readFile(new URL("../src/components/docs/DocumentationWorkspace.jsx", import.meta.url), "utf8");
+  assert.match(workspace, /t\(block\.text\)/);
+  assert.match(workspace, /block\.code/);
+  const editService = await readFile(new URL("../src/components/service/services/ServiceEditDialog.jsx", import.meta.url), "utf8");
+  assert.match(editService, /useLocale/);
+  const serviceDetail = await readFile(new URL("../src/components/service_detail/ServiceDetail.jsx", import.meta.url), "utf8");
+  assert.ok(serviceDetail.includes("message: t(message)"));
 });

@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Stack,
   Paper,
@@ -35,6 +36,7 @@ export default function LogsPanel({
   const deployReconnecting = Boolean(deployLogs?.reconnecting);
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.5} sx={{ maxWidth: 960, width: "100%" }}>
       <LogPanel
         title={t("Service logs")}
@@ -232,5 +234,6 @@ export default function LogsPanel({
         />
       </Paper>
     </Stack>
+    </TranslatedTextTree>
   );
 }

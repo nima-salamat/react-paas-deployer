@@ -151,3 +151,19 @@ test("backend Ready App descriptions have Persian translations without translati
   assert.doesNotMatch(helper, /if \(typeof node === "string"\)/);
   assert.match(helper, /nextProps\.children = translated/);
 });
+
+test("Persian locale includes documentation, service creation, editing and detailed service messages", () => {
+  for (const [english, persian] of [
+    ["Developer knowledge base", "پایگاه دانش توسعه‌دهندگان"],
+    ["Search docs…", "جستجو در مستندات…"],
+    ["Documentation page not found", "صفحهٔ مستندات پیدا نشد"],
+    ["Service name is required.", "واردکردن نام سرویس الزامی است."],
+    ["Please select or create a network.", "یک شبکه انتخاب یا ایجاد کنید."],
+    ["Volume name is required.", "واردکردن نام فضای ذخیره‌سازی الزامی است."],
+    ["No deploy history available. Start a deploy to see live events.", "تاریخچهٔ استقراری موجود نیست. برای مشاهدهٔ رویدادهای زنده یک استقرار آغاز کنید."],
+    ["The backend reports that volume changes are unavailable until the service is idle.", "طبق اعلام بک‌اند، تا زمانی که سرویس در حالت بیکار قرار نگیرد امکان تغییر فضاهای ذخیره‌سازی وجود ندارد."],
+  ]) {
+    assert.equal(translateText(english, "fa"), persian);
+  }
+  assert.equal(translateText("An operator-authored paragraph that is not in the catalogue.", "fa"), "An operator-authored paragraph that is not in the catalogue.");
+});

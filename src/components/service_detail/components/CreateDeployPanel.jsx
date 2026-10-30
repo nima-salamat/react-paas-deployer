@@ -25,6 +25,8 @@ import AutoFixHighIcon from "@mui/icons-material/AutoFixHigh";
 import SearchIcon from "@mui/icons-material/Search";
 import ConfigBuilder from "./ConfigBuilder";
 import apiRequest from "../../customHooks/apiRequest";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import { getApiErrorMessage } from "../errorUtils";
 
 export default function CreateDeployPanel({
@@ -43,6 +45,7 @@ export default function CreateDeployPanel({
   service,
   error,
 }) {
+  const { t } = useLocale();
   const {
     name,
     version,
@@ -220,8 +223,8 @@ export default function CreateDeployPanel({
               openConfirm(
                 "delete",
                 d.id,
-                "Delete deploy",
-                `Delete deploy "${d.name}"?`
+                t("Delete deploy"),
+                t(`Delete deploy "${d.name}"?`)
               )
             }
             onDownload={handleDownloadZip}
@@ -232,6 +235,7 @@ export default function CreateDeployPanel({
   );
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
       {/* Create / Edit form */}
       <Paper
@@ -557,7 +561,7 @@ export default function CreateDeployPanel({
                   and offers to apply the suggested config JSON. */}
               {inspectError && (
                 <Alert severity="warning" sx={{ mb: 1.5 }} onClose={() => setInspectError(null)}>
-                  {inspectError}
+                  {t(inspectError)}
                 </Alert>
               )}
               {inspectResult && (
@@ -720,7 +724,7 @@ export default function CreateDeployPanel({
 
           {error ? (
             <Alert severity="error" sx={{ mt: 2, borderRadius: 1.5 }}>
-              {error}
+              {t(error)}
             </Alert>
           ) : null}
         </Box>
@@ -814,5 +818,6 @@ export default function CreateDeployPanel({
         </Box>
       </Paper>
     </Stack>
+    </TranslatedTextTree>
   );
 }

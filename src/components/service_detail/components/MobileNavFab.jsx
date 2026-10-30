@@ -27,6 +27,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import HubIcon from "@mui/icons-material/Hub";
 import VolumeIcon from "../../VolumeIcon.jsx";
 import WidgetsOutlinedIcon from "@mui/icons-material/WidgetsOutlined";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 
 const ALL_TABS = [
   { value: "overview", label: "Overview", icon: <SpaceDashboardRoundedIcon /> },
@@ -108,6 +109,7 @@ export default function MobileNavFab({
   };
 
   return (
+    <TranslatedTextTree>
     <>
       {/* Fixed FAB — mirror of FloatingNav (right ↔ left) */}
       <Box
@@ -254,5 +256,6 @@ export default function MobileNavFab({
         </List>
       </Drawer>
     </>
+    </TranslatedTextTree>
   );
 }

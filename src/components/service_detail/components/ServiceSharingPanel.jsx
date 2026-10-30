@@ -31,6 +31,8 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import apiRequest from "../../customHooks/apiRequest";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import ShareServiceDialog, {
   RULE_LABELS,
 } from "../../service/services/ShareServiceDialog";
@@ -94,6 +96,7 @@ function ShareSummaryCard({ share, onEdit, onRemove, removing }) {
   const isExpired = expiry.label === "Expired";
 
   return (
+    <TranslatedTextTree>
     <Paper
       variant="outlined"
       sx={{
@@ -221,10 +224,12 @@ function ShareSummaryCard({ share, onEdit, onRemove, removing }) {
         )}
       </Stack>
     </Paper>
+    </TranslatedTextTree>
   );
 }
 
 export default function ServiceSharingPanel({ service }) {
+  const { t } = useLocale();
   const serviceId = service?.id ?? service?.pk;
   const [shares, setShares] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -265,7 +270,7 @@ export default function ServiceSharingPanel({ service }) {
       );
     } catch (err) {
       const detail = err?.response?.data?.detail || err?.message;
-      setError(detail || "Could not load sharing settings for this service.");
+      setError(t(detail || "Could not load sharing settings for this service."));
     } finally {
       setLoading(false);
     }
@@ -325,13 +330,14 @@ export default function ServiceSharingPanel({ service }) {
       });
       setRequestVersion((version) => version + 1);
     } catch (err) {
-      setError(err?.response?.data?.detail || err?.message || "Could not remove this share.");
+      setError(t(err?.response?.data?.detail || err?.message || "Could not remove this share."));
     } finally {
       setRemovingId("");
     }
   };
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.25} sx={{ minWidth: 0, pb: 2 }}>
       <Paper
         elevation={0}
@@ -584,5 +590,6 @@ export default function ServiceSharingPanel({ service }) {
         </DialogActions>
       </Dialog>
     </Stack>
+    </TranslatedTextTree>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { useNavigate } from "react-router-dom";
 import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
@@ -949,6 +950,7 @@ export default function SettingsPanel({
   }, [onSectionChange, isDatabaseService]);
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
       {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{t(error)}</Alert>}
       {volumeActionError ? (
@@ -1739,5 +1741,6 @@ export default function SettingsPanel({
         </DialogActions>
       </Dialog>
     </Stack>
+    </TranslatedTextTree>
   );
 }

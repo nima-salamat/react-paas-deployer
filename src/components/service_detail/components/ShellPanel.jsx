@@ -1,5 +1,6 @@
 import React, { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale } from "../../../i18n/LocaleProvider.jsx";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { useMediaQuery } from "@mui/material";
 import {
   Box,
@@ -1499,16 +1500,19 @@ export default function ShellPanel({ service, enabled = true, onError }) {
 
   if (!enabled) {
     return (
+      <TranslatedTextTree>
       <Paper variant="outlined" sx={{ p: 3, borderRadius: 1.25 }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
           <TerminalRoundedIcon color="disabled" />
           <Box><Typography fontWeight={800}>{tr("Shell unavailable")}</Typography><Typography variant="body2" color="text.secondary">{tr("You do not have permission to use the restricted service shell.")}</Typography></Box>
         </Stack>
       </Paper>
+      </TranslatedTextTree>
     );
   }
 
   return (
+    <TranslatedTextTree>
     <>
       <Paper
         variant="outlined"

@@ -1,4 +1,5 @@
 import React, { memo, useState, useMemo } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { Box, Typography, Chip, Button, useTheme, useMediaQuery } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
@@ -50,6 +51,7 @@ export default memo(function LogRow({ entry }) {
   };
 
   return (
+    <TranslatedTextTree>
     <Box
       sx={{
         borderLeft: 3,
@@ -182,5 +184,6 @@ export default memo(function LogRow({ entry }) {
         ) : null}
       </Box>
     </Box>
+    </TranslatedTextTree>
   );
 });

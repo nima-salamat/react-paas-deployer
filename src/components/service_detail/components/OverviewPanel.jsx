@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   Paper, Typography, Box, Stack, Divider, Chip, IconButton, Tooltip,
@@ -387,6 +388,7 @@ export default function OverviewPanel({
   const serviceHost = service?.service_host || null;
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.5} sx={{ maxWidth: 960, width: "100%" }}>
       {!hideServiceIdentity ? (
       <SectionCard
@@ -508,5 +510,6 @@ export default function OverviewPanel({
         )}
       </SectionCard>
     </Stack>
+    </TranslatedTextTree>
   );
 }

@@ -36,6 +36,8 @@ import ReplayIcon from "@mui/icons-material/Replay";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import HubIcon from "@mui/icons-material/Hub";
 import VolumeIcon from "../VolumeIcon.jsx";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_NETWORKS = `${API_BASE}/api/networks/`;
@@ -99,6 +101,7 @@ export default function CreateServiceWizard({
   notifyOnSuccess = false,
   resetKey = 0,
 }) {
+  const { t } = useLocale();
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -576,6 +579,7 @@ export default function CreateServiceWizard({
   ];
 
   return (
+    <TranslatedTextTree>
     <Dialog
       open={Boolean(open)}
       onClose={handleClose}
@@ -605,11 +609,11 @@ export default function CreateServiceWizard({
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {initialData.plan_name
-              ? `Plan: ${initialData.plan_name}${
+              ? `${t("Plan:")} ${initialData.plan_name}${
                   initialData.platform ? ` · ${initialData.platform}` : ""
                 }${
                   planQuotaMb != null
-                    ? ` · Storage ${planQuotaMb} MB`
+                    ? ` · ${t("Storage")} ${planQuotaMb} MB`
                     : ""
                 }`
               : "Wizard"}
@@ -624,7 +628,7 @@ export default function CreateServiceWizard({
         <Stepper activeStep={activeStep} alternativeLabel={!isMobile}>
           {steps.map((label) => (
             <Step key={label}>
-              <StepLabel>{label}</StepLabel>
+              <StepLabel>{t(label)}</StepLabel>
             </Step>
           ))}
         </Stepper>
@@ -640,7 +644,7 @@ export default function CreateServiceWizard({
               Not authenticated
             </Typography>
             <Alert severity="warning" sx={{ mt: 1.5, textAlign: "left", borderRadius: 1.5 }}>
-              Log in to continue.
+              {t("Log in to continue.")}
             </Alert>
             <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
               <Button
@@ -694,7 +698,7 @@ export default function CreateServiceWizard({
                   : "error.main"
               }
             >
-              {submissionResult.message}
+              {t(submissionResult.message)}
             </Typography>
             {submissionResult.ok ? (
               <Button
@@ -832,12 +836,12 @@ export default function CreateServiceWizard({
                 </Stack>
                 {createNetworkError && (
                   <Alert severity="error" sx={{ borderRadius: 1.5 }}>
-                    {createNetworkError}
+                    {t(createNetworkError)}
                   </Alert>
                 )}
                 {createNetworkSuccess && (
                   <Alert severity="success" sx={{ borderRadius: 1.5 }}>
-                    {createNetworkSuccess}
+                    {t(createNetworkSuccess)}
                   </Alert>
                 )}
               </Box>
@@ -1035,7 +1039,7 @@ export default function CreateServiceWizard({
                   </Button>
                   {volumeMsg && (
                     <Alert severity={volumeMsg.type} sx={{ borderRadius: 1.5 }}>
-                      {volumeMsg.text}
+                      {t(volumeMsg.text)}
                     </Alert>
                   )}
                 </Stack>
@@ -1114,7 +1118,7 @@ export default function CreateServiceWizard({
 
             {error && (
               <Alert severity="error" sx={{ borderRadius: 1.5 }}>
-                {error}
+                {t(error)}
               </Alert>
             )}
           </Box>
@@ -1163,6 +1167,7 @@ export default function CreateServiceWizard({
         </DialogActions>
       )}
     </Dialog>
+    </TranslatedTextTree>
   );
 }
 

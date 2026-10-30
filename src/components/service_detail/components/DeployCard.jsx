@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box,
   Paper,
@@ -51,6 +52,7 @@ export default memo(
     const hasZip = Boolean(deploy?.zip_file);
 
     return (
+      <TranslatedTextTree>
       <Paper
         elevation={0}
         sx={{
@@ -266,6 +268,7 @@ export default memo(
           </Stack>
         </Stack>
       </Paper>
+      </TranslatedTextTree>
     );
   },
   (prev, next) => {

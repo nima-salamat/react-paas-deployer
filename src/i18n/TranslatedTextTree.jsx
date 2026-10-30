@@ -4,6 +4,8 @@ import { useLocale } from "./LocaleProvider.jsx";
 const TRANSLATABLE_PROPS = new Set([
   "label",
   "title",
+  "subtitle",
+  "emptyText",
   "placeholder",
   "helperText",
   "message",

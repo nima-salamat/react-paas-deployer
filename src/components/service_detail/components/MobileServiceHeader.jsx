@@ -18,6 +18,7 @@ import RocketLaunchRoundedIcon from "@mui/icons-material/RocketLaunchRounded";
 import HubIcon from "@mui/icons-material/Hub";
 import VolumeIcon from "../../VolumeIcon.jsx";
 import ServicePlatformBadge from "../../service/ServicePlatformBadge.jsx";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 
 /**
  * Compact sticky header for mobile — single source of truth for
@@ -75,6 +76,7 @@ export default function MobileServiceHeader({
   }, [copyTarget]);
 
   return (
+    <TranslatedTextTree>
     <Paper
       elevation={0}
       sx={{
@@ -195,5 +197,6 @@ export default function MobileServiceHeader({
         </Box>
       </Collapse>
     </Paper>
+    </TranslatedTextTree>
   );
 }

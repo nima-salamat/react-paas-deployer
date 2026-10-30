@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box,
   Button,
@@ -51,6 +52,7 @@ export default function ServiceToolbar({
       `${Math.round(refreshIntervalMs / 1000)}s`;
 
   return (
+    <TranslatedTextTree>
     <Paper
       elevation={0}
       sx={{
@@ -176,5 +178,6 @@ export default function ServiceToolbar({
         </MenuItem>
       </Menu>
     </Paper>
+    </TranslatedTextTree>
   );
 }

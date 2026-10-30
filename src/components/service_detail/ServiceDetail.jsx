@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useCallback, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 import {
   Box,
@@ -60,6 +62,7 @@ import { getApiErrorMessage, getApiErrorMeta } from "./errorUtils";
 import ServiceErrorAlert from "./components/ServiceErrorAlert";
 
 export default function ServiceDetail({ themeMode = "system", onThemeModeChange }) {
+  const { t } = useLocale();
   const { id, section } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -214,9 +217,9 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
       return;
     }
     const source = typeof value === "string" ? { message: value } : value;
-    setErrorState(getApiErrorMessage(source, fallback));
+    setErrorState(t(getApiErrorMessage(source, fallback)));
     setErrorMeta(getApiErrorMeta(source, fallback));
-  }, []);
+  }, [t]);
 
   const clearError = useCallback(() => {
     setErrorState(null);
@@ -417,8 +420,8 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
   }, [deployLogDeployId]);
 
   const safeSetSnackbar = useCallback((severity, message) => {
-    setSnackbar({ severity, message });
-  }, []);
+    setSnackbar({ severity, message: t(message) });
+  }, [t]);
 
   const handleDownloadZip = useCallback(async (deploy) => {
     const deployId = deploy?.id ?? deploy?.pk;
@@ -1604,7 +1607,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
 
       const detail = resp.data?.detail || "Plan applied.";
       safeSetSnackbar("success", detail);
-      setSettingsSuccess(detail);
+      setSettingsSuccess(t(detail));
 
       const applied = (availablePlans || []).find(
         (p) => String(p.id ?? p.pk ?? "") === String(planId),
@@ -1686,6 +1689,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
   };
 
   return (
+    <TranslatedTextTree>
     <Box
       sx={{
         minHeight: {
@@ -1699,7 +1703,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
     >
       <DashboardNavbar
         serviceDetail
-        serviceName={service?.name || "Service"}
+        serviceName={service?.name || t("Service")}
         servicePlatform={servicePlatform}
         themeMode={themeMode}
         onThemeModeChange={onThemeModeChange}
@@ -2098,9 +2102,9 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
         </Dialog>
 
         <Dialog open={confirmDialog.open} onClose={closeConfirm}>
-          <DialogTitle>{confirmDialog.title}</DialogTitle>
+          <DialogTitle>{t(confirmDialog.title)}</DialogTitle>
           <DialogContent>
-            <Typography>{confirmDialog.message}</Typography>
+            <Typography>{t(confirmDialog.message)}</Typography>
           </DialogContent>
           <DialogActions>
             <Button onClick={closeConfirm} disabled={confirmDialog.loading}>Cancel</Button>
@@ -2122,5 +2126,6 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
       </Box>
       </Box>
     </Box>
+    </TranslatedTextTree>
   );
 }
