@@ -73,3 +73,57 @@ test("Persian locale includes secure-chat recovery, language API and admin table
   assert.match(messages, /"Database tables": "جدول‌های پایگاه داده"/);
   assert.match(messages, /"Language preference updated.":/);
 });
+
+
+test("Persian locale covers admin console, Services and all Ready Apps screens", async () => {
+  const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
+  const helper = await readFile(new URL("../src/i18n/TranslatedTextTree.jsx", import.meta.url), "utf8");
+  const surfaces = [
+    "../src/components/admin/AdminDashboard.jsx",
+    "../src/components/admin/layout/AdminSidebar.jsx",
+    "../src/components/admin/layout/AdminTopBar.jsx",
+    "../src/components/admin/panels/OverviewPanel.jsx",
+    "../src/components/admin/panels/TicketsPanel.jsx",
+    "../src/components/admin/panels/UsersPanel.jsx",
+    "../src/components/admin/panels/DepartmentsPanel.jsx",
+    "../src/components/admin/panels/ServicesPanel.jsx",
+    "../src/components/admin/panels/PlansPanel.jsx",
+    "../src/components/admin/panels/LoginSettingsPanel.jsx",
+    "../src/components/admin/panels/InvitesPanel.jsx",
+    "../src/components/admin/panels/AuthCodesPanel.jsx",
+    "../src/components/admin/panels/EmailsPanel.jsx",
+    "../src/components/admin/panels/ProfilePanel.jsx",
+    "../src/components/admin/panels/docs/DocsPanel.jsx",
+    "../src/components/service/Services.jsx",
+    "../src/components/service/services/ServicesToolbar.jsx",
+    "../src/components/service/services/ServiceItem.jsx",
+    "../src/components/service/services/ServiceEditDialog.jsx",
+    "../src/components/service/services/ServiceDeleteDialog.jsx",
+    "../src/components/service/services/ShareServiceDialog.jsx",
+    "../src/components/ready_apps/ReadyApps.jsx",
+    "../src/components/ready_apps/ReadyAppDetail.jsx",
+    "../src/components/ready_apps/ReadyAppInstallations.jsx",
+    "../src/components/ready_apps/ReadyAppInstallation.jsx",
+    "../src/components/ready_apps/ReadyAppWizard.jsx",
+  ];
+
+  assert.match(helper, /useLocale/);
+  assert.match(helper, /TRANSLATABLE_PROPS/);
+  for (const relativePath of surfaces) {
+    const source = await readFile(new URL(relativePath, import.meta.url), "utf8");
+    assert.match(source, /TranslatedTextTree/, relativePath + " must use the active locale");
+  }
+
+  for (const [english, persian] of [
+    ["App Library", "کتابخانهٔ اپلیکیشن‌ها"],
+    ["Deployed Apps", "اپلیکیشن‌های مستقرشده"],
+    ["Users & access", "کاربران و دسترسی‌ها"],
+    ["Departments", "دپارتمان‌ها"],
+    ["cms", "مدیریت محتوا"],
+    ["helpdesk", "پشتیبانی"],
+    ["devtools", "ابزارهای توسعه"],
+    ["messaging", "پیام‌رسانی"],
+  ]) {
+    assert.ok(messages.includes(JSON.stringify(english) + ": " + JSON.stringify(persian)), "Missing Persian translation: " + english);
+  }
+});
