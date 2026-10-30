@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Alert,
   Box,
@@ -34,6 +35,7 @@ export default function ServiceDeleteDialog({
   const platform = String(plan?.platform || service?.platform || "unknown");
 
   return (
+    <TranslatedTextTree>
     <Dialog
       open={Boolean(open)}
       onClose={loading ? undefined : onClose}
@@ -187,5 +189,6 @@ export default function ServiceDeleteDialog({
         </Button>
       </DialogActions>
     </Dialog>
+    </TranslatedTextTree>
   );
 }
