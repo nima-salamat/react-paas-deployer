@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { Box, Typography, alpha } from "@mui/material";
 import PlatformIcon from "../plans/PlatformIcon.jsx";
 
@@ -17,6 +18,7 @@ export default function ServicePlatformBadge({
   const visiblePlatform = String(platformLabel || platformKey || "Unknown platform");
 
   return (
+    <TranslatedTextTree>
     <Box
       component="span"
       title={`${typeLabel} · ${visiblePlatform}`}
@@ -89,5 +91,6 @@ export default function ServicePlatformBadge({
         </Typography>
       </Box>
     </Box>
+    </TranslatedTextTree>
   );
 }
