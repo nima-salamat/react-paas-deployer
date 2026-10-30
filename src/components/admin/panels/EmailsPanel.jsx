@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { Box, Typography, Stack } from "@mui/material";
 import EmailManagement from "../../emails/EmailManagement.jsx";
 import PermissionGate from "../components/PermissionGate";
@@ -9,6 +10,7 @@ import PermissionGate from "../components/PermissionGate";
  */
 export default function EmailsPanel() {
   return (
+    <TranslatedTextTree>
     <PermissionGate rule="emails.manage">
       <Stack spacing={2}>
         <Box>
@@ -20,5 +22,6 @@ export default function EmailsPanel() {
         <EmailManagement />
       </Stack>
     </PermissionGate>
+    </TranslatedTextTree>
   );
 }
