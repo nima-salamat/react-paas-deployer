@@ -965,6 +965,7 @@ export default function ShareServiceDialog({
                     const uid = String(m.user_id);
                     const ov = memberOverrides[uid];
                     return (
+    <TranslatedTextTree>
                       <ListItemButton key={uid} selected={selectedMemberId === uid} onClick={() => editMemberRules(m)}>
                         <ListItemAvatar>
                           <Avatar sx={{ width: 28, height: 28 }}>
@@ -1144,5 +1145,6 @@ export default function ShareServiceDialog({
         </Button>
       </DialogActions>
     </Dialog>
+    </TranslatedTextTree>
   );
 }
