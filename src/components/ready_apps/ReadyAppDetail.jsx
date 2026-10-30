@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Alert,
   Box,
@@ -55,6 +56,7 @@ function AppLogo({ app, size = 84 }) {
 
 function Meta({ label, value }) {
   return (
+    <TranslatedTextTree>
     <Box>
       <Typography
         variant="caption"
@@ -65,6 +67,7 @@ function Meta({ label, value }) {
       </Typography>
       <Typography sx={{ mt: .2, fontWeight: 850 }}>{value || "—"}</Typography>
     </Box>
+    </TranslatedTextTree>
   );
 }
 
