@@ -293,7 +293,7 @@ test("About page fills its Ready Apps visual section with branded marks and resp
   assert.match(about, /APPLICATION FLOW/);
   assert.match(about, /Data layer/);
   assert.match(about, /Public route/);
-  assert.match(about, /ArrowForwardRounded sx=\{\{ fontSize: 16, transform: \{ xs: "rotate\(90deg\)", sm: "none" \} \}\}/);
+  assert.match(about, /ArrowForwardRounded sx=\{\{ fontSize: 16, transform: \{ xs: "rotate\(90deg\)", sm: theme\.direction === "rtl" \? "rotate\(180deg\)" : "none" \} \}\}/);
 });
 
 test("dashboard shell and workspace header support narrow viewports consistently", () => {
