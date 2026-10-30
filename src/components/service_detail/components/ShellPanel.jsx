@@ -1792,7 +1792,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                         <Chip size="small" onClick={(e) => { e.stopPropagation(); setDryRun((v) => !v); }} label={dryRun ? "dry-run" : "live"} sx={{ height: 22, cursor: "pointer", color: dryRun ? "#e9bd69" : "#8fa0b0", bgcolor: dryRun ? "rgba(246,199,108,.1)" : "rgba(148,163,184,.06)" }} />
                       </Tooltip>
                       <Tooltip title={tr("Snippets")}><Button size="small" onClick={(e) => { e.stopPropagation(); setSnippetsOpen(true); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Snippets")}</Button></Tooltip>
-                      <Tooltip title={tr("Environment (masked")})}><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Env")}</Button></Tooltip>
+                      <Tooltip title={tr("Environment (masked)")}><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Env")}</Button></Tooltip>
                       <Tooltip title={tr("Activity / audit log")}><Button size="small" onClick={(e) => { e.stopPropagation(); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Audit")}</Button></Tooltip>
                       {health?.container?.running ? <Chip size="small" label={tr("healthy")} sx={{ height: 22, color: "#73c9a0", bgcolor: "rgba(53,211,153,.08)" }} /> : session ? <Chip size="small" label={tr("check")} onClick={(e) => { e.stopPropagation(); loadHealth(); }} sx={{ height: 22, cursor: "pointer", color: "#9ab0c4" }} /> : null}
                       <Tooltip title={tr(fullscreen ? "Exit fullscreen" : "Fullscreen")}>
@@ -2116,7 +2116,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           {tr(dryRun ? "Disable dry-run" : "Enable dry-run")}
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setSnippetsOpen(true); }}>
-          Snippets
+          {tr("Snippets")}
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); loadEnv(); }}>
           {tr("Environment")}
