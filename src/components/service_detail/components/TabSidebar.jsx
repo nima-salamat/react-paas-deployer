@@ -16,6 +16,7 @@ import SubjectIcon from "@mui/icons-material/Subject";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import TerminalRoundedIcon from "@mui/icons-material/TerminalRounded";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 const ALL_TABS = [
   { value: "overview", label: "Overview", icon: <SpaceDashboardRoundedIcon fontSize="small" /> },
@@ -37,6 +38,7 @@ export default function TabSidebar({
   serviceRunning,
   allowedTabs = null, // null = all tabs; array of tab values
 }) {
+  const { t } = useLocale();
   const theme = useTheme();
   const TABS = allowedTabs
     ? ALL_TABS.filter((tab) => allowedTabs.includes(tab.value))
@@ -106,7 +108,7 @@ export default function TabSidebar({
               value={tab.value}
               icon={tab.icon}
               iconPosition="start"
-              label={tab.label}
+              label={t(tab.label)}
             />
           ))}
         </Tabs>
@@ -158,7 +160,7 @@ export default function TabSidebar({
               />
               {selectedDeploy ? (
                 <Chip
-                  label={`Deploy: ${selectedDeploy.name || selectedDeploy.id}`}
+                  label={`${t("Deploy")}: ${selectedDeploy.name || selectedDeploy.id}`}
                   size="small"
                   variant="outlined"
                   sx={{ height: 22, fontSize: 11 }}
