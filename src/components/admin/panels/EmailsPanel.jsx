@@ -9,8 +9,8 @@ import PermissionGate from "../components/PermissionGate";
  * Gates access on the emails.manage rule.
  */
 export default function EmailsPanel() {
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <PermissionGate rule="emails.manage">
       <Stack spacing={2}>
         <Box>
