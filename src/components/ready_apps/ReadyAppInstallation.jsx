@@ -667,6 +667,7 @@ export default function ReadyAppInstallation() {
 function LiveUsage({ label, value }) {
   const percent = Math.max(0, Math.min(100, Number(value) || 0));
   return (
+    <TranslatedTextTree>
     <Box sx={{ minWidth: { sm: 180 }, flex: 1 }}>
       <Stack direction="row" justifyContent="space-between" spacing={1} sx={{ mb: 0.35 }}>
         <Typography variant="caption" sx={{ fontWeight: 700 }}>
@@ -682,6 +683,7 @@ function LiveUsage({ label, value }) {
         sx={{ height: 6, borderRadius: 3 }}
       />
     </Box>
+    </TranslatedTextTree>
   );
 }
 
