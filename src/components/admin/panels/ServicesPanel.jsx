@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Grid, IconButton, InputAdornment, MenuItem,
@@ -51,6 +52,7 @@ function statusColor(s) {
  *     (network optional). The form loads plans + the owner's networks.
  */
 export default function ServicesPanel({ setToast: setToastProp }) {
+  const { t } = useLocale();
   const pushToast = useToast();
   const setToast = setToastProp || pushToast;
   const SVC_API = svcApi();
@@ -296,7 +298,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
           <Grid key={label} size={{ xs: 6, sm: 3 }}>
             <DryPanel sx={{ p: 1.75, borderColor: alpha(resolveThemeColor(theme, color), 0.25) }}>
               <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1, lineHeight: 1 }}>
-                {label}
+                {t(label)}
               </Typography>
               <Typography variant="h5" fontWeight={800} sx={{ color: color || "text.primary" }}>
                 {val ?? "—"}
