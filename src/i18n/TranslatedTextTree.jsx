@@ -18,6 +18,10 @@ const TRANSLATABLE_PROPS = new Set([
   "buttonText",
   "aria-label",
   "alt",
+  "typeLabel",
+  "platformLabel",
+  "kindLabel",
+  "statusLabel",
 ]);
 
 function translateTextNode(value, t) {
