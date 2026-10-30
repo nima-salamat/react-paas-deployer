@@ -136,7 +136,7 @@ function AppCard({ app }) {
 
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: "auto", pt: 2.6 }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 700 }}>
-              {app.software_version ? "v" + app.software_version : "Managed runtime"}
+              {t(app.software_version ? "v" + app.software_version : "Managed runtime")}
             </Typography>
             <Stack direction="row" spacing={.55} alignItems="center" sx={{ color: "primary.main", fontWeight: 850 }}>
               <Typography variant="body2" sx={{ fontWeight: 850 }}>Install</Typography>
