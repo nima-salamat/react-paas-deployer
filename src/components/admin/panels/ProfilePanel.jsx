@@ -86,8 +86,8 @@ export default function ProfilePanel({ me: meProp, onMeUpdated }) {
   const isSuper = isSessionSuperuser();
   const isStaff = isSessionStaff();
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2.5} maxWidth={720}>
       <Box>
         <Typography variant="h5" fontWeight={800} gutterBottom>
