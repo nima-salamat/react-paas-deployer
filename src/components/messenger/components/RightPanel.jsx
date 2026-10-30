@@ -224,7 +224,7 @@ export default function RightPanel({
               <ListItemIcon><HourglassEmptyIcon fontSize="small" /></ListItemIcon>
               <ListItemText
                 primary={t("My join requests")}
-                secondary={myJoinRequests?.length ? `${myJoinRequests.filter((r) => r.status === "pending").length} pending` : t("None pending")}
+                secondary={myJoinRequests?.length ? `${myJoinRequests.filter((r) => r.status === "pending").length} ${t("pending")}` : t("None pending")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -283,7 +283,7 @@ export default function RightPanel({
                   : recoveryError
                     ? t("Recovery status could not be verified. Retry before relying on this device for encrypted history.")
                     : t("Set up an encrypted key backup to help restore message history if this browser or device is lost.")}
-              {Number.isFinite(matrixRecoveryState?.deviceCount) ? ` ${t("Active Matrix devices")} : ${matrixRecoveryState.deviceCount}.` : ""}
+              {Number.isFinite(matrixRecoveryState?.deviceCount) ? ` ${t("Active Matrix devices")}: ${matrixRecoveryState.deviceCount}.` : ""}
             </Alert>
             <Button fullWidth variant="contained" startIcon={<VpnKeyIcon />} onClick={onOpenSecureRecovery}>{t("Recovery key & encrypted backup")}</Button>
             <Button fullWidth variant="outlined" startIcon={<SecurityIcon />} onClick={onOpenSecureDevices}>{t("Manage secure devices")}</Button>
