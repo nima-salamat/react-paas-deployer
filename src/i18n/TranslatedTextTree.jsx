@@ -23,8 +23,7 @@ const TRANSLATABLE_PROPS = new Set([
 ]);
 
 function translateUiProp(value, t) {
-  // Only translate declared UI props. Raw rendered child strings may be
-  // service names, usernames, ticket subjects, documentation or other data.
+  // Only translate declared UI props. Raw rendered child strings may be service names, usernames, ticket subjects, documentation or other data.
   if (typeof value === "string") return value.trim() ? t(value) : value;
   if (Array.isArray(value)) return value.map((item) => translateUiProp(item, t));
   if (!isValidElement(value)) return value;
