@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, FormControl, InputLabel, MenuItem, Pagination, Select, Stack,
@@ -49,6 +50,7 @@ const EMPTY_FORM = {
 };
 
 export default function PlansPanel() {
+  const { t } = useLocale();
   const pushToast = useToast();
   const canManage = hasAnyRule("plans.manage");
   const API = useMemo(() => plansAdminApi(), []);
@@ -189,7 +191,7 @@ export default function PlansPanel() {
         <Box>
           <Typography variant="h5" fontWeight={800}>Resource Plans</Typography>
           <Typography variant="body2" color="text.secondary">
-            Resource and logging policy tiers offered to services. {canManage ? "Full CRUD enabled." : "Read-only — you need plans.manage to edit."}
+            {t("Resource and logging policy tiers offered to services.")} {canManage ? t("Full CRUD enabled.") : t("Read-only — you need plans.manage to edit.")}
           </Typography>
         </Box>
         <Stack direction="row" gap={1}>
@@ -253,7 +255,7 @@ export default function PlansPanel() {
 
       {/* Create / Edit dialog */}
       <Dialog open={Boolean(edit)} onClose={closeDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>{edit?.id ? "Edit resource plan" : "Create resource plan"}</DialogTitle>
+        <DialogTitle>{t(edit?.id ? "Edit resource plan" : "Create resource plan")}</DialogTitle>
         <DialogContent>
           <Stack gap={2} mt={1}>
             <FormControl size="small" fullWidth>
@@ -355,7 +357,7 @@ export default function PlansPanel() {
         <DialogActions>
           <Button onClick={closeDialog} disabled={busy}>Cancel</Button>
           <Button variant="contained" onClick={save} disabled={busy}>
-            {busy ? "Saving…" : edit?.id ? "Update" : "Create"}
+            {t(busy ? "Saving…" : edit?.id ? "Update" : "Create")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -379,7 +381,7 @@ export default function PlansPanel() {
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)} disabled={busy}>Cancel</Button>
           <Button color="error" variant="contained" onClick={confirmDelete} disabled={busy}>
-            {busy ? "Deleting…" : "Delete plan"}
+            {t(busy ? "Deleting…" : "Delete plan")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -464,18 +466,19 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
 }
 
 function LoggingSummary({ plan }) {
-  const retention = plan.log_retention_days == null ? "inherit" : String(plan.log_retention_days) + "d";
-  const storage = plan.log_storage_mb == null ? "inherit" : Number(plan.log_storage_mb).toLocaleString() + "MB";
-  const ingest = plan.log_ingest_bytes_per_sec == null ? "inherit" : Number(plan.log_ingest_bytes_per_sec).toLocaleString() + "B/s";
-  const persistent = plan.persistent_logging == null ? "inherit" : plan.persistent_logging ? "persist" : "no persist";
-  const realtime = plan.realtime_logging == null ? "inherit" : plan.realtime_logging ? "realtime" : "no realtime";
+  const { t } = useLocale();
+  const retention = plan.log_retention_days == null ? t("inherit") : String(plan.log_retention_days) + "d";
+  const storage = plan.log_storage_mb == null ? t("inherit") : Number(plan.log_storage_mb).toLocaleString() + "MB";
+  const ingest = plan.log_ingest_bytes_per_sec == null ? t("inherit") : Number(plan.log_ingest_bytes_per_sec).toLocaleString() + "B/s";
+  const persistent = plan.persistent_logging == null ? t("inherit") : plan.persistent_logging ? t("persist") : t("no persist");
+  const realtime = plan.realtime_logging == null ? t("inherit") : plan.realtime_logging ? t("realtime") : t("no realtime");
 
   return (    <TranslatedTextTree>
 
     <Typography variant="caption" color="text.secondary" component="span">
       {retention} · {storage} · {ingest}
       <br />
-      {persistent} · {realtime} · {plan.log_quota_behavior || "inherit"}
+      {persistent} · {realtime} · {t(plan.log_quota_behavior || "inherit")}
     </Typography>
     </TranslatedTextTree>
   );
