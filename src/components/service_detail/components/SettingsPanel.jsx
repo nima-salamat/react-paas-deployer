@@ -375,7 +375,7 @@ function VolumeCard({
                   startIcon={<LinkOffIcon fontSize="small" />}
                   sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
                 >
-                  Detach
+                  {t("Detach")}
                 </Button>
               </span>
             </Tooltip>
@@ -950,21 +950,21 @@ export default function SettingsPanel({
 
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960 }}>
-      {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ borderRadius: 2 }}>{t(error)}</Alert>}
       {volumeActionError ? (
-        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{volumeActionError}</Alert>
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{t(volumeActionError)}</Alert>
       ) : null}
-      {successMessage && <Alert severity="success" sx={{ borderRadius: 2 }}>{successMessage}</Alert>}
+      {successMessage && <Alert severity="success" sx={{ borderRadius: 2 }}>{t(successMessage)}</Alert>}
 
       {/* ═══════════════ NETWORK ═══════════════ */}
       <Paper id="network" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
           icon={<HubIcon fontSize="small" />}
-          title="Network"
-          subtitle="One private network can be attached to this service."
+          title={t("Network")}
+          subtitle={t("One private network can be attached to this service.")}
           action={
             <Button size="small" startIcon={<AddIcon />} variant="outlined" onClick={() => setCreateNetworkOpen(true)} sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}>
-              New
+              {t("New")}
             </Button>
           }
         />
@@ -982,14 +982,14 @@ export default function SettingsPanel({
         >
           <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" useFlexGap spacing={1}>
             <Box>
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>Currently attached</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>{t("Currently attached")}</Typography>
               <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                {networkName && networkName !== "—" ? networkName : "No network"}
+                {networkName && networkName !== "—" ? networkName : t("No network")}
               </Typography>
             </Box>
             {currentNetworkId && (
               <Button size="small" color="warning" variant="outlined" startIcon={<LinkOffIcon />} disabled={networkActionLoading} onClick={onDetachNetwork} sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}>
-                Detach
+                {t("Detach")}
               </Button>
             )}
           </Stack>
@@ -1001,13 +1001,13 @@ export default function SettingsPanel({
           onClick={() => setShowAllNetworks((v) => !v)}
           sx={{ mb: 1, textTransform: "none", fontWeight: 600 }}
         >
-          {showAllNetworks ? "Hide networks" : `Show all networks (${(availableNetworks || []).length})`}
+          {showAllNetworks ? t("Hide networks") : t("Show all networks") + ` (${(availableNetworks || []).length})`}
         </Button>
 
         <Collapse in={showAllNetworks}>
           <Stack spacing={1}>
             {(availableNetworks || []).length === 0 ? (
-              <Typography variant="body2" color="text.secondary">No networks yet. Create one with the New button.</Typography>
+              <Typography variant="body2" color="text.secondary">{t("No networks yet. Create one with the New button.")}</Typography>
             ) : (
               (availableNetworks || []).map((n) => {
                 const nid = String(n.id ?? n.pk ?? "");
@@ -1033,8 +1033,8 @@ export default function SettingsPanel({
       <Paper id="database" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
           icon={<LuDatabase size={18} />}
-          title="Databases"
-          subtitle="Choose a managed database resource or an existing database service. The backend checks ownership and shared private-network configuration; credentials stay in the backend secret store."
+          title={t("Databases")}
+          subtitle={t("Choose a managed database resource or an existing database service. The backend checks ownership and shared private-network configuration; credentials stay in the backend secret store.")}
         />
         {databaseFormError ? <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{databaseFormError}</Alert> : null}
         {databaseLoading ? (
@@ -1115,7 +1115,7 @@ export default function SettingsPanel({
               </Alert>
             ) : (
             <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, bgcolor: "background.default" }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>Connect a database resource or service</Typography>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>{t("Connect a database resource or service")}</Typography>
               {(databaseResources || []).length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   {catalogDatabaseDependencies.length > 0
@@ -1152,8 +1152,8 @@ export default function SettingsPanel({
                     <TextField size="small" fullWidth label={t("Alias")} value={databaseAlias} onChange={(e) => setDatabaseAlias(e.target.value)} disabled={databaseActionLoading} />
                     <TextField size="small" fullWidth label={t("Environment prefix")} value={databasePrefix} onChange={(e) => setDatabasePrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))} disabled={databaseActionLoading} />
                     <TextField select size="small" fullWidth label={t("Access")} value={databaseAccessMode} onChange={(e) => setDatabaseAccessMode(e.target.value)} disabled={databaseActionLoading}>
-                      <MenuItem value="rw">Read / write</MenuItem>
-                      <MenuItem value="ro">Read only</MenuItem>
+                      <MenuItem value="rw">{t("Read / write")}</MenuItem>
+                      <MenuItem value="ro">{t("Read only")}</MenuItem>
                     </TextField>
                   </Stack>
                   <Button
@@ -1189,8 +1189,8 @@ export default function SettingsPanel({
       <Paper id="volume" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
           icon={<VolumeIcon size={18} />}
-          title="Volumes"
-          subtitle="Exclusive storage for this service. Volumes are not shareable."
+          title={t("Volumes")}
+          subtitle={t("Exclusive storage for this service. Volumes are not shareable.")}
           action={
             <Button
               size="small" startIcon={<AddIcon />} variant="outlined"
@@ -1198,7 +1198,7 @@ export default function SettingsPanel({
               disabled={(remainingMb != null && remainingMb <= 0) || !canAdd}
               sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
             >
-              New
+              {t("New")}
             </Button>
           }
         />
@@ -1211,19 +1211,18 @@ export default function SettingsPanel({
         >
           <Typography variant="body2" sx={{ lineHeight: 1.45 }}>
             {effectiveCanMutate
-              ? "Quota counts every volume owned by this service (attached and soft-detached). Name/size/path lock after Docker provision. Soft-detached volumes can be deleted anytime; mounted ones need an idle runtime."
-              : effectiveMutateReason ||
-                "Stop the service before changing volumes. If a container still exists, use Danger zone → Remove runtime."}
+              ? t("Quota counts every volume owned by this service (attached and soft-detached). Name/size/path lock after Docker provision. Soft-detached volumes can be deleted anytime; mounted ones need an idle runtime.")
+              : t(effectiveMutateReason || "Stop the service before changing volumes. If a container still exists, use Danger zone → Remove runtime.")}
           </Typography>
         </Alert>
 
         {/* Attached (mounted) volumes — split by is_mounted, not parent buckets */}
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>
-          Attached ({mountedList.length})
+          {t("Attached")} ({mountedList.length})
         </Typography>
         {mountedList.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            No volumes mounted on this service.
+            {t("No volumes mounted on this service.")}
           </Typography>
         ) : (
           <Stack spacing={1} sx={{ mb: 2 }}>
@@ -1257,15 +1256,15 @@ export default function SettingsPanel({
           sx={{ mb: 1, textTransform: "none", fontWeight: 600 }}
         >
           {showAvailableVolumes
-            ? "Hide available volumes"
-            : `Show available volumes (${unmountedList.length})`}
+            ? t("Hide available volumes")
+            : t("Show available volumes") + ` (${unmountedList.length})`}
         </Button>
 
         <Collapse in={showAvailableVolumes}>
           <Stack spacing={1}>
             {unmountedList.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                No unmounted volumes. Create one with the New button.
+                {t("No unmounted volumes. Create one with the New button.")}
               </Typography>
             ) : (
               unmountedList.map((v) => {
@@ -1299,11 +1298,11 @@ export default function SettingsPanel({
       <Paper id="plan" elevation={0} sx={{ scrollMarginTop: { xs: 12, md: 16 }, p: { xs: 2, sm: 2.5 }, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}>
         <SectionHeader
           icon={<SellOutlinedIcon fontSize="small" />}
-          title="Plan"
+          title={t("Plan")}
           subtitle={
             currentPlatform
-              ? `Plans for platform "${currentPlatform}". Current plan cannot be re-selected.`
-              : "Choose a plan for this service."
+              ? t("Plans for platform") + ` "${currentPlatform}". ` + t("Current plan cannot be re-selected.")
+              : t("Choose a plan for this service.")
           }
           action={
             <Button
@@ -1314,7 +1313,7 @@ export default function SettingsPanel({
               disabled={plansLoading}
               sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}
             >
-              {plansLoading ? "Loading…" : "Refresh plans"}
+              {t(plansLoading ? "Loading…" : "Refresh plans")}
             </Button>
           }
         />
@@ -1325,7 +1324,7 @@ export default function SettingsPanel({
             sx={{ mb: 1.5, borderRadius: 1.5 }}
             action={
               <Button color="inherit" size="small" onClick={() => onRefreshPlans?.()} disabled={plansLoading}>
-                Retry
+                {t("Retry")}
               </Button>
             }
           >
@@ -1338,7 +1337,7 @@ export default function SettingsPanel({
             <CircularProgress size={28} />
           </Box>
         ) : samePlatformPlans.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">No plans are available for this platform. Refresh to try again or check that plans are configured for this runtime.</Typography>
+          <Typography variant="body2" color="text.secondary">{t("No plans are available for this platform. Refresh to try again or check that plans are configured for this runtime.")}</Typography>
         ) : (
           <>
             <Box
@@ -1375,7 +1374,7 @@ export default function SettingsPanel({
                     disabled={!selectedPlanId || String(selectedPlanId) === currentPlanId}
                   />
                 }
-                label={<Typography variant="body2">Apply immediately (redeploy if a deploy is selected)</Typography>}
+                label={<Typography variant="body2">{t("Apply immediately (redeploy if a deploy is selected)")}</Typography>}
               />
               <Button
                 variant="contained" size="medium"
@@ -1407,8 +1406,8 @@ export default function SettingsPanel({
       >
         <SectionHeader
           icon={<DeleteIcon fontSize="small" color="error" />}
-          title="Danger zone"
-          subtitle="Destructive actions. Runtime must be removed before volume topology changes."
+          title={t("Danger zone")}
+          subtitle={t("Destructive actions. Runtime must be removed before volume topology changes.")}
         />
 
         <Stack spacing={1.5}>
@@ -1482,7 +1481,7 @@ export default function SettingsPanel({
         fullWidth maxWidth="xs"
         PaperProps={{ sx: { borderRadius: 2.5 } }}
       >
-        <DialogTitle sx={{ fontWeight: 800 }}>Create network</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800 }}>{t("Create network")}</DialogTitle>
         <DialogContent>
           <Stack spacing={1.5} sx={{ mt: 0.5 }}>
             <TextField autoFocus fullWidth size="small" label={t("Name")} value={newNetworkName} onChange={(e) => setNewNetworkName(e.target.value)} />
@@ -1490,7 +1489,7 @@ export default function SettingsPanel({
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateNetworkOpen(false)} disabled={creatingNetwork} sx={{ textTransform: "none" }}>Cancel</Button>
+          <Button onClick={() => setCreateNetworkOpen(false)} disabled={creatingNetwork} sx={{ textTransform: "none" }}>{t("Cancel")}</Button>
           <Button variant="contained" onClick={handleCreateNetwork} disabled={!newNetworkName.trim() || creatingNetwork} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5 }}>
             {creatingNetwork ? "Creating..." : "Create"}
           </Button>
@@ -1504,7 +1503,7 @@ export default function SettingsPanel({
         fullWidth maxWidth="xs"
         PaperProps={{ sx: { borderRadius: 2.5 } }}
       >
-        <DialogTitle sx={{ fontWeight: 800 }}>Create volume</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800 }}>{t("Create volume")}</DialogTitle>
         <DialogContent>
           <Stack spacing={1.5} sx={{ mt: 0.5 }}>
             {storageNormalized && (
@@ -1536,13 +1535,13 @@ export default function SettingsPanel({
               select fullWidth size="small" label={t("Access mode")} value={newVolumeMode}
               onChange={(e) => setNewVolumeMode(e.target.value)}
             >
-              <MenuItem value="rw">Read-write (rw)</MenuItem>
-              <MenuItem value="ro">Read-only (ro)</MenuItem>
+              <MenuItem value="rw">{t("Read-write (rw)")}</MenuItem>
+              <MenuItem value="ro">{t("Read-only (ro)")}</MenuItem>
             </TextField>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateVolumeOpen(false)} disabled={creatingVolume} sx={{ textTransform: "none" }}>Cancel</Button>
+          <Button onClick={() => setCreateVolumeOpen(false)} disabled={creatingVolume} sx={{ textTransform: "none" }}>{t("Cancel")}</Button>
           <Button
             variant="contained" onClick={handleCreateVolume}
             disabled={
@@ -1565,11 +1564,11 @@ export default function SettingsPanel({
         maxWidth="xs"
         PaperProps={{ sx: { borderRadius: 2.5 } }}
       >
-        <DialogTitle sx={{ fontWeight: 800 }}>Edit volume</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800 }}>{t("Edit volume")}</DialogTitle>
         <DialogContent>
           <Stack spacing={1.5} sx={{ mt: 0.5 }}>
             <Alert severity="info" sx={{ borderRadius: 1.5 }}>
-              Metadata can be changed only while this volume is <strong>not</strong> provisioned in Docker.
+              {t("Metadata can be changed only while this volume is")} <strong>{t("not")}</strong> {t("provisioned in Docker.")}
               After the first deploy, name/size/path/mode are locked.
             </Alert>
             {editVolumeError && (
@@ -1610,8 +1609,8 @@ export default function SettingsPanel({
               value={editVolumeForm.default_mode}
               onChange={(e) => setEditVolumeForm((p) => ({ ...p, default_mode: e.target.value }))}
             >
-              <MenuItem value="rw">Read-write (rw)</MenuItem>
-              <MenuItem value="ro">Read-only (ro)</MenuItem>
+              <MenuItem value="rw">{t("Read-write (rw)")}</MenuItem>
+              <MenuItem value="ro">{t("Read-only (ro)")}</MenuItem>
             </TextField>
           </Stack>
         </DialogContent>
@@ -1646,7 +1645,7 @@ export default function SettingsPanel({
 
       {/* ═══════════ Delete Confirm Dialog ═══════════ */}
       <Dialog open={deleteVolumeDialog.open} onClose={() => !deleteVolumeDialog.loading && setDeleteVolumeDialog({ open: false, volume: null, loading: false })} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 2.5 } }}>
-        <DialogTitle sx={{ fontWeight: 800 }}>Delete volume</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800 }}>{t("Delete volume")}</DialogTitle>
         <DialogContent>
           <Typography>
             Are you sure you want to delete <strong>"{deleteVolumeDialog.volume?.name}"</strong>? This action cannot be undone.
@@ -1670,11 +1669,11 @@ export default function SettingsPanel({
         fullWidth
         PaperProps={{ sx: { borderRadius: 2.5 } }}
       >
-        <DialogTitle sx={{ fontWeight: 800 }}>Remove container & image?</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800 }}>{t("Remove container & image?")}</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 1 }}>
             This will force-stop and delete the Docker container and related images for this service.
-            Volumes on disk are <strong>not</strong> deleted.
+            {t("Volumes on disk are")} <strong>{t("not")}</strong> {t("deleted.")}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             After removal you can attach, detach, or edit volumes that are not yet provisioned in Docker.
@@ -1709,7 +1708,7 @@ export default function SettingsPanel({
         fullWidth
         PaperProps={{ sx: { borderRadius: 2.5 } }}
       >
-        <DialogTitle sx={{ fontWeight: 800, color: "error.main" }}>Delete service?</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: "error.main" }}>{t("Delete service?")}</DialogTitle>
         <DialogContent>
           {deleteServiceError ? (
             <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{deleteServiceError}</Alert>
