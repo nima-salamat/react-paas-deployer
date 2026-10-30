@@ -29,7 +29,8 @@ const API_ROOT =
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
 
 function AppLogo({ app, size = 84 }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <Box
       sx={(theme) => ({
         width: size,
@@ -51,12 +52,13 @@ function AppLogo({ app, size = 84 }) {
     >
       <ReadyAppBrandMark app={app} size={size * 0.68} />
     </Box>
+    </TranslatedTextTree>
   );
 }
 
 function Meta({ label, value }) {
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Box>
       <Typography
         variant="caption"
@@ -143,8 +145,8 @@ export default function ReadyAppDetail() {
     app.variants?.[0];
   const components = app.managed_components || [];
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <>
       <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
         <Stack spacing={3}>
