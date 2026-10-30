@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, IconButton, InputAdornment, LinearProgress, Pagination, Stack,
@@ -596,6 +597,7 @@ export default function TablesPanel() {
                       const field = fields.find((f) => f.name === k);
                       const isFK = field?.is_relation && field?.related;
                       return (
+    <TranslatedTextTree>
                         <tr key={k} style={{ borderTop: DRY_BORDER_LIGHT }}>
                           <DryTd sx={{ width: 200, bgcolor: "action.hover" }}>
                             <Typography variant="caption" fontWeight={700}>{field?.label || translate(k)}</Typography>
@@ -637,6 +639,7 @@ export default function TablesPanel() {
         </DialogActions>
       </Dialog>
     </Stack>
+    </TranslatedTextTree>
   );
 }
 
