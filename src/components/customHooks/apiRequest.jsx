@@ -45,6 +45,9 @@ function localizeApiError(error) {
   if (error?.response?.data) {
     error.response.data = localizeApiPayload(error.response.data, "errors");
   }
+  if (error?.message && getPreferredLanguage() === "fa") {
+    error.message = translateText(error.message, "fa");
+  }
   return error;
 }
 const REFRESH_URLS = [
