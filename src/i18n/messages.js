@@ -1260,6 +1260,7 @@ Object.assign(fa, {
   "Groups": "گروه‌ها",
   "Join with invite": "پیوستن با دعوت‌نامه",
   "Preferences": "ترجیحات",
+  "Group info": "اطلاعات گروه",
   "Camera & microphone": "دوربین و میکروفون",
   "Devices for voice and video messages": "دستگاه‌های پیام صوتی و تصویری",
   "Appearance": "ظاهر",
