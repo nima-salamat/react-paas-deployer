@@ -1,4 +1,5 @@
 import React, { memo, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { Link as RouterLink } from "react-router-dom";
 import { alpha } from "@mui/material/styles";
 import {
@@ -453,6 +454,7 @@ function ServiceItem({
 
   /* ─── Card layout ─── */
   return (
+    <TranslatedTextTree>
     <>
       {myPermsDialog}
       <Paper elevation={0} onMouseEnter={() => onPrefetch?.(s)} onFocus={() => onPrefetch?.(s)}
@@ -496,6 +498,7 @@ function ServiceItem({
         </Box>
       </Paper>
     </>
+    </TranslatedTextTree>
   );
 }
 
