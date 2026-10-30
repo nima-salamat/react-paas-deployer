@@ -134,23 +134,23 @@ export default function ServicesPanel({ setToast: setToastProp }) {
     try {
       if (action === "start") {
         await apiRequest({ method: "POST", url: `${SVC_API}/admin/start_service/`, data: { service_id: serviceId } });
-        setToast?.("Start queued");
+        setToast?.(t("Start queued"));
       } else if (action === "stop") {
         await apiRequest({ method: "POST", url: `${SVC_API}/admin/stop_service/`, data: { service_id: serviceId } });
-        setToast?.("Stop queued");
+        setToast?.(t("Stop queued"));
       } else if (action === "restart") {
         await apiRequest({ method: "POST", url: `${SVC_API}/admin/stop_service/`, data: { service_id: serviceId } });
         setTimeout(async () => {
           try { await apiRequest({ method: "POST", url: `${SVC_API}/admin/start_service/`, data: { service_id: serviceId } }); } catch { /* */ }
         }, 2500);
-        setToast?.("Restart queued");
+        setToast?.(t("Restart queued"));
       } else if (action === "purge") {
         await apiRequest({ method: "POST", url: `${SVC_API}/admin/purge_service_runtime/`, data: { service_id: serviceId } });
-        setToast?.("Runtime purged");
+        setToast?.(t("Runtime purged"));
       } else if (action === "delete") {
-        if (!window.confirm("Delete this service? Its runtime will be purged first.")) return;
+        if (!window.confirm(t("Delete this service? Its runtime will be purged first."))) return;
         await apiRequest({ method: "DELETE", url: `${SVC_API}/admin/services/${serviceId}/` });
-        setToast?.("Service deleted");
+        setToast?.(t("Service deleted"));
         setSvcDetail(null);
       }
       await loadServices();
@@ -158,7 +158,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         openSvcDetail(svcDetail);
       }
     } catch (e) {
-      setToast?.(e?.response?.data?.detail || "Action failed");
+      setToast?.(e?.response?.data?.detail || t("Action failed"));
     } finally {
       setSvcActionBusy(null);
     }
@@ -271,7 +271,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         <Box>
           <Typography variant="h5" fontWeight={800}>Services</Typography>
           <Typography variant="body2" color="text.secondary">
-            Inspect any user's services. {canManage ? "You can manage runtime and configuration." : canDelete ? "You can delete services, but runtime and configuration changes are disabled." : "Read-only access."}
+            {t("Inspect any user's services.")} {canManage ? t("You can manage runtime and configuration.") : canDelete ? t("You can delete services, but runtime and configuration changes are disabled.") : t("Read-only access.")}
           </Typography>
         </Box>
         <Stack direction="row" gap={1}>
@@ -583,7 +583,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
           <Button variant="contained" onClick={submitCreate}
             disabled={createBusy || !createOwner || !createName.trim() || !createPlan}
             sx={{ borderRadius: 0, textTransform: "none", fontWeight: 700 }}>
-            {createBusy ? "Creating…" : "Create service"}
+            {t(createBusy ? "Creating…" : "Create service")}
           </Button>
         </DialogActions>
       </Dialog>
