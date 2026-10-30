@@ -466,7 +466,7 @@ test("dashboard theme, cursor selection, service identity badges and wizard icon
   assert.match(serviceItem, /ServicePlatformBadge/);
   assert.match(globalControls, /ServicePlatformBadge/);
   assert.ok(globalControls.includes('icon={<VolumeIcon size={16} />}'));
-  assert.ok(globalControls.includes('label={`Volumes: ${volumeCount}`}'));
+  assert.ok(globalControls.includes('label={`${t("Volumes")}: ${volumeCount}`}'));
   assert.match(globalControls, /servicePlatformKey/);
 
   assert.match(networks, /HubIcon/);
