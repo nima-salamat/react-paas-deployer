@@ -203,12 +203,15 @@ export default function FloatingNav({
     ? (anchorOffset?.left ?? anchorOffset?.right ?? 24)
     : (anchorOffset?.right ?? anchorOffset?.left ?? 24);
 
-  const containerSx =
+  // Use inline physical coordinates: MUI's RTL Stylis plugin otherwise flips
+  // left/right and places this navigation on the opposite edge.
+  const containerStyle =
     position === "bottom-center"
-      ? { left: "50%", transform: "translateX(-50%)", right: "auto" }
+      ? { left: "50%", right: "auto", bottom, transform: "translateX(-50%)" }
       : {
-          [isRTL ? "left" : "right"]: horizontalOffset,
-          [isRTL ? "right" : "left"]: "auto",
+          left: isRTL ? horizontalOffset : "auto",
+          right: isRTL ? "auto" : horizontalOffset,
+          bottom,
         };
 
   // لیست آیتم‌ها برای کاربران مهمان (لاگین نکرده)
@@ -257,23 +260,22 @@ export default function FloatingNav({
         position: "fixed",
         // Stay above the full-screen Messenger shell, but below MUI modal/snackbar layers.
         zIndex: 1250,
-        bottom,
-        ...containerSx,
         pointerEvents: "none",
       }}
+      style={containerStyle}
     >
       <ClickAwayListener onClickAway={() => open && close()}>
         <Box
           sx={{
             display: "flex",
             flexDirection: "column",
-            alignItems: isRTL ? "flex-start" : "flex-end",
+            alignItems: "flex-end",
             pointerEvents: "auto",
           }}
         >
           <Collapse in={open} timeout={220} unmountOnExit>
             {/* استک حاوی دکمه‌های کشیده شونده */}
-            <Stack spacing={1} sx={{ mb: 2, alignItems: isRTL ? "flex-start" : "flex-end" }}>
+            <Stack spacing={1} sx={{ mb: 2, alignItems: "flex-end" }}>
               {items.map((item, index) => (
                 <Button
                   key={index}
