@@ -1040,7 +1040,8 @@ export default function ServicesListMui({
     [fetchShares, showAlert]
   );
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 } }}>
       <ServicesToolbar
         query={searchDraft}
@@ -1205,7 +1206,6 @@ export default function ServicesListMui({
                 const s = entry.service;
                 const shareMeta = entry.shareMeta;
                 return (
-    <TranslatedTextTree>
                 <Box
                   key={shareMeta?.shareId || getKey(s)}
                   sx={{
