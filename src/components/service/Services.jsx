@@ -2,6 +2,7 @@
  * Services list page — modular entry.
  * Submodules live in ./services/
  */
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import React, {
   useCallback,
   useEffect,
