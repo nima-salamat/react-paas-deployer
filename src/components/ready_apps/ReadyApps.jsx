@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Alert,
   Box,
@@ -68,6 +69,7 @@ function AppLogo({ app, size = 58 }) {
 
 function AppCard({ app }) {
   return (
+    <TranslatedTextTree>
     <Card
       variant="outlined"
       sx={(theme) => ({
@@ -140,6 +142,7 @@ function AppCard({ app }) {
         </CardContent>
       </CardActionArea>
     </Card>
+    </TranslatedTextTree>
   );
 }
 
