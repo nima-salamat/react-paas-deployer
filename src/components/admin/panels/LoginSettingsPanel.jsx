@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Alert, Box, Button, Chip, CircularProgress, Divider, FormControlLabel,
   Paper, Stack, Switch, TextField, Typography,
@@ -163,6 +164,7 @@ export default function LoginSettingsPanel() {
   }
 
   return (
+    <TranslatedTextTree>
     <PermissionGate anyOf={["login_settings.view", "login_settings.manage"]}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} gap={1.5} mb={2}>
         <Box>
@@ -255,6 +257,7 @@ export default function LoginSettingsPanel() {
         )}
       </Stack>
     </PermissionGate>
+    </TranslatedTextTree>
   );
 }
 
