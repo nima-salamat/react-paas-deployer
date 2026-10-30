@@ -779,3 +779,86 @@ html[dir="rtl"] .MuiButton-endIcon {
   margin-right: 8px;
   margin-left: -4px;
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Public marketing pages: refined Persian typography and RTL composition      */
+/* -------------------------------------------------------------------------- */
+html[dir="rtl"] .public-marketing-page {
+  font-family: "Vazirmatn", "Noto Sans Arabic", Tahoma, system-ui, sans-serif;
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+html[dir="rtl"] .public-marketing-page .MuiTypography-root {
+  letter-spacing: 0 !important;
+  line-height: 1.9;
+  text-align: right;
+  text-wrap: pretty;
+}
+
+html[dir="rtl"] .public-marketing-page h1.MuiTypography-root {
+  font-size: clamp(2.15rem, 5.4vw, 4.7rem) !important;
+  line-height: 1.34 !important;
+  font-weight: 900;
+  max-width: 100%;
+}
+
+html[dir="rtl"] .public-marketing-page h2.MuiTypography-root {
+  font-size: clamp(1.65rem, 3.9vw, 3.25rem) !important;
+  line-height: 1.42 !important;
+  font-weight: 900;
+}
+
+html[dir="rtl"] .public-marketing-page h3.MuiTypography-root {
+  line-height: 1.55 !important;
+}
+
+html[dir="rtl"] .public-marketing-page .MuiTypography-overline,
+html[dir="rtl"] .public-marketing-page .MuiChip-label {
+  letter-spacing: 0 !important;
+  line-height: 1.8;
+  text-transform: none;
+}
+
+html[dir="rtl"] .public-marketing-page .MuiButton-root {
+  letter-spacing: 0 !important;
+  line-height: 1.8;
+  font-weight: 750;
+}
+
+html[dir="rtl"] .public-marketing-page .MuiButton-endIcon [data-testid="ArrowForwardRoundedIcon"],
+html[dir="rtl"] .public-marketing-page [data-testid="ArrowForwardRoundedIcon"] {
+  transform: rotate(180deg);
+}
+
+html[dir="rtl"] .public-home-page .home-reading-progress {
+  right: 0;
+  left: auto !important;
+}
+
+html[dir="rtl"] .public-home-page .home-reading-progress > .MuiBox-root {
+  margin-left: auto;
+}
+
+html[dir="rtl"] .public-marketing-page .MuiAccordionSummary-content {
+  margin-inline: 0;
+}
+
+html[dir="rtl"] .public-site-footer .MuiTypography-root {
+  letter-spacing: 0 !important;
+  line-height: 1.9;
+}
+
+html[dir="rtl"] .public-site-footer .MuiLink-root {
+  text-align: right;
+}
+
+@media (max-width: 600px) {
+  html[dir="rtl"] .public-marketing-page h1.MuiTypography-root {
+    font-size: clamp(2rem, 9vw, 3.2rem) !important;
+  }
+
+  html[dir="rtl"] .public-marketing-page h2.MuiTypography-root {
+    font-size: clamp(1.55rem, 7vw, 2.35rem) !important;
+  }
+}

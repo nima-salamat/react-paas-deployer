@@ -69,9 +69,9 @@ const PLATFORM_AREAS = [
 ];
 
 function SectionHeading({ eyebrow, title, body, align = "left" }) {
-  const { t } = useLocale();
+  const { t, isRTL } = useLocale();
   return (
-    <Box sx={{ textAlign: align, maxWidth: align === "center" ? 780 : 720 }}>
+    <Box sx={{ textAlign: align === "center" ? "center" : isRTL ? "right" : align, maxWidth: align === "center" ? 780 : 720 }}>
       <Typography
         variant="overline"
         component="p"
@@ -288,7 +288,7 @@ function ArchitectureVisual() {
                       py: { xs: 0, sm: 0 },
                     }}
                   >
-                    <ArrowForwardRounded sx={{ fontSize: 18, transform: { xs: "rotate(90deg)", sm: "none" }, opacity: 0.8 }} />
+                    <ArrowForwardRounded sx={{ fontSize: 18, transform: { xs: "rotate(90deg)", sm: theme.direction === "rtl" ? "rotate(180deg)" : "none" }, opacity: 0.8 }} />
                   </Box>
                 ) : null}
               </React.Fragment>
@@ -358,7 +358,7 @@ function ArchitectureVisual() {
                     <Icon sx={{ color: "primary.main", fontSize: 15, flexShrink: 0 }} />
                     <Typography sx={{ fontSize: ".7rem", fontWeight: 850 }}>{t(name)}</Typography>
                   </Stack>
-                  <Typography sx={{ pl: 2.55, mt: 0.3, color: "text.secondary", fontSize: ".63rem", overflowWrap: "anywhere" }}>
+                  <Typography sx={{ pl: theme.direction === "rtl" ? 0 : 2.55, pr: theme.direction === "rtl" ? 2.55 : 0, mt: 0.3, color: "text.secondary", fontSize: ".63rem", overflowWrap: "anywhere" }}>
                     {t(detail)}
                   </Typography>
                 </Box>
@@ -376,7 +376,7 @@ function ArchitectureVisual() {
             {["CONFIGURE", "DEPLOY", "OPERATE"].map((label, index) => (
               <React.Fragment key={label}>
                 <Typography sx={{ color: "text.secondary", fontSize: ".61rem", fontWeight: 900, letterSpacing: ".1em" }}>
-                  {label}
+                  {t(label)}
                 </Typography>
                 {index < 2 ? <ArrowForwardRounded sx={{ color: alpha(theme.palette.primary.main, 0.72), fontSize: 14 }} /> : null}
               </React.Fragment>
@@ -394,7 +394,7 @@ export default function AboutUs() {
   const dark = theme.palette.mode === "dark";
 
   return (
-    <Box sx={{ bgcolor: "background.default", overflowX: "clip" }}>
+    <Box className="public-marketing-page public-about-page" sx={{ bgcolor: "background.default", overflowX: "clip" }}>
       <Box
         component="section"
         sx={{
@@ -696,7 +696,7 @@ export default function AboutUs() {
                             aria-hidden="true"
                             sx={{ display: "grid", placeItems: "center", color: "primary.main", flexShrink: 0 }}
                           >
-                            <ArrowForwardRounded sx={{ fontSize: 16, transform: { xs: "rotate(90deg)", sm: "none" } }} />
+                            <ArrowForwardRounded sx={{ fontSize: 16, transform: { xs: "rotate(90deg)", sm: theme.direction === "rtl" ? "rotate(180deg)" : "none" } }} />
                           </Box>
                         ) : null}
                       </React.Fragment>
@@ -796,9 +796,9 @@ export default function AboutUs() {
                     }}
                   >
                     <Icon sx={{ color: "primary.main", fontSize: 20 }} />
-                    <Typography sx={{ mt: .7, fontWeight: 900 }}>{title}</Typography>
+                    <Typography sx={{ mt: .7, fontWeight: 900 }}>{t(title)}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: .35, lineHeight: 1.6 }}>
-                      {body}
+                      {t(body)}
                     </Typography>
                   </Box>
                 ))}

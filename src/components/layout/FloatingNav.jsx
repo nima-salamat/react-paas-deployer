@@ -25,6 +25,7 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 
 import { motion } from "framer-motion";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
 
@@ -90,6 +91,7 @@ export default function FloatingNav({
   position = "bottom-right",
   anchorOffset = { bottom: 24, right: 24 },
 }) {
+  const { t, isRTL } = useLocale();
   const theme = useTheme();
   const isSm = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
@@ -110,15 +112,18 @@ export default function FloatingNav({
   useEffect(() => {
     const sync = () => setLoggedIn(readLoggedIn());
 
+    const handleStorage = (event) => {
+      if (event.key === "access" || event.key === "refresh") sync();
+    };
+
     window.addEventListener("auth-changed", sync);
     window.addEventListener("auth", sync);
-    window.addEventListener("storage", (e) => {
-      if (e.key === "access" || e.key === "refresh") sync();
-    });
+    window.addEventListener("storage", handleStorage);
 
     return () => {
       window.removeEventListener("auth-changed", sync);
       window.removeEventListener("auth", sync);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
@@ -194,12 +199,17 @@ export default function FloatingNav({
   };
 
   const bottom = anchorOffset?.bottom ?? 24;
-  const right = anchorOffset?.right ?? 24;
+  const horizontalOffset = isRTL
+    ? (anchorOffset?.left ?? anchorOffset?.right ?? 24)
+    : (anchorOffset?.right ?? anchorOffset?.left ?? 24);
 
   const containerSx =
     position === "bottom-center"
       ? { left: "50%", transform: "translateX(-50%)", right: "auto" }
-      : { right, left: "auto" };
+      : {
+          [isRTL ? "left" : "right"]: horizontalOffset,
+          [isRTL ? "right" : "left"]: "auto",
+        };
 
   // لیست آیتم‌ها برای کاربران مهمان (لاگین نکرده)
   const guestItems = [
@@ -257,13 +267,13 @@ export default function FloatingNav({
           sx={{
             display: "flex",
             flexDirection: "column",
-            alignItems: "flex-end",
+            alignItems: isRTL ? "flex-start" : "flex-end",
             pointerEvents: "auto",
           }}
         >
           <Collapse in={open} timeout={220} unmountOnExit>
             {/* استک حاوی دکمه‌های کشیده شونده */}
-            <Stack spacing={1} sx={{ mb: 2, alignItems: "flex-end" }}>
+            <Stack spacing={1} sx={{ mb: 2, alignItems: isRTL ? "flex-start" : "flex-end" }}>
               {items.map((item, index) => (
                 <Button
                   key={index}
@@ -322,14 +332,14 @@ export default function FloatingNav({
                     className="nav-label"
                     sx={{
                       opacity: isSm ? 1 : 0, // در موبایل شفافیت کامل باشد تا نوشته پنهان نشود
-                      pr: 0.5,
-                      pl: 2.5,
+                      paddingInlineStart: 2.5,
+                      paddingInlineEnd: 0.5,
                       fontWeight: 600,
                       fontSize: "0.875rem",
                       transition: "opacity 0.2s ease 0.1s",
                     }}
                   >
-                    {item.label}
+                    {t(item.label)}
                   </Box>
                 </Button>
               ))}
@@ -337,15 +347,15 @@ export default function FloatingNav({
           </Collapse>
 
           <Tooltip
-            title={open ? "Close menu" : loggedIn ? "Quick navigation" : "Account & navigation"}
-            placement="left"
+            title={t(open ? "Close menu" : loggedIn ? "Quick navigation" : "Account & navigation")}
+            placement={isRTL ? "right" : "left"}
           >
             <Fab
               onClick={toggle}
               size={isSm ? "medium" : "large"}
               color="primary"
               aria-expanded={open}
-              aria-label={open ? "Close quick menu" : "Open quick menu"}
+              aria-label={t(open ? "Close quick menu" : "Open quick menu")}
               sx={{
                 pointerEvents: "auto",
                 boxShadow:

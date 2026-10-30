@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import { Link as RouterLink, useLocation } from "react-router-dom";
 import GitHubIcon from "@mui/icons-material/GitHub";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const GITHUB_API = "https://github.com/nima-salamat/django-paas-deployer";
 const GITHUB_FRONTEND = "https://github.com/nima-salamat/react-paas-deployer";
@@ -50,6 +51,7 @@ const thinLinks = [
 ];
 
 const Footer = () => {
+  const { t } = useLocale();
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
   const year = new Date().getFullYear();
@@ -73,7 +75,7 @@ const Footer = () => {
   /* ── Thin footer: one compact row for app / inner pages ── */
   if (!isFullFooter) {
     return (
-      <Box component="footer" sx={surface}>
+      <Box component="footer" className="public-site-footer" sx={surface}>
         <Container maxWidth="xl">
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -122,7 +124,7 @@ const Footer = () => {
                   underline="hover"
                   sx={linkSx}
                 >
-                  {link.label}
+                  {t(link.label)}
                 </MuiLink>
               ))}
             </Stack>
@@ -183,7 +185,7 @@ const Footer = () => {
                   color: "text.primary",
                 }}
               >
-                {column.heading}
+                {t(column.heading)}
               </Typography>
 
               <Stack spacing={0.75}>
@@ -212,7 +214,7 @@ const Footer = () => {
                     {link.external && (
                       <GitHubIcon sx={{ fontSize: 15, opacity: 0.7 }} />
                     )}
-                    {link.label}
+                    {t(link.label)}
                   </MuiLink>
                 ))}
               </Stack>
@@ -236,7 +238,7 @@ const Footer = () => {
           sx={{ py: 2 }}
         >
           <Typography variant="caption">
-            © {year} PaaSDeployer — open-source PaaS platform.
+            © {year} {t("PaaSDeployer — open-source PaaS platform.")}
           </Typography>
 
           <Typography
@@ -247,7 +249,7 @@ const Footer = () => {
               gap: 0.5,
             }}
           >
-            Built with Django, React and Docker
+            {t("Built with Django, React and Docker")}
           </Typography>
         </Stack>
       </Container>

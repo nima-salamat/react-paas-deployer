@@ -786,7 +786,7 @@ function FloatingBadge({ children, sx = {} }) {
 /* ───────────────── Main Page ───────────────── */
 
 export default function Home() {
-  const { t } = useLocale();
+  const { t, isRTL } = useLocale();
   const theme = useTheme();
   const navigate = useNavigate();
   const dark = theme.palette.mode === "dark";
@@ -873,6 +873,7 @@ export default function Home() {
   return (
     <Box
       component="main"
+      className="public-marketing-page public-home-page"
       sx={{
         position: "relative",
         overflowX: "hidden",
@@ -884,6 +885,7 @@ export default function Home() {
     >
       {/* Reading progress — driven by motion value, minimal re-render */}
       <Box
+        className="home-reading-progress"
         aria-hidden="true"
         sx={{
           position: "fixed",
@@ -1534,7 +1536,7 @@ export default function Home() {
       <ScrollScene page>
         <Container maxWidth="xl">
           <Reveal>
-            <Box sx={{ textAlign: { xs: "left", md: "center" }, maxWidth: 780, mx: "auto", mb: { xs: 4, md: 5.5 } }}>
+            <Box sx={{ textAlign: { xs: isRTL ? "right" : "left", md: "center" }, maxWidth: 780, mx: "auto", mb: { xs: 4, md: 5.5 } }}>
               <Typography
                 variant="overline"
                 component="p"

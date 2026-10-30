@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
@@ -48,7 +49,8 @@ const formatStorage = (value) => {
 };
 
 function PreviewCard({ plan }) {
-  const platform = plan?.platform ?? "Platform";
+  const { t } = useLocale();
+  const platform = plan?.platform ?? t("Platform");
   const cpu = plan?.max_cpu ?? plan?.cpu;
   const ram = plan?.max_ram ?? plan?.ram;
   const storage = formatStorage(plan?.max_storage ?? plan?.storage ?? plan?.disk ?? plan?.storage_gb);
@@ -81,7 +83,7 @@ function PreviewCard({ plan }) {
               {platform}
             </Typography>
             <Typography sx={{ fontWeight: 850, lineHeight: 1.2 }} noWrap>
-              {plan?.name ?? "Unnamed plan"}
+              {plan?.name ?? t("Unnamed plan")}
             </Typography>
           </Box>
         </Stack>
@@ -102,7 +104,7 @@ function PreviewCard({ plan }) {
           {storage && (
             <Stack direction="row" spacing={0.8} alignItems="center">
               <StorageRoundedIcon sx={{ fontSize: 17, color: "text.secondary" }} />
-              <Typography variant="body2">Storage {storage}</Typography>
+              <Typography variant="body2">{t("Storage")} {storage}</Typography>
             </Stack>
           )}
         </Stack>
@@ -116,6 +118,7 @@ function PreviewCard({ plan }) {
 }
 
 export default function PlansPreview() {
+  const { t } = useLocale();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -213,7 +216,7 @@ export default function PlansPreview() {
                   <SellOutlinedIcon fontSize="small" />
                 </Box>
                 <Chip label="Plans" size="small" sx={{ fontWeight: 850 }} />
-                {platformCount > 0 && <Chip label={`${platformCount} platforms`} size="small" variant="outlined" />}
+                {platformCount > 0 && <Chip label={`${platformCount} ${t(platformCount === 1 ? "platform" : "platforms")}`} size="small" variant="outlined" />}
               </Stack>
               <Typography
                 component="h2"
