@@ -146,7 +146,7 @@ test("backend Ready App descriptions have Persian translations without translati
   assert.equal(translateText("devtools", "fa"), "ابزارهای توسعه");
 
   assert.match(helper, /TRANSLATABLE_PROPS/);
-  assert.match(helper, /Raw rendered child strings may be service names, usernames, ticket subjects/);
+  assert.match(helper, /Raw rendered child strings may be[\\s\\S]*service names, usernames, ticket subjects/);
   assert.doesNotMatch(helper, /if \(typeof node === "string"\)/);
   assert.match(helper, /nextProps\.children = translated/);
 });
