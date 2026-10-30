@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Alert, Box, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControl, FormControlLabel,
@@ -521,6 +522,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
                               const allowed = canGrantRule(code);
                               const checked = (editUser.rules || []).includes(code);
                               return (
+    <TranslatedTextTree>
                                 <FormControlLabel
                                   key={code}
                                   sx={{ m: 0, alignItems: "center", mr: 1 }}
@@ -674,5 +676,6 @@ export default function UsersPanel({ setToast: setToastProp }) {
         onIndexChange={(i) => setLightbox((prev) => (prev ? { ...prev, index: i } : null))}
       />
     </Stack>
+    </TranslatedTextTree>
   );
 }
