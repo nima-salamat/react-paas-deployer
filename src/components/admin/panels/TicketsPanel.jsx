@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Button, Chip, FormControl, IconButton, InputLabel, MenuItem, Pagination,
   Select, Stack, TextField, Tooltip, Typography,
@@ -55,6 +56,7 @@ export default function TicketsPanel({
   const [deleteId, setDeleteId] = useState(null);
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
@@ -254,5 +256,6 @@ export default function TicketsPanel({
         }}
       />
     </Stack>
+    </TranslatedTextTree>
   );
 }
