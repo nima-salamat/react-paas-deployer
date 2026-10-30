@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Alert, Box, Button, Chip, CircularProgress, Divider, FormControlLabel,
   Paper, Stack, Switch, TextField, Typography,
@@ -97,6 +98,7 @@ const GROUPS = [
 const ALL_FIELDS = GROUPS.flatMap((g) => g.fields.map(([key]) => key));
 
 export default function LoginSettingsPanel() {
+  const { t } = useLocale();
   const pushToast = useToast();
   const canManage = hasAnyRule("login_settings.manage");
   const API = useMemo(() => loginSettingsAdminApi(), []);
@@ -182,7 +184,7 @@ export default function LoginSettingsPanel() {
               onClick={save}
               disabled={busy || !dirty}
             >
-              {busy ? "Saving…" : dirty ? "Save changes" : "Saved"}
+              {t(busy ? "Saving…" : dirty ? "Save changes" : "Saved")}
             </Button>
           )}
         </Stack>
@@ -210,11 +212,11 @@ export default function LoginSettingsPanel() {
         {GROUPS.map((g) => (
           <Paper key={g.title} variant="outlined" sx={{ p: 2 }}>
             <Stack direction="row" alignItems="center" gap={1} mb={0.5}>
-              <Typography fontWeight={700}>{g.title}</Typography>
+              <Typography fontWeight={700}>{t(g.title)}</Typography>
               {g.title === "Login master switch" && (
                 <Chip
                   size="small"
-                  label={form.allow_login ? "OPEN" : "CLOSED"}
+                  label={t(form.allow_login ? "OPEN" : "CLOSED")}
                   color={form.allow_login ? "success" : "error"}
                   sx={{ height: 20, fontSize: 11 }}
                 />
@@ -222,7 +224,7 @@ export default function LoginSettingsPanel() {
             </Stack>
             {g.description && (
               <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
-                {g.description}
+                {t(g.description)}
               </Typography>
             )}
             <Divider sx={{ mb: 1.5 }} />
