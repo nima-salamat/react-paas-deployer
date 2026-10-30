@@ -689,6 +689,7 @@ function LiveUsage({ label, value }) {
 
 function Metric({ icon, label, value }) {
   return (
+    <TranslatedTextTree>
     <Stack direction="row" spacing={1} alignItems="center">
       <Box sx={{ color: "primary.main", display: "grid", placeItems: "center" }}>{icon}</Box>
       <Typography variant="body2">
@@ -696,6 +697,7 @@ function Metric({ icon, label, value }) {
         <Box component="strong">{value}</Box>
       </Typography>
     </Stack>
+    </TranslatedTextTree>
   );
 }
 
