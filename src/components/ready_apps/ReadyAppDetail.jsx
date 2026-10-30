@@ -58,6 +58,7 @@ function AppLogo({ app, size = 84 }) {
 }
 
 function Meta({ label, value }) {
+  const { t } = useLocale();
   return (    <TranslatedTextTree>
 
     <Box>
@@ -66,7 +67,7 @@ function Meta({ label, value }) {
         color="text.secondary"
         sx={{ textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}
       >
-        {label}
+        {t(label)}
       </Typography>
       <Typography sx={{ mt: .2, fontWeight: 850 }}>{value || "—"}</Typography>
     </Box>
@@ -320,7 +321,7 @@ export default function ReadyAppDetail() {
 
           {variant && variant.availability !== "supported" && (
             <Alert severity="warning" sx={{ borderRadius: 2.5 }}>
-              {variant.unavailable_reason || "This app isn't available right now."}
+              {t(variant.unavailable_reason || "This app isn't available right now.")}
             </Alert>
           )}
         </Stack>
