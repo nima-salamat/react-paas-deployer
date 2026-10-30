@@ -30,6 +30,25 @@ test("Persian locale covers the requested public, dashboard, service and Messeng
     "Container",
     "Running",
     "Release progress",
+    "A calmer way to operate",
+    "Less infrastructure assembly. More time shipping.",
+    "PaaSDeployer keeps the operational surface area small: one place to create services, ship releases, read logs and manage the runtime boundary around your workloads.",
+    "Create a service, connect code, deploy, inspect logs and manage the runtime without jumping between disconnected tools.",
+    "Docker-backed services provide a predictable boundary for applications, data services and supporting workloads.",
+    "See resource usage, service health, networking and persistent data from one focused control plane.",
+    "Search public groups…",
+    "Search conversations or people…",
+    "All",
+    "Unread",
+    "Pinned",
+    "Pin",
+    "Unpin",
+    "Message pinned",
+    "Message unpinned",
+    "Pin message",
+    "Unpin message",
+    "You're all caught up.",
+    "No pinned conversations.",
     "Connection lost",
     "We could not reach the PaaSDeployer service. Check your connection and reconnect to continue.",
     "Reconnect",
@@ -92,8 +111,27 @@ test("dynamic page data and non-JSX labels are connected to the active locale", 
   assert.equal((footer.match(/className="public-site-footer"/g) || []).length, 2);
 
   const homeCurtain = await readFile(new URL("../src/components/home/home.jsx", import.meta.url), "utf8");
-  assert.match(homeCurtain, /const visualSide = isRTL/);
-  assert.match(homeCurtain, /\[visualSide\]: 0/);
+  assert.match(homeCurtain, /side === "left"/);
+  assert.match(homeCurtain, /left: side === "left" \? 0 : "auto"/);
+  assert.match(homeCurtain, /right: side === "right" \? 0 : "auto"/);
+  assert.doesNotMatch(homeCurtain, /const visualSide = isRTL/);
+
+  const floatingNav = await readFile(new URL("../src/components/layout/FloatingNav.jsx", import.meta.url), "utf8");
+  assert.match(floatingNav, /style=\{containerStyle\}/);
+  assert.match(floatingNav, /left: isRTL \? horizontalOffset : "auto"/);
+  assert.match(floatingNav, /right: isRTL \? "auto" : horizontalOffset/);
+  assert.match(floatingNav, /alignItems: "flex-end"/);
+
+  const messengerSidebar = await readFile(new URL("../src/components/messenger/components/Sidebar.jsx", import.meta.url), "utf8");
+  assert.match(messengerSidebar, /placeholder=\{t\(listTab === 1 \? "Search public groups…"/);
+  assert.match(messengerSidebar, /label=\{t\(label\)\}/);
+  assert.match(messengerSidebar, /t\(ctx\.conv\.is_pinned \? "Unpin" : "Pin"\)/);
+
+  const messageBubble = await readFile(new URL("../src/components/messenger/components/MessageBubble.jsx", import.meta.url), "utf8");
+  assert.match(messageBubble, /tr\(isPinned \? "Unpin message" : "Pin message"\)/);
+
+  const messengerApp = await readFile(new URL("../src/components/messenger/MessengerApp.jsx", import.meta.url), "utf8");
+  assert.match(messengerApp, /flash\(t\(data\?\.pinned \? "Message pinned" : "Message unpinned"\)\)/);
   const reconnect = await readFile(new URL("../src/components/layout/ConnectionReconnectDialog.jsx", import.meta.url), "utf8");
   assert.match(reconnect, /t\(state\.title\)/);
   assert.match(reconnect, /t\(state\.body\)/);
