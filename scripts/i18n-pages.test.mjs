@@ -49,6 +49,22 @@ test("Persian locale covers the requested public, dashboard, service and Messeng
     "Unpin message",
     "You're all caught up.",
     "No pinned conversations.",
+    "Photos, bio & privacy",
+    "Devices & sessions",
+    "Manage signed-in sessions",
+    "Secure chat & recovery",
+    "Encrypted history, recovery key and Matrix devices",
+    "Preferences",
+    "Camera & microphone",
+    "Devices for voice and video messages",
+    "Themes, avatars & message style",
+    "Encrypted key backup is verified for this device.",
+    "An encrypted backup already exists. Restore its existing recovery key or verify a trusted device; do not replace it.",
+    "Recovery status could not be verified. Retry before relying on this device for encrypted history.",
+    "Set up an encrypted key backup to help restore message history if this browser or device is lost.",
+    "Unblock",
+    "Photos · Videos · Music",
+    "Share & manage group services",
     "Connection lost",
     "We could not reach the PaaSDeployer service. Check your connection and reconnect to continue.",
     "Reconnect",
@@ -90,6 +106,7 @@ test("dynamic page data and non-JSX labels are connected to the active locale", 
     "../src/components/plans/plans.jsx",
     "../src/components/messenger/components/MessengerHome.jsx",
     "../src/components/messenger/components/Sidebar.jsx",
+    "../src/components/messenger/components/RightPanel.jsx",
     "../src/components/messenger/components/ChatHeader.jsx",
     "../src/components/messenger/components/MessageComposer.jsx",
     "../src/components/messenger/components/MessengerDialogs.jsx",
@@ -121,6 +138,13 @@ test("dynamic page data and non-JSX labels are connected to the active locale", 
   assert.match(floatingNav, /left: isRTL \? horizontalOffset : "auto"/);
   assert.match(floatingNav, /right: isRTL \? "auto" : horizontalOffset/);
   assert.match(floatingNav, /alignItems: "flex-end"/);
+
+  const messengerSettings = await readFile(new URL("../src/components/messenger/components/RightPanel.jsx", import.meta.url), "utf8");
+  assert.match(messengerSettings, /\{t\(headerTitle\)\}/);
+  assert.match(messengerSettings, /primary=\{t\("My profile"\)\}/);
+  assert.match(messengerSettings, /secondary=\{t\("Photos, bio & privacy"\)\}/);
+  assert.match(messengerSettings, /t\("Secure chat & recovery"\)/);
+  assert.match(messengerSettings, /t\("Themes, avatars & message style"\)/);
 
   const messengerSidebar = await readFile(new URL("../src/components/messenger/components/Sidebar.jsx", import.meta.url), "utf8");
   assert.match(messengerSidebar, /placeholder=\{t\(listTab === 1 \? "Search public groups…"/);
