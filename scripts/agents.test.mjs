@@ -116,8 +116,8 @@ test("agent detail uses styled dialogs for Agent and credential deletion", () =>
 test("agent create dialog provides All and Reset scope presets", () => {
   const source = read("src/components/agents/Agents.jsx");
 
-  assert.match(source, />\s*All\s*<\/Button>/);
-  assert.match(source, />\s*Reset\s*<\/Button>/);
+  assert.match(source, />\s*\{tr\("All"\)\}\s*<\/Button>/);
+  assert.match(source, />\s*\{tr\("Reset"\)\}\s*<\/Button>/);
   assert.match(source, /scopes: \(scopeCatalog\.scopes \|\| \[\]\)\.map\(\(scope\) => scope\.name\)/);
   assert.match(source, /scopes: \[\.\.\.\(scopeCatalog\.defaults \|\| \[\]\)\]/);
 });
