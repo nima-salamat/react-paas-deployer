@@ -55,8 +55,8 @@ export default function TicketsPanel({
   const pages = Math.max(1, Math.ceil((count || 0) / PAGE_SIZE));
   const [deleteId, setDeleteId] = useState(null);
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
