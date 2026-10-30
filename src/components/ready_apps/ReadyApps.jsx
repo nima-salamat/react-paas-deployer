@@ -209,6 +209,7 @@ export default function ReadyApps() {
   }, [apps, query]);
 
   return (
+    <TranslatedTextTree>
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
       <Stack spacing={3.25}>
         <Stack
@@ -336,5 +337,6 @@ export default function ReadyApps() {
         )}
       </Stack>
     </Container>
+    </TranslatedTextTree>
   );
 }
