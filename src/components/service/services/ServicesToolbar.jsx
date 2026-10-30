@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
@@ -49,6 +50,7 @@ export default function ServicesToolbar({
   shareCounts = { mine: 0, shared_with_me: 0, shared_by_me: 0 },
 }) {
   return (
+    <TranslatedTextTree>
     <>
       <Box
         sx={{
@@ -305,5 +307,6 @@ export default function ServicesToolbar({
         </Paper>
       )}
     </>
+    </TranslatedTextTree>
   );
 }
