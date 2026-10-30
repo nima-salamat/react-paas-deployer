@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Alert,
   Box,
@@ -112,6 +113,7 @@ function InstallationCard({ installation, app }) {
   const tone = statusTone(status, deleting);
 
   return (
+    <TranslatedTextTree>
     <Card
       variant="outlined"
       sx={(theme) => ({
@@ -200,6 +202,7 @@ function InstallationCard({ installation, app }) {
         </Button>
       </Box>
     </Card>
+    </TranslatedTextTree>
   );
 }
 
