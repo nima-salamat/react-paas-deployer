@@ -1,5 +1,5 @@
 import React from "react";
-import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import { Box, Typography, alpha } from "@mui/material";
 import PlatformIcon from "../plans/PlatformIcon.jsx";
 
