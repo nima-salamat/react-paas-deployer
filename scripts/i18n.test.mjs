@@ -41,7 +41,7 @@ test("Vite localizes visible JSX copy without changing code or form input conten
   const vite = await readFile(new URL("../vite.config.js", import.meta.url), "utf8");
   assert.match(vite, /localizeJsxTextPlugin/);
   assert.match(vite, /LocalizedText/);
-  assert.match(vite, /jsxExpressionContainer\\(t\\.stringLiteral\\(value\\)\\)/);
+  assert.match(vite, /jsxExpressionContainer\(t\.stringLiteral\(value\)\)/);
   assert.match(vite, /\["code", "pre", "textarea", "script", "style"\]/);
 });
 
