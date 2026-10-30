@@ -114,7 +114,7 @@ export default function TicketList() {
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1200, mx: "auto" }}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "center" }} gap={1} mb={2}>
         <Box>
-          <Typography variant="h5" fontWeight={700}>My tickets</Typography>
+          <Typography variant="h5" fontWeight={700}>{tr("My tickets")}</Typography>
           <Typography variant="caption" color="text.secondary">
             {connected ? "Live updates on" : "Live offline"}
             {refreshing ? " · refreshing…" : ""}
@@ -130,18 +130,18 @@ export default function TicketList() {
       </Stack>
 
       <Stack direction={{ xs: "column", md: "row" }} gap={1.5} mb={2}>
-        <TextField size="small" label="Search" value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} fullWidth />
+        <TextField size="small" label={tr("Search")} value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} fullWidth />
         <FormControl size="small" sx={{ width: { xs: "100%", md: 140 }, minWidth: 0 }}>
-          <InputLabel>Status</InputLabel>
-          <Select label="Status" value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>
-            <MenuItem value="">All</MenuItem>
+          <InputLabel>{tr("Status")}</InputLabel>
+          <Select label={tr("Status")} value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }}>
+            <MenuItem value="">{tr("All")}</MenuItem>
             {Object.keys(STATUS_COLOR).map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ width: { xs: "100%", md: 140 }, minWidth: 0 }}>
-          <InputLabel>Priority</InputLabel>
-          <Select label="Priority" value={priority} onChange={(e) => { setPage(1); setPriority(e.target.value); }}>
-            <MenuItem value="">All</MenuItem>
+          <InputLabel>{tr("Priority")}</InputLabel>
+          <Select label={tr("Priority")} value={priority} onChange={(e) => { setPage(1); setPriority(e.target.value); }}>
+            <MenuItem value="">{tr("All")}</MenuItem>
             {Object.keys(PRIORITY_COLOR).map((p) => <MenuItem key={p} value={p}>{p}</MenuItem>)}
           </Select>
         </FormControl>
@@ -165,19 +165,19 @@ export default function TicketList() {
               <TableHead>
                 <TableRow>
                   <TableCell width={28} />
-                  <TableCell>ID</TableCell>
-                  <TableCell>Subject</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Priority</TableCell>
-                  <TableCell>Updated</TableCell>
-                  <TableCell align="right">Action</TableCell>
+                  <TableCell>{tr("ID")}</TableCell>
+                  <TableCell>{tr("Subject")}</TableCell>
+                  <TableCell>{tr("Status")}</TableCell>
+                  <TableCell>{tr("Priority")}</TableCell>
+                  <TableCell>{tr("Updated")}</TableCell>
+                  <TableCell align="right">{tr("Action")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {tickets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>
-                      <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
+                      <Typography color="text.secondary" align="center" py={3}>{tr("No tickets")}</Typography>
                     </TableCell>
                   </TableRow>
                 ) : tickets.map((t) => {
@@ -221,7 +221,7 @@ export default function TicketList() {
                             e.stopPropagation();
                             openTicket(t.id);
                           }}
-                          aria-label={"Open ticket " + t.public_id}
+                          aria-label={tr("Open ticket") + " " + t.public_id}
                         >
                           Open
                         </Button>
@@ -236,7 +236,7 @@ export default function TicketList() {
           {/* Mobile card list */}
           <Box sx={{ display: { xs: "block", md: "none" } }}>
             {tickets.length === 0 ? (
-              <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
+              <Typography color="text.secondary" align="center" py={3}>{tr("No tickets")}</Typography>
             ) : (
               <Stack divider={<Box sx={{ borderBottom: 1, borderColor: "divider" }} />}>
                 {tickets.map((t) => {
@@ -298,7 +298,7 @@ export default function TicketList() {
                                 e.stopPropagation();
                                 openTicket(t.id);
                               }}
-                              aria-label={"Open ticket " + t.public_id}
+                              aria-label={tr("Open ticket") + " " + t.public_id}
                               sx={{ alignSelf: { xs: "stretch", sm: "auto" }, minWidth: 76 }}
                             >
                               Open
