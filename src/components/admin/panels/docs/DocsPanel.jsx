@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import TranslatedTextTree from "../../../../i18n/TranslatedTextTree.jsx";
 import {
   Alert,
   Box,
@@ -1397,6 +1398,7 @@ export default function DocsPanel() {
   };
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", lg: "row" }}
@@ -2117,5 +2119,6 @@ export default function DocsPanel() {
         </Typography>
       </Paper>
     </Stack>
+    </TranslatedTextTree>
   );
 }
