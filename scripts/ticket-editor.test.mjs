@@ -659,7 +659,7 @@ test("Create Ticket has a back arrow and uses the shared attachment preview belo
 test("ticket list has an explicit Open button on desktop and mobile", () => {
   const source = read("src/components/tickets/TicketList.jsx");
 
-  assert.match(source, /TableCell align="right">Action/);
+  assert.match(source, /TableCell align="right">\{tr\("Action"\)\}/);
   assert.match(source, /Open ticket/);
   assert.match(source, /e\.stopPropagation\(\)/);
   assert.match(source, /<TableCell colSpan=\{7\}>/);
