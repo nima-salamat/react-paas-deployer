@@ -20,6 +20,7 @@ import {
   Check as CheckIcon,
 } from "@mui/icons-material";
 import { REFRESH_INTERVAL_OPTIONS } from "../constants";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 export default function ServiceToolbar({
   refreshIntervalMs,
@@ -30,6 +31,7 @@ export default function ServiceToolbar({
   refreshing = false,
   navigate,
 }) {
+  const { t } = useLocale();
   const open = Boolean(intervalMenuAnchor);
 
   const handleOpenMenu = (event) => setIntervalMenuAnchor(event.currentTarget);
@@ -68,7 +70,7 @@ export default function ServiceToolbar({
       }}
     >
       {/* Left: back */}
-      <Tooltip title="Back to services list">
+      <Tooltip title={t("Back to services list")}>
         <Button
           size="small"
           startIcon={<ArrowBackIcon fontSize="small" />}
@@ -83,13 +85,13 @@ export default function ServiceToolbar({
 
       {/* Right: refresh + interval */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, ml: "auto" }}>
-        <Tooltip title="Refresh now">
+        <Tooltip title={t("Refresh now")}>
           <span>
             <IconButton
               size="small"
               onClick={onRefresh}
               disabled={refreshing}
-              aria-label="Refresh"
+              aria-label={t("Refresh")}
               sx={{
                 border: "1px solid",
                 borderColor: "divider",
