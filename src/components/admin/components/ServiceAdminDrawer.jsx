@@ -160,7 +160,6 @@ export default function ServiceAdminDrawer({
   ];
 
   return (
-    <TranslatedTextTree>
     <>
       <Drawer
         anchor="right"
@@ -535,7 +534,6 @@ export default function ServiceAdminDrawer({
         </DialogActions>
       </Dialog>
     </>
-    </TranslatedTextTree>
   );
 }
 
