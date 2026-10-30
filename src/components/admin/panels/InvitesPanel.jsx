@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
   IconButton, Pagination, Stack, TextField, Tooltip, Typography,
@@ -149,6 +150,7 @@ export default function InvitesPanel({
                 {slice.map((inv) => {
                   const publicUrl = invitePublicUrl(inv);
                   return (
+    <TranslatedTextTree>
                     <tr key={inv.id || inv.token} style={{ borderTop: DRY_BORDER_LIGHT }}>
                       <DryTd>{inv.label || "—"}</DryTd>
                       <DryTd>
@@ -317,5 +319,6 @@ export default function InvitesPanel({
         }}
       />
     </Stack>
+    </TranslatedTextTree>
   );
 }
