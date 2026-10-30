@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Grid, IconButton, InputAdornment, MenuItem,
@@ -261,6 +262,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
   }, [svcList, svcCount]);
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.5}>
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} gap={1.5}>
@@ -584,5 +586,6 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         </DialogActions>
       </Dialog>
     </Stack>
+    </TranslatedTextTree>
   );
 }
