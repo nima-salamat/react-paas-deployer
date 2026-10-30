@@ -109,7 +109,7 @@ export default function CreateTicket() {
     return (
       <Box p={4} display="flex" flexDirection="column" alignItems="center" gap={2}>
         <CircularProgress />
-        <Typography color="text.secondary">Loading departments…</Typography>
+        <Typography color="text.secondary">{tr("Loading departments…")}</Typography>
       </Box>
     );
   }
@@ -117,44 +117,44 @@ export default function CreateTicket() {
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 720, mx: "auto" }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 2 }}>
-        <Tooltip title="Back to tickets">
-          <IconButton onClick={() => navigate("/dashboard/tickets")} size="small" aria-label="Back to tickets">
+        <Tooltip title={tr("Back to tickets")}>
+          <IconButton onClick={() => navigate("/dashboard/tickets")} size="small" aria-label={tr("Back to tickets")}>
             <ArrowBackIcon />
           </IconButton>
         </Tooltip>
         <Box minWidth={0}>
-          <Typography variant="h5" fontWeight={700}>Create Ticket</Typography>
-          <Typography variant="caption" color="text.secondary">Open a new support ticket</Typography>
+          <Typography variant="h5" fontWeight={700}>{tr("Create Ticket")}</Typography>
+          <Typography variant="caption" color="text.secondary">{tr("Open a new support ticket")}</Typography>
         </Box>
       </Stack>
       <Paper sx={{ p: 3 }} component="form" onSubmit={submit}>
         {depsError && (
-          <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={loadOptions}>Retry</Button>}>
+          <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={loadOptions}>{tr("Retry")}</Button>}>
             {tr(depsError)}
           </Alert>
         )}
         {!depsError && departments.length === 0 && (
-          <Alert severity="warning" sx={{ mb: 2 }}>No departments available. Ask an admin to create one.</Alert>
+          <Alert severity="warning" sx={{ mb: 2 }}>{tr("No departments available. Ask an admin to create one.")}</Alert>
         )}
         {error && <Alert severity="error" sx={{ mb: 2 }}>{tr(error)}</Alert>}
         <Stack spacing={2.5}>
           <FormControl fullWidth required>
-            <InputLabel>Department</InputLabel>
-            <Select label="Department" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
+            <InputLabel>{tr("Department")}</InputLabel>
+            <Select label={tr("Department")} value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
               {departments.map((d) => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl fullWidth>
-            <InputLabel>Service (optional)</InputLabel>
-            <Select label="Service (optional)" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-              <MenuItem value=""><em>None</em></MenuItem>
+            <InputLabel>{tr("Service (optional)")}</InputLabel>
+            <Select label={tr("Service (optional)")} value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+              <MenuItem value=""><em>{tr("None")}</em></MenuItem>
               {services.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
             </Select>
           </FormControl>
           <FormControl fullWidth>
-            <InputLabel>Deploy (optional)</InputLabel>
-            <Select label="Deploy (optional)" value={deployId} onChange={(e) => setDeployId(e.target.value)}>
-              <MenuItem value=""><em>None</em></MenuItem>
+            <InputLabel>{tr("Deploy (optional)")}</InputLabel>
+            <Select label={tr("Deploy (optional)")} value={deployId} onChange={(e) => setDeployId(e.target.value)}>
+              <MenuItem value=""><em>{tr("None")}</em></MenuItem>
               {deploys.map((d) => (
                 <MenuItem key={d.id} value={d.id}>
                   {d.name || d.version || String(d.id).slice(0, 8)}{d.status ? ` · ${d.status}` : ""}
@@ -162,24 +162,24 @@ export default function CreateTicket() {
               ))}
             </Select>
           </FormControl>
-          <TextField label="Subject" required value={subject} onChange={(e) => setSubject(e.target.value)} fullWidth inputProps={{ maxLength: 255 }} />
+          <TextField label={tr("Subject")} required value={subject} onChange={(e) => setSubject(e.target.value)} fullWidth inputProps={{ maxLength: 255 }} />
           <FormControl fullWidth>
-            <InputLabel>Priority</InputLabel>
-            <Select label="Priority" value={priority} onChange={(e) => setPriority(e.target.value)}>
-              <MenuItem value="low">Low</MenuItem>
-              <MenuItem value="normal">Normal</MenuItem>
-              <MenuItem value="high">High</MenuItem>
-              <MenuItem value="urgent">Urgent</MenuItem>
+            <InputLabel>{tr("Priority")}</InputLabel>
+            <Select label={tr("Priority")} value={priority} onChange={(e) => setPriority(e.target.value)}>
+              <MenuItem value="low">{tr("Low")}</MenuItem>
+              <MenuItem value="normal">{tr("Normal")}</MenuItem>
+              <MenuItem value="high">{tr("High")}</MenuItem>
+              <MenuItem value="urgent">{tr("Urgent")}</MenuItem>
             </Select>
           </FormControl>
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
-              Message
+              {tr("Message")}
             </Typography>
             <SimpleHtmlEditor
               value={body}
               onChange={setBody}
-              placeholder="Describe your issue…"
+              placeholder={tr("Describe your issue…")}
               defaultExpanded
               minHeight={140}
               maxHeight={320}
@@ -189,7 +189,7 @@ export default function CreateTicket() {
           </Box>
           <Box>
             <Button variant="outlined" component="label" disabled={loading}>
-              Attach files
+              {tr("Attach files")}
               <input
                 hidden
                 type="file"
@@ -205,8 +205,8 @@ export default function CreateTicket() {
           </Box>
           {loading && <LinearProgress />}
           <Stack direction="row" gap={2} justifyContent="flex-end">
-            <Button onClick={() => navigate("/dashboard/tickets")}>Cancel</Button>
-            <Button type="submit" variant="contained" disabled={loading || !departments.length}>{loading ? "Creating…" : "Create Ticket"}</Button>
+            <Button onClick={() => navigate("/dashboard/tickets")}>{tr("Cancel")}</Button>
+            <Button type="submit" variant="contained" disabled={loading || !departments.length}>{tr(loading ? "Creating…" : "Create Ticket")}</Button>
           </Stack>
         </Stack>
       </Paper>
