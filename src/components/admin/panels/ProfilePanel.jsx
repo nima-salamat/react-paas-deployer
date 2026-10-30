@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Avatar, Box, Button, Chip, CircularProgress, Divider, Paper, Stack,
   TextField, Typography, alpha,
@@ -86,6 +87,7 @@ export default function ProfilePanel({ me: meProp, onMeUpdated }) {
   const isStaff = isSessionStaff();
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2.5} maxWidth={720}>
       <Box>
         <Typography variant="h5" fontWeight={800} gutterBottom>
@@ -204,5 +206,6 @@ export default function ProfilePanel({ me: meProp, onMeUpdated }) {
         </Typography>
       </Paper>
     </Stack>
+    </TranslatedTextTree>
   );
 }
