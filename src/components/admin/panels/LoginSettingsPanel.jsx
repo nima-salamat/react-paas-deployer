@@ -163,8 +163,8 @@ export default function LoginSettingsPanel() {
     return <Alert severity="warning">Could not load login settings.</Alert>;
   }
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <PermissionGate anyOf={["login_settings.view", "login_settings.manage"]}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} gap={1.5} mb={2}>
         <Box>
@@ -303,7 +303,8 @@ function FieldRow({ fieldKey, label, type, value, disabled, onChange }) {
     );
   }
   // text
-  return (
+  return (    <TranslatedTextTree>
+
     <Stack gap={0.5}>
       <Typography variant="body2" fontWeight={500}>{label}</Typography>
       <TextField
@@ -316,5 +317,6 @@ function FieldRow({ fieldKey, label, type, value, disabled, onChange }) {
         minRows={fieldKey === "custom_login_closed_message" ? 2 : 1}
       />
     </Stack>
+    </TranslatedTextTree>
   );
 }
