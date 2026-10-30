@@ -419,6 +419,7 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
           {rows.map((r) => {
             const priceDay = Number(r.price_per_hour || 0) * 24;
             return (
+    <TranslatedTextTree>
               <tr key={r.id} style={{ borderTop: "1px solid", borderTopColor: "rgba(127,127,127,0.18)" }}>
                 <Td>
                   <Chip
@@ -458,6 +459,7 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
         </tbody>
       </Box>
     </Box>
+    </TranslatedTextTree>
   );
 }
 
