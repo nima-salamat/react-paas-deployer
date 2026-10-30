@@ -32,6 +32,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import HubIcon from "@mui/icons-material/Hub";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import apiRequest from "../customHooks/apiRequest";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const NETWORK_ROOT = `${API_BASE}/api/networks/`;
@@ -62,6 +63,7 @@ function friendlyError(err, fallback = "Something went wrong.") {
 }
 
 export default function Networks() {
+  const { t: tr } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
@@ -209,13 +211,13 @@ export default function Networks() {
                 </Typography>
               ) : (
                 <Typography variant="body2" color="text.disabled" sx={{ mt: 0.25 }}>
-                  No description
+                  {tr("No description")}
                 </Typography>
               )}
             </Box>
             <Chip
               size="small"
-              label={`${connected} service${connected !== 1 ? "s" : ""}`}
+              label={`${connected} ${tr(connected !== 1 ? "services" : "service")}`}
               color={connected > 0 ? "info" : "default"}
               sx={{ fontWeight: 700, height: 22, flexShrink: 0, ml: 1 }}
             />
@@ -224,7 +226,7 @@ export default function Networks() {
           <Divider />
 
           <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-            <Tooltip title="Edit">
+            <Tooltip title={tr("Edit")}>
               <IconButton size="small" onClick={() => openEditDialog(network)}>
                 <EditIcon fontSize="small" />
               </IconButton>
@@ -329,7 +331,7 @@ export default function Networks() {
           sx={{ mb: 2, borderRadius: 1 }}
           onClose={() => setError(null)}
         >
-          {error}
+          {tr(error)}
         </Alert>
       )}
       {success && (
@@ -338,7 +340,7 @@ export default function Networks() {
           sx={{ mb: 2, borderRadius: 1 }}
           onClose={() => setSuccess(null)}
         >
-          {success}
+          {tr(success)}
         </Alert>
       )}
 
@@ -359,14 +361,14 @@ export default function Networks() {
           }}
         >
           <Typography color="text.secondary" gutterBottom>
-            No networks yet.
+            {tr("No networks yet.")}
           </Typography>
           <Button
             sx={{ mt: 1, textTransform: "none", fontWeight: 700, borderRadius: 1 }}
             startIcon={<AddIcon />}
             onClick={openCreateDialog}
           >
-            Create your first network
+            {tr("Create your first network")}
           </Button>
         </Paper>
       ) : isMobile || isTablet ? (
@@ -400,9 +402,9 @@ export default function Networks() {
                     },
                   }}
                 >
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Name</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Description</TableCell>
-                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>Services</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Name")}</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Description")}</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: 13 }}>{tr("Services")}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700, fontSize: 13 }}>
                     Actions
                   </TableCell>
@@ -450,7 +452,7 @@ export default function Networks() {
                       </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={0.25} justifyContent="flex-end">
-                          <Tooltip title="Edit">
+                          <Tooltip title={tr("Edit")}>
                             <IconButton
                               size="small"
                               onClick={() => openEditDialog(network)}
@@ -461,8 +463,8 @@ export default function Networks() {
                           <Tooltip
                             title={
                               connected > 0
-                                ? "Detach services before deleting"
-                                : "Delete"
+                                ? tr("Detach services before deleting")
+                                : tr("Delete")
                             }
                           >
                             <span>
@@ -497,14 +499,14 @@ export default function Networks() {
         PaperProps={{ sx: { borderRadius: isMobile ? 0 : 1 } }}
       >
         <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>
-          {currentNetwork ? "Edit network" : "Create network"}
+          {tr(currentNetwork ? "Edit network" : "Create network")}
         </DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 0.5 }}>
             <TextField
               fullWidth
               size="small"
-              label="Name"
+              label={tr("Name")}
               name="name"
               value={formData.name}
               onChange={handleFormChange}
@@ -513,7 +515,7 @@ export default function Networks() {
             <TextField
               fullWidth
               size="small"
-              label="Description"
+              label={tr("Description")}
               name="description"
               value={formData.description}
               onChange={handleFormChange}
@@ -524,7 +526,7 @@ export default function Networks() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
           <Button onClick={closeDialog} sx={{ textTransform: "none" }}>
-            Cancel
+            {tr("Cancel")}
           </Button>
           <Button
             variant="contained"
@@ -532,7 +534,7 @@ export default function Networks() {
             disabled={saving}
             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1 }}
           >
-            {saving ? "Saving…" : currentNetwork ? "Save" : "Create"}
+            {tr(saving ? "Saving…" : currentNetwork ? "Save" : "Create")}
           </Button>
         </DialogActions>
       </Dialog>
