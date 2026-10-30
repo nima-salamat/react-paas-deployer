@@ -12,8 +12,8 @@ import { EMAILS_API, unwrapData } from "../tickets/api";
 const VARS = ["{{ user.username }}", "{{ user.email }}", "{{ user.first_name }}", "{{ user.last_name }}", "{{ site_name }}", "{{ support_email }}"];
 
 function StatCard({ label, value }) {
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Paper sx={{ p: 2 }}>
       <Typography variant="body2" color="text.secondary">{label}</Typography>
       <Typography variant="h4" fontWeight={700}>{value ?? "—"}</Typography>
@@ -209,8 +209,8 @@ export default function EmailManagement() {
     { id: "failed", label: "Failed" },
   ];
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto" }}>
       <Typography variant="h5" fontWeight={700} mb={2}>Email Management</Typography>
       <Stack direction="row" gap={1} mb={3} flexWrap="wrap">
