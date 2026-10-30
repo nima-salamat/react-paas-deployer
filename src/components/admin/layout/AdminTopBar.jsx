@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   AppBar, Avatar, Badge, Box, Button, Chip, Divider, FormControlLabel,
   IconButton, List, ListItem, ListItemText, Menu, MenuItem, Popover,
@@ -74,6 +75,7 @@ export default function AdminTopBar({
   const initial = (me?.username || "A").charAt(0).toUpperCase();
 
   return (
+    <TranslatedTextTree>
     <AppBar
       position="sticky"
       elevation={0}
@@ -399,5 +401,6 @@ export default function AdminTopBar({
         </Menu>
       </Toolbar>
     </AppBar>
+    </TranslatedTextTree>
   );
 }
