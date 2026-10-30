@@ -18,29 +18,33 @@ import HubIcon from "@mui/icons-material/Hub";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import { LuCpu, LuDatabase, LuHardDrive, LuMemoryStick } from "react-icons/lu";
 import VolumeIcon from "../../VolumeIcon.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 
 function ResourceMetric({ icon, label, value, unit }) {
+  const { t } = useLocale();
   return (
     <Box sx={{ flex: "1 1 170px", minWidth: 0, p: 1.3, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "action.hover" }}>
       <Stack direction="row" spacing={1} alignItems="center">
         <Box sx={{ width: 32, height: 32, display: "grid", placeItems: "center", borderRadius: 1.5, bgcolor: "background.paper", color: "primary.main", border: "1px solid", borderColor: "divider" }}>{icon}</Box>
-        <Box sx={{ minWidth: 0 }}><Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{label}</Typography><Typography variant="body1" sx={{ fontWeight: 850 }}>{value == null ? "—" : value + " " + unit}</Typography></Box>
+        <Box sx={{ minWidth: 0 }}><Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>{t(label)}</Typography><Typography variant="body1" sx={{ fontWeight: 850 }}>{value == null ? "—" : value + " " + unit}</Typography></Box>
       </Stack>
     </Box>
   );
 }
 
 function AttachedVolumes({ volumes }) {
-  if (!Array.isArray(volumes) || !volumes.length) return <Typography variant="body2" color="text.secondary">No volumes attached to this service.</Typography>;
+  const { t } = useLocale();
+  if (!Array.isArray(volumes) || !volumes.length) return <Typography variant="body2" color="text.secondary">{t("No volumes attached to this service.")}</Typography>;
   return <Stack spacing={0.8}>{volumes.slice(0, 6).map((v) => <Box key={v.id ?? v.pk ?? v.name} sx={{ p: 1, border: "1px solid", borderColor: "divider", borderRadius: 1.7 }}>
     <Stack direction="row" spacing={1} alignItems="center"><VolumeIcon size={18} /><Box sx={{ flex: 1, minWidth: 0 }}>
       <Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name || "Unnamed volume"}</Typography>
-      <Typography variant="caption" color="text.secondary">{v.size_mb != null ? v.size_mb + " MB" : "Size unavailable"} · {v.bind || v.default_bind || "Mount path unavailable"}</Typography>
+      <Typography variant="caption" color="text.secondary">{v.size_mb != null ? v.size_mb + " MB" : t("Size unavailable")} · {v.bind || v.default_bind || t("Mount path unavailable")}</Typography>
     </Box><Chip size="small" label={String(v.mode || v.default_mode || "rw").toLowerCase()} color={String(v.mode || v.default_mode || "rw").toLowerCase() === "ro" ? "warning" : "success"} variant="outlined" sx={{ height: 22, fontWeight: 700 }}/></Stack>
-  </Box>)}{volumes.length > 6 && <Typography variant="caption" color="text.secondary">Showing 6 of {volumes.length} volumes.</Typography>}</Stack>;
+  </Box>)}{volumes.length > 6 && <Typography variant="caption" color="text.secondary">{t("Showing 6 of")} {volumes.length} {t("volumes")}.</Typography>}</Stack>;
 }
 function InfoRow({ label, value }) {
+  const { t } = useLocale();
   return (
     <Box
       sx={{
@@ -71,6 +75,7 @@ function InfoRow({ label, value }) {
 }
 
 function SectionCard({ icon, title, children }) {
+  const { t } = useLocale();
   return (
     <Paper
       elevation={0}
@@ -88,7 +93,7 @@ function SectionCard({ icon, title, children }) {
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.75 }}>
         {icon}
         <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: "-0.01em" }}>
-          {title}
+          {t(title)}
         </Typography>
       </Box>
       <Divider sx={{ mb: 1.5 }} />
@@ -101,6 +106,7 @@ function SectionCard({ icon, title, children }) {
 // Credential row — masked by default, eye toggle to reveal, copy button.
 // ---------------------------------------------------------------------------
 function CredentialRow({ label, value, mono = false, sensitive = false, tooltip = "" }) {
+  const { t } = useLocale();
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -149,19 +155,19 @@ function CredentialRow({ label, value, mono = false, sensitive = false, tooltip 
           {displayValue}
         </Typography>
         {sensitive && value != null && value !== "" && (
-          <Tooltip title={revealed ? "Hide" : "Show"}>
+          <Tooltip title={t(revealed ? "Hide" : "Show")}>
             <IconButton
               size="small"
               onClick={() => setRevealed((r) => !r)}
-              aria-label={revealed ? "Hide value" : "Show value"}
+              aria-label={t(revealed ? "Hide value" : "Show value")}
             >
               {revealed ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
             </IconButton>
           </Tooltip>
         )}
         {value != null && value !== "" && (
-          <Tooltip title={copied ? "Copied!" : "Copy"}>
-            <IconButton size="small" onClick={handleCopy} aria-label={`Copy ${label}`}>
+          <Tooltip title={t(copied ? "Copied!" : "Copy")}>
+            <IconButton size="small" onClick={handleCopy} aria-label={t("Copy")} ${label}>
               <ContentCopy fontSize="small" color={copied ? "success" : "inherit"} />
             </IconButton>
           </Tooltip>
@@ -175,6 +181,7 @@ function CredentialRow({ label, value, mono = false, sensitive = false, tooltip 
 // Connection-string block — monospace, copy button, collapsible hints.
 // ---------------------------------------------------------------------------
 function ConnectionStringBlock({ platform, cfg, serviceName }) {
+  const { t } = useLocale();
   const [copied, setCopied] = useState(false);
   const [showHints, setShowHints] = useState(false);
   // For a database deployed as a Docker container, the host clients should
@@ -217,12 +224,12 @@ function ConnectionStringBlock({ platform, cfg, serviceName }) {
         }}
       >
         {uri}
-        <Tooltip title={copied ? "Copied!" : "Copy connection string"}>
+        <Tooltip title={t(copied ? "Copied!" : "Copy connection string")}>
           <IconButton
             size="small"
             onClick={handleCopy}
             sx={{ position: "absolute", top: 4, right: 4 }}
-            aria-label="Copy connection string"
+            aria-label={t("Copy connection string")}
           >
             <ContentCopy fontSize="small" color={copied ? "success" : "inherit"} />
           </IconButton>
@@ -269,6 +276,7 @@ function ConnectionStringBlock({ platform, cfg, serviceName }) {
 // endpoint (because DeploySerializer masks them in the regular API).
 // ---------------------------------------------------------------------------
 function DatabaseCredentialsCard({ selectedDeploy, serviceName, serviceHost }) {
+  const { t } = useLocale();
   const [creds, setCreds] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -311,12 +319,12 @@ function DatabaseCredentialsCard({ selectedDeploy, serviceName, serviceHost }) {
   return (
     <SectionCard
       icon={<LuDatabase size={18} />}
-      title="Database credentials"
+      title={t("Database credentials")}
     >
       {loading && (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 1 }}>
           <CircularProgress size={20} />
-          <Typography variant="body2" color="text.secondary">Loading credentials…</Typography>
+          <Typography variant="body2" color="text.secondary">{t("Loading credentials…")}</Typography>
         </Box>
       )}
       {error && (
@@ -329,7 +337,7 @@ function DatabaseCredentialsCard({ selectedDeploy, serviceName, serviceHost }) {
             </IconButton>
           }
         >
-          {error}
+          {t(error)}
         </Alert>
       )}
       {!loading && !error && creds && (
@@ -382,7 +390,7 @@ export default function OverviewPanel({
       {!hideServiceIdentity ? (
       <SectionCard
         icon={<DnsIcon color="primary" fontSize="small" />}
-        title="Service details"
+        title={t("Service details")}
       >
         <InfoRow label="Name" value={service?.name} />
         <InfoRow label="Service name" value={service?.service_name || null} />
@@ -392,9 +400,9 @@ export default function OverviewPanel({
           label="Running"
           value={
             serviceRunning === null ? null : serviceRunning ? (
-              <Chip label="Yes" size="small" color="success" sx={{ height: 22, fontWeight: 600 }} />
+              <Chip label={t("Yes")} size="small" color="success" sx={{ height: 22, fontWeight: 600 }} />
             ) : (
-              <Chip label="No" size="small" color="default" sx={{ height: 22 }} />
+              <Chip label={t("No")} size="small" color="default" sx={{ height: 22 }} />
             )
           }
         />
@@ -418,7 +426,7 @@ export default function OverviewPanel({
       ) : (
       <SectionCard
         icon={<DnsIcon color="primary" fontSize="small" />}
-        title="Selected deploy"
+        title={t("Selected deploy")}
       >
         <InfoRow
           label="Deploy"
@@ -441,10 +449,10 @@ export default function OverviewPanel({
 
       <SectionCard
         icon={<SmartToyOutlinedIcon color="primary" fontSize="small" />}
-        title="Automation"
+        title={t("Automation")}
       >
         <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
-          Connect scoped automation clients and AI agents to the PaaSDeployer control plane. Agents are account-level resources and are not tied to this service.
+          {t("Connect scoped automation clients and AI agents to the PaaSDeployer control plane. Agents are account-level resources and are not tied to this service.")}
         </Typography>
         <Button
           variant="outlined"
@@ -467,7 +475,7 @@ export default function OverviewPanel({
 
       <SectionCard
         icon={<SellOutlinedIcon color="primary" fontSize="small" />}
-        title="Plan & resources"
+        title={t("Plan & resources")}
       >
         <Stack spacing={1.5}>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
@@ -482,13 +490,13 @@ export default function OverviewPanel({
           </Stack>
         </Stack>
       </SectionCard>
-      <SectionCard icon={<VolumeIcon size={18} />} title="Attached volumes">
+      <SectionCard icon={<VolumeIcon size={18} />} title={t("Attached volumes")}>
         <AttachedVolumes volumes={attachedVolumes} />
       </SectionCard>
 
       <SectionCard
         icon={<HubIcon color="primary" fontSize="small" />}
-        title="Network"
+        title={t("Network")}
       >
         <InfoRow label="Name" value={networkName} />
         {(networkDetail?.network?.cidr ?? networkDetail?.cidr) && (
