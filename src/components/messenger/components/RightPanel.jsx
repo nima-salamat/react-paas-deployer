@@ -142,7 +142,7 @@ export default function RightPanel({
             <ArrowBackIcon />
           </IconButton>
         )}
-        <Typography fontWeight={700} sx={{ flex: 1, ml: canGoBack ? 1 : 0 }}>{headerTitle}</Typography>
+        <Typography fontWeight={700} sx={{ flex: 1, ml: canGoBack ? 1 : 0 }}>{t(headerTitle)}</Typography>
         <IconButton size="small" onClick={onClose} title={t("Close")}>
           <CloseIcon fontSize="small" />
         </IconButton>
@@ -165,7 +165,7 @@ export default function RightPanel({
         color="text.secondary"
         sx={{ display: "block", px: 2, pt: 1.5, pb: 0.5, letterSpacing: 0.6, fontWeight: 700 }}
       >
-        {label}
+        {t(label)}
       </Typography>
     );
     return (
@@ -179,8 +179,8 @@ export default function RightPanel({
             <ListItemButton onClick={onOpenMyProfile} sx={itemSx}>
               <ListItemIcon><AccountCircleIcon fontSize="small" /></ListItemIcon>
               <ListItemText
-                primary="My profile"
-                secondary="Photos, bio & privacy"
+                primary={t("My profile")}
+                secondary={t("Photos, bio & privacy")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -188,25 +188,25 @@ export default function RightPanel({
             <ListItemButton onClick={onOpenSessions} sx={itemSx}>
               <ListItemIcon><DevicesOutlinedIcon fontSize="small" /></ListItemIcon>
               <ListItemText
-                primary="Devices & sessions"
-                secondary="Manage signed-in sessions"
+                primary={t("Devices & sessions")}
+                secondary={t("Manage signed-in sessions")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
             </ListItemButton>
             <ListItemButton onClick={onOpenSecureSettings} sx={itemSx}>
               <ListItemIcon><SecurityIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Secure chat & recovery" secondary="Encrypted history, recovery key and Matrix devices"
+              <ListItemText primary={t("Secure chat & recovery")} secondary={t("Encrypted history, recovery key and Matrix devices")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }} />
             </ListItemButton>
             <ListItemButton onClick={onOpenContacts} sx={itemSx}>
               <ListItemIcon><ContactsIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Contacts" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+              <ListItemText primary={t("Contacts")} primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
             </ListItemButton>
             <ListItemButton onClick={onOpenBlocks} sx={itemSx}>
               <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Blocked users" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+              <ListItemText primary={t("Blocked users")} primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
             </ListItemButton>
           </List>
 
@@ -214,17 +214,17 @@ export default function RightPanel({
           <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
             <ListItemButton onClick={onOpenCreateGroup} sx={itemSx}>
               <ListItemIcon><GroupAddIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="New group" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+              <ListItemText primary={t("New group")} primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
             </ListItemButton>
             <ListItemButton onClick={onOpenJoin} sx={itemSx}>
               <ListItemIcon><LinkIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Join with invite" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+              <ListItemText primary={t("Join with invite")} primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
             </ListItemButton>
             <ListItemButton onClick={onOpenMyRequests} sx={itemSx}>
               <ListItemIcon><HourglassEmptyIcon fontSize="small" /></ListItemIcon>
               <ListItemText
-                primary="My join requests"
-                secondary={myJoinRequests?.length ? `${myJoinRequests.filter((r) => r.status === "pending").length} pending` : "None pending"}
+                primary={t("My join requests")}
+                secondary={myJoinRequests?.length ? `${myJoinRequests.filter((r) => r.status === "pending").length} pending` : t("None pending")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -236,8 +236,8 @@ export default function RightPanel({
             <ListItemButton onClick={onOpenMediaSettings} sx={itemSx}>
               <ListItemIcon><VideocamIcon fontSize="small" /></ListItemIcon>
               <ListItemText
-                primary="Camera & microphone"
-                secondary="Devices for voice and video messages"
+                primary={t("Camera & microphone")}
+                secondary={t("Devices for voice and video messages")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -245,8 +245,8 @@ export default function RightPanel({
             <ListItemButton onClick={onOpenAppearance} sx={itemSx}>
               <ListItemIcon><PaletteOutlinedIcon fontSize="small" /></ListItemIcon>
               <ListItemText
-                primary="Appearance"
-                secondary="Themes, avatars & message style"
+                primary={t("Appearance")}
+                secondary={t("Themes, avatars & message style")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -257,7 +257,7 @@ export default function RightPanel({
           <List disablePadding sx={{ mt: 2, bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider" }}>
             <ListItemButton onClick={onNavigateHome} sx={{ ...itemSx, color: "text.secondary" }}>
               <ListItemIcon sx={{ color: "inherit" }}><HomeOutlinedIcon fontSize="small" /></ListItemIcon>
-              <ListItemText primary="Back to Deployer" primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
+              <ListItemText primary={t("Back to Deployer")} primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }} />
             </ListItemButton>
           </List>
         </Box>
@@ -277,19 +277,19 @@ export default function RightPanel({
           <Stack spacing={1.5}>
             <Alert severity={recoveryReady ? "success" : recoveryError ? "error" : "warning"}>
               {recoveryReady
-                ? "Encrypted key backup is verified for this device."
+                ? t("Encrypted key backup is verified for this device.")
                 : matrixRecoveryState?.state === "recovery_required"
-                  ? "An encrypted backup already exists. Restore its existing recovery key or verify a trusted device; do not replace it."
+                  ? t("An encrypted backup already exists. Restore its existing recovery key or verify a trusted device; do not replace it.")
                   : recoveryError
-                    ? "Recovery status could not be verified. Retry before relying on this device for encrypted history."
-                    : "Set up an encrypted key backup to help restore message history if this browser or device is lost."}
-              {Number.isFinite(matrixRecoveryState?.deviceCount) ? ` Active Matrix devices: ${matrixRecoveryState.deviceCount}.` : ""}
+                    ? t("Recovery status could not be verified. Retry before relying on this device for encrypted history.")
+                    : t("Set up an encrypted key backup to help restore message history if this browser or device is lost.")}
+              {Number.isFinite(matrixRecoveryState?.deviceCount) ? ` ${t("Active Matrix devices")} : ${matrixRecoveryState.deviceCount}.` : ""}
             </Alert>
-            <Button fullWidth variant="contained" startIcon={<VpnKeyIcon />} onClick={onOpenSecureRecovery}>Recovery key & encrypted backup</Button>
-            <Button fullWidth variant="outlined" startIcon={<SecurityIcon />} onClick={onOpenSecureDevices}>Manage secure devices</Button>
-            <Button fullWidth variant="text" onClick={onRefreshSecureRecoveryState}>Refresh security status</Button>
+            <Button fullWidth variant="contained" startIcon={<VpnKeyIcon />} onClick={onOpenSecureRecovery}>{t("Recovery key & encrypted backup")}</Button>
+            <Button fullWidth variant="outlined" startIcon={<SecurityIcon />} onClick={onOpenSecureDevices}>{t("Manage secure devices")}</Button>
+            <Button fullWidth variant="text" onClick={onRefreshSecureRecoveryState}>{t("Refresh security status")}</Button>
             <Typography variant="caption" color="text.secondary">
-              Recovery keys stay on your device. The Messenger backend does not receive the recovery key or encrypted message content.
+              {t("Recovery keys stay on your device. The Messenger backend does not receive the recovery key or encrypted message content.")}
             </Typography>
           </Stack>
         </Box>
@@ -343,7 +343,7 @@ export default function RightPanel({
         color="text.secondary"
         sx={{ display: "block", px: 2, pt: 1.5, pb: 0.5, letterSpacing: 0.6, fontWeight: 700 }}
       >
-        {label}
+        {t(label)}
       </Typography>
     );
     return (
@@ -376,15 +376,15 @@ export default function RightPanel({
             >
               <ToggleButton value="light" aria-label={t("Light")}>
                 <LightModeOutlinedIcon sx={{ fontSize: 18 }} />
-                Light
+                {t("Light")}
               </ToggleButton>
               <ToggleButton value="dark" aria-label={t("Dark")}>
                 <DarkModeOutlinedIcon sx={{ fontSize: 18 }} />
-                Dark
+                {t("Dark")}
               </ToggleButton>
               <ToggleButton value="system" aria-label={t("System")}>
                 <SettingsBrightnessOutlinedIcon sx={{ fontSize: 18 }} />
-                System
+                {t("System")}
               </ToggleButton>
             </ToggleButtonGroup>
           </List>
@@ -571,7 +571,7 @@ export default function RightPanel({
                       : "error.main",
                     fontWeight: 600,
                   }}>
-                    {r.status.toUpperCase()} · {new Date(r.created_at).toLocaleDateString()}
+                    {t(r.status.toUpperCase())} · {new Date(r.created_at).toLocaleDateString()}
                   </Typography>
                 }
               />
@@ -583,14 +583,14 @@ export default function RightPanel({
                   startIcon={<CloseIcon fontSize="small" />}
                   onClick={() => onCancelJoinRequest(r.id)}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
               )}
             </ListItemButton>
           ))}
           {!(myJoinRequests || []).length && (
             <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-              You have no join requests. Search public groups and request to join one.
+{t("You have no join requests. Search public groups and request to join one.")}
             </Typography>
           )}
         </List>
@@ -607,7 +607,7 @@ export default function RightPanel({
         {header}
         {!canManage ? (
           <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-            Only group admins can view join requests.
+{t("Only group admins can view join requests.")}
           </Typography>
         ) : (
           <List dense sx={{ overflow: "auto", flex: 1 }}>
@@ -621,7 +621,7 @@ export default function RightPanel({
                 </ListItemAvatar>
                 <ListItemText
                   primary={r.user?.username || "Unknown"}
-                  secondary={`Requested ${new Date(r.created_at).toLocaleString()}`}
+                  secondary={`${t("Requested")} ${new Date(r.created_at).toLocaleString()}`}
                 />
                 <Stack direction="row" spacing={0.5}>
                   <IconButton
@@ -645,7 +645,7 @@ export default function RightPanel({
             ))}
             {!(convJoinRequests || []).length && (
               <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-                No pending join requests.
+{t("No pending join requests.")}
               </Typography>
             )}
           </List>
@@ -680,7 +680,7 @@ export default function RightPanel({
             </ListItemButton>
           ))}
           {!contacts.length && (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>No contacts</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>{t("No contacts")}</Typography>
           )}
         </List>
       </Box>
@@ -696,11 +696,11 @@ export default function RightPanel({
             <ListItemButton key={u.id}>
               <ListItemAvatar><Avatar src={withTokenQuery(u.avatar) || undefined}>{u.username?.[0]}</Avatar></ListItemAvatar>
               <ListItemText primary={u.username} />
-              <Button size="small" onClick={() => onUnblock(u.id)}>Unblock</Button>
+              <Button size="small" onClick={() => onUnblock(u.id)}>{t("Unblock")}</Button>
             </ListItemButton>
           ))}
           {!blocks.length && (
-            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>None</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>{t("None")}</Typography>
           )}
         </List>
       </Box>
@@ -737,7 +737,7 @@ export default function RightPanel({
               <ArrowBackIcon />
             </IconButton>
           ) : null}
-          <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>Shared services</Typography>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>{t("Shared services")}</Typography>
           {onClose && (
             <IconButton size="small" onClick={onClose}>
               <ArrowBackIcon sx={{ transform: "rotate(180deg)" }} />
@@ -903,13 +903,13 @@ export default function RightPanel({
         <Typography variant="h6">{convTitle(activeConv, meId)}</Typography>
         {peer && <Typography variant="body2" color="text.secondary">@{peer.username}</Typography>}
         {peer && peer.id && onlineUsers?.has(Number(peer.id)) && (
-          <Typography variant="caption" sx={{ color: "success.main", fontWeight: 600 }}>online</Typography>
+          <Typography variant="caption" sx={{ color: "success.main", fontWeight: 600 }}>{t("online")}</Typography>
         )}
         {/* Group avatar clear button — only show if avatar exists and user is admin */}
         {activeConv?.type === "group" && isAdmin && (activeConv.avatar_url || activeConv.avatar) && (
           <Box>
             <Button size="small" color="error" onClick={() => onClearGroupAvatar(activeConv.id)} sx={{ mt: 0.5 }}>
-              Remove photo
+              {t("Remove photo")}
             </Button>
           </Box>
         )}
@@ -933,8 +933,8 @@ export default function RightPanel({
           >
             <ListItemIcon><PhotoLibraryIcon color="primary" /></ListItemIcon>
             <ListItemText
-              primary="Shared media"
-              secondary="Photos · Videos · Music"
+              primary={t("Shared media")}
+              secondary={t("Photos · Videos · Music")}
               primaryTypographyProps={{ fontWeight: 700 }}
             />
           </ListItemButton>
@@ -955,8 +955,8 @@ export default function RightPanel({
               <CloudQueueIcon color="primary" />
             </ListItemIcon>
             <ListItemText
-              primary="Shared services"
-              secondary="Share & manage group services"
+              primary={t("Shared services")}
+              secondary={t("Share & manage group services")}
               primaryTypographyProps={{ fontWeight: 700 }}
             />
             <ChevronRightIcon sx={{ color: "text.secondary" }} />
