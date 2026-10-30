@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Box, Button, Chip, IconButton, Pagination, Stack, TextField, Typography,
 } from "@mui/material";
@@ -49,6 +50,7 @@ export default function AuthCodesPanel({
   const [confirmPurge, setConfirmPurge] = useState(false);
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
@@ -217,5 +219,6 @@ export default function AuthCodesPanel({
         </>
       )}
     </Stack>
+    </TranslatedTextTree>
   );
 }
