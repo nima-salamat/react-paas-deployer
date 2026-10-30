@@ -61,7 +61,9 @@
     "wavesurfer.js": "^7.12.11",
     "@xterm/xterm": "^5.5.0",
     "@xterm/addon-fit": "^0.10.0",
-    "matrix-js-sdk": "41.6.0"
+    "matrix-js-sdk": "41.6.0",
+    "@mui/stylis-plugin-rtl": "7.3.10",
+    "stylis": "^4.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

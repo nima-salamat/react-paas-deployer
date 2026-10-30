@@ -4,14 +4,17 @@ import { decodeRecoveryKey } from "matrix-js-sdk/lib/crypto-api/recovery-key";
 import { MSG_API, authHeaders } from "../api";
 import { getSessionBoundAccessToken } from "../../customHooks/authSession.js";
 
-const SESSION_KEY = "pd.matrix.secure-session.v1";
+const LEGACY_SESSION_KEY = "pd.matrix.secure-session.v1";
+const SESSION_KEY_PREFIX = "pd.matrix.secure-session.v2:";
 const PERSISTENT_DEVICE_KEY_PREFIX = "pd.matrix.device-id.v1:";
 const DEVICE_MARKER_DB = "pd-messenger-matrix-device-marker";
 const DEVICE_MARKER_STORE = "devices";
 
 let client = null;
 let clientPromise = null;
+let clientPromiseNamespace = "";
 let currentSession = null;
+let currentSessionNamespace = "";
 let releaseDeviceLock = null;
 let recoveryKeyBytesPending = null;
 let recoveryKeyIdPending = null;
@@ -26,30 +29,99 @@ export class MatrixSecureError extends Error {
   }
 }
 
+function isValidStoredSession(session) {
+  return Boolean(
+    session
+    && typeof session.homeserverUrl === "string" && session.homeserverUrl
+    && typeof session.userId === "string" && session.userId
+    && typeof session.deviceId === "string" && session.deviceId
+    && typeof session.accessToken === "string" && session.accessToken
+  );
+}
+
 function readSession() {
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace) return null;
+  const storageKey = `${SESSION_KEY_PREFIX}${namespace}`;
+
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
-    if (
-      parsed
-      && typeof parsed.homeserverUrl === "string"
-      && typeof parsed.userId === "string"
-      && typeof parsed.deviceId === "string"
-      && typeof parsed.accessToken === "string"
-    ) return parsed;
+    const persisted = JSON.parse(localStorage.getItem(storageKey) || "null");
+    if (isValidStoredSession(persisted)) {
+      currentSessionNamespace = namespace;
+      return persisted;
+    }
   } catch {
-    // Invalid local state is treated as a lost local device, not recovered by
-    // reusing the old remote device ID.
+    throw new MatrixSecureError(
+      "Could not read the saved Matrix device session for this account. The existing device was preserved.",
+      "persistent_session_unavailable",
+    );
   }
+
+  // Migrate older tab-only sessions only after normal Matrix whoami and Django
+  // device-binding validation succeeds in initializeClient().
+  try {
+    const legacy = JSON.parse(sessionStorage.getItem(LEGACY_SESSION_KEY) || "null");
+    if (isValidStoredSession(legacy)) {
+      currentSessionNamespace = namespace;
+      return legacy;
+    }
+  } catch {
+    // An unreadable legacy session is not trusted or reused.
+  }
+
+  currentSessionNamespace = namespace;
   return null;
 }
 
 function storeSession(session) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace || !isValidStoredSession(session)) {
+    throw new MatrixSecureError(
+      "The Matrix session cannot be safely bound to the current Paas Deployer account.",
+      "device_owner_unavailable",
+    );
+  }
+
+  const key = `${SESSION_KEY_PREFIX}${namespace}`;
+  const stored = {
+    deviceId: session.deviceId,
+    userId: session.userId,
+    accessToken: session.accessToken,
+    homeserverUrl: session.homeserverUrl,
+  };
+
+  try {
+    localStorage.setItem(key, JSON.stringify(stored));
+    const verified = JSON.parse(localStorage.getItem(key) || "null");
+    if (
+      !isValidStoredSession(verified)
+      || verified.deviceId !== stored.deviceId
+      || verified.userId !== stored.userId
+      || verified.accessToken !== stored.accessToken
+      || verified.homeserverUrl !== stored.homeserverUrl
+    ) throw new Error("Matrix session storage read-back did not match.");
+    sessionStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    throw new MatrixSecureError(
+      "This browser could not persist the Matrix device session. The existing device will not be replaced; enable site storage and retry.",
+      "persistent_session_unavailable",
+    );
+  }
+
+  currentSessionNamespace = namespace;
+  currentSession = stored;
+  return stored;
 }
 
 function clearSession() {
-  sessionStorage.removeItem(SESSION_KEY);
+  const namespace = currentSessionNamespace || currentDjangoUserNamespace();
+  if (namespace) {
+    try { localStorage.removeItem(`${SESSION_KEY_PREFIX}${namespace}`); }
+    catch { /* Keep runtime state cleared even if storage is blocked. */ }
+  }
+  try { sessionStorage.removeItem(LEGACY_SESSION_KEY); } catch { /* optional legacy state */ }
   currentSession = null;
+  currentSessionNamespace = "";
 }
 
 function newDeviceId() {
@@ -323,6 +395,10 @@ async function validateStoredSession(session) {
       "device_binding_unavailable",
     );
   }
+  // A valid Django session with a 403 from this endpoint means this Matrix
+  // token is not registered to that account (wrong account, revoked device,
+  // or missing identity). Retire only that Matrix session, not the Django one.
+  if (bindingResponse.status === 403) return false;
 
   let bindingBody;
   try {
@@ -338,7 +414,7 @@ async function validateStoredSession(session) {
     // An expired/revoked/foreign Matrix device is genuinely invalid. In
     // contrast, a stale Django session or an unexplained authorization error
     // must not silently replace the browser's device and its only local keys.
-    if (/matrix (?:access )?token.*(?:invalid|expired)|device.*(?:revoked|belongs to another|different device|not found)/i.test(reason)) {
+    if (/matrix (?:access )?token.*(?:invalid|expired)|matrix session belongs to a different account|device.*(?:revoked|belongs to another|different device|not found)/i.test(reason)) {
       return false;
     }
     throw new MatrixSecureError(
@@ -351,7 +427,7 @@ async function validateStoredSession(session) {
   return binding?.valid === true && binding?.device_id === session.deviceId;
 }
 
-async function requestNewDeviceSession() {
+async function requestNewDeviceSession(retryRevokedDevice = true) {
   let remembered = getOrCreatePersistentDeviceId();
   // A persistent browser ID is reusable only while its matching IndexedDB
   // crypto marker still exists. Otherwise retire it and allocate a new ID;
@@ -393,7 +469,18 @@ async function requestNewDeviceSession() {
   }
   const session = body?.data || body;
   if (!response.ok || body?.success === false) {
-    throw new MatrixSecureError(body?.message || "Could not create a Matrix device session.", "device_session_failed");
+    const message = String(body?.message || body?.detail || "");
+    // This endpoint uses HTTP 410 only for an app-registered device whose
+    // access was explicitly revoked. Rotate the stable ID once; network,
+    // timeout, 429 and 5xx failures must never trigger a new device.
+    if (
+      retryRevokedDevice
+      && response.status === 410
+    ) {
+      forgetPersistentMatrixDeviceId(deviceId);
+      return requestNewDeviceSession(false);
+    }
+    throw new MatrixSecureError(message || "Could not create a Matrix device session.", "device_session_failed");
   }
   if (
     session?.device_id !== deviceId
@@ -532,14 +619,14 @@ async function initializeClient() {
           throw new MatrixSecureError("Could not verify the saved Matrix encryption store.", "indexeddb_error");
         }
         if (persistentMarkerExists) {
-          // The current tab has an older duplicate ID. Keep the stable device
-          // and retire the stale remote login before reopening that device.
+          // A stable account device already owns the local crypto store.
+          // Retire the verified legacy login and restore the stable device below.
           await revokeLostLocalDevice(session.deviceId);
           clearSession();
           session = null;
         } else {
-          // Persistent ID points at a crypto store that no longer exists.
-          // Retire it and migrate the validated, marker-backed session instead.
+          // The stable ID has no matching local store. Retire it and keep the
+          // verified legacy device so its existing encryption keys survive.
           await revokeLostLocalDevice(persistentDeviceId);
           rememberValidatedPersistentDeviceId(session.deviceId);
         }
@@ -547,6 +634,9 @@ async function initializeClient() {
         rememberValidatedPersistentDeviceId(session.deviceId);
       }
     }
+
+    // Persist only after resolving legacy-vs-stable device conflicts above.
+    if (session) storeSession(session);
     if (!session) {
       session = await requestNewDeviceSession();
       createdDeviceSession = session.createdNewDeviceId !== false;
@@ -601,26 +691,57 @@ async function initializeClient() {
 }
 
 export async function getSecureMatrixClient() {
-  if (client) {
-    const session = currentSession || readSession();
-    if (session && await validateStoredSession(session)) return client;
-    // The Django login changed or the Matrix device was revoked while this
-    // tab stayed open. Clear cached auth and fail closed; a user gesture/reload
-    // can establish a fresh, separate device.
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace) {
+    throw new MatrixSecureError(
+      "Sign in to Paas Deployer before opening a Matrix secure chat.",
+      "device_owner_unavailable",
+    );
+  }
+
+  if (client && currentSessionNamespace !== namespace) {
+    // Preserve the old account's durable session when another app account
+    // signs in in this browser; switching back can reuse its validated device.
     shutdownSecureMatrixClient();
+  }
+
+  if (client) {
+    const session = currentSessionNamespace === namespace ? (currentSession || readSession()) : null;
+    if (
+      session
+      && client.getUserId?.() === session.userId
+      && client.getDeviceId?.() === session.deviceId
+      && await validateStoredSession(session)
+    ) return client;
+
+    // Definitive invalidation clears the account's token. Network, timeout,
+    // 429 and server failures throw from validation and preserve it.
+    shutdownSecureMatrixClient({ clearStoredSession: true });
     throw new MatrixSecureError(
       "The Matrix device no longer belongs to the current Messenger session. Reopen secure chat to establish a new device and recover keys.",
       "account_binding_changed",
     );
   }
+  if (clientPromise && clientPromiseNamespace !== namespace) {
+    throw new MatrixSecureError(
+      "Matrix is still initializing for a different Paas Deployer account. Retry after that initialization finishes.",
+      "account_initialization_in_progress",
+    );
+  }
   if (!clientPromise) {
-    clientPromise = initializeClient().finally(() => { clientPromise = null; });
+    clientPromiseNamespace = namespace;
+    clientPromise = initializeClient().finally(() => {
+      clientPromise = null;
+      clientPromiseNamespace = "";
+    });
   }
   return clientPromise;
 }
 
 export function getSecureMatrixSession() {
-  return currentSession || readSession();
+  const namespace = currentDjangoUserNamespace();
+  if (currentSession && currentSessionNamespace === namespace) return currentSession;
+  return readSession();
 }
 
 export function hasSecureMatrixInitialSync(matrixClient) {
@@ -1147,11 +1268,21 @@ export async function createEncryptedTopic({ conversation, title, description = 
   );
 }
 
-export function shutdownSecureMatrixClient() {
+export function shutdownSecureMatrixClient({ clearStoredSession = false } = {}) {
   try { client?.stopClient(); } catch { /* no-op */ }
   client = null;
   clientPromise = null;
-  clearSession();
+  clientPromiseNamespace = "";
+
+  if (clearStoredSession) {
+    clearSession();
+  } else {
+    // Normal shutdown and account switching release SDK resources and locks
+    // without deleting a validated session that should be reused next time.
+    currentSession = null;
+    currentSessionNamespace = "";
+  }
+
   secretStorageKeyCache.clear();
   recoveryKeyBytesPending?.fill(0);
   recoveryKeyBytesPending = null;

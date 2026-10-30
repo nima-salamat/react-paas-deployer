@@ -8,6 +8,7 @@ import ComputerIcon from "@mui/icons-material/Computer";
 import SmartphoneIcon from "@mui/icons-material/Smartphone";
 import BlockIcon from "@mui/icons-material/Block";
 import { MSG_API, authHeaders } from "../api";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   forgetPersistentMatrixDeviceId, getSecureMatrixSession, shutdownSecureMatrixClient,
 } from "./MatrixSecureClient";
@@ -26,6 +27,7 @@ async function parseApiResponse(response) {
 }
 
 export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevoked }) {
+  const { t } = useLocale();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busyDevice, setBusyDevice] = useState("");
@@ -75,7 +77,7 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
       const isCurrent = device.is_current || session?.deviceId === device.device_id;
       if (isCurrent) {
         forgetPersistentMatrixDeviceId(device.device_id);
-        shutdownSecureMatrixClient();
+        shutdownSecureMatrixClient({ clearStoredSession: true });
         onCurrentDeviceRevoked?.();
       }
       setPendingRevoke(null);
@@ -92,23 +94,23 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
 
   return (
     <Dialog open={Boolean(open)} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Secure devices</DialogTitle>
+      <DialogTitle>{t("Secure devices")}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={1.5}>
           <Alert severity="info">
-            Revoking a device stops its Matrix session from receiving future room events and keys. It cannot delete message copies or keys that device already saved. Only devices registered through this Paas Deployer account appear here.
+            {t("Revoking a device stops its Matrix session from receiving future room events and keys. It cannot delete message copies or keys that device already saved. Only devices registered through this Paas Deployer account appear here.")}
           </Alert>
-          {error && <Alert severity="error">{error}</Alert>}
-          {message && <Alert severity="success">{message}</Alert>}
+          {error && <Alert severity="error">{t(error)}</Alert>}
+          {message && <Alert severity="success">{t(message)}</Alert>}
           {!loading && !error && (
             <Alert severity="info">
-              {devices.filter((device) => !device.revoked_at).length} active Matrix device(s) · {devices.filter((device) => Boolean(device.revoked_at)).length} revoked historical device(s).
+              {devices.filter((device) => !device.revoked_at).length} {t("active Matrix device(s)")} · {devices.filter((device) => Boolean(device.revoked_at)).length} {t("revoked historical device(s).")}
             </Alert>
           )}
           {loading && <Box sx={{ py: 2, display: "flex", justifyContent: "center" }}><CircularProgress size={22} /></Box>}
           {!loading && devices.length === 0 && (
             <Typography color="text.secondary" variant="body2">
-              No Matrix devices are registered for this account yet.
+              {t("No Matrix devices are registered for this account yet.")}
             </Typography>
           )}
           <List disablePadding>

@@ -27,9 +27,17 @@ export function unwrapList(res) {
  *  that bypass apiRequest — e.g. fetching text-attachment content). */
 export function authHeaders(extra = {}) {
   const token = localStorage.getItem("access");
+  let language = "en-us";
+  try {
+    const saved = localStorage.getItem("paas-language");
+    if (saved === "fa") language = "fa";
+  } catch {
+    // Keep English when site storage is unavailable.
+  }
+  const localizedExtra = { "Accept-Language": language, ...extra };
   if (token && !isSessionBoundToken(token)) {
     clearAuthAndRedirect();
-    return { ...extra };
+    return localizedExtra;
   }
-  return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra };
+  return token ? { Authorization: `Bearer ${token}`, ...localizedExtra } : localizedExtra;
 }

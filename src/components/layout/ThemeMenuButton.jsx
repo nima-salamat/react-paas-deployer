@@ -47,7 +47,7 @@ export default function ThemeMenuButton({
         <IconButton
           size="small"
           onClick={(event) => setAnchorEl(event.currentTarget)}
-          aria-label={tooltip}
+          aria-label={t(tooltip)}
           aria-haspopup="menu"
           aria-expanded={anchorEl ? "true" : undefined}
           sx={{

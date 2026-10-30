@@ -20,6 +20,7 @@ import {
   dryChipSx, dryWarningChipSx,
 } from "../components/DryTable";
 import FKPicker from "../components/FKPicker";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 /**
  * TablesPanel — read + delete CRUD on registered Django models.
@@ -46,6 +47,7 @@ const COL_REORDER_PREFIX = "admin_table_col_order_";
 
 export default function TablesPanel() {
   const pushToast = useToast();
+  const { t: translate } = useLocale();
   const canManage = hasAnyRule("tables.manage");
 
   const [tables, setTables] = useState([]);
@@ -76,7 +78,7 @@ export default function TablesPanel() {
       const d = res.data?.data || res.data || {};
       setTables(d.tables || []);
     } catch (e) {
-      pushToast(e?.response?.data?.detail || "Failed to load table catalog");
+      pushToast(e?.response?.data?.message || e?.response?.data?.detail || "Failed to load table catalog");
     } finally {
       setTablesLoading(false);
     }
@@ -105,7 +107,7 @@ export default function TablesPanel() {
         t.key === activeTable.key ? { ...t, count: d.count ?? t.count } : t
       ));
     } catch (e) {
-      pushToast(e?.response?.data?.detail || "Failed to load rows");
+      pushToast(e?.response?.data?.message || e?.response?.data?.detail || "Failed to load rows");
       setRows([]);
       setFields([]);
       setRowCount(0);
@@ -172,7 +174,7 @@ export default function TablesPanel() {
     // Find table in catalog
     const t = tables.find((x) => x.key === modelKey);
     if (!t) {
-      pushToast(`Table ${modelKey} is not registered`);
+      pushToast(translate("Table not registered"));
       return;
     }
     setActiveTable(t);
@@ -191,7 +193,7 @@ export default function TablesPanel() {
         const d = res.data?.data || res.data || {};
         setDetailRow({ ...d, pk });
       } catch (e) {
-        pushToast(e?.response?.data?.detail || "Failed to load row");
+        pushToast(e?.response?.data?.message || e?.response?.data?.detail || "Failed to load row");
         setDetailRow(null);
       } finally {
         setDetailLoading(false);
@@ -213,7 +215,7 @@ export default function TablesPanel() {
       const d = res.data?.data || res.data || {};
       setDetailRow({ ...d, pk });
     } catch (e) {
-      pushToast(e?.response?.data?.detail || "Failed to load row");
+      pushToast(e?.response?.data?.message || e?.response?.data?.detail || "Failed to load row");
       setDetailRow(null);
     } finally {
       setDetailLoading(false);
@@ -283,7 +285,7 @@ export default function TablesPanel() {
       if (rows.length === 1 && page > 1) setPage((p) => p - 1);
       else loadRows();
     } catch (e) {
-      const detail = e?.response?.data?.detail
+      const detail = e?.response?.data?.message || e?.response?.data?.detail
         || (e?.response?.data?.protected?.length
           ? `Cannot delete: referenced by ${e.response.data.protected.length} row(s)`
           : "Delete failed");
@@ -299,24 +301,21 @@ export default function TablesPanel() {
       <Stack spacing={2.5}>
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} gap={1.5}>
           <Box>
-            <Typography variant="h5" fontWeight={800}>Database tables</Typography>
+            <Typography variant="h5" fontWeight={800}>{translate("Database tables")}</Typography>
             <Typography variant="body2" color="text.secondary">
-              Browse and inspect registered Django models. {canManage ? "Rows on deletable tables can be deleted." : "Read-only — you need tables.manage to delete rows."}
+              {translate("Browse and inspect registered Django models.")} {canManage ? translate("Rows on deletable tables can be deleted.") : translate("Read-only — you need tables.view to inspect rows.")}
             </Typography>
           </Box>
           <Button startIcon={<RefreshIcon />} onClick={loadTables} disabled={tablesLoading} variant="outlined"
             sx={{ borderRadius: 0, textTransform: "none" }}>
-            Refresh
+            {translate("Refresh")}
           </Button>
         </Stack>
 
         <DryInfoBanner icon={StorageIcon} color="info.main">
-          <Typography variant="body2" fontWeight={600}>Security model</Typography>
+          <Typography variant="body2" fontWeight={600}>{translate("Security model")}</Typography>
           <Typography variant="caption" color="text.secondary">
-            Only models registered in <code>TABLE_REGISTRY</code> are exposed. Sensitive fields
-            (passwords, tokens, secrets) are masked on read. Hard delete is restricted to models
-            flagged <code>deletable=True</code> and requires the <code>tables.manage</code> rule.
-            Column order can be rearranged by dragging the column header — it persists per table.
+            {translate("Only models registered in")} <code>TABLE_REGISTRY</code> {translate("are exposed. Sensitive fields (passwords, tokens, secrets) are masked on read. Hard delete is restricted to models flagged")} <code>deletable=True</code> {translate("and requires the")} <code>tables.manage</code> {translate("rule. Column order can be rearranged by dragging the column header — it persists per table.")}
           </Typography>
         </DryInfoBanner>
 
@@ -324,7 +323,7 @@ export default function TablesPanel() {
           <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
         ) : tables.length === 0 ? (
           <DryPanel sx={{ p: 4, textAlign: "center" }}>
-            <Typography color="text.secondary">No tables registered</Typography>
+            <Typography color="text.secondary">{translate("No tables registered")}</Typography>
           </DryPanel>
         ) : (
           <DryPanel sx={{ overflow: "hidden" }}>
@@ -332,12 +331,12 @@ export default function TablesPanel() {
               <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <Box component="thead" sx={{ bgcolor: "action.hover" }}>
                   <tr>
-                    <DryTh>Table</DryTh>
-                    <DryTh>App</DryTh>
-                    <DryTh>Model</DryTh>
-                    <DryTh align="right">Rows</DryTh>
-                    <DryTh align="center">Search</DryTh>
-                    <DryTh align="center">Deletable</DryTh>
+                    <DryTh>{translate("Table")}</DryTh>
+                    <DryTh>{translate("App")}</DryTh>
+                    <DryTh>{translate("Model")}</DryTh>
+                    <DryTh align="right">{translate("Rows")}</DryTh>
+                    <DryTh align="center">{translate("Search")}</DryTh>
+                    <DryTh align="center">{translate("Deletable")}</DryTh>
                     <DryTh align="right"> </DryTh>
                   </tr>
                 </Box>
@@ -347,7 +346,7 @@ export default function TablesPanel() {
                       <DryTd>
                         <Stack direction="row" alignItems="center" gap={1}>
                           <TableChartIcon fontSize="small" color="action" />
-                          <Typography fontWeight={700} fontSize={13}>{t.label}</Typography>
+                          <Typography fontWeight={700} fontSize={13}>{translate(t.label)}</Typography>
                         </Stack>
                       </DryTd>
                       <DryTd><code style={{ fontSize: 11 }}>{t.app}</code></DryTd>
@@ -355,18 +354,18 @@ export default function TablesPanel() {
                       <DryTd align="right">{t.count ?? "—"}</DryTd>
                       <DryTd align="center">
                         {t.searchable
-                          ? <Chip size="small" label="yes" sx={dryChipSx(true)} />
-                          : <Chip size="small" label="no" sx={dryChipSx(false)} />}
+                          ? <Chip size="small" label={translate("Yes")} sx={dryChipSx(true)} />
+                          : <Chip size="small" label={translate("No")} sx={dryChipSx(false)} />}
                       </DryTd>
                       <DryTd align="center">
                         {t.deletable
-                          ? <Chip size="small" label="deletable" sx={dryWarningChipSx} />
-                          : <Chip size="small" icon={<LockIcon sx={{ fontSize: 11 }} />} label="read-only" sx={dryChipSx(false)} />}
+                          ? <Chip size="small" label={translate("Deletable")} sx={dryWarningChipSx} />
+                          : <Chip size="small" icon={<LockIcon sx={{ fontSize: 11 }} />} label={translate("Read-only")} sx={dryChipSx(false)} />}
                       </DryTd>
                       <DryTd align="right">
                         <Button size="small" onClick={() => openTable(t)} variant="outlined"
                           sx={{ borderRadius: 0, textTransform: "none" }}>
-                          Open
+                          {translate("Open")}
                         </Button>
                       </DryTd>
                     </tr>
@@ -384,7 +383,7 @@ export default function TablesPanel() {
   return (
     <Stack spacing={2.5}>
       <Stack direction="row" alignItems="center" gap={1.5}>
-        <IconButton onClick={goBack} aria-label="back to catalog">
+        <IconButton onClick={goBack} aria-label={translate("Back to catalog")}>
           <ArrowBackIcon />
         </IconButton>
         <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -392,14 +391,14 @@ export default function TablesPanel() {
             {activeTable.label}
           </Typography>
           <Typography variant="caption" color="text.secondary" fontFamily="monospace">
-            {activeTable.app}.{activeTable.model} · {rowCount.toLocaleString()} rows
+            {activeTable.app}.{activeTable.model} · {rowCount.toLocaleString()} {translate("rows")}
           </Typography>
         </Box>
-        <Tooltip title="Create / Update endpoints are not exposed by the backend for safety. Use the Django admin or a dedicated admin API for write operations.">
+        <Tooltip title={translate("Create / Update endpoints are not exposed by the backend for safety. Use the Django admin or a dedicated admin API for write operations.")}>
           <span>
             <Button size="small" variant="outlined" disabled
               sx={{ borderRadius: 0, textTransform: "none" }}>
-              New row (locked)
+              {translate("New row (locked)")}
             </Button>
           </span>
         </Tooltip>
@@ -410,14 +409,14 @@ export default function TablesPanel() {
       </Stack>
 
       <Typography variant="caption" color="text.secondary">
-        Tip: drag the column header to reorder columns. Click any FK chip to navigate to that row.
+        {translate("Tip: drag the column header to reorder columns. Click any FK chip to navigate to that row.")}
       </Typography>
 
       {activeTable.searchable && (
         <DryPanel sx={{ p: 1.5 }}>
           <TextField
             size="small"
-            placeholder="Search rows…"
+            placeholder={translate("Search rows…")}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             fullWidth
@@ -439,7 +438,7 @@ export default function TablesPanel() {
           <LinearProgress />
         ) : rows.length === 0 ? (
           <Box sx={{ p: 4, textAlign: "center" }}>
-            <Typography color="text.secondary">No rows</Typography>
+            <Typography color="text.secondary">{translate("No rows")}</Typography>
           </Box>
         ) : (
           <Box sx={{ overflowX: "auto" }}>
@@ -467,7 +466,7 @@ export default function TablesPanel() {
                       <Stack direction="row" alignItems="center" gap={0.5}>
                         <DragIndicatorIcon sx={{ fontSize: 12, color: "text.disabled" }} />
                         <Stack>
-                          <Typography variant="caption" fontWeight={700}>{f.name}</Typography>
+                          <Typography variant="caption" fontWeight={700}>{f.label || translate(f.name)}</Typography>
                           <Typography variant="overline" color="text.secondary" sx={{ fontSize: 9, lineHeight: 1, display: "block" }}>
                             {f.type}
                           </Typography>
@@ -476,7 +475,7 @@ export default function TablesPanel() {
                       </Stack>
                     </DryTh>
                   ))}
-                  <DryTh align="right">Actions</DryTh>
+                  <DryTh align="right">{translate("Actions")}</DryTh>
                 </tr>
               </Box>
               <tbody>
@@ -488,6 +487,8 @@ export default function TablesPanel() {
                         <DryTd key={f.name} sx={{ maxWidth: MAX_CELL_WIDTH, verticalAlign: "top" }}>
                           <CellRenderer
                             value={r[f.name]}
+                            displayValue={r?._display?.[f.name]}
+                            t={translate}
                             field={f}
                             onFkClick={f.is_relation && f.related ? (fkPk) => navigateToRow(f.related, fkPk) : null}
                           />
@@ -496,9 +497,9 @@ export default function TablesPanel() {
                       <DryTd align="right">
                         <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                           <Button size="small" onClick={() => openRowDetail(r)}
-                            sx={{ borderRadius: 0, textTransform: "none", fontSize: 11 }}>View</Button>
+                            sx={{ borderRadius: 0, textTransform: "none", fontSize: 11 }}>{translate("View")}</Button>
                           {canManage && activeTable.deletable && (
-                            <Tooltip title="Delete row">
+                            <Tooltip title={translate("Delete row")}>
                               <IconButton
                                 size="small"
                                 color="error"
@@ -539,26 +540,26 @@ export default function TablesPanel() {
       {/* Delete confirmation */}
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth
         PaperProps={{ sx: { borderRadius: 0 } }}>
-        <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>Delete row?</DialogTitle>
+        <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>{translate("Delete row?")}</DialogTitle>
         <DialogContent>
           <Stack gap={1}>
             <Typography>
-              You are about to <strong>permanently delete</strong> this row from <code>{activeTable.key}</code>:
+              {translate("You are about to")} <strong>{translate("permanently delete")}</strong> {translate("this row from")} <code>{activeTable.key}</code>:
             </Typography>
             <DryPanel sx={{ p: 1.5, fontFamily: "monospace", fontSize: 12 }}>
               {deleteTarget?.label || deleteTarget?.pk}
             </DryPanel>
             <Typography variant="caption" color="error">
-              This cannot be undone. If the row is referenced by other rows via protected foreign keys, the delete will be blocked.
+              {translate("This cannot be undone. If the row is referenced by other rows via protected foreign keys, the delete will be blocked.")}
             </Typography>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setDeleteTarget(null)} disabled={deleting}
-            sx={{ borderRadius: 0, textTransform: "none" }}>Cancel</Button>
+            sx={{ borderRadius: 0, textTransform: "none" }}>{translate("Cancel")}</Button>
           <Button color="error" variant="contained" onClick={confirmDelete} disabled={deleting}
             sx={{ borderRadius: 0, textTransform: "none", fontWeight: 700 }}>
-            {deleting ? "Deleting…" : "Delete row"}
+            {deleting ? translate("Deleting…") : translate("Delete row")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -574,7 +575,7 @@ export default function TablesPanel() {
         <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>
           <Stack direction="row" alignItems="center" gap={1}>
             <StorageIcon fontSize="small" />
-            <span>Row detail · {activeTable.label}</span>
+            <span>{translate("Row detail")} · {translate(activeTable.label)}</span>
             {detailRow?.pk != null && (
               <code style={{ fontSize: 11, color: "text.secondary" }}>
                 pk={String(detailRow.pk).slice(0, 16)}
@@ -590,14 +591,14 @@ export default function TablesPanel() {
               <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <tbody>
                   {Object.entries(detailRow)
-                    .filter(([k]) => k !== "__loading" && k !== "pk")
+                    .filter(([k]) => k !== "__loading" && k !== "pk" && k !== "_display")
                     .map(([k, v]) => {
                       const field = fields.find((f) => f.name === k);
                       const isFK = field?.is_relation && field?.related;
                       return (
                         <tr key={k} style={{ borderTop: DRY_BORDER_LIGHT }}>
                           <DryTd sx={{ width: 200, bgcolor: "action.hover" }}>
-                            <Typography variant="caption" fontWeight={700}>{k}</Typography>
+                            <Typography variant="caption" fontWeight={700}>{field?.label || translate(k)}</Typography>
                             {field && (
                               <Typography variant="overline" color="text.secondary" sx={{ fontSize: 9, lineHeight: 1, display: "block" }}>
                                 {field.type}
@@ -614,6 +615,8 @@ export default function TablesPanel() {
                                   navigateToRow(field.related, fkPk);
                                 }}
                               />
+                            ) : detailRow?._display?.[k] != null ? (
+                              <Typography variant="body2">{translate(detailRow._display[k])}</Typography>
                             ) : (
                               <CellValueDetail value={v} />
                             )}
@@ -625,12 +628,12 @@ export default function TablesPanel() {
               </Box>
             </Box>
           ) : (
-            <Typography color="text.secondary">No data</Typography>
+            <Typography color="text.secondary">{translate("No data")}</Typography>
           )}
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setDetailRow(null)}
-            sx={{ borderRadius: 0, textTransform: "none" }}>Close</Button>
+            sx={{ borderRadius: 0, textTransform: "none" }}>{translate("Close")}</Button>
         </DialogActions>
       </Dialog>
     </Stack>
@@ -638,18 +641,21 @@ export default function TablesPanel() {
 }
 
 // ─── Cell renderers ──────────────────────────────────────────────────────
-function CellRenderer({ value, field, onFkClick }) {
+function CellRenderer({ value, displayValue, t = (value) => value, field, onFkClick }) {
   if (value === null || value === undefined || value === "") {
     return <Typography variant="caption" color="text.disabled">—</Typography>;
   }
   if (field?.sensitive) {
-    return <Chip size="small" label="REDACTED" variant="outlined" sx={{ height: 18, fontSize: 10, borderRadius: 0 }} />;
+    return <Chip size="small" label={t("REDACTED")} variant="outlined" sx={{ height: 18, fontSize: 10, borderRadius: 0 }} />;
+  }
+  if (displayValue !== null && displayValue !== undefined) {
+    return <Typography variant="caption">{displayValue}</Typography>;
   }
   if (typeof value === "boolean") {
     return (
       <Chip
         size="small"
-        label={value ? "true" : "false"}
+        label={t(value ? "True" : "False")}
         sx={{
           height: 18,
           fontSize: 10,
@@ -674,7 +680,7 @@ function CellRenderer({ value, field, onFkClick }) {
           />
         ))}
         {value.length > 2 && (
-          <Typography variant="caption" color="text.secondary">+{value.length - 2} more</Typography>
+          <Typography variant="caption" color="text.secondary">+{value.length - 2} {t("more")}</Typography>
         )}
       </Stack>
     );
@@ -685,7 +691,7 @@ function CellRenderer({ value, field, onFkClick }) {
     // FK chip — clickable to navigate
     if (pk != null && onFkClick) {
       return (
-        <Tooltip title={`Open ${field?.related || "related row"} #${pk}`}>
+        <Tooltip title={`${t("Open")} ${field?.related || t("related row")} #${pk}`}>
           <Chip
             size="small"
             label={`#${pk} · ${label}`}
@@ -740,7 +746,7 @@ function CellRenderer({ value, field, onFkClick }) {
 
 function CellValueDetail({ value }) {
   if (value === null || value === undefined) {
-    return <Typography variant="caption" color="text.disabled">null</Typography>;
+    return <Typography variant="caption" color="text.disabled">{t("null")}</Typography>;
   }
   if (typeof value === "object") {
     return (

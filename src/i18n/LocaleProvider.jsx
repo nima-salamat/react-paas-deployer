@@ -8,11 +8,11 @@ import React, {
   useState,
 } from "react";
 import apiRequest from "../components/customHooks/apiRequest.jsx";
-import { getSessionBoundAccessToken } from "../components/customHooks/authSession.js";
+import { decodeJwtPayload, getSessionBoundAccessToken } from "../components/customHooks/authSession.js";
 import { LANGUAGE_OPTIONS, normalizeLanguage, translateText } from "./messages.js";
 
 const LANGUAGE_STORAGE_KEY = "paas-language";
-const EXPLICIT_LANGUAGE_KEY = "paas-language-explicit";
+const EXPLICIT_LANGUAGE_KEY_PREFIX = "paas-language-explicit:";
 const LANGUAGE_API_URL = "https://" + import.meta.env.VITE_API_BASE + "/api/users/user/language/";
 const LocaleContext = createContext(null);
 
@@ -25,17 +25,20 @@ function readStoredLanguage() {
   }
 }
 
-function hasAuthenticatedSession() {
+function getAuthenticatedAccountId() {
   try {
-    return Boolean(getSessionBoundAccessToken(window.localStorage));
+    const token = getSessionBoundAccessToken(window.localStorage);
+    const payload = decodeJwtPayload(token);
+    const accountId = payload?.user_id ?? payload?.user;
+    return accountId == null ? "" : String(accountId);
   } catch {
-    return false;
+    return "";
   }
 }
 
 export function LocaleProvider({ children }) {
   const [language, setLanguageState] = useState(readStoredLanguage);
-  const syncRequestRef = useRef(null);
+  const syncRequestRef = useRef(new Map());
 
   const applyLanguage = useCallback((nextLanguage) => {
     const normalized = normalizeLanguage(nextLanguage);
@@ -55,13 +58,13 @@ export function LocaleProvider({ children }) {
     if (!normalized) return;
 
     applyLanguage(normalized);
+    const accountId = getAuthenticatedAccountId();
+    if (!accountId) return;
     try {
-      window.localStorage.setItem(EXPLICIT_LANGUAGE_KEY, "1");
+      window.localStorage.setItem(`${EXPLICIT_LANGUAGE_KEY_PREFIX}${accountId}`, normalized);
     } catch {
-      // Ignore storage restrictions.
+      // The API update still proceeds when local storage is unavailable.
     }
-
-    if (!hasAuthenticatedSession()) return;
     try {
       await apiRequest({
         method: "PATCH",
@@ -75,33 +78,48 @@ export function LocaleProvider({ children }) {
   }, [applyLanguage]);
 
   const syncAccountLanguage = useCallback(async () => {
-    if (!hasAuthenticatedSession() || syncRequestRef.current) return syncRequestRef.current;
+    const accountId = getAuthenticatedAccountId();
+    if (!accountId) return null;
+    const pending = syncRequestRef.current.get(accountId);
+    if (pending) return pending;
 
     const request = (async () => {
       try {
-        const explicit = window.localStorage.getItem(EXPLICIT_LANGUAGE_KEY) === "1";
-        if (explicit) {
-          const localLanguage = readStoredLanguage();
+        let explicitLanguage = null;
+        try {
+          explicitLanguage = normalizeLanguage(
+            window.localStorage.getItem(`${EXPLICIT_LANGUAGE_KEY_PREFIX}${accountId}`),
+          );
+        } catch {
+          // Fall back to the server preference when local storage is unavailable.
+        }
+
+        if (explicitLanguage) {
+          // The saved value belongs to this account; never reuse the global
+          // language currently selected by another account in this browser.
+          if (getAuthenticatedAccountId() === accountId) applyLanguage(explicitLanguage);
           await apiRequest({
             method: "PATCH",
             url: LANGUAGE_API_URL,
-            data: { language: localLanguage },
+            data: { language: explicitLanguage },
           });
-          return localLanguage;
+          return explicitLanguage;
         }
 
         const response = await apiRequest({ method: "GET", url: LANGUAGE_API_URL });
         const serverLanguage = normalizeLanguage(response?.data?.language);
-        if (serverLanguage) applyLanguage(serverLanguage);
+        // Do not let a slow response for the previous account overwrite the
+        // language after the user switches accounts in another tab.
+        if (getAuthenticatedAccountId() === accountId && serverLanguage) applyLanguage(serverLanguage);
         return serverLanguage;
       } catch {
         return null;
       } finally {
-        syncRequestRef.current = null;
+        syncRequestRef.current.delete(accountId);
       }
     })();
 
-    syncRequestRef.current = request;
+    syncRequestRef.current.set(accountId, request);
     return request;
   }, [applyLanguage]);
 

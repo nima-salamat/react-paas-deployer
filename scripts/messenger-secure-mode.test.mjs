@@ -295,3 +295,111 @@ test("Matrix initialization resolves a stale tab ID against the persisted local 
   assert.match(migrate, /await revokeLostLocalDevice\(session\.deviceId\)/);
   assert.match(migrate, /await revokeLostLocalDevice\(persistentDeviceId\)/);
 });
+
+
+test("Matrix device sessions survive tab and browser restarts in account-scoped durable storage", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+
+  assert.match(client, /SESSION_KEY_PREFIX = "pd\.matrix\.secure-session\.v2:"/);
+  assert.match(client, /localStorage\.getItem\(storageKey\)/);
+  assert.match(client, /localStorage\.setItem\(key, JSON\.stringify\(stored\)\)/);
+  assert.match(client, /currentDjangoUserNamespace\(\)/);
+  assert.match(client, /sessionStorage\.removeItem\(LEGACY_SESSION_KEY\)/);
+  assert.match(client, /storeSession\(session\)/);
+});
+
+test("ordinary Matrix client shutdown preserves saved credentials, while explicit revocation clears them", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const devices = read("src/components/messenger/secure/MatrixDevicesDialog.jsx");
+
+  assert.match(client, /shutdownSecureMatrixClient\(\{ clearStoredSession = false \} = \{\}\)/);
+  assert.match(client, /if \(clearStoredSession\) \{\s*clearSession\(\)/);
+  assert.match(client, /Normal shutdown and account switching release SDK resources and locks/);
+  assert.match(devices, /shutdownSecureMatrixClient\(\{ clearStoredSession: true \}\)/);
+});
+
+test("revoked stable Matrix device IDs rotate once instead of leaving the account stuck", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+
+  assert.match(client, /requestNewDeviceSession\(retryRevokedDevice = true\)/);
+  assert.match(client, /retryRevokedDevice[\\s\\S]*?response\\.status === 410[\\s\\S]*?forgetPersistentMatrixDeviceId\\(deviceId\\)/);
+  assert.match(client, /forgetPersistentMatrixDeviceId\(deviceId\);\s*return requestNewDeviceSession\(false\)/);
+  assert.match(client, /Network\/5xx errors must never trigger a new device/);
+});
+
+test("direct Messenger API fetches carry the selected language to Django", () => {
+  const api = read("src/components/messenger/api.js");
+  assert.match(api, /Accept-Language/);
+  assert.match(api, /paas-language/);
+});
+
+test("admin database tables render translated schema labels and choice display values without replacing raw values", () => {
+  const panel = read("src/components/admin/panels/TablesPanel.jsx");
+  const messages = read("src/i18n/messages.js");
+
+  assert.match(panel, /useLocale/);
+  assert.match(panel, /f\.label \|\| translate\(f\.name\)/);
+  assert.match(panel, /displayValue=\{r\?\._display\?\.\[f\.name\]\}/);
+  assert.match(panel, /displayValue !== null && displayValue !== undefined/);
+  assert.match(messages, /"Database tables": "جدول‌های پایگاه داده"/);
+});
+
+test("home, dashboard, messenger and admin have Persian navigation and visible-label translations", () => {
+  const messages = read("src/i18n/messages.js");
+
+  for (const label of [
+    "Ready Apps",
+    "Start deploying",
+    "Overview",
+    "Quick access",
+    "Recent services",
+    "Your conversations",
+    "New message",
+    "New group",
+    "Admin",
+    "Database tables",
+    "Forgot Password?",
+    "Send Code",
+  ]) {
+    assert.ok(messages.includes(JSON.stringify(label)), "Missing locale entry for a main application area");
+  }
+});
+
+
+test("account-scoped Matrix sessions do not get confused during concurrent account initialization", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  assert.match(client, /let clientPromiseNamespace = ""/);
+  assert.match(client, /if \(clientPromise && clientPromiseNamespace !== namespace\)/);
+  assert.match(client, /account_initialization_in_progress/);
+  assert.match(client, /clientPromiseNamespace = namespace/);
+});
+
+test("a verified legacy session cannot overwrite an existing account-scoped device before conflict resolution", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const start = client.indexOf("stage = \"validating or creating the Matrix device session\"");
+  const end = client.indexOf("stage = \"creating the Matrix client\"", start);
+  const flow = client.slice(start, end);
+  assert.ok(flow.indexOf("persistentDeviceId !== session.deviceId") < flow.indexOf("if (session) storeSession(session)"));
+  assert.match(flow, /persistentMarkerExists[\s\S]*?clearSession\(\)[\s\S]*?session = null/);
+});
+
+test("only an explicit revoked-device response rotates a Matrix device ID; foreign-account legacy sessions are rejected", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  assert.match(client, /response\.status === 410/);
+  assert.match(client, /retryRevokedDevice[\s\S]*?forgetPersistentMatrixDeviceId\(deviceId\)/);
+  assert.match(client, /bindingResponse.status === 403/);
+  assert.match(client, /matrix_session_validation_unavailable/);
+});
+
+test("Matrix recovery and verification errors are translated at their display boundary", () => {
+  const recovery = read("src/components/messenger/secure/MatrixRecoveryDialog.jsx");
+  const verification = read("src/components/messenger/secure/MatrixDeviceVerificationDialog.jsx");
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  assert.match(recovery, /useLocale/);
+  assert.match(recovery, /<Alert severity="error">\{t\(error\)\}<\/Alert>/);
+  assert.match(recovery, /<Alert severity="info">\{t\(message\)\}<\/Alert>/);
+  assert.match(verification, /<Alert severity="error">\{t\(error\)\}<\/Alert>/);
+  assert.match(verification, /\{t\(phaseLabel\)\}/);
+  assert.match(app, /error=\{t\(error\)\}/);
+  assert.match(app, /\{t\(matrixNotice\.body\)\}/);
+});

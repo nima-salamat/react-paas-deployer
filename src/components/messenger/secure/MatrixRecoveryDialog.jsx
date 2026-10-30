@@ -6,12 +6,14 @@ import {
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyIcon from "@mui/icons-material/Key";
 import MatrixDeviceVerificationDialog from "./MatrixDeviceVerificationDialog";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   commitRecoveryKey, getRecoveryState, getSecureMatrixClient,
   prepareRecoveryKey, restoreRecoveryKey,
 } from "./MatrixSecureClient";
 
 export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
+  const { t } = useLocale();
   const [phase, setPhase] = useState("loading");
   const [recoveryState, setRecoveryState] = useState(null);
   const [verificationOpen, setVerificationOpen] = useState(false);
@@ -140,8 +142,8 @@ export default function MatrixRecoveryDialog({ open, onClose, onReady }) {
           <Typography color="text.secondary" variant="body2">
             Logging in to Paas Deployer is not enough to read encrypted history. This device needs a trusted Matrix key backup or an existing recovery key. The recovery key is never sent to the Messenger backend.
           </Typography>
-          {error && <Alert severity="error">{error}</Alert>}
-          {message && <Alert severity="info">{message}</Alert>}
+          {error && <Alert severity="error">{t(error)}</Alert>}
+          {message && <Alert severity="info">{t(message)}</Alert>}
           {phase === "loading" && (
             <Box sx={{ py: 3, display: "flex", justifyContent: "center" }}>
               <CircularProgress />

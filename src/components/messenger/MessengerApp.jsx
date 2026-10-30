@@ -74,6 +74,7 @@ import { JitsiCallModal, IncomingCallBanner, useMessengerCalls, useMessengerWebS
 import { RightPanel, readAppearance, writeAppearance, getPalette, normalizeColorThemeId } from "./features/settings";
 import { ContextMenu } from "./features/shared";
 import useKeyboardLayout from "./hooks/useKeyboardLayout";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 
 import CallIcon from "@mui/icons-material/Call";
@@ -91,6 +92,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 
 export default function MessengerApp({ themeMode = "system", onThemeModeChange }) {
   const theme = useTheme();
+  const { t } = useLocale();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   // Real phone/tablet (UA/OS/pointer) — independent of window width.
   // Narrow desktop windows must NOT be treated as mobile for Enter / keyboard.
@@ -6722,7 +6724,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         mediaSettingsOpen={mediaSettingsOpen}
         setMediaSettingsOpen={setMediaSettingsOpen}
         toast={toast}
-        error={error}
+        error={t(error)}
         setError={setError}
         exitHint={exitHint}
         hashReady={hashReady}
@@ -6772,8 +6774,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               </Stack>
             )}
           >
-            <Typography fontWeight={750} variant="subtitle2">{matrixNotice.title}</Typography>
-            <Typography variant="body2">{matrixNotice.body}</Typography>
+            <Typography fontWeight={750} variant="subtitle2">{t(matrixNotice.title)}</Typography>
+            <Typography variant="body2">{t(matrixNotice.body)}</Typography>
           </Alert>
         ) : <span />}
       </Snackbar>

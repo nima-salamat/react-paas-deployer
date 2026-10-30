@@ -44,3 +44,32 @@ test("Vite localizes visible JSX copy without changing code or form input conten
   assert.match(vite, /jsxExpressionContainer\\(t\\.stringLiteral\\(value\\)\\)/);
   assert.match(vite, /\["code", "pre", "textarea", "script", "style"\]/);
 });
+
+
+test("Emotion uses MUI's RTL Stylis plugin whenever the Persian locale is active", async () => {
+  const cache = await readFile(new URL("../src/emotionCache.js", import.meta.url), "utf8");
+  const root = await readFile(new URL("../src/Root.jsx", import.meta.url), "utf8");
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(pkg.dependencies["@mui/stylis-plugin-rtl"], "7.3.10");
+  assert.match(cache, /stylisPlugins: \[prefixer, rtlPlugin\]/);
+  assert.match(cache, /key: isRTL \? "pdrtl" : "pd"/);
+  assert.match(root, /createEmotionCache\("ltr"\)/);
+  assert.match(root, /createEmotionCache\("rtl"\)/);
+  assert.match(root, /caches\.rtl : caches\.ltr/);
+  assert.match(root, /<LocaleProvider>[\s\S]*<DirectionalCacheProvider>/);
+});
+
+
+test("explicit language preference markers are scoped to the authenticated account", async () => {
+  const provider = await readFile(new URL("../src/i18n/LocaleProvider.jsx", import.meta.url), "utf8");
+  assert.match(provider, /decodeJwtPayload/);
+  assert.match(provider, /EXPLICIT_LANGUAGE_KEY_PREFIX/);
+  assert.match(provider, /getAuthenticatedAccountId\(\) === accountId/);
+});
+
+test("Persian locale includes secure-chat recovery, language API and admin table messages", async () => {
+  const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
+  assert.match(messages, /"Secure chat recovery":/);
+  assert.match(messages, /"Database tables": "جدول‌های پایگاه داده"/);
+  assert.match(messages, /"Language preference updated.":/);
+});

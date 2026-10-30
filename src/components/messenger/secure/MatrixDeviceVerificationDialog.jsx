@@ -6,6 +6,7 @@ import {
 import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
 import { VerificationRequestEvent, VerifierEvent } from "matrix-js-sdk/lib/crypto-api";
 import { getSecureMatrixClient, MatrixSecureError } from "./MatrixSecureClient";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 const PHASE_LABELS = {
   1: "Creating verification request…",
@@ -17,6 +18,7 @@ const PHASE_LABELS = {
 };
 
 export default function MatrixDeviceVerificationDialog({ open, onClose, onVerified }) {
+  const { t } = useLocale();
   const [phase, setPhase] = useState("loading");
   const [request, setRequest] = useState(null);
   const [sasCallbacks, setSasCallbacks] = useState(null);
@@ -188,11 +190,11 @@ export default function MatrixDeviceVerificationDialog({ open, onClose, onVerifi
           <Typography color="text.secondary" variant="body2">
             Open the security settings on a device you already trust and approve this verification request. Never approve a device you do not recognize.
           </Typography>
-          {error && <Alert severity="error">{error}</Alert>}
+          {error && <Alert severity="error">{t(error)}</Alert>}
           {phase === "loading" && <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}><CircularProgress /></Box>}
           {phase !== "loading" && phase !== "error" && (
             <Alert severity={success ? "success" : phase === "cancelled" ? "warning" : "info"}>
-              {phaseLabel}
+              {t(phaseLabel)}
             </Alert>
           )}
           {phase === 3 && (
