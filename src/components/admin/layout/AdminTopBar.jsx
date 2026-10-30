@@ -74,8 +74,8 @@ export default function AdminTopBar({
 
   const initial = (me?.username || "A").charAt(0).toUpperCase();
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <AppBar
       position="sticky"
       elevation={0}
