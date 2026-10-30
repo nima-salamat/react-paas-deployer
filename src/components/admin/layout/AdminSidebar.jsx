@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Avatar, Box, Divider, List, ListItem, ListItemButton,
   ListItemIcon, ListItemText, Stack, Tooltip, Typography, alpha,
@@ -229,6 +230,7 @@ export default function AdminSidebar({
             ? `${n.label}${n.shortcut ? ` (Alt+${n.shortcut})` : ""}`
             : "";
           return (
+    <TranslatedTextTree>
             <ListItem key={n.id} disablePadding sx={{ mb: 0.3 }}>
               <Tooltip title={tip} placement="right" disableHoverListener={!collapsed}>
                 <ListItemButton
@@ -342,5 +344,6 @@ export default function AdminSidebar({
         </Tooltip>
       </Box>
     </Box>
+    </TranslatedTextTree>
   );
 }
