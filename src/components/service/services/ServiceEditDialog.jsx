@@ -38,7 +38,8 @@ import apiRequest from "../../customHooks/apiRequest";
 import { VOLUME_API_ROOT } from "./helpers";
 
 function SectionHead({ icon, title, subtitle }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 1.5 }}>
       <Box
         sx={{
@@ -65,6 +66,7 @@ function SectionHead({ icon, title, subtitle }) {
         ) : null}
       </Box>
     </Stack>
+    </TranslatedTextTree>
   );
 }
 
@@ -74,7 +76,8 @@ function StorageBar({ quotaMb, usedMb }) {
   const quota = Number(quotaMb) || 0;
   const pct = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0;
   const color = pct >= 95 ? "error" : pct >= 80 ? "warning" : "primary";
-  return (
+  return (    <TranslatedTextTree>
+
     <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, borderRadius: 2 }}>
       <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
         <Typography variant="caption" fontWeight={700}>
@@ -94,6 +97,7 @@ function StorageBar({ quotaMb, usedMb }) {
         Remaining {(Math.max(0, quota - used)).toLocaleString()} MB · Exclusive volumes only
       </Typography>
     </Paper>
+    </TranslatedTextTree>
   );
 }
 
@@ -307,7 +311,8 @@ function EditBody({
     }
   };
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Box
       sx={{
         display: "grid",
@@ -1093,6 +1098,7 @@ function EditBody({
         </Paper>
       </Box>
     </Box>
+    </TranslatedTextTree>
   );
 }
 
@@ -1122,8 +1128,8 @@ export default function ServiceEditDialog({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Dialog
       open={open}
       onClose={onClose}
