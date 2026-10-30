@@ -2547,6 +2547,7 @@ export function MessageContextMenuItems({
   ctxMsg, isMine, onReply, onReact, onForward, onCopy, onPreview, onDownload,
   onEdit, onDelete, onShowReaders, onSelect, onPinMessage, isPinned,
 }) {
+  const { t: tr } = useLocale();
   const ctxAtts = ctxMsg?.attachments || [];
   const hasText = Boolean(typeof ctxMsg?.body === "string" ? ctxMsg.body.trim() : ctxMsg?.body);
   return (
@@ -2574,7 +2575,7 @@ export function MessageContextMenuItems({
               ? <PushPinOutlinedIcon fontSize="small" />
               : <PushPinIcon fontSize="small" />}
           </ListItemIcon>
-          {isPinned ? "Unpin message" : "Pin message"}
+          {tr(isPinned ? "Unpin message" : "Pin message")}
         </MenuItem>
       )}
       <MenuItem onClick={async () => { await onCopy(ctxMsg); }}>
