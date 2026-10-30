@@ -139,8 +139,8 @@ function TreeDocRow({
     plan?.type === "doc-position" && String(plan.targetId) === String(doc.id)
       ? plan.position
       : null;
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <ListItemButton
       ref={(el) => {
         setNodeRef(el);
@@ -272,8 +272,8 @@ function TreeFolderRow({
     plan?.type === "cat-reorder" && String(plan.targetId) === String(node.id)
       ? plan.position
       : null;
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <ListItemButton
       ref={(el) => {
         setNodeRef(el);
@@ -390,8 +390,8 @@ function GeneralDropZone({ plan, children }) {
   const active = Boolean(
     plan && (plan.type === "doc-to-general" || plan.type === "cat-to-root")
   );
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Box
       ref={setNodeRef}
       sx={{
@@ -445,7 +445,8 @@ function CategoryTree({
 
   if (!nodes?.length) return null;
 
-  return (
+  return (    <TranslatedTextTree>
+
     <List dense disablePadding sx={{ pl: depth ? 1.25 : 0 }}>
       {nodes.map((node, nodeIndex) => {
         const expanded = folderOpen[node.id] !== false;
@@ -454,7 +455,6 @@ function CategoryTree({
           (node.children && node.children.length > 0) ||
           docs.length > 0;
         return (
-    <TranslatedTextTree>
           <React.Fragment key={node.id}>
             <TreeFolderRow
               node={node}
@@ -590,10 +590,12 @@ function AdminAssetOpenButton({ asset }) {
       setBusy(false);
     }
   };
-  return (
+  return (    <TranslatedTextTree>
+
     <IconButton size="small" onClick={open} disabled={busy} aria-label="Open file">
       {busy ? <CircularProgress size={16} /> : <OpenInNewRoundedIcon fontSize="small" />}
     </IconButton>
+    </TranslatedTextTree>
   );
 }
 
@@ -617,8 +619,8 @@ function AssetLibrary({
   const [previewAsset, setPreviewAsset] = useState(null);
 
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Paper
       variant="outlined"
       sx={{
@@ -1407,8 +1409,8 @@ export default function DocsPanel() {
     })();
   };
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", lg: "row" }}
