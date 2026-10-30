@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Alert,
   Box,
@@ -1122,6 +1123,7 @@ export default function ServiceEditDialog({
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   return (
+    <TranslatedTextTree>
     <Dialog
       open={open}
       onClose={onClose}
@@ -1190,5 +1192,6 @@ export default function ServiceEditDialog({
         </Button>
       </DialogActions>
     </Dialog>
+    </TranslatedTextTree>
   );
 }
