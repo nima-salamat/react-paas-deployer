@@ -42,7 +42,8 @@ function normalizeList(data) {
 }
 
 function AppLogo({ app, size = 58 }) {
-  return (
+  return (    <TranslatedTextTree>
+
     <Box
       sx={(theme) => ({
         width: size,
@@ -64,12 +65,13 @@ function AppLogo({ app, size = 58 }) {
     >
       <ReadyAppBrandMark app={app} size={size * 0.68} />
     </Box>
+    </TranslatedTextTree>
   );
 }
 
 function AppCard({ app }) {
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Card
       variant="outlined"
       sx={(theme) => ({
@@ -208,8 +210,8 @@ export default function ReadyApps() {
       });
   }, [apps, query]);
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
       <Stack spacing={3.25}>
         <Stack
