@@ -145,8 +145,8 @@ export default function DepartmentsPanel() {
     }
   };
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
