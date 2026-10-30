@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { Link as RouterLink } from "react-router-dom";
 import {
   ArrowForwardRounded,
@@ -68,6 +69,7 @@ const PLATFORM_AREAS = [
 ];
 
 function SectionHeading({ eyebrow, title, body, align = "left" }) {
+  const { t } = useLocale();
   return (
     <Box sx={{ textAlign: align, maxWidth: align === "center" ? 780 : 720 }}>
       <Typography
@@ -75,7 +77,7 @@ function SectionHeading({ eyebrow, title, body, align = "left" }) {
         component="p"
         sx={{ fontWeight: 900, letterSpacing: ".16em", color: "primary.main" }}
       >
-        {eyebrow}
+        {t(eyebrow)}
       </Typography>
       <Typography
         component="h2"
@@ -87,14 +89,14 @@ function SectionHeading({ eyebrow, title, body, align = "left" }) {
           fontSize: { xs: "clamp(1.8rem, 7vw, 2.5rem)", md: "3.65rem" },
         }}
       >
-        {title}
+        {t(title)}
       </Typography>
       {body ? (
         <Typography
           sx={{ mt: 1.5, lineHeight: 1.75, fontSize: { xs: ".95rem", md: "1.05rem" } }}
           color="text.secondary"
         >
-          {body}
+          {t(body)}
         </Typography>
       ) : null}
     </Box>
@@ -123,6 +125,7 @@ function Surface({ children, sx = {}, ...props }) {
 }
 
 function ArchitectureVisual() {
+  const { t } = useLocale();
   const theme = useTheme();
   const dark = theme.palette.mode === "dark";
   const border = alpha(theme.palette.primary.main, dark ? 0.22 : 0.15);
@@ -261,16 +264,16 @@ function ArchitectureVisual() {
                       <Icon sx={{ fontSize: 19 }} />
                     </Box>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontSize: ".86rem", fontWeight: 900 }}>{name}</Typography>
+                      <Typography sx={{ fontSize: ".86rem", fontWeight: 900 }}>{t(name)}</Typography>
                       <Typography sx={{ fontSize: ".68rem", color: "text.secondary", lineHeight: 1.35 }}>
-                        {detail}
+                        {t(detail)}
                       </Typography>
                     </Box>
                   </Stack>
                   <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 1.25 }}>
                     <CheckCircleRounded sx={{ color: dark ? "#86efac" : "#16a34a", fontSize: 13 }} />
                     <Typography sx={{ color: "text.secondary", fontSize: ".57rem", fontWeight: 900, letterSpacing: ".07em" }}>
-                      {state}
+                      {t(state)}
                     </Typography>
                   </Stack>
                 </Paper>
@@ -320,7 +323,7 @@ function ArchitectureVisual() {
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography sx={{ fontSize: ".87rem", fontWeight: 900 }}>Runtime health</Typography>
                 <Typography sx={{ fontSize: ".7rem", color: "text.secondary", lineHeight: 1.45 }}>
-                  Keep service signals close to everyday operations
+                  {t("Keep service signals close to everyday operations")}
                 </Typography>
               </Box>
               <Box
@@ -353,10 +356,10 @@ function ArchitectureVisual() {
                 <Box key={name} sx={{ minWidth: 0 }}>
                   <Stack direction="row" alignItems="center" spacing={0.55}>
                     <Icon sx={{ color: "primary.main", fontSize: 15, flexShrink: 0 }} />
-                    <Typography sx={{ fontSize: ".7rem", fontWeight: 850 }}>{name}</Typography>
+                    <Typography sx={{ fontSize: ".7rem", fontWeight: 850 }}>{t(name)}</Typography>
                   </Stack>
                   <Typography sx={{ pl: 2.55, mt: 0.3, color: "text.secondary", fontSize: ".63rem", overflowWrap: "anywhere" }}>
-                    {detail}
+                    {t(detail)}
                   </Typography>
                 </Box>
               ))}
@@ -386,6 +389,7 @@ function ArchitectureVisual() {
 }
 
 export default function AboutUs() {
+  const { t } = useLocale();
   const theme = useTheme();
   const dark = theme.palette.mode === "dark";
 
@@ -479,7 +483,7 @@ export default function AboutUs() {
                 ].map(([label, detail]) => (
                   <Box key={label}>
                     <Typography sx={{ fontWeight: 900, fontSize: ".95rem" }}>{label}</Typography>
-                    <Typography variant="caption" color="text.secondary">{detail}</Typography>
+                    <Typography variant="caption" color="text.secondary">{t(detail)}</Typography>
                   </Box>
                 ))}
               </Stack>
@@ -535,9 +539,9 @@ export default function AboutUs() {
                     <Icon />
                   </Box>
                   <Box>
-                    <Typography sx={{ fontWeight: 900 }}>{title}</Typography>
+                    <Typography sx={{ fontWeight: 900 }}>{t(title)}</Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: .5, lineHeight: 1.65 }}>
-                      {body}
+                      {t(body)}
                     </Typography>
                   </Box>
                 </Stack>
@@ -568,9 +572,9 @@ export default function AboutUs() {
                   <Stack key={title} direction="row" spacing={1.1} alignItems="flex-start">
                     <Icon sx={{ mt: .15, fontSize: 20, color: "primary.main" }} />
                     <Box>
-                      <Typography sx={{ fontWeight: 850 }}>{title}</Typography>
+                      <Typography sx={{ fontWeight: 850 }}>{t(title)}</Typography>
                       <Typography variant="body2" color="text.secondary" sx={{ mt: .2, lineHeight: 1.6 }}>
-                        {body}
+                        {t(body)}
                       </Typography>
                     </Box>
                   </Stack>
@@ -680,10 +684,10 @@ export default function AboutUs() {
                           <Icon sx={{ color: "primary.main", fontSize: 19, flexShrink: 0 }} />
                           <Box sx={{ minWidth: 0 }}>
                             <Typography sx={{ fontSize: ".75rem", fontWeight: 900, lineHeight: 1.25 }}>
-                              {title}
+                              {t(title)}
                             </Typography>
                             <Typography sx={{ mt: .25, color: "text.secondary", fontSize: ".65rem", lineHeight: 1.35 }}>
-                              {detail}
+                              {t(detail)}
                             </Typography>
                           </Box>
                         </Box>

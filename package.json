@@ -11,7 +11,7 @@
     "start": "node server.js",
     "seo:check": "node scripts/seo-audit.mjs",
     "test:auth": "node --test scripts/auth-session.test.mjs",
-    "test:i18n": "node --test scripts/i18n.test.mjs",
+    "test:i18n": "node --test scripts/i18n.test.mjs scripts/i18n-pages.test.mjs",
     "test:service-detail": "node --test scripts/service-detail.test.mjs",
     "test:agents": "node --test scripts/agents.test.mjs",
     "test:ticket-editor": "node scripts/ticket-editor.test.mjs",

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box,
   Paper,
@@ -63,6 +64,7 @@ function normalizePlanPlatform(value) {
 // ─────────────────────────────────────────────
 
 function SectionHeader({ icon, title, subtitle, action }) {
+  const { t } = useLocale();
   return (
     <Box
       sx={{
@@ -93,11 +95,11 @@ function SectionHeader({ icon, title, subtitle, action }) {
         </Box>
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-            {title}
+            {t(title)}
           </Typography>
           {subtitle ? (
             <Typography variant="caption" color="text.secondary">
-              {subtitle}
+              {t(subtitle)}
             </Typography>
           ) : null}
         </Box>
@@ -142,6 +144,7 @@ function StorageQuotaBar({ storage }) {
 }
 
 function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
+  const { t } = useLocale();
   const handleClick = () => {
     if (isCurrent) { onClearSelection?.(); return; }
     onSelect?.(plan);
@@ -169,7 +172,7 @@ function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{plan.name || "Plan"}</Typography>
         {isCurrent ? (
-          <Chip icon={<CheckCircleIcon sx={{ fontSize: 16 }} />} label="Current" color="success" size="small" sx={{ fontWeight: 700, height: 24 }} />
+          <Chip icon={<CheckCircleIcon sx={{ fontSize: 16 }} />} label={t("Current")} color="success" size="small" sx={{ fontWeight: 700, height: 24 }} />
         ) : (
           <Radio checked={selected && !isCurrent} size="small" color="primary" sx={{ p: 0 }} />
         )}
@@ -209,6 +212,7 @@ function PlanCard({ plan, selected, isCurrent, onSelect, onClearSelection }) {
 }
 
 function NetworkCard({ network, isAttached, onAttach, onDetach, loading }) {
+  const { t } = useLocale();
   return (
     <Paper
       variant="outlined"
@@ -224,7 +228,7 @@ function NetworkCard({ network, isAttached, onAttach, onDetach, loading }) {
       <Box sx={{ minWidth: 0 }}>
         <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography variant="body2" sx={{ fontWeight: 700 }}>{network.name || network.id}</Typography>
-          {isAttached && <Chip label="Attached" size="small" color="info" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />}
+          {isAttached && <Chip label={t("Attached")} size="small" color="info" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />}
         </Stack>
         {network.description && (
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
@@ -264,6 +268,7 @@ function VolumeCard({
   canDetach = canMutate,
   canDelete = canMutate,
 }) {
+  const { t } = useLocale();
   const size = Number(volume.size_mb) || 0;
   const exceeds = !isAttached && remainingMb != null && size > remainingMb;
   const bind = volume.bind || volume.default_bind || "—";
@@ -301,12 +306,12 @@ function VolumeCard({
               {volume.name}
             </Typography>
             {isAttached ? (
-              <Chip label="Attached" size="small" color="success" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />
+              <Chip label={t("Attached")} size="small" color="success" sx={{ height: 20, fontSize: 11, fontWeight: 700 }} />
             ) : (
-              <Chip label="Available" size="small" variant="outlined" sx={{ height: 20, fontSize: 11 }} />
+              <Chip label={t("Available")} size="small" variant="outlined" sx={{ height: 20, fontSize: 11 }} />
             )}
             {exceeds && (
-              <Chip label="Exceeds quota" size="small" color="error" sx={{ height: 20, fontSize: 11 }} />
+              <Chip label={t("Exceeds quota")} size="small" color="error" sx={{ height: 20, fontSize: 11 }} />
             )}
           </Stack>
           <Stack direction="row" spacing={1.5} sx={{ mt: 0.75 }} flexWrap="wrap" useFlexGap>
@@ -340,7 +345,7 @@ function VolumeCard({
           </Tooltip>
 
           {onViewFiles && (
-            <Tooltip title="View files">
+            <Tooltip title={t("View files")}>
               <span>
                 <IconButton size="small" onClick={() => onViewFiles?.(volume)} disabled={loading}>
                   <FolderOpenIcon fontSize="small" />
@@ -349,7 +354,7 @@ function VolumeCard({
             </Tooltip>
           )}
           {onDownload && (
-            <Tooltip title="Download archive">
+            <Tooltip title={t("Download archive")}>
               <span>
                 <IconButton size="small" onClick={() => onDownload?.(volume)} disabled={loading}>
                   <DownloadIcon fontSize="small" />
@@ -480,6 +485,7 @@ export default function SettingsPanel({
   error,
   successMessage,
 }) {
+  const { t } = useLocale();
   const navigate = useNavigate();
   // Database plans represent database-provider services, not workloads that
   // need to attach to a database. Hide the consumer-side binding UI for them.
@@ -1050,7 +1056,7 @@ export default function SettingsPanel({
                         {database.engine ? (
                           <Chip size="small" label={database.engine} color="primary" variant="outlined" sx={{ height: 22 }} />
                         ) : null}
-                        <Chip size="small" label="Ready App dependency" color="success" variant="outlined" sx={{ height: 22 }} />
+                        <Chip size="small" label={t("Ready App dependency")} color="success" variant="outlined" sx={{ height: 22 }} />
                         {database.status ? (
                           <Chip size="small" label={database.status} variant="outlined" sx={{ height: 22 }} />
                         ) : null}
@@ -1081,8 +1087,8 @@ export default function SettingsPanel({
                     <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
                       <Typography variant="body2" sx={{ fontWeight: 800 }}>{binding.database_name_runtime || binding.database_name || binding.database}</Typography>
                       {binding.engine ? <Chip size="small" label={binding.engine} color="primary" variant="outlined" sx={{ height: 22 }} /> : null}
-                      {binding.status ? <Chip size="small" label={`Resource: ${binding.status}`} variant="outlined" sx={{ height: 22 }} /> : null}
-                      {binding.binding_status === "configured_unverified" ? <Chip size="small" label="Binding saved · not tested" variant="outlined" sx={{ height: 22 }} /> : null}
+                      {binding.status ? <Chip size="small" label={`${t("Resource")}: ${binding.status}`} variant="outlined" sx={{ height: 22 }} /> : null}
+                      {binding.binding_status === "configured_unverified" ? <Chip size="small" label={t("Binding saved · not tested")} variant="outlined" sx={{ height: 22 }} /> : null}
                     </Stack>
                     <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                       {binding.host || "managed"}{binding.port ? `:${binding.port}` : ""} · alias {binding.alias || "default"} · env prefix {binding.env_prefix || "DB"} · {String(binding.access_mode || "rw").toUpperCase()}
@@ -1124,7 +1130,7 @@ export default function SettingsPanel({
                     </Alert>
                   ) : null}
                   <TextField
-                    select fullWidth size="small" label="Database resource or service"
+                    select fullWidth size="small" label={t("Database resource or service")}
                     value={selectedDatabaseId}
                     onChange={(e) => setSelectedDatabaseId(e.target.value)}
                     disabled={databaseActionLoading || statusBusy}
@@ -1143,9 +1149,9 @@ export default function SettingsPanel({
                     })}
                   </TextField>
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                    <TextField size="small" fullWidth label="Alias" value={databaseAlias} onChange={(e) => setDatabaseAlias(e.target.value)} disabled={databaseActionLoading} />
-                    <TextField size="small" fullWidth label="Environment prefix" value={databasePrefix} onChange={(e) => setDatabasePrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))} disabled={databaseActionLoading} />
-                    <TextField select size="small" fullWidth label="Access" value={databaseAccessMode} onChange={(e) => setDatabaseAccessMode(e.target.value)} disabled={databaseActionLoading}>
+                    <TextField size="small" fullWidth label={t("Alias")} value={databaseAlias} onChange={(e) => setDatabaseAlias(e.target.value)} disabled={databaseActionLoading} />
+                    <TextField size="small" fullWidth label={t("Environment prefix")} value={databasePrefix} onChange={(e) => setDatabasePrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, ""))} disabled={databaseActionLoading} />
+                    <TextField select size="small" fullWidth label={t("Access")} value={databaseAccessMode} onChange={(e) => setDatabaseAccessMode(e.target.value)} disabled={databaseActionLoading}>
                       <MenuItem value="rw">Read / write</MenuItem>
                       <MenuItem value="ro">Read only</MenuItem>
                     </TextField>
@@ -1479,8 +1485,8 @@ export default function SettingsPanel({
         <DialogTitle sx={{ fontWeight: 800 }}>Create network</DialogTitle>
         <DialogContent>
           <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-            <TextField autoFocus fullWidth size="small" label="Name" value={newNetworkName} onChange={(e) => setNewNetworkName(e.target.value)} />
-            <TextField fullWidth size="small" label="Description (optional)" value={newNetworkDesc} onChange={(e) => setNewNetworkDesc(e.target.value)} multiline rows={2} />
+            <TextField autoFocus fullWidth size="small" label={t("Name")} value={newNetworkName} onChange={(e) => setNewNetworkName(e.target.value)} />
+            <TextField fullWidth size="small" label={t("Description (optional)")} value={newNetworkDesc} onChange={(e) => setNewNetworkDesc(e.target.value)} multiline rows={2} />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -1509,25 +1515,25 @@ export default function SettingsPanel({
             )}
             {createVolumeError && <Alert severity="error" sx={{ borderRadius: 1.5 }}>{createVolumeError}</Alert>}
             <TextField
-              autoFocus fullWidth size="small" label="Name" value={newVolumeName}
+              autoFocus fullWidth size="small" label={t("Name")} value={newVolumeName}
               onChange={(e) => setNewVolumeName(e.target.value)}
-              helperText="Unique volume name"
+              helperText={t("Unique volume name")}
             />
             <TextField
-              fullWidth size="small" label="Size (MB)" type="number" value={newVolumeSize}
+              fullWidth size="small" label={t("Size (MB)")} type="number" value={newVolumeSize}
               onChange={(e) => setNewVolumeSize(e.target.value)}
               inputProps={{ min: 1, max: remainingMb != null ? remainingMb : undefined }}
               helperText={remainingMb != null ? `Max allowed by quota: ${remainingMb} MB` : undefined}
               error={remainingMb != null && Number(newVolumeSize) > remainingMb}
             />
             <TextField
-              fullWidth size="small" label="Bind directory" value={newVolumeBind}
+              fullWidth size="small" label={t("Bind directory")} value={newVolumeBind}
               onChange={(e) => setNewVolumeBind(e.target.value)}
               placeholder="/data"
-              helperText="Path inside container (e.g. /data, /var/lib/mysql)"
+              helperText={t("Path inside container (e.g. /data, /var/lib/mysql)")}
             />
             <TextField
-              select fullWidth size="small" label="Access mode" value={newVolumeMode}
+              select fullWidth size="small" label={t("Access mode")} value={newVolumeMode}
               onChange={(e) => setNewVolumeMode(e.target.value)}
             >
               <MenuItem value="rw">Read-write (rw)</MenuItem>
@@ -1575,14 +1581,14 @@ export default function SettingsPanel({
               autoFocus
               fullWidth
               size="small"
-              label="Name"
+              label={t("Name")}
               value={editVolumeForm.name}
               onChange={(e) => setEditVolumeForm((p) => ({ ...p, name: e.target.value }))}
             />
             <TextField
               fullWidth
               size="small"
-              label="Size (MB)"
+              label={t("Size (MB)")}
               type="number"
               value={editVolumeForm.size_mb}
               onChange={(e) => setEditVolumeForm((p) => ({ ...p, size_mb: e.target.value }))}
@@ -1591,7 +1597,7 @@ export default function SettingsPanel({
             <TextField
               fullWidth
               size="small"
-              label="Bind directory"
+              label={t("Bind directory")}
               value={editVolumeForm.default_bind}
               onChange={(e) => setEditVolumeForm((p) => ({ ...p, default_bind: e.target.value }))}
               placeholder="/data"
@@ -1600,7 +1606,7 @@ export default function SettingsPanel({
               select
               fullWidth
               size="small"
-              label="Access mode"
+              label={t("Access mode")}
               value={editVolumeForm.default_mode}
               onChange={(e) => setEditVolumeForm((p) => ({ ...p, default_mode: e.target.value }))}
             >

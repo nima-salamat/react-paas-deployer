@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import GroupSharedServicesPanel from "./GroupSharedServicesPanel";
 import CloudQueueIcon from "@mui/icons-material/CloudQueue";
 import {
@@ -104,6 +105,7 @@ export default function RightPanel({
   onUploadGroupAvatar, onClearGroupAvatar,
   onCancelJoinRequest, onActOnJoinRequest,
 }) {
+  const { t } = useLocale();
   const messengerTheme = useTheme();
 
   // All hooks MUST be declared before any conditional `return` — otherwise
@@ -136,12 +138,12 @@ export default function RightPanel({
     <>
       <Stack direction="row" alignItems="center" sx={{ p: 1.5 }}>
         {canGoBack && (
-          <IconButton size="small" onClick={onBack} title="Back">
+          <IconButton size="small" onClick={onBack} title={t("Back")}>
             <ArrowBackIcon />
           </IconButton>
         )}
         <Typography fontWeight={700} sx={{ flex: 1, ml: canGoBack ? 1 : 0 }}>{headerTitle}</Typography>
-        <IconButton size="small" onClick={onClose} title="Close">
+        <IconButton size="small" onClick={onClose} title={t("Close")}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </Stack>
@@ -350,7 +352,7 @@ export default function RightPanel({
           {header}
         </Box>
         <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
-          {sectionTitle("Mode")}
+          {sectionTitle(t("Mode"))}
           <List disablePadding sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider", px: 2, py: 1.25 }}>
             <ToggleButtonGroup
               exclusive
@@ -361,7 +363,7 @@ export default function RightPanel({
                 if (!next || next === themeMode) return;
                 onThemeModeChange?.(next);
               }}
-              aria-label="Theme mode"
+              aria-label={t("Theme mode")}
               sx={{
                 "& .MuiToggleButton-root": {
                   textTransform: "none",
@@ -372,22 +374,22 @@ export default function RightPanel({
                 },
               }}
             >
-              <ToggleButton value="light" aria-label="Light">
+              <ToggleButton value="light" aria-label={t("Light")}>
                 <LightModeOutlinedIcon sx={{ fontSize: 18 }} />
                 Light
               </ToggleButton>
-              <ToggleButton value="dark" aria-label="Dark">
+              <ToggleButton value="dark" aria-label={t("Dark")}>
                 <DarkModeOutlinedIcon sx={{ fontSize: 18 }} />
                 Dark
               </ToggleButton>
-              <ToggleButton value="system" aria-label="System">
+              <ToggleButton value="system" aria-label={t("System")}>
                 <SettingsBrightnessOutlinedIcon sx={{ fontSize: 18 }} />
                 System
               </ToggleButton>
             </ToggleButtonGroup>
           </List>
 
-          {sectionTitle("Color theme")}
+          {sectionTitle(t("Color theme"))}
           <Box sx={{ bgcolor: "background.paper", borderTop: "1px solid", borderBottom: "1px solid", borderColor: "divider", px: 1.5, py: 1.25 }}>
             <Box
               sx={{
@@ -396,20 +398,20 @@ export default function RightPanel({
                 gap: 1,
               }}
             >
-              {themes.map((t) => {
-                const selected = (colorThemeId || "default") === t.id;
-                const previewPalette = getPalette(t.id, messengerTheme.palette.mode);
+              {themes.map((themeOption) => {
+                const selected = (colorThemeId || "default") === themeOption.id;
+                const previewPalette = getPalette(themeOption.id, messengerTheme.palette.mode);
                 return (
                   <Box
-                    key={t.id}
-                    onClick={() => onColorThemeChange?.(t.id)}
+                    key={themeOption.id}
+                    onClick={() => onColorThemeChange?.(themeOption.id)}
                     role="button"
                     tabIndex={0}
                     aria-pressed={selected}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        onColorThemeChange?.(t.id);
+                        onColorThemeChange?.(themeOption.id);
                       }
                     }}
                     sx={{
@@ -460,10 +462,10 @@ export default function RightPanel({
                       </Box>
                       <Box sx={{ minWidth: 0 }}>
                         <Typography sx={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2 }}>
-                          {t.emoji} {t.label}
+                          {themeOption.emoji} {t(themeOption.label)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ fontSize: 11 }}>
-                          {t.tagline}
+                          {t(themeOption.tagline)}
                         </Typography>
                       </Box>
                     </Stack>
@@ -487,8 +489,8 @@ export default function RightPanel({
               sx={itemSx}
             >
               <ListItemText
-                primary="My profile photo"
-                secondary={showOwnAvatar ? "Shown on your messages" : "Hidden on your messages"}
+                primary={t("My profile photo")}
+                secondary={t(showOwnAvatar ? "Shown on your messages" : "Hidden on your messages")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -504,8 +506,8 @@ export default function RightPanel({
               sx={itemSx}
             >
               <ListItemText
-                primary="Others' profile photos"
-                secondary={showOthersAvatar ? "Shown on their messages" : "Hidden on their messages"}
+                primary={t("Others' profile photos")}
+                secondary={t(showOthersAvatar ? "Shown on their messages" : "Hidden on their messages")}
                 primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                 secondaryTypographyProps={{ fontSize: 12 }}
               />
@@ -532,8 +534,8 @@ export default function RightPanel({
                   }}
                 >
                   <ListItemText
-                    primary={opt.label}
-                    secondary={opt.desc}
+                    primary={t(opt.label)}
+                    secondary={t(opt.desc)}
                     primaryTypographyProps={{ fontWeight: 600, fontSize: 14.5 }}
                     secondaryTypographyProps={{ fontSize: 12 }}
                   />
@@ -625,7 +627,7 @@ export default function RightPanel({
                   <IconButton
                     size="small"
                     color="success"
-                    title="Approve"
+                    title={t("Approve")}
                     onClick={() => onActOnJoinRequest(activeConv?.id, r.id, "approve")}
                   >
                     <CheckIcon fontSize="small" />
@@ -633,7 +635,7 @@ export default function RightPanel({
                   <IconButton
                     size="small"
                     color="error"
-                    title="Reject"
+                    title={t("Reject")}
                     onClick={() => onActOnJoinRequest(activeConv?.id, r.id, "reject")}
                   >
                     <CloseIcon fontSize="small" />
@@ -884,7 +886,7 @@ export default function RightPanel({
                   "&:hover": { bgcolor: "primary.dark" },
                   zIndex: 2,
                 }}
-                title="Change group photo"
+                title={t("Change group photo")}
               >
                 {uploadingAvatar ? <CircularProgress size={14} color="inherit" /> : <AddPhotoAlternateIcon sx={{ fontSize: 16 }} />}
               </IconButton>
@@ -1000,12 +1002,12 @@ export default function RightPanel({
           )}
           {isAdmin && (
             <>
-              <TextField fullWidth size="small" label="Group title" defaultValue={activeConv.title || ""}
+              <TextField fullWidth size="small" label={t("Group title")} defaultValue={activeConv.title || ""}
                 onBlur={(e) => {
                   if (e.target.value.trim() && e.target.value !== activeConv.title)
                     onPatchGroup({ title: e.target.value.trim() });
                 }} sx={{ mb: 1.5 }} />
-              <TextField fullWidth size="small" label="Description" multiline minRows={2}
+              <TextField fullWidth size="small" label={t("Description")} multiline minRows={2}
                 defaultValue={activeConv.description || ""}
                 onBlur={(e) => {
                   if (e.target.value !== (activeConv.description || ""))
@@ -1013,11 +1015,11 @@ export default function RightPanel({
                 }} sx={{ mb: 1.5 }} />
               <FormControlLabel
                 control={<Switch checked={Boolean(activeConv.is_public)} onChange={(e) => onPatchGroup({ is_public: e.target.checked })} />}
-                label="Public (searchable)"
+                label={t("Public (searchable)")}
               />
               <FormControlLabel
                 control={<Switch checked={Boolean(activeConv.is_closed)} onChange={(e) => onPatchGroup({ is_closed: e.target.checked })} />}
-                label="Closed"
+                label={t("Closed")}
               />
               {/* Public groups can require admin approval before new users can join.
                   Owner-only — Telegram-style "private public groups". */}
@@ -1027,12 +1029,12 @@ export default function RightPanel({
                     checked={Boolean(activeConv.requires_approval)}
                     onChange={(e) => onPatchGroup({ requires_approval: e.target.checked })}
                   />}
-                  label="Require admin approval to join"
+                  label={t("Require admin approval to join")}
                 />
               )}
               <FormControlLabel
                 control={<Switch checked={activeConv.members_can_add !== false} onChange={(e) => onPatchGroup({ members_can_add: e.target.checked })} />}
-                label="Members can add contacts"
+                label={t("Members can add contacts")}
               />
               {/* Channel-like mode — only admins can send messages */}
               <FormControlLabel
@@ -1040,14 +1042,14 @@ export default function RightPanel({
                   checked={Boolean(activeConv.only_admins_send)}
                   onChange={(e) => onPatchGroup({ only_admins_send: e.target.checked })}
                 />}
-                label="Only admins can send messages (channel mode)"
+                label={t("Only admins can send messages (channel mode)")}
               />
               {/* History visibility for new members — owner only */}
               {isOwner && (
                 <FormControl fullWidth size="small" sx={{ mt: 1.5 }}>
-                  <InputLabel>History visibility for new members</InputLabel>
+                  <InputLabel>{t("History visibility for new members")}</InputLabel>
                   <Select
-                    label="History visibility for new members"
+                    label={t("History visibility for new members")}
                     value={activeConv.history_visibility || "all"}
                     onChange={(e) => onPatchGroup({ history_visibility: e.target.value })}
                   >
@@ -1129,7 +1131,7 @@ export default function RightPanel({
                           <Chip
                             size="small"
                             icon={<CrownIcon sx={{ fontSize: 12 }} />}
-                            label="Creator"
+                            label={t("Creator")}
                             sx={{ height: 18, fontSize: 10, bgcolor: alpha("#ff9800", 0.15), color: "#ff9800" }}
                           />
                         )}
@@ -1137,7 +1139,7 @@ export default function RightPanel({
                           <Chip
                             size="small"
                             icon={<ShieldIcon sx={{ fontSize: 12 }} />}
-                            label="Admin"
+                            label={t("Admin")}
                             sx={{ height: 18, fontSize: 10, bgcolor: alpha("#2196f3", 0.15), color: "#2196f3" }}
                           />
                         )}

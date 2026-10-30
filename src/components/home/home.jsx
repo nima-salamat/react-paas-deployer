@@ -6,6 +6,7 @@ import {
   useReducedMotion,
 } from "framer-motion";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   Accordion,
   AccordionDetails,
@@ -133,6 +134,7 @@ const FEATURED_READY_APPS = [
 ];
 
 function FeaturedReadyAppCard({ app }) {
+  const { t } = useLocale();
   const theme = useTheme();
   return (
     <Paper
@@ -191,7 +193,7 @@ function FeaturedReadyAppCard({ app }) {
               {app.name}
             </Typography>
             <Typography sx={{ mt: 0.35, color: app.accent, fontSize: "0.69rem", fontWeight: 850, letterSpacing: ".095em", textTransform: "uppercase" }}>
-              {app.category}
+              {t(app.category)}
             </Typography>
           </Box>
           <Box className="ready-app-arrow" aria-hidden="true" sx={{
@@ -207,11 +209,11 @@ function FeaturedReadyAppCard({ app }) {
           display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2,
           overflow: "hidden", maxWidth: 390,
         }}>
-          {app.description}
+          {t(app.description)}
         </Typography>
         <Box sx={{ mt: "auto", pt: 0.2 }}>
           <Button component={RouterLink} to="/dashboard/ready-apps" variant="text" size="small"
-            aria-label={"Open " + app.name + " in the Ready App library"}
+            aria-label={t("Open App Library") + ": " + app.name}
             endIcon={<ArrowForwardRoundedIcon className="ready-app-button-arrow" sx={{ fontSize: 15 }} />}
             sx={{
               p: 0, minWidth: 0, minHeight: 30, color: "text.primary", fontWeight: 850,
@@ -663,6 +665,7 @@ function GlassPanel({ children, sx = {}, ...props }) {
 }
 
 function Metric({ value, label, accent }) {
+  const { t } = useLocale();
   return (
     <Box sx={{ minWidth: 0, pr: { xs: 0.5, md: 1 } }}>
       <Typography
@@ -676,20 +679,21 @@ function Metric({ value, label, accent }) {
           WebkitTextFillColor: "transparent",
         }}
       >
-        {value}
+        {t(value)}
       </Typography>
       <Typography
         variant="caption"
         color="text.secondary"
         sx={{ fontWeight: 700, display: "block", mt: 0.35, lineHeight: 1.35, fontSize: { xs: "0.68rem", sm: "0.75rem" } }}
       >
-        {label}
+        {t(label)}
       </Typography>
     </Box>
   );
 }
 
 function FeatureCard({ icon: Icon, number, title, body }) {
+  const { t } = useLocale();
   const theme = useTheme();
   return (
     <GlassPanel
@@ -746,10 +750,10 @@ function FeatureCard({ icon: Icon, number, title, body }) {
         </Typography>
       </Stack>
       <Typography component="h3" sx={{ mt: 2.5, fontWeight: 900, fontSize: "1.05rem" }}>
-        {title}
+        {t(title)}
       </Typography>
       <Typography color="text.secondary" sx={{ mt: 1, lineHeight: 1.7, fontSize: { xs: "0.9rem", md: "1rem" } }}>
-        {body}
+        {t(body)}
       </Typography>
     </GlassPanel>
   );
@@ -782,6 +786,7 @@ function FloatingBadge({ children, sx = {} }) {
 /* ───────────────── Main Page ───────────────── */
 
 export default function Home() {
+  const { t } = useLocale();
   const theme = useTheme();
   const navigate = useNavigate();
   const dark = theme.palette.mode === "dark";
@@ -1016,7 +1021,7 @@ export default function Home() {
                     boxShadow: `0 12px 32px ${alpha(theme.palette.primary.main, 0.22)}`,
                   }}
                 >
-                  {loggedIn ? "Open dashboard" : "Start deploying"}
+                  {t(loggedIn ? "Open dashboard" : "Start deploying")}
                 </Button>
                 <Button
                   onClick={goDocs}
@@ -1444,10 +1449,10 @@ export default function Home() {
                       </Box>
                       <Box>
                         <Typography component="h3" sx={{ fontWeight: 750, fontSize: "1rem" }}>
-                          {step.title}
+                          {t(step.title)}
                         </Typography>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, lineHeight: 1.6 }}>
-                          {step.body}
+                          {t(step.body)}
                         </Typography>
                       </Box>
                     </Stack>
@@ -1627,10 +1632,10 @@ export default function Home() {
                       </Box>
                       <Box>
                         <Typography component="h3" sx={{ fontWeight: 900 }}>
-                          {step.title}
+                          {t(step.title)}
                         </Typography>
                         <Typography color="text.secondary" sx={{ mt: 0.35, lineHeight: 1.65, fontSize: ".92rem" }}>
-                          {step.body}
+                          {t(step.body)}
                         </Typography>
                       </Box>
                     </Stack>
@@ -1686,10 +1691,10 @@ export default function Home() {
                     <CheckRoundedIcon sx={{ color: "success.main", mt: 0.1, fontSize: 20 }} aria-hidden="true" />
                     <Box>
                       <Typography component="h3" sx={{ fontWeight: 850 }}>
-                        {title}
+                        {t(title)}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        {body}
+                        {t(body)}
                       </Typography>
                     </Box>
                   </Stack>
@@ -1789,10 +1794,10 @@ export default function Home() {
                     </Box>
                     <Box>
                       <Typography component="h3" sx={{ fontWeight: 900 }}>
-                        {title}
+                        {t(title)}
                       </Typography>
                       <Typography sx={{ mt: 0.4, lineHeight: 1.65, fontSize: ".92rem" }} color="text.secondary">
-                        {body}
+                        {t(body)}
                       </Typography>
                     </Box>
                   </Stack>
@@ -1942,12 +1947,12 @@ export default function Home() {
                     id={`faq-panel-${i}-header`}
                   >
                     <Typography component="h3" sx={{ fontWeight: 850 }}>
-                      {faq.q}
+                      {t(faq.q)}
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails sx={{ px: 0, pb: 2.5 }} id={`faq-panel-${i}-content`}>
                     <Typography color="text.secondary" sx={{ lineHeight: 1.75, maxWidth: 720, fontSize: "0.95rem" }}>
-                      {faq.a}
+                      {t(faq.a)}
                     </Typography>
                   </AccordionDetails>
                 </Accordion>

@@ -18,6 +18,7 @@ import PlatformIcon from "../plans/PlatformIcon.jsx";
 import apiRequest from "../customHooks/apiRequest";
 import { SERVICE_API, resolveServiceKind } from "../service/services/helpers";
 import { TICKETS_API, unwrapList } from "../tickets/api.js";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const QUICK_LINKS = [
   ["Services", "/dashboard/services", MiscellaneousServicesOutlinedIcon],
@@ -35,15 +36,17 @@ const STATUS_LABELS = { running: "Running", stopped: "Stopped", failed: "Failed"
 const dateLabel = (v) => { const d = new Date(v || 0); return Number.isNaN(d.getTime()) ? "—" : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(d); };
 
 function StatCard({ icon, label, value, tone = "primary" }) {
+  const { t } = useLocale();
   return <Paper elevation={0} sx={{ p: 2, minHeight: 112, border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
     <Stack direction="row" spacing={1.2} alignItems="flex-start">
       <Box sx={{ width: 36, height: 36, display: "grid", placeItems: "center", borderRadius: 1.5, color: tone + ".main", bgcolor: (t) => alpha(t.palette[tone]?.main || t.palette.primary.main, t.palette.mode === "dark" ? 0.16 : 0.08) }}>{icon}</Box>
-      <Box><Typography variant="caption" color="text.secondary" sx={{ fontWeight: 750 }}>{label}</Typography><Typography variant="h5" sx={{ fontWeight: 850, fontVariantNumeric: "tabular-nums" }}>{value == null ? <Skeleton width={40} /> : value}</Typography></Box>
+      <Box><Typography variant="caption" color="text.secondary" sx={{ fontWeight: 750 }}>{t(label)}</Typography><Typography variant="h5" sx={{ fontWeight: 850, fontVariantNumeric: "tabular-nums" }}>{value == null ? <Skeleton width={40} /> : value}</Typography></Box>
     </Stack>
   </Paper>;
 }
 
 function ServiceMini({ service }) {
+  const { t } = useLocale();
   const kind = resolveServiceKind(service, {});
   const platform = String(service?.plan?.platform || service?.platform || "").toLowerCase();
   const status = String(service?.status || "").toLowerCase();
@@ -51,22 +54,24 @@ function ServiceMini({ service }) {
   return <Button component={RouterLink} to={"/dashboard/services/" + id} sx={{ justifyContent: "flex-start", textAlign: "left", px: 1, py: 0.8, borderRadius: 1.5, color: "text.primary", minWidth: 0, "&:hover": { bgcolor: "action.hover" } }}>
     <PlatformIcon platformKey={platform} label={platform || kind} size={17} />
     <Box sx={{ ml: 1, minWidth: 0, flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{service?.name || "(no name)"}</Typography>
-      <Stack direction="row" spacing={0.7} alignItems="center"><Typography variant="caption" color="text.secondary">{kind === "db" ? "Database" : "Application"}</Typography><Chip size="small" label={STATUS_LABELS[status] || status || "Unknown"} color={status === "running" ? "success" : ["failed", "error"].includes(status) ? "error" : "default"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /></Stack>
+      <Stack direction="row" spacing={0.7} alignItems="center"><Typography variant="caption" color="text.secondary">{t(kind === "db" ? "Database" : "Application")}</Typography><Chip size="small" label={STATUS_LABELS[status] ? t(STATUS_LABELS[status]) : status || t("Unknown")} color={status === "running" ? "success" : ["failed", "error"].includes(status) ? "error" : "default"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /></Stack>
     </Box><LaunchRoundedIcon sx={{ fontSize: 16, color: "text.disabled" }} />
   </Button>;
 }
 
 function TicketMini({ ticket }) {
+  const { t } = useLocale();
   const status = String(ticket?.status || "").toLowerCase();
   return <Button component={RouterLink} to={"/dashboard/tickets/" + ticket?.id} sx={{ justifyContent: "flex-start", textAlign: "left", px: 1, py: 0.8, borderRadius: 1.5, color: "text.primary", minWidth: 0, "&:hover": { bgcolor: "action.hover" } }}>
     <ConfirmationNumberOutlinedIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />
     <Box sx={{ minWidth: 0, flex: 1 }}><Typography variant="body2" sx={{ fontWeight: 750, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ticket?.subject || ticket?.public_id || "Ticket"}</Typography>
-      <Stack direction="row" spacing={0.8} alignItems="center"><Chip size="small" label={status === "in_progress" ? "In progress" : "Open"} color={status === "in_progress" ? "warning" : "info"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /><Typography variant="caption" color="text.secondary">{dateLabel(ticket?.updated_at || ticket?.last_message_at || ticket?.created_at)}</Typography></Stack>
+      <Stack direction="row" spacing={0.8} alignItems="center"><Chip size="small" label={t(status === "in_progress" ? "In progress" : "Open")} color={status === "in_progress" ? "warning" : "info"} sx={{ height: 20, fontSize: 10, fontWeight: 700 }} /><Typography variant="caption" color="text.secondary">{dateLabel(ticket?.updated_at || ticket?.last_message_at || ticket?.created_at)}</Typography></Stack>
     </Box>
   </Button>;
 }
 
 export default function DashboardOverview() {
+  const { t } = useLocale();
   const [state, setState] = useState({ loading: true, error: null, services: [], tickets: [], total: null, running: null, stopped: null, failed: null });
   const load = useCallback(async () => {
     setState((p) => ({ ...p, loading: true, error: null }));
@@ -106,7 +111,7 @@ export default function DashboardOverview() {
     <Paper elevation={0} sx={{ p: 2, border: "1px solid", borderColor: "divider", borderRadius: 2.5 }}>
       <Typography variant="h6" sx={{ fontWeight: 850 }}>Quick access</Typography><Typography variant="caption" color="text.secondary">Jump to a workspace area.</Typography>
       <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: { xs: "repeat(2,minmax(0,1fr))", sm: "repeat(4,minmax(0,1fr))", lg: "repeat(9,minmax(0,1fr))" }, gap: 1 }}>
-        {QUICK_LINKS.map(([label,path,Icon]) => <Button key={path} component={RouterLink} to={path} sx={{ minHeight: 68, p: 1, flexDirection: "column", gap: 0.5, border: "1px solid", borderColor: "divider", borderRadius: 2, color: "text.primary" }}><Icon sx={{ color: "primary.main", fontSize: 21 }} /><Typography variant="caption" sx={{ fontWeight: 750 }}>{label}</Typography></Button>)}
+        {QUICK_LINKS.map(([label,path,Icon]) => <Button key={path} component={RouterLink} to={path} sx={{ minHeight: 68, p: 1, flexDirection: "column", gap: 0.5, border: "1px solid", borderColor: "divider", borderRadius: 2, color: "text.primary" }}><Icon sx={{ color: "primary.main", fontSize: 21 }} /><Typography variant="caption" sx={{ fontWeight: 750 }}>{t(label)}</Typography></Button>)}
       </Box>
     </Paper>
     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1.15fr 1fr" }, gap: 2 }}>

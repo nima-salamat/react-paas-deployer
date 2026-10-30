@@ -137,6 +137,7 @@ function isImageFile(file) {
 import DashboardNavbar from "../dashboard/DashboardNavbar.jsx";
 import CursorPreferencePicker from "../layout/CursorPreferencePicker.jsx";
 import SessionManager from "../security/SessionManager.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 // --- DND-Kit Imports ---
 import {
@@ -160,6 +161,7 @@ import { CSS } from "@dnd-kit/utilities";
 // ─── Sortable Photo — whole card is draggable; click still opens preview ───
 
 const SortablePhoto = ({ id, profile, index, handleDeleteProfile, onPreview }) => {
+  const { t } = useLocale();
   const {
     attributes,
     listeners,
@@ -261,7 +263,7 @@ const SortablePhoto = ({ id, profile, index, handleDeleteProfile, onPreview }) =
       {index === 0 && (
         <Chip
           icon={<StarIcon sx={{ fontSize: 14 }} />}
-          label="Primary"
+          label={t("Primary")}
           size="small"
           color="primary"
           sx={{
@@ -338,6 +340,7 @@ const SortablePhoto = ({ id, profile, index, handleDeleteProfile, onPreview }) =
 // ─── Profile page ──────────────────────────────────────────────────────────
 
 const Profile = ({ embedded = false }) => {
+  const { t } = useLocale();
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1194,10 +1197,10 @@ const Profile = ({ embedded = false }) => {
                 useFlexGap
               >
                 {userData.email_verified && (
-                  <Chip size="small" color="success" label="Email verified" sx={{ fontWeight: 700 }} />
+                  <Chip size="small" color="success" label={t("Email verified")} sx={{ fontWeight: 700 }} />
                 )}
                 {userData.phone_number_verified && (
-                  <Chip size="small" color="success" label="Phone verified" sx={{ fontWeight: 700 }} />
+                  <Chip size="small" color="success" label={t("Phone verified")} sx={{ fontWeight: 700 }} />
                 )}
                 {!passwordStatusLoading && (
                   <Chip
@@ -1246,7 +1249,7 @@ const Profile = ({ embedded = false }) => {
           <Grid container spacing={2}>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Username"
+                label={t("Username")}
                 name="username"
                 value={userData.username}
                 onChange={handleInputChange}
@@ -1257,7 +1260,7 @@ const Profile = ({ embedded = false }) => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Email"
+                label={t("Email")}
                 name="email"
                 value={userData.email}
                 fullWidth
@@ -1296,7 +1299,7 @@ const Profile = ({ embedded = false }) => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
-                label="Phone number"
+                label={t("Phone number")}
                 name="phone_number"
                 value={userData.phone_number}
                 fullWidth
@@ -1311,7 +1314,7 @@ const Profile = ({ embedded = false }) => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <DatePicker
-                label="Birthdate"
+                label={t("Birthdate")}
                 value={userData.birthdate}
                 onChange={handleDateChange}
                 maxDate={new Date()}
@@ -1328,11 +1331,11 @@ const Profile = ({ embedded = false }) => {
                   name="theme"
                   value={userData.theme}
                   onChange={handleInputChange}
-                  label="Theme preference"
+                  label={t("Theme preference")}
                 >
                   {THEME_CHOICES.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                      {t(opt.label)}
                     </MenuItem>
                   ))}
                 </Select>
@@ -1345,7 +1348,7 @@ const Profile = ({ embedded = false }) => {
                   name="color"
                   value={userData.color}
                   onChange={handleInputChange}
-                  label="Accent color"
+                  label={t("Accent color")}
                 >
                   {COLOR_CHOICES.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>
@@ -1950,7 +1953,7 @@ const Profile = ({ embedded = false }) => {
                   fullWidth
                   size="small"
                   type="email"
-                  label="New email address"
+                  label={t("New email address")}
                   value={emailChangeValue}
                   onChange={(e) => setEmailChangeValue(e.target.value)}
                   onKeyDown={(e) => {
@@ -1976,7 +1979,7 @@ const Profile = ({ embedded = false }) => {
                   autoFocus
                   fullWidth
                   size="small"
-                  label="Verification code"
+                  label={t("Verification code")}
                   value={emailChangeCode}
                   onChange={(e) => setEmailChangeCode(e.target.value.replace(/\s/g, ""))}
                   onKeyDown={(e) => {
@@ -1987,7 +1990,7 @@ const Profile = ({ embedded = false }) => {
                   }}
                   inputProps={{ inputMode: "numeric", maxLength: 32 }}
                   error={Boolean(emailChangeError)}
-                  helperText="Enter the code sent to the new email address."
+                  helperText={t("Enter the code sent to the new email address.")}
                 />
                 {emailChangeError && (
                   <Alert severity="error" sx={{ borderRadius: 2 }}>
@@ -2049,7 +2052,7 @@ const Profile = ({ embedded = false }) => {
             {hasPassword && (
               <>
                 <TextField
-                  label="Current password"
+                  label={t("Current password")}
                   name="password"
                   type={showCurrentPassword ? "text" : "password"}
                   value={passwordData.password}
@@ -2071,7 +2074,7 @@ const Profile = ({ embedded = false }) => {
                   }}
                 />
                 <TextField
-                  label="Confirm current password"
+                  label={t("Confirm current password")}
                   name="confirm_password"
                   type={showCurrentPassword ? "text" : "password"}
                   value={passwordData.confirm_password}
@@ -2083,7 +2086,7 @@ const Profile = ({ embedded = false }) => {
               </>
             )}
             <TextField
-              label="New password"
+              label={t("New password")}
               name="new_password"
               type={showNewPassword ? "text" : "password"}
               value={passwordData.new_password}
@@ -2102,7 +2105,7 @@ const Profile = ({ embedded = false }) => {
               }}
             />
             <TextField
-              label="Confirm new password"
+              label={t("Confirm new password")}
               name="new_confirm_password"
               type={showConfirmPassword ? "text" : "password"}
               value={passwordData.new_confirm_password}
@@ -2150,7 +2153,7 @@ const Profile = ({ embedded = false }) => {
           <DialogTitle sx={{ fontWeight: 800 }}>Remove password</DialogTitle>
           <DialogContent>
             <TextField
-              label="Current password"
+              label={t("Current password")}
               name="password"
               type={showDeletePassword ? "text" : "password"}
               value={deletePasswordData.password}
@@ -2169,7 +2172,7 @@ const Profile = ({ embedded = false }) => {
               }}
             />
             <TextField
-              label="Confirm current password"
+              label={t("Confirm current password")}
               name="confirm_password"
               type={showDeletePassword ? "text" : "password"}
               value={deletePasswordData.confirm_password}

@@ -24,6 +24,7 @@ import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import AppsOutlinedIcon from "@mui/icons-material/AppsOutlined";
 import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 export const SIDEBAR_WIDTH = 232;
 
@@ -77,6 +78,7 @@ function resolveActiveId(pathname) {
 
 function SidebarContent({ onNavigate }) {
   const theme = useTheme();
+  const { t } = useLocale();
   const location = useLocation();
   const navigate = useNavigate();
   const activeId = resolveActiveId(location.pathname);
@@ -150,7 +152,7 @@ function SidebarContent({ onNavigate }) {
                     <Icon sx={{ fontSize: 20 }} />
                   </ListItemIcon>
                   <ListItemText
-                    primary={label}
+                    primary={t(label)}
                     primaryTypographyProps={{
                       fontWeight: selected ? 800 : 650,
                       fontSize: 13.5,
@@ -174,6 +176,7 @@ function SidebarContent({ onNavigate }) {
  */
 export default function DashboardSidebar({ mobileOpen, onClose }) {
   const theme = useTheme();
+  const { t } = useLocale();
 
   const paperSx = {
     width: SIDEBAR_WIDTH,
@@ -217,10 +220,10 @@ export default function DashboardSidebar({ mobileOpen, onClose }) {
             fontSize: 14,
           }}
         >
-          Menu
+          {t("Menu")}
           <IconButton
             size="small"
-            aria-label="Close dashboard menu"
+            aria-label={t("Close dashboard menu")}
             onClick={onClose}
             sx={{ borderRadius: 1.5 }}
           >

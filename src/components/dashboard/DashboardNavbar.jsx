@@ -145,19 +145,19 @@ export default function DashboardNavbar({
                 size="small"
                 onClick={onMenuClick}
                 sx={{ ...navButtonSx, display: { xs: "inline-flex", md: "none" } }}
-                aria-label="Open menu"
+                aria-label={t("Open menu")}
               >
                 <MenuRoundedIcon sx={{ fontSize: { xs: 20, sm: 21 } }} />
               </IconButton>
             )}
 
             {showBack && (
-              <Tooltip title="Back to Dashboard">
+              <Tooltip title={t("Back to Dashboard")}>
                 <IconButton
                   size="small"
                   onClick={handleBack}
                   sx={navButtonSx}
-                  aria-label="Back to dashboard"
+                  aria-label={t("Back to dashboard")}
                 >
                   <ArrowBackRoundedIcon sx={{ fontSize: { xs: 18, sm: 19 } }} />
                 </IconButton>

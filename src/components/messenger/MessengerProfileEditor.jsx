@@ -11,6 +11,7 @@
  *  - Back arrow button at the top (closes the editor)
  */
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   Box, Stack, Typography, IconButton, Button, CircularProgress, Avatar,
   FormControl, Select, MenuItem, InputLabel, Chip, alpha, Paper, TextField,
@@ -62,6 +63,7 @@ function resolveUrl(profile) {
 
 
 function SortableMessengerPhoto({ photo, index, onDelete }) {
+  const { t } = useLocale();
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: String(photo.id) });
@@ -97,7 +99,7 @@ function SortableMessengerPhoto({ photo, index, onDelete }) {
         sx={{ width: "100%", height: "100%", border: "1px solid", borderColor: "divider", pointerEvents: "none" }}
       />
       {index === 0 && (
-        <Chip size="small" label="Primary" color="primary"
+        <Chip size="small" label={t("Primary")} color="primary"
           sx={{ position: "absolute", bottom: 4, left: "50%", transform: "translateX(-50%)", height: 18, fontSize: 10, pointerEvents: "none" }}
         />
       )}
@@ -117,6 +119,7 @@ function SortableMessengerPhoto({ photo, index, onDelete }) {
 }
 
 export default function MessengerProfileEditor({ onClose, onPhotosChange }) {
+  const { t } = useLocale();
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -335,7 +338,7 @@ export default function MessengerProfileEditor({ onClose, onPhotosChange }) {
     <Box sx={{ p: { xs: 1.5, sm: 2 }, maxWidth: 520, mx: "auto" }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
         {onClose && (
-          <IconButton onClick={onClose} size="small" title="Back">
+          <IconButton onClick={onClose} size="small" title={t("Back")}>
             <ArrowBackIcon />
           </IconButton>
         )}
@@ -396,7 +399,7 @@ export default function MessengerProfileEditor({ onClose, onPhotosChange }) {
         </Typography>
         <FormControl fullWidth size="small">
           <InputLabel>Visibility</InputLabel>
-          <Select label="Visibility" value={privacy} onChange={(e) => savePrivacy(e.target.value)}>
+          <Select label={t("Visibility")} value={privacy} onChange={(e) => savePrivacy(e.target.value)}>
             <MenuItem value="everyone">Everyone</MenuItem>
             <MenuItem value="contacts">Contacts only</MenuItem>
             <MenuItem value="nobody">Nobody</MenuItem>
@@ -411,7 +414,7 @@ export default function MessengerProfileEditor({ onClose, onPhotosChange }) {
           <EditIcon fontSize="small" color="action" />
           <Typography variant="subtitle2" sx={{ flex: 1 }}>Bio (about me)</Typography>
           {!bioEditing && (
-            <IconButton size="small" onClick={startEditBio} title="Edit bio">
+            <IconButton size="small" onClick={startEditBio} title={t("Edit bio")}>
               <EditIcon fontSize="small" />
             </IconButton>
           )}
@@ -420,7 +423,7 @@ export default function MessengerProfileEditor({ onClose, onPhotosChange }) {
           <Stack spacing={1}>
             <TextField
               fullWidth size="small" multiline minRows={2} maxRows={4}
-              placeholder="A few words about you (max 255 chars)"
+              placeholder={t("A few words about you (max 255 chars)")}
               value={bioDraft}
               onChange={(e) => setBioDraft(e.target.value.slice(0, 255))}
               inputProps={{ maxLength: 255 }}
@@ -453,7 +456,7 @@ export default function MessengerProfileEditor({ onClose, onPhotosChange }) {
         onConfirm={onCropConfirm}
         circular
         outputSize={512}
-        title="Crop profile photo"
+        title={t("Crop profile photo")}
       />
     </Box>
   );
