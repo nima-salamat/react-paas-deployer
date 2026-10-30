@@ -118,8 +118,8 @@ function prettyStage(value) {
 }
 
 function ResourceRow({ icon, label, value }) {
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Stack direction="row" spacing={1} alignItems="center">
       <Box sx={{ color: "primary.main", display: "grid", placeItems: "center" }}>{icon}</Box>
       <Typography variant="body2">
@@ -175,8 +175,8 @@ function DynamicField({ field, value, onChange, config }) {
   }
 
   const inputType = type === "secret" ? (showSecret ? "text" : "password") : type === "integer" ? "number" : "text";
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <TextField
       fullWidth
       type={inputType}
@@ -469,7 +469,8 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
     </Box>
   );
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Dialog
       open={open}
       onClose={installing ? undefined : onClose}
@@ -655,7 +656,6 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                   const id = String(plan.id ?? plan.pk ?? plan.uuid);
                   const selected = id === String(planId);
                   return (
-    <TranslatedTextTree>
                     <Box
                       key={id}
                       onClick={() => {
