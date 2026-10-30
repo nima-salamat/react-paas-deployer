@@ -127,3 +127,26 @@ test("Persian locale covers admin console, Services and all Ready Apps screens",
     assert.ok(messages.includes(JSON.stringify(english) + ": " + JSON.stringify(persian)), "Missing Persian translation: " + english);
   }
 });
+
+
+test("backend Ready App descriptions have Persian translations without translating user-rendered children", async () => {
+  const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
+  const helper = await readFile(new URL("../src/i18n/TranslatedTextTree.jsx", import.meta.url), "utf8");
+
+  assert.equal(
+    translateText("Open source no-code business automation.", "fa"),
+    "راهکار متن‌باز و بدون نیاز به کدنویسی برای خودکارسازی فرایندهای کسب‌وکار.",
+  );
+  assert.equal(
+    translateText("WordPress is open source software you can use to create a beautiful website, blog, or app.", "fa"),
+    "WordPress نرم‌افزاری متن‌باز برای ساخت وب‌سایت، وبلاگ یا برنامه‌ای زیباست.",
+  );
+  assert.equal(translateText("cms", "fa"), "مدیریت محتوا");
+  assert.equal(translateText("helpdesk", "fa"), "پشتیبانی");
+  assert.equal(translateText("devtools", "fa"), "ابزارهای توسعه");
+
+  assert.match(helper, /TRANSLATABLE_PROPS/);
+  assert.match(helper, /Raw rendered child strings may be service names, usernames, ticket subjects/);
+  assert.doesNotMatch(helper, /if \(typeof node === "string"\)/);
+  assert.match(helper, /nextProps\.children = translated/);
+});
