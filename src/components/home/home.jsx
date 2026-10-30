@@ -970,7 +970,7 @@ export default function Home() {
           >
             <motion.div style={{ y: heroTitleY }}>
               <Chip
-                label="Open-source PaaS · Docker-native"
+                label={t("Open-source PaaS · Docker-native")}
                 sx={{
                   mb: 2,
                   fontWeight: 850,
@@ -1125,7 +1125,7 @@ export default function Home() {
                     <Typography sx={{ fontWeight: 900, fontSize: { xs: ".75rem", sm: ".85rem" }, minWidth: 0 }} noWrap>
                       deployment / production
                     </Typography>
-                    <Chip size="small" label="Healthy" color="success" sx={{ fontWeight: 800, borderRadius: 1, height: 22 }} />
+                    <Chip size="small" label={t("Healthy")} color="success" sx={{ fontWeight: 800, borderRadius: 1, height: 22 }} />
                   </Stack>
                   <Divider sx={{ my: { xs: 0.75, sm: 1 } }} />
                   <Stack spacing={0.55}>
@@ -1136,10 +1136,10 @@ export default function Home() {
                     ].map(([a, b]) => (
                       <Stack key={a} direction="row" justifyContent="space-between">
                         <Typography variant="caption" color="text.secondary">
-                          {a}
+                          {t(a)}
                         </Typography>
                         <Typography variant="caption" sx={{ fontWeight: 850 }}>
-                          {b}
+                          {t(b)}
                         </Typography>
                       </Stack>
                     ))}
@@ -1515,7 +1515,7 @@ export default function Home() {
                     aria-valuenow={86}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-label="Release progress"
+                    aria-label={t("Release progress")}
                   >
                     <Box
                       sx={{

@@ -24,6 +24,12 @@ test("Persian locale covers the requested public, dashboard, service and Messeng
     "Plans are temporarily unavailable.",
     "PaaSDeployer — open-source PaaS platform.",
     "Quick navigation",
+    "Open-source PaaS · Docker-native",
+    "Healthy",
+    "Complete",
+    "Container",
+    "Running",
+    "Release progress",
   ];
 
   for (const source of samples) {
@@ -46,6 +52,12 @@ test("dynamic page data and non-JSX labels are connected to the active locale", 
     const source = await readFile(new URL(page, import.meta.url), "utf8");
     assert.match(source, /useLocale/, `${page} should localize dynamic strings`);
   }
+
+  const home = await readFile(new URL("../src/components/home/home.jsx", import.meta.url), "utf8");
+  assert.match(home, /label=\{t\("Open-source PaaS · Docker-native"\)\}/);
+  assert.match(home, /\{t\(a\)\}[\s\S]*\{t\(b\)\}/);
+  const footer = await readFile(new URL("../src/components/layout/Footer.jsx", import.meta.url), "utf8");
+  assert.equal((footer.match(/className="public-site-footer"/g) || []).length, 2);
 
   const css = await readFile(new URL("../src/index.css", import.meta.url), "utf8");
   assert.match(css, /public-marketing-page/);

@@ -745,6 +745,7 @@ function CellRenderer({ value, displayValue, t = (value) => value, field, onFkCl
 }
 
 function CellValueDetail({ value }) {
+  const { t } = useLocale();
   if (value === null || value === undefined) {
     return <Typography variant="caption" color="text.disabled">{t("null")}</Typography>;
   }

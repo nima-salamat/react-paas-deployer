@@ -792,7 +792,7 @@ html[dir="rtl"] .public-marketing-page {
 html[dir="rtl"] .public-marketing-page .MuiTypography-root {
   letter-spacing: 0 !important;
   line-height: 1.9;
-  text-align: right;
+  text-align: inherit;
   text-wrap: pretty;
 }
 

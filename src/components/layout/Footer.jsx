@@ -140,7 +140,7 @@ const Footer = () => {
 
   /* ── Full footer: home, about us, plans ── */
   return (
-    <Box component="footer" sx={surface}>
+    <Box component="footer" className="public-site-footer" sx={surface}>
       <Container maxWidth="xl">
         <Box
           sx={{

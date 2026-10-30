@@ -1165,4 +1165,19 @@ Object.assign(fa, {
   "in the Ready App library": "در کتابخانهٔ اپلیکیشن‌های آماده"
 });
 
+Object.assign(fa, {
+  "Open-source PaaS · Docker-native": "PaaS متن‌باز · مبتنی بر Docker",
+  "Healthy": "سالم",
+  "Complete": "کامل شد",
+  "Container": "کانتینر",
+  "Running": "در حال اجرا",
+  "Network": "شبکه",
+  "Release progress": "پیشرفت انتشار",
+  "Plans": "پلن‌ها",
+  "Product": "محصول",
+  "Project": "پروژه",
+  "About": "دربارهٔ ما",
+  "Docs": "مستندات"
+});
+
 export const PERSIAN_TRANSLATIONS = fa;
