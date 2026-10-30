@@ -1205,6 +1205,7 @@ export default function ServicesListMui({
                 const s = entry.service;
                 const shareMeta = entry.shareMeta;
                 return (
+    <TranslatedTextTree>
                 <Box
                   key={shareMeta?.shareId || getKey(s)}
                   sx={{
@@ -1306,5 +1307,6 @@ export default function ServicesListMui({
         onVolumesChanged={() => fetchVolumes({ silent: false })}
       />
     </Container>
+    </TranslatedTextTree>
   );
 }
