@@ -249,14 +249,14 @@ export default function ServicesToolbar({
               sx={{ width: "100%", mb: 0, gridColumn: "1 / -1", gridRow: { md: 2 } }}
             >
               {[
-                { key: "mine", label: `Mine (${shareCounts.mine ?? 0})` },
+                { key: "mine", label: `${t("Mine")} (${shareCounts.mine ?? 0})` },
                 {
                   key: "shared_with_me",
-                  label: `Shared with me (${shareCounts.shared_with_me ?? 0})`,
+                  label: `${t("Shared with me")} (${shareCounts.shared_with_me ?? 0})`,
                 },
                 {
                   key: "shared_by_me",
-                  label: `I shared (${shareCounts.shared_by_me ?? 0})`,
+                  label: `${t("I shared")} (${shareCounts.shared_by_me ?? 0})`,
                 },
               ].map((f) => (
                 <Chip
