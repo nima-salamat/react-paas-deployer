@@ -17,8 +17,8 @@ export default function ServicePlatformBadge({
 }) {
   const visiblePlatform = String(platformLabel || platformKey || "Unknown platform");
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Box
       component="span"
       title={`${typeLabel} · ${visiblePlatform}`}
