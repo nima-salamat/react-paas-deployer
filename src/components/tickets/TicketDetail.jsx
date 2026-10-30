@@ -230,7 +230,7 @@ export default function TicketDetail() {
           flexShrink: 0,
         }}
       >
-        <IconButton onClick={() => navigate("/dashboard/tickets")} size="small"><ArrowBackIcon /></IconButton>
+        <IconButton onClick={() => navigate("/dashboard/tickets")} size="small" aria-label={tr("Back to tickets")}><ArrowBackIcon /></IconButton>
         <Box flex={1} minWidth={0}>
           <Typography variant="subtitle1" fontWeight={700} noWrap>{ticket.subject}</Typography>
           <Typography variant="caption" color="text.secondary">
@@ -270,7 +270,7 @@ export default function TicketDetail() {
 
       {/* Composer */}
       {ticket.status === "closed" ? (
-        <Alert severity="info" sx={{ borderRadius: 2, mx: { xs: 1, sm: 1.5 }, mt: 1, flexShrink: 0 }}>This ticket is closed.</Alert>
+        <Alert severity="info" sx={{ borderRadius: 2, mx: { xs: 1, sm: 1.5 }, mt: 1, flexShrink: 0 }}>{tr("This ticket is closed.")}</Alert>
       ) : (
         <Box sx={{ flexShrink: 0, mx: { xs: 1, sm: 1.5 }, mt: 1 }}>
           <ChatComposer
