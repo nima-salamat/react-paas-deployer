@@ -144,6 +144,7 @@ export default function ReadyAppDetail() {
   const components = app.managed_components || [];
 
   return (
+    <TranslatedTextTree>
     <>
       <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4.5 } }}>
         <Stack spacing={3}>
@@ -331,5 +332,6 @@ export default function ReadyAppDetail() {
         }}
       />
     </>
+    </TranslatedTextTree>
   );
 }
