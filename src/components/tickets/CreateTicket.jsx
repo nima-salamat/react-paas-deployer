@@ -6,11 +6,13 @@ import {
 import { useNavigate } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import apiRequest from "../customHooks/apiRequest";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { TICKETS_API, unwrapData, unwrapList } from "./api";
 import SimpleHtmlEditor, { htmlToPlain } from "./SimpleHtmlEditor";
 import PendingFilesBar from "./PendingFilesBar";
 
 export default function CreateTicket() {
+  const { t: tr } = useLocale();
   const navigate = useNavigate();
   const [departments, setDepartments] = useState([]);
   const [services, setServices] = useState([]);
@@ -128,13 +130,13 @@ export default function CreateTicket() {
       <Paper sx={{ p: 3 }} component="form" onSubmit={submit}>
         {depsError && (
           <Alert severity="error" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={loadOptions}>Retry</Button>}>
-            {depsError}
+            {tr(depsError)}
           </Alert>
         )}
         {!depsError && departments.length === 0 && (
           <Alert severity="warning" sx={{ mb: 2 }}>No departments available. Ask an admin to create one.</Alert>
         )}
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{tr(error)}</Alert>}
         <Stack spacing={2.5}>
           <FormControl fullWidth required>
             <InputLabel>Department</InputLabel>
