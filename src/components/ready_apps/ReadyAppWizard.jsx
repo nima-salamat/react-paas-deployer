@@ -133,6 +133,7 @@ function ResourceRow({ icon, label, value }) {
 }
 
 function DynamicField({ field, value, onChange, config }) {
+  const { t } = useLocale();
   const [showSecret, setShowSecret] = useState(false);
   if (!fieldVisible(field, config) || field?.user_editable === false) return null;
   const id = String(field.id);
@@ -168,7 +169,7 @@ function DynamicField({ field, value, onChange, config }) {
       >
         {(field.options || []).map((option) => (
           <MenuItem key={option} value={option}>
-            {optionLabels[String(option)] || option}
+            {optionLabels[String(option)] ? t(optionLabels[String(option)]) : option}
           </MenuItem>
         ))}
       </TextField>
@@ -526,7 +527,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                       color: index === activeStep ? "primary.main" : "text.secondary",
                     }}
                   >
-                    {index + 1} {label}
+                    {index + 1} {t(label)}
                   </Typography>
                 </React.Fragment>
               ))}
