@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   Alert,
   Box,
@@ -70,6 +71,7 @@ function AppLogo({ app, size = 58 }) {
 }
 
 function AppCard({ app }) {
+  const { t } = useLocale();
   return (    <TranslatedTextTree>
 
     <Card
@@ -105,7 +107,7 @@ function AppCard({ app }) {
                 color="text.secondary"
                 sx={{ textTransform: "uppercase", letterSpacing: ".08em", fontWeight: 800 }}
               >
-                {app.category || "Application"}
+                {t(app.category || "Application")}
               </Typography>
               <Typography
                 component="h2"
@@ -129,7 +131,7 @@ function AppCard({ app }) {
               overflow: "hidden",
             }}
           >
-            {app.description || "A curated application, ready to deploy."}
+            {t(app.description || "A curated application, ready to deploy.")}
           </Typography>
 
           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: "auto", pt: 2.6 }}>
