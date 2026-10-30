@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Alert, Box, Typography, Avatar, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, FormControlLabel, Switch, List, ListItemButton, ListItemAvatar,
@@ -49,6 +50,7 @@ export default function MessengerDialogs({
   // day jump
   dayJumpOpen, setDayJumpOpen, messagesWithDays, messages, jumpToDayInChat,
 }) {
+  const { t: tr } = useLocale();
   const safeConversations = Array.isArray(conversations)
     ? conversations
     : Array.isArray(conversations?.results)
@@ -90,7 +92,7 @@ export default function MessengerDialogs({
       <Dialog open={createGroupOpen} onClose={() => setCreateGroupOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>New group</DialogTitle>
         <DialogContent>
-          <TextField fullWidth label="Group title" value={groupTitle}
+          <TextField fullWidth label={tr("Group title")} value={groupTitle}
             onChange={(e) => setGroupTitle(e.target.value)} sx={{ mt: 1 }} />
           <FormControlLabel sx={{ mt: 1.5 }}
             control={(
@@ -104,7 +106,7 @@ export default function MessengerDialogs({
                 }}
               />
             )}
-            label="End-to-end encrypted group" />
+            label={tr("End-to-end encrypted group")} />
           {secureGroup ? (
             <>
               <Alert severity="info" sx={{ mt: 1, mb: 1.5 }}>
@@ -146,7 +148,7 @@ export default function MessengerDialogs({
           ) : (
             <FormControlLabel sx={{ mt: 0.75 }}
               control={<Switch checked={groupPublic} onChange={(e) => setGroupPublic(e.target.checked)} />}
-              label="Public (appears in search)" />
+              label={tr("Public (appears in search)")} />
           )}
         </DialogContent>
         <DialogActions>
@@ -177,8 +179,8 @@ export default function MessengerDialogs({
           <TextField
             fullWidth
             autoFocus
-            label="Topic name"
-            placeholder="Announcements, Development, Support…"
+            label={tr("Topic name")}
+            placeholder={tr("Announcements, Development, Support…")}
             value={topicTitle}
             onChange={(event) => setTopicTitle(event.target.value)}
             inputProps={{ maxLength: 100 }}
@@ -205,7 +207,7 @@ export default function MessengerDialogs({
       <Dialog open={joinOpen} onClose={() => setJoinOpen(false)} fullWidth maxWidth="xs">
         <DialogTitle>Join with invite code</DialogTitle>
         <DialogContent>
-          <TextField fullWidth label="Invite code" value={joinCode}
+          <TextField fullWidth label={tr("Invite code")} value={joinCode}
             onChange={(e) => setJoinCode(e.target.value)} sx={{ mt: 1 }} />
         </DialogContent>
         <DialogActions>
@@ -322,7 +324,7 @@ export default function MessengerDialogs({
       />
       <ConfirmDialog
         open={Boolean(confirmCleanup)}
-        title="Clear messages?"
+        title={tr("Clear messages?")}
         message="This permanently removes all messages and attachments from this conversation. Other participants will lose this conversation history too. This cannot be undone."
         confirmLabel="Clear"
         confirmColor="warning"
@@ -331,7 +333,7 @@ export default function MessengerDialogs({
       />
       <ConfirmDialog
         open={Boolean(confirmBlock)}
-        title="Block user?"
+        title={tr("Block user?")}
         message={confirmBlock?.user?.username
           ? `@${confirmBlock.user.username} will no longer be able to message you. They'll be removed from your contacts.`
           : "This user will no longer be able to message you. They'll be removed from your contacts."}
@@ -342,7 +344,7 @@ export default function MessengerDialogs({
       />
       <ConfirmDialog
         open={Boolean(confirmLeave)}
-        title="Leave chat?"
+        title={tr("Leave chat?")}
         message="You will no longer receive messages from this chat. Other members will see that you left."
         confirmLabel="Leave"
         confirmColor="warning"

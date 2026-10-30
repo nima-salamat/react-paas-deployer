@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   Box, Stack, Typography, IconButton, TextField, InputAdornment, Avatar,
@@ -71,28 +72,28 @@ import AudioPlayerBar from "./AudioPlayerBar";
  *  - onOpenMyRequests: () => void          (open the "My Join Requests" panel)
  */
 
-function formatLastMessagePreview(lm) {
-  if (!lm) return "No messages yet";
+function formatLastMessagePreview(lm, t = (value) => value) {
+  if (!lm) return t("No messages yet");
   const body = typeof lm.body === "string" ? lm.body : (lm.body != null ? String(lm.body) : "");
   const callLabel = formatCallSystemLabel(body);
   if (callLabel) return callLabel;
-  if (body.includes("__call__:")) return "Call";
+  if (body.includes("__call__:")) return t("Call");
   if (body.startsWith("__service_event__:")) {
     const nl = body.indexOf("\n");
     if (nl >= 0 && body.slice(nl + 1).trim()) return body.slice(nl + 1).trim();
     try {
       const jsonPart = nl >= 0 ? body.slice("__service_event__:".length, nl) : body.slice("__service_event__:".length);
       const d = JSON.parse(jsonPart);
-      const actor = d.actor_name || "Someone";
-      const svc = d.service_name || "service";
-      return `${actor}: ${d.action || "event"} · ${svc}`;
+      const actor = d.actor_name || t("Someone");
+      const svc = d.service_name || t("service");
+      return `${actor}: ${d.action || t("event")} · ${svc}`;
     } catch {
-      return "Service event";
+      return t("Service event");
     }
   }
   if (body) return body;
-  if (lm.has_attachments) return "📎 Attachment";
-  return "No messages yet";
+  if (lm.has_attachments) return `📎 ${t("Attachment")}`;
+  return t("No messages yet");
 }
 
 export default function Sidebar({
@@ -120,6 +121,7 @@ export default function Sidebar({
   meAvatar = null,
   onOpenMyProfile,
 }) {
+  const { t } = useLocale();
   const [ctx, setCtx] = useState(null); // { x, y, conv, peer, role }
   const navigate = useNavigate();
   const [listMenuAnchor, setListMenuAnchor] = useState(null);
@@ -245,7 +247,7 @@ export default function Sidebar({
         <IconButton
           size="small"
           onClick={() => (onOpenMyProfile ? onOpenMyProfile() : onOpenSettings?.())}
-          title="My profile"
+          title={t("My profile")}
           sx={{ p: 0.35 }}
         >
           <Avatar src={meAvatar || undefined} sx={{ width: 36, height: 36 }} />
@@ -277,8 +279,8 @@ export default function Sidebar({
               document.querySelector('input[data-messenger-search="true"]')?.focus?.();
             });
           }}
-          title="New message"
-          aria-label="New message"
+          title={t("New message")}
+          aria-label={t("New message")}
           sx={{
             borderRadius: 2,
             color: "primary.main",
@@ -291,7 +293,7 @@ export default function Sidebar({
         <IconButton
           size="small"
           onClick={(e) => setListMenuAnchor(e.currentTarget)}
-          title="More"
+          title={t("More")}
         >
           <MoreVertIcon />
         </IconButton>
@@ -399,8 +401,8 @@ export default function Sidebar({
         variant="fullWidth"
         sx={{ minHeight: 36, "& .MuiTab-root": { minHeight: 36, py: 0.5, fontSize: 13 } }}
       >
-        <Tab label="Chats" />
-        <Tab label="Public groups" />
+        <Tab label={t("Chats")} />
+        <Tab label={t("Public groups")} />
       </Tabs>
 
       {listTab === 0 && searchQ.trim() ? (
@@ -408,7 +410,7 @@ export default function Sidebar({
           const q = searchQ.trim().toLowerCase();
           const matchingChats = conversations.filter((c) => {
             const title = convTitle(c, meId).toLowerCase();
-            const preview = formatLastMessagePreview(c.last_message).toLowerCase();
+            const preview = formatLastMessagePreview(c.last_message, t).toLowerCase();
             const username = String(c.peer?.username || "").toLowerCase();
             return title.includes(q) || preview.includes(q) || username.includes(q);
           });
@@ -460,7 +462,7 @@ export default function Sidebar({
                               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
                                 {c.security_mode === "matrix_e2ee" && (
                                   <LockOutlinedIcon
-                                    aria-label="End-to-end encrypted conversation"
+                                    aria-label={t("End-to-end encrypted conversation")}
                                     titleAccess="End-to-end encrypted"
                                     sx={{ fontSize: 15, color: "success.main", flexShrink: 0 }}
                                   />
@@ -483,7 +485,7 @@ export default function Sidebar({
                                 ? "End-to-end encrypted"
                                 : c.draft_text
                                   ? `Draft: ${String(c.draft_text).slice(0, 70)}`
-                                  : formatLastMessagePreview(c.last_message)}
+                                  : formatLastMessagePreview(c.last_message, t)}
                             </Typography>
                           }
                         />
@@ -513,12 +515,12 @@ export default function Sidebar({
                     />
                     <Stack direction="row" spacing={0.25}>
                       {String(u.id) !== String(meId) && (
-                        <IconButton size="small" title="Message" onClick={(e) => { e.stopPropagation(); startDm(u); }}>
+                        <IconButton size="small" title={t("Message")} onClick={(e) => { e.stopPropagation(); startDm(u); }}>
                           <ChatIcon fontSize="small" />
                         </IconButton>
                       )}
                       {!u.is_contact && String(u.id) !== String(meId) && (
-                        <IconButton size="small" title="Add contact" onClick={(e) => { e.stopPropagation(); addContact(u.id); }}>
+                        <IconButton size="small" title={t("Add contact")} onClick={(e) => { e.stopPropagation(); addContact(u.id); }}>
                           <PersonAddIcon fontSize="small" />
                         </IconButton>
                       )}
@@ -745,7 +747,7 @@ export default function Sidebar({
                             {pinned && <PushPinIcon sx={{ fontSize: 13, color: "text.secondary", flexShrink: 0 }} />}
                             {c.security_mode === "matrix_e2ee" && (
                               <LockOutlinedIcon
-                                aria-label="End-to-end encrypted conversation"
+                                aria-label={t("End-to-end encrypted conversation")}
                                 titleAccess="End-to-end encrypted"
                                 sx={{ fontSize: 15, color: "success.main", flexShrink: 0 }}
                               />
@@ -770,7 +772,7 @@ export default function Sidebar({
                             ? `Draft: ${String(c.draft_text).slice(0, 80)}`
                             : c.security_mode === "matrix_e2ee" && !c.last_message
                               ? "End-to-end encrypted"
-                              : formatLastMessagePreview(c.last_message)}
+                              : formatLastMessagePreview(c.last_message, t)}
                         </Typography>
                       }
                     />
@@ -826,8 +828,8 @@ export default function Sidebar({
                         </IconButton>
                         <IconButton
                           size="small"
-                          aria-label="Decline incoming call"
-                          title="Decline"
+                          aria-label={t("Decline incoming call")}
+                          title={t("Decline")}
                           disabled={incomingCallBusy}
                           onClick={(e) => {
                             e.stopPropagation();

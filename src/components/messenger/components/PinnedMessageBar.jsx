@@ -23,6 +23,7 @@
  *   headerHeight    — number, the header's height in px (for sizing)
  */
 import React, { useCallback, useMemo } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Typography, IconButton, Tooltip, Chip,
 } from "@mui/material";
@@ -39,6 +40,7 @@ export default function PinnedMessageBar({
   onJumpToMessage,
   headerHeight = 56,
 }) {
+  const { t: tr } = useLocale();
   const theme = useTheme();
 
   const pin = pinnedMessages[currentIndex];
@@ -138,7 +140,7 @@ export default function PinnedMessageBar({
       {/* Cycle arrows — only show when there are multiple pins */}
       {total > 1 && (
         <>
-          <Tooltip title="Previous pinned" placement="top">
+          <Tooltip title={tr("Previous pinned")} placement="top">
             <IconButton
               size="small"
               onClick={(e) => { e.stopPropagation(); onCycleUp?.(); }}
@@ -153,7 +155,7 @@ export default function PinnedMessageBar({
               <KeyboardArrowUpIcon />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Next pinned" placement="top">
+          <Tooltip title={tr("Next pinned")} placement="top">
             <IconButton
               size="small"
               onClick={(e) => { e.stopPropagation(); onCycleDown?.(); }}

@@ -112,7 +112,7 @@ function SidebarContent({ onNavigate }) {
               color: "text.secondary",
             }}
           >
-            {group.group}
+            {t(group.group)}
           </Typography>
           <List disablePadding dense>
             {group.items.map(({ id, label, path, icon: Icon }) => {

@@ -2,6 +2,7 @@
  * Group shared services — list, share (pick service → rules → per-member), manage.
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box,
   Stack,
@@ -103,6 +104,7 @@ function applyLocalPreset(name) {
 }
 
 function RulesGrid({ rules, onChange, disabled }) {
+  const { t: tr } = useLocale();
   return (
     <Stack spacing={1}>
       <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.5}>
@@ -119,7 +121,7 @@ function RulesGrid({ rules, onChange, disabled }) {
                   onChange={() => onChange({ ...rules, [key]: !rules[key] })}
                 />
               }
-              label={<Typography variant="caption">{RULE_LABELS[key] || key}</Typography>}
+              label={<Typography variant="caption">{tr(RULE_LABELS[key] || key)}</Typography>}
               sx={{
                 border: "1px solid",
                 borderColor: "divider",
@@ -136,7 +138,7 @@ function RulesGrid({ rules, onChange, disabled }) {
         size="small"
         type="number"
         disabled={disabled}
-        label="Daily deploy limit (max 50)"
+        label={tr("Daily deploy limit (max 50)")}
         value={rules.daily_deploy_limit ?? 50}
         onChange={(e) => {
           let n = parseInt(e.target.value, 10);
@@ -145,7 +147,7 @@ function RulesGrid({ rules, onChange, disabled }) {
           onChange({ ...rules, daily_deploy_limit: n });
         }}
         inputProps={{ min: 0, max: 50 }}
-        helperText="Deploys/builds this member may run per day on this service"
+        helperText={tr("Deploys/builds this member may run per day on this service")}
         fullWidth
       />
     </Stack>
@@ -153,6 +155,7 @@ function RulesGrid({ rules, onChange, disabled }) {
 }
 
 export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) {
+  const { t: tr } = useLocale();
   const groupId = activeConv?.id ?? activeConv?.pk;
   const participants = useMemo(() => {
     const raw = activeConv?.participants || activeConv?.members || [];
@@ -431,7 +434,7 @@ export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) 
         <Typography variant="subtitle2" fontWeight={800} sx={{ flex: 1 }}>
           Shared services
         </Typography>
-        <Tooltip title="Refresh">
+        <Tooltip title={tr("Refresh")}>
           <IconButton size="small" onClick={loadShares} disabled={loading}>
             <RefreshIcon fontSize="small" />
           </IconButton>
@@ -487,9 +490,9 @@ export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) 
                         <Typography variant="body2" fontWeight={700}>
                           {name}
                         </Typography>
-                        <Chip size="small" label={status} sx={{ height: 20, fontWeight: 700 }} />
+                        <Chip size="small" label={tr(status)} sx={{ height: 20, fontWeight: 700 }} />
                         {isOwner && (
-                          <Chip size="small" color="info" variant="outlined" label="Mine" sx={{ height: 20 }} />
+                          <Chip size="small" color="info" variant="outlined" label={tr("Mine")} sx={{ height: 20 }} />
                         )}
                       </Stack>
                     }
@@ -502,21 +505,21 @@ export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) 
                   />
                   <Stack direction="row" spacing={0.25} alignItems="center">
                     {perms.can_start && (
-                      <Tooltip title="Start">
+                      <Tooltip title={tr("Start")}>
                         <IconButton size="small" onClick={() => runAction(share, "start")}>
                           <PlayArrowIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
                     {perms.can_stop && (
-                      <Tooltip title="Stop">
+                      <Tooltip title={tr("Stop")}>
                         <IconButton size="small" onClick={() => runAction(share, "stop")}>
                           <StopIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
                     {perms.can_restart && (
-                      <Tooltip title="Restart">
+                      <Tooltip title={tr("Restart")}>
                         <IconButton size="small" onClick={() => runAction(share, "restart")}>
                           <RestartAltIcon fontSize="small" />
                         </IconButton>
@@ -524,12 +527,12 @@ export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) 
                     )}
                     {isOwner && (
                       <>
-                        <Tooltip title="Member permissions">
+                        <Tooltip title={tr("Member permissions")}>
                           <IconButton size="small" onClick={() => openManageMembers(share)}>
                             <SettingsIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Unshare">
+                        <Tooltip title={tr("Unshare")}>
                           <IconButton size="small" color="warning" onClick={() => handleUnshare(share)}>
                             <LinkOffIcon fontSize="small" />
                           </IconButton>
@@ -611,18 +614,18 @@ export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) 
               </Stack>
               <FormControlLabel
                 control={<Switch size="small" checked={adminOnly} onChange={(e) => setAdminOnly(e.target.checked)} />}
-                label="Admins only (base gate — still can set per-member below)"
+                label={tr("Admins only (base gate — still can set per-member below)")}
               />
               <TextField
                 size="small"
                 type="datetime-local"
-                label="Expires at (optional)"
+                label={tr("Expires at (optional)")}
                 value={expiresLocal}
                 onChange={(e) => setExpiresLocal(e.target.value)}
                 InputLabelProps={{ shrink: true }}
                 fullWidth
               />
-              <TextField size="small" label="Note" value={note} onChange={(e) => setNote(e.target.value)} fullWidth />
+              <TextField size="small" label={tr("Note")} value={note} onChange={(e) => setNote(e.target.value)} fullWidth />
               <Divider />
               <RulesGrid
                 rules={defaultRules}
@@ -672,7 +675,7 @@ export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) 
                             }
                           />
                         }
-                        label="Enabled"
+                        label={tr("Enabled")}
                       />
                       <Button
                         size="small"
@@ -777,7 +780,7 @@ export default function GroupSharedServicesPanel({ activeConv, meId, onClose }) 
                           }}
                         />
                       }
-                      label="Enabled"
+                      label={tr("Enabled")}
                     />
                   </Stack>
                   {m.is_enabled && (

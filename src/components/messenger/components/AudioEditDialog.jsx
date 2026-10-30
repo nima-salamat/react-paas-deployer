@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, IconButton, Slider, Stack, Typography, CircularProgress,
@@ -67,6 +68,7 @@ export default function AudioEditDialog({
   confirmLabel = "Done",
   initialEdits = null,
 }) {
+  const { t: tr } = useLocale();
   const audioRef = useRef(null);
   const urlRef = useRef(null);
   const [src, setSrc] = useState("");
@@ -195,7 +197,7 @@ export default function AudioEditDialog({
           onClick={onClose}
           disabled={busy}
           sx={{ position: "absolute", right: 8, top: 8 }}
-          aria-label="Close audio editor"
+          aria-label={tr("Close audio editor")}
         >
           <CloseIcon />
         </IconButton>
@@ -227,7 +229,7 @@ export default function AudioEditDialog({
             step={0.01}
             onChange={onSeek}
             disabled={!duration || busy}
-            aria-label="Audio position"
+            aria-label={tr("Audio position")}
           />
           <Typography variant="caption" color="text.secondary">
             Drag the two handles below to choose the section to keep.
@@ -242,7 +244,7 @@ export default function AudioEditDialog({
             disableSwap
             valueLabelDisplay="auto"
             valueLabelFormat={fmtTime}
-            aria-label="Audio trim range"
+            aria-label={tr("Audio trim range")}
           />
           <Stack direction="row" justifyContent="space-between">
             <Typography variant="caption">{fmtTime(trimStart)}</Typography>

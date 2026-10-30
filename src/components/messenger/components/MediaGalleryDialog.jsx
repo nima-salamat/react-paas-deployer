@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Dialog, IconButton, Typography, CircularProgress, Stack, Slider, alpha,
 } from "@mui/material";
@@ -35,6 +36,7 @@ export default function MediaGalleryDialog({
   initialItems = null,
   kinds = null,
 }) {
+  const { t: tr } = useLocale();
   const [items, setItems] = useState([]);
   const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -313,7 +315,7 @@ export default function MediaGalleryDialog({
             <IconButton
               onClick={() => { onShowInChat(current); onClose?.(); }}
               sx={{ color: "#fff" }}
-              title="Show in chat"
+              title={tr("Show in chat")}
             >
               <Typography variant="caption" sx={{ color: "#fff", px: 0.5 }}>In chat</Typography>
             </IconButton>
@@ -322,13 +324,13 @@ export default function MediaGalleryDialog({
             <IconButton
               onClick={() => { onReply(current); onClose?.(); }}
               sx={{ color: "#fff" }}
-              title="Reply"
+              title={tr("Reply")}
             >
               <Typography variant="caption" sx={{ color: "#fff", px: 0.5 }}>Reply</Typography>
             </IconButton>
           )}
           {src && (
-            <IconButton onClick={onDownload} sx={{ color: "#fff" }} size="small" title="Download">
+            <IconButton onClick={onDownload} sx={{ color: "#fff" }} size="small" title={tr("Download")}>
               <DownloadIcon />
             </IconButton>
           )}

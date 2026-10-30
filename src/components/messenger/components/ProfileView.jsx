@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box,
   Stack,
@@ -50,6 +51,7 @@ export default function ProfileView({
   onVideoCall,
   isSelf = false,
 }) {
+  const { t: tr } = useLocale();
   const [galleryIndex, setGalleryIndex] = useState(null);
   const [copied, setCopied] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -198,9 +200,9 @@ export default function ProfileView({
             </Box>
           ) : (
             <Stack direction="row" spacing={0.8} sx={{ p: 1.25 }}>
-              <ActionButton icon={<MessageIcon />} label="Message" onClick={() => onMessage?.(profileData)} />
-              <ActionButton icon={<PhoneIcon />} label="Call" onClick={() => onVoiceCall?.(profileData)} />
-              <ActionButton icon={<VideocamIcon />} label="Video" onClick={() => onVideoCall?.(profileData)} />
+              <ActionButton icon={<MessageIcon />} label={tr("Message")} onClick={() => onMessage?.(profileData)} />
+              <ActionButton icon={<PhoneIcon />} label={tr("Call")} onClick={() => onVoiceCall?.(profileData)} />
+              <ActionButton icon={<VideocamIcon />} label={tr("Video")} onClick={() => onVideoCall?.(profileData)} />
             </Stack>
           )}
         </Paper>
@@ -266,7 +268,7 @@ export default function ProfileView({
             {!isSelf && !isContact && !isBlocked && (
               <ListItemButtonRow
                 icon={<PersonAddIcon color="primary" />}
-                title="Add to contacts"
+                title={tr("Add to contacts")}
                 onClick={() => onAddContact?.(profileData.id)}
               />
             )}
@@ -277,13 +279,13 @@ export default function ProfileView({
             />
             <ListItemButtonRow
               icon={<ShareIcon color="action" />}
-              title="Share contact"
+              title={tr("Share contact")}
               onClick={shareProfile}
             />
             {typeof onOpenChatInfo === "function" && (
               <ListItemButtonRow
                 icon={<InfoOutlinedIcon color="action" />}
-                title="Chat info"
+                title={tr("Chat info")}
                 onClick={onOpenChatInfo}
               />
             )}
@@ -291,14 +293,14 @@ export default function ProfileView({
             {!isSelf && (isBlocked ? (
               <ListItemButtonRow
                 icon={<BlockIcon color="success" />}
-                title="Unblock user"
+                title={tr("Unblock user")}
                 destructive={false}
                 onClick={() => onUnblock?.(profileData.id)}
               />
             ) : (
               <ListItemButtonRow
                 icon={<BlockIcon color="error" />}
-                title="Block user"
+                title={tr("Block user")}
                 destructive
                 onClick={() => onBlock?.(profileData.id)}
               />

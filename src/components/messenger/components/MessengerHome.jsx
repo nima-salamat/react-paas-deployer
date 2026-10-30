@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Typography, Button, Stack, Paper,
 } from "@mui/material";
@@ -13,6 +14,7 @@ export default function MessengerHome({
   onNavigateHome,
   chatCount = 0,
 }) {
+  const { t } = useLocale();
   return (
     <Box
       sx={{
@@ -74,9 +76,9 @@ export default function MessengerHome({
           color="text.secondary"
           sx={{ mt: 1, maxWidth: 430, mx: "auto", lineHeight: 1.65 }}
         >
-          {chatCount
+          {t(chatCount
             ? "Pick up a conversation, search for someone, or start something new."
-            : "Start a conversation and keep your messages, calls, files, and groups in one place."}
+            : "Start a conversation and keep your messages, calls, files, and groups in one place.")}
         </Typography>
 
         <Stack

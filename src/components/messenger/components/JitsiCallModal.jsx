@@ -23,6 +23,7 @@ import { formatCallSystemLabel as formatCallSystemLabelShared, parseCallSystemBo
 import React, {
   useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo,
 } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, IconButton, Stack, Typography, Avatar, Chip, Tooltip,
   CircularProgress, Paper, Modal, Slide, List, ListItemButton, ListItemText,
@@ -505,6 +506,7 @@ function ParticipantTile({
  * Does NOT remount the video when entering fullscreen (avoids the "page jump").
  */
 function ScreenShareViewer({ participant, isLocal }) {
+  const { t: tr } = useLocale();
   const wrapRef = useRef(null);
   const videoRef = useRef(null);
   const vTrack = participant?.videoTrack;
@@ -673,19 +675,19 @@ function ScreenShareViewer({ participant, isLocal }) {
         }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <IconButton size="small" onClick={() => zoomBy(-0.25)} sx={{ color: "#fff" }} aria-label="Zoom out">
+        <IconButton size="small" onClick={() => zoomBy(-0.25)} sx={{ color: "#fff" }} aria-label={tr("Zoom out")}>
           <ZoomOutIcon sx={{ fontSize: 20 }} />
         </IconButton>
         <Typography variant="caption" sx={{ color: "#fff", minWidth: 40, textAlign: "center", fontWeight: 600 }}>
           {Math.round(zoom * 100)}%
         </Typography>
-        <IconButton size="small" onClick={() => zoomBy(0.25)} sx={{ color: "#fff" }} aria-label="Zoom in">
+        <IconButton size="small" onClick={() => zoomBy(0.25)} sx={{ color: "#fff" }} aria-label={tr("Zoom in")}>
           <ZoomInIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <IconButton size="small" onClick={() => applyTransform(1, { x: 0, y: 0 })} sx={{ color: "#fff" }} aria-label="Reset zoom">
+        <IconButton size="small" onClick={() => applyTransform(1, { x: 0, y: 0 })} sx={{ color: "#fff" }} aria-label={tr("Reset zoom")}>
           <Typography sx={{ fontSize: 11, fontWeight: 700, px: 0.5 }}>1:1</Typography>
         </IconButton>
-        <IconButton size="small" onClick={toggleFs} sx={{ color: "#fff" }} aria-label="Fullscreen">
+        <IconButton size="small" onClick={toggleFs} sx={{ color: "#fff" }} aria-label={tr("Fullscreen")}>
           {fs ? <FullscreenExitIcon sx={{ fontSize: 20 }} /> : <FullscreenIcon sx={{ fontSize: 20 }} />}
         </IconButton>
       </Stack>
@@ -919,6 +921,7 @@ export default function JitsiCallModal({
   loadingMore = false,
   hasMoreMessages = false,
 }) {
+  const { t: tr } = useLocale();
   const theme = useTheme();
   const isMobileView = useMediaQuery(theme.breakpoints.down("md"));
   const isSmallView = useMediaQuery(theme.breakpoints.down("sm"));
@@ -2005,9 +2008,9 @@ export default function JitsiCallModal({
         {!compact && (
           <>
             {/* Always-visible core actions */}
-            <Tooltip title="In-call chat">
+            <Tooltip title={tr("In-call chat")}>
               <IconButton onClick={() => setChatOpen((v) => !v)} sx={{ ...controlBtnSx(chatOpen, false, sz), position: "relative" }}
-                aria-label="In-call chat">
+                aria-label={tr("In-call chat")}>
                 <ChatIcon fontSize={mobile ? "small" : "medium"} />
                 {chatUnread > 0 && !chatOpen && (
                   <Box sx={{
@@ -2021,9 +2024,9 @@ export default function JitsiCallModal({
                 )}
               </IconButton>
             </Tooltip>
-            <Tooltip title="Participants">
+            <Tooltip title={tr("Participants")}>
               <IconButton onClick={() => setRailOpen((v) => !v)} sx={controlBtnSx(railOpen, false, sz)}
-                aria-label="Participants">
+                aria-label={tr("Participants")}>
                 <PeopleIcon fontSize={mobile ? "small" : "medium"} />
               </IconButton>
             </Tooltip>
@@ -2031,38 +2034,38 @@ export default function JitsiCallModal({
               <>
                 <Tooltip title={sharing ? "Stop screen share" : "Share screen"}>
                   <IconButton onClick={toggleShare} sx={controlBtnSx(sharing, false, sz)}
-                    aria-label={sharing ? "Stop screen share" : "Share screen"}>
+                    aria-label={tr(sharing ? "Stop screen share" : "Share screen")}>
                     {sharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Microphone & camera">
+                <Tooltip title={tr("Microphone & camera")}>
                   <IconButton onClick={() => setDeviceSheetOpen(true)} sx={controlBtnSx(false, false, sz)}
-                    aria-label="Microphone & camera">
+                    aria-label={tr("Microphone & camera")}>
                     <SettingsIcon />
                   </IconButton>
                 </Tooltip>
                 <Tooltip title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
                   <IconButton onClick={toggleFullscreen} sx={controlBtnSx(false, false, sz)}
-                    aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
+                    aria-label={tr(fullscreen ? "Exit fullscreen" : "Fullscreen")}>
                     {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
                   </IconButton>
                 </Tooltip>
               </>
             )}
             {mobile && (
-              <Tooltip title="More">
+              <Tooltip title={tr("More")}>
                 <IconButton
                   onClick={(e) => setMoreAnchor(e.currentTarget)}
                   sx={controlBtnSx(Boolean(moreAnchor), false, sz)}
-                  aria-label="More"
+                  aria-label={tr("More")}
                 >
                   <MoreHorizIcon />
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Minimise">
+            <Tooltip title={tr("Minimise")}>
               <IconButton onClick={goMini} sx={controlBtnSx(false, false, sz)}
-                aria-label="Minimise">
+                aria-label={tr("Minimise")}>
                 <PictureInPictureAltIcon fontSize={mobile ? "small" : "medium"} />
               </IconButton>
             </Tooltip>
@@ -2070,21 +2073,21 @@ export default function JitsiCallModal({
         )}
 
         {compact && (
-          <Tooltip title="Expand">
+          <Tooltip title={tr("Expand")}>
             <IconButton onClick={goFull} sx={controlBtnSx(false, false, sz)}
-              aria-label="Expand">
+              aria-label={tr("Expand")}>
               <OpenInFullIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         )}
 
-        <Tooltip title="Hang up">
+        <Tooltip title={tr("Hang up")}>
           <IconButton onClick={hangup}
             sx={{
               ...controlBtnSx(false, true, compact ? 38 : (mobile ? 46 : 52)),
               borderRadius: 3, ml: 0.5, px: compact ? 0.5 : 1.5,
             }}
-            aria-label="Hang up">
+            aria-label={tr("Hang up")}>
             <CallEndIcon fontSize={compact ? "small" : "medium"} />
           </IconButton>
         </Tooltip>
@@ -2136,7 +2139,7 @@ export default function JitsiCallModal({
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography variant="h6" fontWeight={700}>Audio &amp; Video</Typography>
           <IconButton size="small" onClick={() => setDeviceSheetOpen(false)}
-            sx={{ color: "rgba(255,255,255,0.7)" }} aria-label="Close">
+            sx={{ color: "rgba(255,255,255,0.7)" }} aria-label={tr("Close")}>
             <CloseIcon />
           </IconButton>
         </Stack>
@@ -2258,15 +2261,15 @@ export default function JitsiCallModal({
         <Stack spacing={1}>
           <FormControlLabel
             control={<Switch checked={!audioMuted} onChange={toggleAudio} color="primary" />}
-            label="Microphone on"
+            label={tr("Microphone on")}
           />
           <FormControlLabel
             control={<Switch checked={!videoMuted} onChange={toggleVideo} color="primary" />}
-            label="Camera on"
+            label={tr("Camera on")}
           />
           <FormControlLabel
             control={<Switch checked={sharing} onChange={toggleShare} color="primary" />}
-            label="Screen share"
+            label={tr("Screen share")}
           />
         </Stack>
 
@@ -2365,7 +2368,7 @@ export default function JitsiCallModal({
                   </Typography>
                   <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25 }}>
                     {p.isScreen && (
-                      <Chip size="small" label="screen"
+                      <Chip size="small" label={tr("screen")}
                         sx={{ height: 16, fontSize: 9, bgcolor: alpha("#3b82f6", 0.18), color: "#93c5fd" }} />
                     )}
                     {p.audioMuted ? (
@@ -2376,7 +2379,7 @@ export default function JitsiCallModal({
                   </Stack>
                 </Box>
                 {p.isScreen && (
-                  <Tooltip title="Bring to stage">
+                  <Tooltip title={tr("Bring to stage")}>
                     <IconButton size="small" onClick={() => setStagedScreenId(p.id)}
                       sx={{
                         color: staged?.id === p.id ? "primary.main" : "rgba(255,255,255,0.6)",
@@ -2647,7 +2650,7 @@ export default function JitsiCallModal({
           <TextField
             size="small"
             fullWidth
-            placeholder="Message…"
+            placeholder={tr("Message…")}
             value={chatDraft}
             onChange={(e) => setChatDraft(e.target.value)}
             inputProps={{ dir: "auto" }}
@@ -2847,7 +2850,7 @@ export default function JitsiCallModal({
               borderRadius: 2,
               "&:hover": { bgcolor: "error.dark" },
             }}
-            aria-label="Hang up"
+            aria-label={tr("Hang up")}
           >
             <CallEndIcon fontSize="small" />
           </IconButton>
@@ -2862,7 +2865,7 @@ export default function JitsiCallModal({
                 bgcolor: (t) => alpha(t.palette.primary.main, t.palette.mode === "dark" ? 0.32 : 0.2),
               },
             }}
-            aria-label="Expand call"
+            aria-label={tr("Expand call")}
           >
             <OpenInFullIcon fontSize="small" />
           </IconButton>
@@ -2920,7 +2923,7 @@ export default function JitsiCallModal({
                   <Chip
                     size="small"
                     icon={<PresentToAllIcon sx={{ fontSize: 12 }} />}
-                    label="Screen"
+                    label={tr("Screen")}
                     sx={{ height: 20, fontSize: 10, bgcolor: alpha("#3b82f6", 0.2), color: "#93c5fd" }}
                   />
                 )}
@@ -2928,8 +2931,8 @@ export default function JitsiCallModal({
             </Box>
           </Stack>
           <Stack direction="row" spacing={0.25}>
-            <Tooltip title="Minimise">
-              <IconButton onClick={goMini} size="small" sx={{ color: "rgba(255,255,255,0.85)" }} aria-label="Minimise">
+            <Tooltip title={tr("Minimise")}>
+              <IconButton onClick={goMini} size="small" sx={{ color: "rgba(255,255,255,0.85)" }} aria-label={tr("Minimise")}>
                 <CloseFullscreenIcon fontSize="small" />
               </IconButton>
             </Tooltip>

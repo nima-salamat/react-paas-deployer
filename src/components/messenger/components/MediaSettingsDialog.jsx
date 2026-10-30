@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack,
   Typography, FormControl, InputLabel, Select, MenuItem, CircularProgress,
@@ -36,6 +37,7 @@ const STORAGE_KEY = "messenger.mediaDevices";
  *  - onSaved: (devices) => void  // optional callback when selection saved
  */
 export default function MediaSettingsDialog({ open, onClose, onSaved }) {
+  const { t: tr } = useLocale();
   const [cameras, setCameras] = useState([]);
   const [mics, setMics] = useState([]);
   const [speakers, setSpeakers] = useState([]);
@@ -471,7 +473,7 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
       <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1, pr: 5 }}>
         <VideocamIcon color="primary" />
         <Typography variant="h6" fontWeight={700} sx={{ flex: 1 }}>Media settings</Typography>
-        <Tooltip title="Refresh devices">
+        <Tooltip title={tr("Refresh devices")}>
           <IconButton size="small" onClick={enumerateDevices} disabled={loadingDevices}>
             <RefreshIcon fontSize="small" />
           </IconButton>
@@ -556,7 +558,7 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
               </Box>
             </InputLabel>
             <Select
-              label="Camera"
+              label={tr("Camera")}
               value={selectedCamera}
               onChange={(e) => setSelectedCamera(e.target.value)}
               renderValue={(v) => {
@@ -590,7 +592,7 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
                 </Box>
               </InputLabel>
               <Select
-                label="Microphone"
+                label={tr("Microphone")}
                 value={selectedMic}
                 onChange={(e) => setSelectedMic(e.target.value)}
                 renderValue={(v) => {
@@ -640,7 +642,7 @@ export default function MediaSettingsDialog({ open, onClose, onSaved }) {
             <FormControl fullWidth size="small">
               <InputLabel>Speaker (output)</InputLabel>
               <Select
-                label="Speaker (output)"
+                label={tr("Speaker (output)")}
                 value={selectedSpeaker}
                 onChange={(e) => setSelectedSpeaker(e.target.value)}
                 renderValue={(v) => {

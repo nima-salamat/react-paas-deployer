@@ -9,6 +9,7 @@ import React, {
   useState,
 } from "react";
 import axios from "axios";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import {
   alpha,
@@ -170,6 +171,7 @@ function SpecRow({ icon, label, value }) {
 }
 
 const PlanCard = memo(function PlanCard({ plan, onCreate }) {
+  const { t } = useLocale();
   const pKey = plan.platform ?? "";
   const cpu = plan.max_cpu ?? plan.cpu;
   const ram = plan.max_ram ?? plan.ram;
@@ -230,14 +232,14 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
           <PlatformIcon platformKey={pKey} label={pKey} size={28} />
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="caption" color="primary.main" sx={{ fontWeight: 700 }}>
-              {plan.platform ?? "Platform"}
+              {t(plan.platform ?? "Platform")}
             </Typography>
             <Typography
               component="h3"
               variant="subtitle1"
               sx={{ fontWeight: 800, lineHeight: 1.25 }}
             >
-              {plan.name ?? "Unnamed"}
+              {t(plan.name ?? "Unnamed")}
             </Typography>
             <Typography
               variant="body2"
@@ -245,8 +247,8 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
               sx={{ lineHeight: 1.35 }}
             >
               {plan.plan_type
-                ? `${plan.plan_type}${plan.storage_type ? ` · ${plan.storage_type}` : ""}`
-                : plan.platform}
+                ? `${t(plan.plan_type)}${plan.storage_type ? ` · ${t(plan.storage_type)}` : ""}`
+                : t(plan.platform)}
             </Typography>
           </Box>
         </Stack>
@@ -271,7 +273,7 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
           {storage != null && (
             <SpecRow
               icon={<StorageIcon sx={{ fontSize: 15 }} />}
-              label="Storage"
+              label={t("Storage")}
               value={storage}
             />
           )}
@@ -320,6 +322,7 @@ const PlanCard = memo(function PlanCard({ plan, onCreate }) {
 /* ─── Main ────────────────────────────────────────────────────────────── */
 
 export default function PlatformPlans() {
+  const { t, isRTL } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [searchParams, setSearchParams] = useSearchParams();
@@ -607,12 +610,12 @@ export default function PlatformPlans() {
       <Tab
         icon={<AppsIcon sx={{ fontSize: 16 }} />}
         iconPosition="start"
-        label={`Apps (${appPlatforms.length})`}
+        label={`${t("Apps")} (${new Intl.NumberFormat(isRTL ? "fa-IR" : "en-US").format(appPlatforms.length)})`}
       />
       <Tab
         icon={<StorageIcon sx={{ fontSize: 16 }} />}
         iconPosition="start"
-        label={`Databases (${dbPlatforms.length})`}
+        label={`${t("Databases")} (${new Intl.NumberFormat(isRTL ? "fa-IR" : "en-US").format(dbPlatforms.length)})`}
       />
     </Tabs>
   );
@@ -653,7 +656,7 @@ export default function PlatformPlans() {
             disabled={!visiblePlatforms.length || loadingPlatforms}
             sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 12 }}
           >
-            {allSelectedInTab ? "Deselect" : "Select all"}
+            {t(allSelectedInTab ? "Deselect" : "Select all")}
           </Button>
           <Button
             size="small"
@@ -661,7 +664,7 @@ export default function PlatformPlans() {
             disabled={!selectedPlatforms.length}
             sx={{ borderRadius: 1, px: 1, minWidth: 0, fontSize: 12 }}
           >
-            Clear
+            {t("Clear")}
           </Button>
         </Stack>
       </Stack>
@@ -676,7 +679,7 @@ export default function PlatformPlans() {
         </Stack>
       ) : visiblePlatforms.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          {filterTab === 0 ? "No app platforms" : "No database platforms"}
+          {t(filterTab === 0 ? "No app platforms" : "No database platforms")}
         </Typography>
       ) : (
         <Stack spacing={0.75} sx={{ pr: 0.5 }}>
@@ -697,7 +700,7 @@ export default function PlatformPlans() {
                   textTransform: "none",
                 }}
               >
-                {label}
+                {t(label)}
               </Button>
             );
           })}
@@ -853,7 +856,7 @@ export default function PlatformPlans() {
             <IconButton
               onClick={retryAll}
               disabled={loadingPlatforms || loadingPlans}
-              aria-label="Refresh plans"
+              aria-label={t("Refresh plans")}
               sx={{ borderRadius: 1, border: "1px solid", borderColor: "divider" }}
             >
               <RefreshIcon />
@@ -863,7 +866,7 @@ export default function PlatformPlans() {
           {selectedLabels.length > 0 && isMobile && (
             <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
               {selectedLabels.map((l) => (
-                <Chip key={l} label={l} size="small" sx={{ borderRadius: 1 }} />
+                <Chip key={l} label={t(l)} size="small" sx={{ borderRadius: 1 }} />
               ))}
             </Stack>
           )}
@@ -886,7 +889,7 @@ export default function PlatformPlans() {
               sx={{ mb: 2 }}
             >
               <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                {selectedPlatforms.length > 0 ? "Filtered plans" : "All plans"}
+                {t(selectedPlatforms.length > 0 ? "Filtered plans" : "All plans")}
               </Typography>
               <Typography
                 variant="caption"
@@ -894,7 +897,7 @@ export default function PlatformPlans() {
                 aria-live="polite"
                 aria-atomic="true"
               >
-                {loadingPlans ? "Loading…" : `${plans.length} result${plans.length === 1 ? "" : "s"}`}
+                {loadingPlans ? t("Loading…") : `${new Intl.NumberFormat(isRTL ? "fa-IR" : "en-US").format(plans.length)} ${t(plans.length === 1 ? "result" : "results")}`}
               </Typography>
             </Stack>
 
@@ -910,7 +913,7 @@ export default function PlatformPlans() {
                 }}
               >
                 <Typography color="error" variant="body2" sx={{ mb: 1 }}>
-                  {fetchError}
+                  {t(fetchError)}
                 </Typography>
                 <Button size="small" variant="contained" color="error" onClick={retryAll} sx={{ borderRadius: 1 }}>
                   Retry
@@ -1019,7 +1022,7 @@ export default function PlatformPlans() {
           <IconButton
             onClick={() => setMobileFilterOpen(false)}
             size="small"
-            aria-label="Close filters"
+            aria-label={t("Close filters")}
           >
             <CloseIcon />
           </IconButton>

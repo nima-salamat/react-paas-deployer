@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Typography, IconButton, CircularProgress, Menu, MenuItem, ListItemIcon,
   Stack, Avatar, TextField, Tooltip,
@@ -26,6 +27,7 @@ import CheckIcon from "@mui/icons-material/Check";
 import { convAvatar, convTitle } from "../messengerUtils";
 
 export default function ChatHeader(props) {
+  const { t: tr } = useLocale();
   const {
     isMobile,
     msgSearchOpen,
@@ -96,7 +98,7 @@ export default function ChatHeader(props) {
   >
     {isMobile && !msgSearchOpen && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
     {isMobile && msgSearchOpen && (
-      <IconButton onClick={closeMsgSearch} size="small" sx={{ p: 0.4, flexShrink: 0 }} title="Close search">
+      <IconButton onClick={closeMsgSearch} size="small" sx={{ p: 0.4, flexShrink: 0 }} title={tr("Close search")}>
         <ArrowBackIcon fontSize="small" />
       </IconButton>
     )}
@@ -104,7 +106,7 @@ export default function ChatHeader(props) {
       <IconButton
         onClick={() => setDrawerOpen((v) => !v)}
         size="small"
-        title={drawerOpen ? "Hide chat list" : "Show chat list"}
+        title={tr(drawerOpen ? "Hide chat list" : "Show chat list")}
       >
         {drawerOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
       </IconButton>
@@ -115,7 +117,7 @@ export default function ChatHeader(props) {
           autoFocus
           fullWidth
           size="small"
-          placeholder="Search messages…"
+          placeholder={tr("Search messages…")}
           value={msgSearchQ}
           onChange={(e) => setMsgSearchQ(e.target.value)}
           onKeyDown={(e) => {
@@ -155,7 +157,7 @@ export default function ChatHeader(props) {
         <IconButton
           color="primary"
           size="small"
-          title="Search"
+          title={tr("Search")}
           disabled={msgSearchLoading || !msgSearchQ.trim()}
           onClick={() => {
             if (msgSearchLastQRef.current === msgSearchQ.trim() && msgSearchResults.length) {
@@ -180,7 +182,7 @@ export default function ChatHeader(props) {
             cursor: msgSearchResults.length ? "pointer" : "default",
             userSelect: "none",
           }}
-          title="Go to current result"
+          title={tr("Go to current result")}
         >
           {msgSearchLoading
             ? "…"
@@ -192,7 +194,7 @@ export default function ChatHeader(props) {
           size="small"
           disabled={!msgSearchResults.length}
           onClick={() => goMsgSearchResult(-1)}
-          title="Previous result"
+          title={tr("Previous result")}
           sx={{ p: 1, flexShrink: 0 }}
         >
           <KeyboardArrowUpIcon fontSize="small" />
@@ -201,12 +203,12 @@ export default function ChatHeader(props) {
           size="small"
           disabled={!msgSearchResults.length}
           onClick={() => goMsgSearchResult(1)}
-          title="Next result"
+          title={tr("Next result")}
           sx={{ p: 1, flexShrink: 0 }}
         >
           <KeyboardArrowDownIcon fontSize="small" />
         </IconButton>
-        <IconButton onClick={closeMsgSearch} size="small" title="Close search">
+        <IconButton onClick={closeMsgSearch} size="small" title={tr("Close search")}>
           <CloseIcon />
         </IconButton>
       </>
@@ -245,17 +247,17 @@ export default function ChatHeader(props) {
         {Object.keys(typingUsers).length
           ? formatTypingLabel(typingUsers, activeConv?.type === "group")
           : activeConv?.type === "group"
-            ? `${(activeConv?.participants || []).length} members`
+            ? `${(activeConv?.participants || []).length} ${tr("members")}`
             : peer?.id && onlineUsers.has(Number(peer.id))
-              ? "online"
-              : "tap for info"}
+              ? tr("online")
+              : tr("tap for info")}
       </Typography>
     </Box>
     {isForumConversation && (
-      <Tooltip title={activeConv?.is_forum ? "Choose a topic" : "Switch topic"}>
+      <Tooltip title={tr(activeConv?.is_forum ? "Choose a topic" : "Switch topic")}>
         <IconButton
           size="small"
-          aria-label="Choose topic"
+          aria-label={tr("Choose topic")}
           onClick={(event) => setTopicMenuAnchor(event.currentTarget)}
           sx={{ flexShrink: 0, color: "primary.main" }}
         >
@@ -266,7 +268,7 @@ export default function ChatHeader(props) {
     )}
     {/* Mobile: keep a single call icon → popup with voice/video; rest in ⋮ menu */}
     {isMobile ? (
-      <Tooltip title="Call">
+      <Tooltip title={tr("Call")}>
         <IconButton
           onClick={() => setCallChoiceOpen(true)}
           sx={{
@@ -279,7 +281,7 @@ export default function ChatHeader(props) {
       </Tooltip>
     ) : (
       <>
-        <Tooltip title="Voice call">
+        <Tooltip title={tr("Voice call")}>
           <IconButton
             onClick={() => startCall({ video: false, audio: true })}
             sx={{
@@ -290,7 +292,7 @@ export default function ChatHeader(props) {
             <CallIcon />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Video call">
+        <Tooltip title={tr("Video call")}>
           <IconButton
             onClick={() => startCall({ video: true, audio: true })}
             sx={{
@@ -304,12 +306,12 @@ export default function ChatHeader(props) {
         <IconButton onClick={() => pushPanel("info")}>
           <InfoOutlinedIcon />
         </IconButton>
-        <IconButton size="small" title="Search messages" onClick={() => openMsgSearch()}>
+        <IconButton size="small" title={tr("Search messages")} onClick={() => openMsgSearch()}>
           <SearchIcon fontSize="small" />
         </IconButton>
       </>
     )}
-    <IconButton aria-label="Chat actions" onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
+    <IconButton aria-label={tr("Chat actions")} onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
     <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
       {isMobile && (
         <MenuItem onClick={() => { openMsgSearch(); setHeaderMenu(null); }}>
@@ -351,7 +353,7 @@ export default function ChatHeader(props) {
         && (role === "owner" || role === "admin") && (
         <MenuItem onClick={() => { onCreateTopic?.(activeConv); setHeaderMenu(null); }}>
           <ListItemIcon><ForumOutlinedIcon fontSize="small" /></ListItemIcon>
-          {activeConv.is_forum ? "Create topic" : "Organize group into topics"}
+          {tr(activeConv.is_forum ? "Create topic" : "Organize group into topics")}
         </MenuItem>
       )}
       <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
@@ -446,7 +448,7 @@ export default function ChatHeader(props) {
         <Typography fontWeight={600} noWrap fontSize={15} sx={{ flex: 1 }}>
           Search messages
         </Typography>
-        <IconButton onClick={closeMsgSearch} size="small" title="Close search">
+        <IconButton onClick={closeMsgSearch} size="small" title={tr("Close search")}>
           <CloseIcon />
         </IconButton>
       </>

@@ -2,6 +2,7 @@ import apiRequest from "../../customHooks/apiRequest";
 import { parseCallSystemBody, formatCallSystemLabel, callSystemIcon, isCallSystemBody } from "../modules/callSystemMessage";
 import { MSG_API } from "../api";
 import React, { useMemo, useState, useEffect, useRef, memo } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import Lottie from "lottie-react";
 import CheckIcon from "@mui/icons-material/Check";
 import {
@@ -267,6 +268,7 @@ function InlineAudioPlayer({
  */
 
 function SpoilerText({ children, mine }) {
+  const { t: tr } = useLocale();
   const [open, setOpen] = React.useState(false);
   return (
     <Box
@@ -953,6 +955,7 @@ function FileAttachmentCard({ att, url, mine, onOpen, authHeaders }) {
  * Image attachment with spoiler blur + view-once handling.
  */
 function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onReply }) {
+  const { t: tr } = useLocale();
   const VIEW_SECS = 15;
   const [spoilerOpen, setSpoilerOpen] = React.useState(false);
   const [viewOnceState, setViewOnceState] = React.useState(() => {
@@ -1130,7 +1133,7 @@ function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onRe
               </Box>
               <IconButton
                 onClick={(e) => { e.stopPropagation(); closeViewer(); }}
-                aria-label="Close"
+                aria-label={tr("Close")}
                 sx={{
                   color: "#fff",
                   bgcolor: "rgba(255,255,255,0.15)",
@@ -1220,13 +1223,13 @@ function ProtectedImageAttachment({ att, url, message, mine, onOpenPreview, onRe
             bgcolor: "rgba(0,0,0,0.25)", cursor: "pointer",
           }}
         >
-          <Chip label="Spoiler · Tap to reveal" size="small"
+          <Chip label={tr("Spoiler · Tap to reveal")} size="small"
             sx={{ bgcolor: "rgba(0,0,0,0.65)", color: "#fff", fontWeight: 700 }} />
         </Box>
       )}
       {isGifAttachment(att) && (
         <Chip
-          label="GIF"
+          label={tr("GIF")}
           size="small"
           sx={{
             position: "absolute", left: 8, bottom: 8,
@@ -1562,6 +1565,7 @@ function MessageBubble({
   showOthersAvatar = true,
   bubbleStyle = "modern", // modern | overlap | irc
 }) {
+  const { t: tr } = useLocale();
   const theme = useTheme();
   const isIrc = bubbleStyle === "irc";
   const isOverlap = bubbleStyle === "overlap";

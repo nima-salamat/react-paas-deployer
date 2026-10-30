@@ -30,6 +30,27 @@ test("Persian locale covers the requested public, dashboard, service and Messeng
     "Container",
     "Running",
     "Release progress",
+    "Connection lost",
+    "We could not reach the PaaSDeployer service. Check your connection and reconnect to continue.",
+    "Reconnect",
+    "Workspace",
+    "Infrastructure",
+    "Automation",
+    "Account",
+    "Apps",
+    "Databases",
+    "All plans",
+    "Select all",
+    "No app platforms",
+    "No database platforms",
+    "Network Error",
+    "Your conversations",
+    "Search messages…",
+    "Lock recording",
+    "Your profile",
+    "Manage account, photos & security",
+    "Upload photo",
+    "Screen share",
   ];
 
   for (const source of samples) {
@@ -46,6 +67,17 @@ test("dynamic page data and non-JSX labels are connected to the active locale", 
     "../src/components/layout/Footer.jsx",
     "../src/components/layout/FloatingNav.jsx",
     "../src/components/home/PlansPreview.jsx",
+    "../src/components/layout/ConnectionReconnectDialog.jsx",
+    "../src/components/plans/plans.jsx",
+    "../src/components/messenger/components/MessengerHome.jsx",
+    "../src/components/messenger/components/Sidebar.jsx",
+    "../src/components/messenger/components/ChatHeader.jsx",
+    "../src/components/messenger/components/MessageComposer.jsx",
+    "../src/components/messenger/components/MessengerDialogs.jsx",
+    "../src/components/messenger/components/ProfileView.jsx",
+    "../src/components/messenger/components/JitsiCallModal.jsx",
+    "../src/components/messenger/components/MediaSettingsDialog.jsx",
+    "../src/components/messenger/components/GroupSharedServicesPanel.jsx",
   ];
 
   for (const page of chrome) {
@@ -58,6 +90,18 @@ test("dynamic page data and non-JSX labels are connected to the active locale", 
   assert.match(home, /\{t\(a\)\}[\s\S]*\{t\(b\)\}/);
   const footer = await readFile(new URL("../src/components/layout/Footer.jsx", import.meta.url), "utf8");
   assert.equal((footer.match(/className="public-site-footer"/g) || []).length, 2);
+
+  const homeCurtain = await readFile(new URL("../src/components/home/home.jsx", import.meta.url), "utf8");
+  assert.match(homeCurtain, /const visualSide = isRTL/);
+  assert.match(homeCurtain, /\[visualSide\]: 0/);
+  const reconnect = await readFile(new URL("../src/components/layout/ConnectionReconnectDialog.jsx", import.meta.url), "utf8");
+  assert.match(reconnect, /t\(state\.title\)/);
+  assert.match(reconnect, /t\(state\.body\)/);
+  const plans = await readFile(new URL("../src/components/plans/plans.jsx", import.meta.url), "utf8");
+  assert.match(plans, /t\(allSelectedInTab/);
+  assert.match(plans, /t\(fetchError\)/);
+  const sidebar = await readFile(new URL("../src/components/dashboard/DashboardSidebar.jsx", import.meta.url), "utf8");
+  assert.match(sidebar, /t\(group\.group\)/);
 
   const css = await readFile(new URL("../src/index.css", import.meta.url), "utf8");
   assert.match(css, /public-marketing-page/);

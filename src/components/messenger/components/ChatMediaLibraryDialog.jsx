@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Dialog, DialogTitle, DialogContent, IconButton, Box, Tabs, Tab,
   Typography, Stack, CircularProgress, Menu, MenuItem, ListItemIcon,
@@ -40,6 +41,7 @@ export default function ChatMediaLibraryDialog({
   onForward,
   embedded = false,
 }) {
+  const { t: tr } = useLocale();
   const [tab, setTab] = useState(0);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -124,7 +126,7 @@ export default function ChatMediaLibraryDialog({
     <>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 1.25, px: embedded ? 0 : 2, pr: 1 }}>
         <Box sx={{ flex: 1, fontWeight: 700 }}>Shared media</Box>
-        <IconButton onClick={onClose} size="small" aria-label="Close">
+        <IconButton onClick={onClose} size="small" aria-label={tr("Close")}>
           <CloseIcon />
         </IconButton>
       </Box>

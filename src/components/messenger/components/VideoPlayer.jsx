@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, IconButton, Typography, Menu, MenuItem, Tooltip,
   Dialog, Backdrop, Fade, CircularProgress,
@@ -83,6 +84,7 @@ export default function VideoPlayer({
   autoPlay = false,
   muted: mutedProp = false,
 }) {
+  const { t: tr } = useLocale();
   const videoRef = useRef(null);        // <video> element
   const playerRef = useRef(null);        // video.js Player instance
   const containerRef = useRef(null);
@@ -543,7 +545,7 @@ export default function VideoPlayer({
             </Box>
           </Box>
           {/* Speed */}
-          <Tooltip title="Playback speed">
+          <Tooltip title={tr("Playback speed")}>
             <IconButton size="small" onClick={(e) => setSpeedMenuAnchor(e.currentTarget)} sx={{ color: accentColor }}>
               <SpeedIcon fontSize="small" />
             </IconButton>
@@ -563,14 +565,14 @@ export default function VideoPlayer({
           </Menu>
           {/* PiP */}
           {"pictureInPictureEnabled" in document && (
-            <Tooltip title="Picture in picture">
+            <Tooltip title={tr("Picture in picture")}>
               <IconButton size="small" onClick={togglePiP} sx={{ color: accentColor }}>
                 <PictureInPictureIcon fontSize="small" />
               </IconButton>
             </Tooltip>
           )}
           {/* Download */}
-          <Tooltip title="Download">
+          <Tooltip title={tr("Download")}>
             <IconButton size="small" onClick={onDownload} sx={{ color: accentColor }}>
               <DownloadIcon fontSize="small" />
             </IconButton>

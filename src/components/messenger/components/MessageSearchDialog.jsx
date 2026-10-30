@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Stack, Typography, TextField, Box,
@@ -17,6 +18,7 @@ export default function MessageSearchDialog({
   onSearch,
   onJumpToMessage,
 }) {
+  const { t: tr } = useLocale();
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Search messages</DialogTitle>
@@ -25,7 +27,7 @@ export default function MessageSearchDialog({
           autoFocus
           fullWidth
           size="small"
-          placeholder="Search in this chat…"
+          placeholder={tr("Search in this chat…")}
           value={query}
           onChange={(e) => setQuery?.(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") onSearch?.(query); }}

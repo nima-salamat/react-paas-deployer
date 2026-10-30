@@ -16,6 +16,7 @@ import {
 } from "@mui/material";
 import { useLocation } from "react-router-dom";
 import { useTheme, ThemeProvider, createTheme } from "@mui/material/styles";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { getPalette, normalizeColorThemeId, readAppearance } from "../messenger/modules/appearance";
 
 const RECONNECTABLE_PREFIXES = ["/dashboard", "/messenger"];
@@ -109,6 +110,7 @@ async function probeBackendConnection() {
 }
 
 export default function ConnectionReconnectDialog() {
+  const { t } = useLocale();
   const location = useLocation();
   const isReconnectable = isReconnectablePath(location.pathname);
   const [offline, setOffline] = useState(
@@ -309,7 +311,7 @@ export default function ConnectionReconnectDialog() {
             {state.icon}
           </Box>
           <Typography variant="h6" fontWeight={700}>
-            {state.title}
+            {t(state.title)}
           </Typography>
         </Stack>
       </DialogTitle>
@@ -320,7 +322,7 @@ export default function ConnectionReconnectDialog() {
           color="text.secondary"
           lineHeight={1.7}
         >
-          {state.body}
+          {t(state.body)}
         </Typography>
       </DialogContent>
 
@@ -339,7 +341,7 @@ export default function ConnectionReconnectDialog() {
           }
           sx={{ minWidth: 132 }}
         >
-          {retrying ? "Reconnecting…" : "Reconnect"}
+          {t(retrying ? "Reconnecting…" : "Reconnect")}
         </Button>
       </DialogActions>
     </Dialog>

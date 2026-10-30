@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Typography, Stack, IconButton, Tooltip, Menu, MenuItem, ListItemIcon,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Chip,
@@ -130,6 +131,7 @@ export default function ComposeCodeWorkspace({
   onAttachFile,
   onRemoveAll,
 }) {
+  const { t: tr } = useLocale();
   const [files, setFiles] = useState(() => (filesProp?.length ? filesProp : [{
     id: "f-0",
     lang: "javascript",
@@ -622,24 +624,24 @@ export default function ComposeCodeWorkspace({
             </Box>
           );
         })}
-        <Tooltip title="New file">
+        <Tooltip title={tr("New file")}>
           <IconButton size="small" onClick={addFile} sx={{ color: "rgba(255,255,255,0.55)", ml: 0.25 }}>
             <AddIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Tooltip>
         <Box sx={{ flex: 1 }} />
-        <Tooltip title="Preview">
+        <Tooltip title={tr("Preview")}>
           <IconButton size="small" onClick={() => setPreviewOpen(true)} sx={{ color: "rgba(255,255,255,0.55)" }}>
             <VisibilityIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Send as file">
+        <Tooltip title={tr("Send as file")}>
           <IconButton size="small" onClick={sendAsFile} sx={{ color: "rgba(255,255,255,0.55)" }}>
             <AttachFileIcon sx={{ fontSize: 18 }} />
           </IconButton>
         </Tooltip>
         {onRemoveAll && (
-          <Tooltip title="Close editor">
+          <Tooltip title={tr("Close editor")}>
             <IconButton size="small" onClick={onRemoveAll} sx={{ color: "rgba(255,255,255,0.45)" }}>
               <CloseIcon sx={{ fontSize: 18 }} />
             </IconButton>
@@ -663,7 +665,7 @@ export default function ComposeCodeWorkspace({
           component="input"
           value={active?.name || ""}
           onChange={(e) => updateActive({ name: e.target.value.replace(/[:\n`]/g, "") })}
-          placeholder="filename"
+          placeholder={tr("filename")}
           sx={{
             width: 130,
             border: "1px solid rgba(255,255,255,0.12)",
@@ -689,7 +691,7 @@ export default function ComposeCodeWorkspace({
             }
             updateActive(patch);
           }}
-          placeholder="language"
+          placeholder={tr("language")}
           sx={{
             width: 100,
             border: "1px solid rgba(255,255,255,0.12)",
@@ -933,6 +935,7 @@ export default function ComposeCodeWorkspace({
 
 /** Quote editor kept simple but larger. */
 export function ComposeQuoteEditor({ text: quoteText, onChange, onRemove }) {
+  const { t: tr } = useLocale();
   return (
     <Box
       sx={{
@@ -965,7 +968,7 @@ export function ComposeQuoteEditor({ text: quoteText, onChange, onRemove }) {
           value={quoteText}
           onChange={(e) => onChange?.(e.target.value)}
           rows={Math.min(10, Math.max(4, (quoteText || "").split("\n").length + 1))}
-          placeholder="Quote text…"
+          placeholder={tr("Quote text…")}
           sx={{
             width: "100%",
             border: "none",

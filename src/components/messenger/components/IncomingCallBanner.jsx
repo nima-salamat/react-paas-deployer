@@ -3,6 +3,7 @@
  * with Web-Audio ringtone (max ~30s).
  */
 import React, { useEffect, useRef } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Avatar, Typography, IconButton, Stack,
 } from "@mui/material";
@@ -68,6 +69,7 @@ export default function IncomingCallBanner({
   visible = true,
   busy = false,
 }) {
+  const { t: tr } = useLocale();
   const ringRef = useRef(null);
   const timeoutRef = useRef(null);
 
@@ -183,8 +185,8 @@ export default function IncomingCallBanner({
         </Box>
 
         <IconButton
-          aria-label="Hide incoming call"
-          title="Hide"
+          aria-label={tr("Hide incoming call")}
+          title={tr("Hide")}
           onClick={(e) => {
             e.stopPropagation();
             if (!busy) onDismiss?.();

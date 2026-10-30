@@ -316,7 +316,7 @@ const SortablePhoto = ({ id, profile, index, handleDeleteProfile, onPreview }) =
       >
         <Avatar
           src={src || undefined}
-          alt={`Photo ${index + 1}`}
+          alt={`${t("Photo")} ${index + 1}`}
           sx={{
             width: 108,
             height: 108,
@@ -1184,10 +1184,10 @@ const Profile = ({ embedded = false }) => {
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0, textAlign: { xs: "center", sm: "left" } }}>
               <Typography variant="h4" fontWeight={900} sx={{ letterSpacing: "-0.02em" }}>
-                {userData.username || "Your profile"}
+                {userData.username || t("Your profile")}
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                {userData.email || userData.phone_number || "Manage account, photos & security"}
+                {userData.email || userData.phone_number || t("Manage account, photos & security")}
               </Typography>
               <Stack
                 direction="row"
@@ -1206,7 +1206,7 @@ const Profile = ({ embedded = false }) => {
                   <Chip
                     size="small"
                     icon={hasPassword ? <LockIcon /> : <LockOpenIcon />}
-                    label={hasPassword ? "Password on" : "No password"}
+                    label={t(hasPassword ? "Password on" : "No password")}
                     color={hasPassword ? "primary" : "default"}
                     variant={hasPassword ? "filled" : "outlined"}
                     sx={{ fontWeight: 700 }}
@@ -1352,7 +1352,7 @@ const Profile = ({ embedded = false }) => {
                 >
                   {COLOR_CHOICES.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                      {t(opt.label)}
                     </MenuItem>
                   ))}
                 </Select>
@@ -1490,7 +1490,7 @@ const Profile = ({ embedded = false }) => {
                 }}
               />
               <Typography variant="body1" fontWeight={700} sx={{ mb: 0.5 }}>
-                {isDragOver ? "Drop image to edit" : "Drag & drop a photo here"}
+                {t(isDragOver ? "Drop image to edit" : "Drag & drop a photo here")}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Opens Adjust & Decorate automatically · JPG, PNG, WebP…
@@ -1547,7 +1547,7 @@ const Profile = ({ embedded = false }) => {
               disabled={!canUpload || uploadingImage}
               sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
             >
-              {uploadingImage ? "Uploading…" : "Upload photo"}
+              {t(uploadingImage ? "Uploading…" : "Upload photo")}
             </Button>
             {(originalFile || newImageFile) && (
               <Button
@@ -1561,9 +1561,9 @@ const Profile = ({ embedded = false }) => {
             )}
           </Stack>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-            {hasAppliedEdit
+            {t(hasAppliedEdit
               ? "Edits are ready — they will be applied when you upload."
-              : "Order is assigned automatically. The #1 photo is set as primary."}
+              : "Order is assigned automatically. The #1 photo is set as primary.")}
           </Typography>
         </Paper>
 
@@ -1576,11 +1576,11 @@ const Profile = ({ embedded = false }) => {
             </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {passwordStatusLoading
+            {t(passwordStatusLoading
               ? "Checking password status…"
               : hasPassword
               ? "A password is set. You can change or remove it."
-              : "No password yet. Set one if you want password login in addition to code login."}
+              : "No password yet. Set one if you want password login in addition to code login.")}
           </Typography>
           <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
             {hasPassword ? (

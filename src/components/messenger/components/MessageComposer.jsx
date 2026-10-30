@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import { flushSync } from "react-dom";
 import {
   Stack, TextField, IconButton, Box, Chip, Tooltip, Typography,
@@ -505,6 +506,7 @@ function MessageComposer({
   scheduledFor = null,
   setScheduledFor,
 }) {
+  const { t: tr } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -952,7 +954,7 @@ function MessageComposer({
     setLocked(false);
     lockedRef.current = false;
     cancelRef.current = false;
-    setHint("Slide up to lock · left to cancel");
+    setHint(tr("Slide up to lock · left to cancel"));
     setDragUI({ dx: 0, dy: 0 });
     // Video messages always open on the selfie (front) camera
     if (mode === "video") {
@@ -1055,7 +1057,7 @@ function MessageComposer({
     lockedRef.current = false;
     setLocked(false);
     setRecPhase("holding");
-    setHint("Slide left to cancel · tap lock to re-lock");
+    setHint(tr("Slide left to cancel · tap lock to re-lock"));
     setDragUI({ dx: 0, dy: 0 });
   }, [recPhase]);
 
@@ -1105,17 +1107,17 @@ function MessageComposer({
         lockedRef.current = true;
         setLocked(true);
         setRecPhase("locked");
-        setHint("Locked · tap send when done");
+        setHint(tr("Locked · tap send when done"));
         setDragUI({ dx: 0, dy: 0 });
         cleanupPointer(onMove, onUp);
         return;
       }
       if (dx <= CANCEL_DX) {
-        setHint("Release to cancel");
+        setHint(tr("Release to cancel"));
       } else if (dy < -12) {
-        setHint("Slide up to lock");
+        setHint(tr("Slide up to lock"));
       } else {
-        setHint("Slide up to lock · left to cancel");
+        setHint(tr("Slide up to lock · left to cancel"));
       }
     };
 
@@ -1702,7 +1704,7 @@ function MessageComposer({
         )}
 
         <Stack direction="row" alignItems="center" spacing={1}>
-          <IconButton onClick={cancelRecording} title="Cancel" sx={{ color: "error.main" }}>
+          <IconButton onClick={cancelRecording} title={tr("Cancel")} sx={{ color: "error.main" }}>
             <DeleteOutlineIcon />
           </IconButton>
 
@@ -1779,10 +1781,10 @@ function MessageComposer({
                 lockedRef.current = true;
                 setLocked(true);
                 setRecPhase("locked");
-                setHint("Locked · finish when ready");
+                setHint(tr("Locked · finish when ready"));
                 setDragUI({ dx: 0, dy: 0 });
               }}
-              title="Lock recording"
+              title={tr("Lock recording")}
               sx={{
                 display: "flex",
                 flexDirection: "column",
@@ -1801,7 +1803,7 @@ function MessageComposer({
           {showLock && (
             <IconButton
               onClick={unlockRecording}
-              title="Unlock"
+              title={tr("Unlock")}
               sx={{
                 bgcolor: "action.hover",
                 border: "1px solid",
@@ -1815,7 +1817,7 @@ function MessageComposer({
           {/* Red finish / stop recording — always visible while recording */}
           <IconButton
             onClick={() => stopRecording(false)}
-            title="Finish & send"
+            title={tr("Finish & send")}
             sx={{
               width: 48,
               height: 48,
@@ -2263,7 +2265,7 @@ function MessageComposer({
       {hasTextSelection && (
         <Box
           role="toolbar"
-          aria-label="Text formatting"
+          aria-label={tr("Text formatting")}
           sx={{
             px: { xs: 1, sm: 1.25 },
             py: 0.35,
@@ -2321,7 +2323,7 @@ function MessageComposer({
         />
         {!editingMsg && (
           <>
-            <Tooltip title="Attach">
+            <Tooltip title={tr("Attach")}>
               <IconButton
                 onClick={() => setAttachMenuAnchor((v) => (v ? null : true))}
                 size="small"
@@ -2469,7 +2471,7 @@ function MessageComposer({
           </>
         )}
 
-        <Tooltip title="Emoji">
+        <Tooltip title={tr("Emoji")}>
           <IconButton
             ref={emojiBtnRef}
             onClick={() => setEmojiOpen(true)}
@@ -2522,7 +2524,7 @@ function MessageComposer({
           <IconButton onClick={() => {
             updateText("");
             onCancelReplyOrEdit?.();
-          }} title="Cancel edit">
+          }} title={tr("Cancel edit")}>
             <CloseIcon color="warning" />
           </IconButton>
         )}
@@ -2795,7 +2797,7 @@ function MessageComposer({
           <IconButton
             onClick={() => setScheduleDialogOpen(false)}
             size="small"
-            aria-label="Close"
+            aria-label={tr("Close")}
             sx={{ position: "absolute", right: 8, top: 8 }}
           >
             <CloseIcon />
@@ -2810,7 +2812,7 @@ function MessageComposer({
           {isMobile ? (
             <Stack spacing={1.5}>
               <TextField
-                label="Date"
+                label={tr("Date")}
                 type="date"
                 fullWidth
                 value={(scheduleDraft || "").split("T")[0] || ""}
@@ -2822,7 +2824,7 @@ function MessageComposer({
                 InputLabelProps={{ shrink: true }}
               />
               <TextField
-                label="Time"
+                label={tr("Time")}
                 type="time"
                 fullWidth
                 value={(() => {
@@ -2852,7 +2854,7 @@ function MessageComposer({
             </Stack>
           ) : (
             <TextField
-              label="Send at"
+              label={tr("Send at")}
               type="datetime-local"
               fullWidth
               value={scheduleDraft}
