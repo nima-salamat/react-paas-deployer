@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Box, CircularProgress, Drawer, Stack, Typography,
   useMediaQuery, useTheme,
@@ -319,6 +320,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
   );
 
   return (
+    <TranslatedTextTree>
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
       {isDesktop && (
         <Box
@@ -477,6 +479,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
         }}
       />
     </Box>
+    </TranslatedTextTree>
   );
 }
 
