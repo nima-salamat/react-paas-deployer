@@ -133,6 +133,7 @@ test("backend Ready App descriptions have Persian translations without translati
   const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
   const helper = await readFile(new URL("../src/i18n/TranslatedTextTree.jsx", import.meta.url), "utf8");
 
+  assert.match(messages, /"Open source no-code business automation\."/);
   assert.equal(
     translateText("Open source no-code business automation.", "fa"),
     "راهکار متن‌باز و بدون نیاز به کدنویسی برای خودکارسازی فرایندهای کسب‌وکار.",
