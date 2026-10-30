@@ -176,6 +176,7 @@ function DynamicField({ field, value, onChange, config }) {
 
   const inputType = type === "secret" ? (showSecret ? "text" : "password") : type === "integer" ? "number" : "text";
   return (
+    <TranslatedTextTree>
     <TextField
       fullWidth
       type={inputType}
@@ -209,6 +210,7 @@ function DynamicField({ field, value, onChange, config }) {
         (field.type === "domain" ? "Platform-managed" : undefined)
       }
     />
+    </TranslatedTextTree>
   );
 }
 
