@@ -16,6 +16,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import WifiIcon from "@mui/icons-material/Wifi";
 import WifiOffIcon from "@mui/icons-material/WifiOff";
 import SyncIcon from "@mui/icons-material/Sync";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 export default function LogsPanel({
   serviceLogs,
@@ -29,14 +30,15 @@ export default function LogsPanel({
   handleDownloadEntries,
   handleCopyEntries,
 }) {
+  const { t } = useLocale();
   const deployLive = Boolean(deployLogs?.connected);
   const deployReconnecting = Boolean(deployLogs?.reconnecting);
 
   return (
     <Stack spacing={2.5} sx={{ maxWidth: 960, width: "100%" }}>
       <LogPanel
-        title="Service logs"
-        subtitle="Live stream + retained history"
+        title={t("Service logs")}
+        subtitle={t("Live stream + retained history")}
         entries={serviceLogs.entries}
         loading={serviceLogs.loading}
         error={serviceLogs.error}
@@ -144,9 +146,9 @@ export default function LogsPanel({
                 width: { xs: "100%", sm: "auto" },
               }}
             >
-              <InputLabel>Deploy</InputLabel>
+              <InputLabel>{t("Deploy")}</InputLabel>
               <Select
-                label="Deploy"
+                label={t("Deploy")}
                 value={deployLogs.deployId || ""}
                 onChange={(e) => deployLogActions.setDeployId(e.target.value)}
               >
@@ -191,7 +193,7 @@ export default function LogsPanel({
               ? `Deploy: ${currentDeployForLogs.name || currentDeployForLogs.id}`
               : "Deploy history"
           }
-          subtitle="Newest at the bottom. Live stages from the deploy worker appear automatically."
+          subtitle={t("Newest at the bottom. Live stages from the deploy worker appear automatically.")}
           entries={deployLogs.entries}
           loading={deployLogs.loading}
           loadingOlder={deployLogs.loadingOlder}
