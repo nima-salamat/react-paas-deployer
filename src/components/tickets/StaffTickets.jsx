@@ -218,7 +218,7 @@ export default function StaffTickets() {
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
         <Box>
-          <Typography variant="h5" fontWeight={700}>Staff tickets</Typography>
+          <Typography variant="h5" fontWeight={700}>{tr("Staff tickets")}</Typography>
           <Typography variant="caption" color="text.secondary">
             {connected ? "Live on" : "Live offline"}{refreshing ? " · refreshing…" : ""}
           </Typography>
@@ -226,25 +226,25 @@ export default function StaffTickets() {
       </Stack>
 
       <Stack direction={{ xs: "column", md: "row" }} gap={1.5} mb={2}>
-        <TextField size="small" label="Search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} fullWidth />
+        <TextField size="small" label={tr("Search")} value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} fullWidth />
         <FormControl size="small" sx={{ minWidth: 130 }}>
-          <InputLabel>Status</InputLabel>
-          <Select label="Status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-            <MenuItem value="">All</MenuItem>
+          <InputLabel>{tr("Status")}</InputLabel>
+          <Select label={tr("Status")} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+            <MenuItem value="">{tr("All")}</MenuItem>
             {Object.keys(STATUS_COLOR).map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ minWidth: 130 }}>
-          <InputLabel>Priority</InputLabel>
-          <Select label="Priority" value={priority} onChange={(e) => { setPriority(e.target.value); setPage(1); }}>
-            <MenuItem value="">All</MenuItem>
+          <InputLabel>{tr("Priority")}</InputLabel>
+          <Select label={tr("Priority")} value={priority} onChange={(e) => { setPriority(e.target.value); setPage(1); }}>
+            <MenuItem value="">{tr("All")}</MenuItem>
             {Object.keys(PRIORITY_COLOR).map((p) => <MenuItem key={p} value={p}>{p}</MenuItem>)}
           </Select>
         </FormControl>
         <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Department</InputLabel>
-          <Select label="Department" value={department} onChange={(e) => { setDepartment(e.target.value); setPage(1); }}>
-            <MenuItem value="">All</MenuItem>
+          <InputLabel>{tr("Department")}</InputLabel>
+          <Select label={tr("Department")} value={department} onChange={(e) => { setDepartment(e.target.value); setPage(1); }}>
+            <MenuItem value="">{tr("All")}</MenuItem>
             {departments.map((d) => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
           </Select>
         </FormControl>
@@ -261,12 +261,12 @@ export default function StaffTickets() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Subject</TableCell>
-                  <TableCell>User</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Priority</TableCell>
-                  <TableCell>Updated</TableCell>
+                  <TableCell>{tr("ID")}</TableCell>
+                  <TableCell>{tr("Subject")}</TableCell>
+                  <TableCell>{tr("User")}</TableCell>
+                  <TableCell>{tr("Status")}</TableCell>
+                  <TableCell>{tr("Priority")}</TableCell>
+                  <TableCell>{tr("Updated")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -290,7 +290,7 @@ export default function StaffTickets() {
           {/* Mobile cards */}
           <Box sx={{ display: { xs: "block", md: "none" } }}>
             {tickets.length === 0 ? (
-              <Typography color="text.secondary" align="center" py={3}>No tickets</Typography>
+              <Typography color="text.secondary" align="center" py={3}>{tr("No tickets")}</Typography>
             ) : tickets.map((t) => (
               <Box
                 key={t.id}
@@ -369,14 +369,14 @@ export default function StaffTickets() {
                 </Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
                   <FormControl size="small" fullWidth>
-                    <InputLabel>Status</InputLabel>
-                    <Select label="Status" value={detail.status} onChange={(e) => changeStatus(e.target.value)}>
+                    <InputLabel>{tr("Status")}</InputLabel>
+                    <Select label={tr("Status")} value={detail.status} onChange={(e) => changeStatus(e.target.value)}>
                       {Object.keys(STATUS_COLOR).map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
                     </Select>
                   </FormControl>
                   <FormControl size="small" fullWidth>
-                    <InputLabel>Priority</InputLabel>
-                    <Select label="Priority" value={detail.priority} onChange={(e) => changePriority(e.target.value)}>
+                    <InputLabel>{tr("Priority")}</InputLabel>
+                    <Select label={tr("Priority")} value={detail.priority} onChange={(e) => changePriority(e.target.value)}>
                       {Object.keys(PRIORITY_COLOR).map((pr) => <MenuItem key={pr} value={pr}>{pr}</MenuItem>)}
                     </Select>
                   </FormControl>
