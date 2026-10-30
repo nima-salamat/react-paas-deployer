@@ -3191,9 +3191,9 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       if (activeIdRef.current) {
         loadConversationDetail(activeIdRef.current);
       }
-      flash(data?.pinned ? "Message pinned" : "Message unpinned");
+      flash(t(data?.pinned ? "Message pinned" : "Message unpinned"));
     } catch (e) {
-      setError(e?.response?.data?.message || "Pin message failed");
+      setError(t(e?.response?.data?.message || "Pin message failed"));
     }
   }, [loadPinnedMessages, loadConversationDetail]);
 
