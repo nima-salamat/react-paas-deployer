@@ -728,7 +728,7 @@ export default function Volumes() {
             <TextField
               fullWidth
               size="small"
-              label={tr("Size (MB")})
+              label={tr("Size (MB)")}
               name="size_mb"
               type="number"
               value={formData.size_mb}
