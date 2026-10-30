@@ -1785,4 +1785,19 @@ Object.assign(fa, {
   "Columns": "ستون‌ها"
 });
 
+Object.assign(fa, {
+  "No credentials have been issued.": "هنوز هیچ اعتبارنامه‌ای صادر نشده است.",
+  "No audit events yet.": "هنوز رویداد ممیزی‌ای ثبت نشده است.",
+  "AGENT.md": "AGENT.md",
+  "Issue Agent access token": "صدور توکن دسترسی عامل",
+  "Expires in days": "انقضا پس از چند روز",
+  "1–3650 days. The server default is used only when no value is supplied.": "از ۱ تا ۳۶۵۰ روز. مقدار پیش‌فرض سرور فقط زمانی استفاده می‌شود که مقداری وارد نکنید.",
+  "Issuing…": "در حال صدور…",
+  "Copy token": "کپی توکن",
+  "Done": "انجام شد",
+  "Bind path": "مسیر اتصال",
+  "Mode": "حالت",
+  "Size": "اندازه"
+});
+
 export const PERSIAN_TRANSLATIONS = fa;
