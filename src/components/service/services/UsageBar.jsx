@@ -1,4 +1,5 @@
 import React from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import { Box, Stack, Typography, LinearProgress, CircularProgress, Tooltip } from "@mui/material";
 
 export default function UsageBar({ label, value, loading = false, error = false, dense = false }) {
@@ -9,6 +10,7 @@ export default function UsageBar({ label, value, loading = false, error = false,
   const title = loading ? label + " usage is being fetched" : error ? label + " live usage is currently unavailable" : hasValue ? label + " live usage" : label + " usage is not available";
 
   return (
+    <TranslatedTextTree>
     <Box sx={{ minWidth: dense ? 90 : 120, flex: 1 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.4, minHeight: 18 }}>
         <Typography variant="caption" color="text.secondary" fontWeight={700}>{label}</Typography>
@@ -30,5 +32,6 @@ export default function UsageBar({ label, value, loading = false, error = false,
         aria-label={label + " usage"}
       />
     </Box>
+    </TranslatedTextTree>
   );
 }
