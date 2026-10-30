@@ -140,6 +140,7 @@ function TreeDocRow({
       ? plan.position
       : null;
   return (
+    <TranslatedTextTree>
     <ListItemButton
       ref={(el) => {
         setNodeRef(el);
@@ -234,6 +235,7 @@ function TreeDocRow({
         sx={{ height: 19, fontSize: 9.5, flexShrink: 0, ml: 0.25 }}
       />
     </ListItemButton>
+    </TranslatedTextTree>
   );
 }
 
@@ -271,6 +273,7 @@ function TreeFolderRow({
       ? plan.position
       : null;
   return (
+    <TranslatedTextTree>
     <ListItemButton
       ref={(el) => {
         setNodeRef(el);
@@ -374,6 +377,7 @@ function TreeFolderRow({
         <MoreVertRoundedIcon fontSize="small" />
       </IconButton>
     </ListItemButton>
+    </TranslatedTextTree>
   );
 }
 
@@ -387,6 +391,7 @@ function GeneralDropZone({ plan, children }) {
     plan && (plan.type === "doc-to-general" || plan.type === "cat-to-root")
   );
   return (
+    <TranslatedTextTree>
     <Box
       ref={setNodeRef}
       sx={{
@@ -419,6 +424,7 @@ function GeneralDropZone({ plan, children }) {
       </Box>
       {children}
     </Box>
+    </TranslatedTextTree>
   );
 }
 
@@ -448,6 +454,7 @@ function CategoryTree({
           (node.children && node.children.length > 0) ||
           docs.length > 0;
         return (
+    <TranslatedTextTree>
           <React.Fragment key={node.id}>
             <TreeFolderRow
               node={node}
@@ -511,6 +518,7 @@ function CategoryTree({
         </MenuItem>
       </Menu>
     </List>
+    </TranslatedTextTree>
   );
 }
 
@@ -610,6 +618,7 @@ function AssetLibrary({
 
 
   return (
+    <TranslatedTextTree>
     <Paper
       variant="outlined"
       sx={{
@@ -839,6 +848,7 @@ function AssetLibrary({
         </DialogContent>
       </Dialog>
     </Paper>
+    </TranslatedTextTree>
   );
 }
 
