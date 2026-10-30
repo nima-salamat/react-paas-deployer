@@ -39,6 +39,7 @@ import VolumeFilesDialog from "./VolumeFilesDialog.jsx";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import apiRequest from "../customHooks/apiRequest";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const VOLUME_ROOT = `${API_BASE}/api/volumes/`;
@@ -127,6 +128,7 @@ function statusInfo(volume) {
 }
 
 export default function Volumes() {
+  const { t: tr } = useLocale();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
@@ -365,7 +367,7 @@ export default function Volumes() {
             />
             <Chip
               size="small"
-              label={st.label}
+              label={tr(st.label)}
               color={st.color}
               variant={st.variant}
               sx={{ fontWeight: 700, height: 22 }}
@@ -373,7 +375,7 @@ export default function Volumes() {
             {mounted && (
               <Chip
                 size="small"
-                label="Mounted"
+                label={tr("Mounted")}
                 color="info"
                 sx={{ fontWeight: 700, height: 22 }}
               />
@@ -382,30 +384,30 @@ export default function Volumes() {
 
           {sid && (
             <Typography variant="caption" color="text.secondary">
-              Service: {getServiceName(volume) || sid}
+              {tr("Service")}: {getServiceName(volume) || sid}
             </Typography>
           )}
 
           <Divider />
 
           <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-            <Tooltip title="Files">
+            <Tooltip title={tr("Files")}>
               <IconButton size="small" onClick={() => handleViewFiles(volume)}>
                 <VisibilityIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Download">
+            <Tooltip title={tr("Download")}>
               <IconButton size="small" onClick={() => handleDownloadVolume(volume)}>
                 <DownloadIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Edit metadata (only if not yet in Docker)">
+            <Tooltip title={tr("Edit metadata (only if not yet in Docker)")}>
               <IconButton size="small" onClick={() => openEditDialog(volume)}>
                 <EditIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             {sid && (
-              <Tooltip title="Soft-detach (keep ownership / quota)">
+              <Tooltip title={tr("Soft-detach (keep ownership / quota)")}>
                 <IconButton
                   size="small"
                   onClick={() => handleDetachVolume(volume, false)}
@@ -414,7 +416,7 @@ export default function Volumes() {
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Delete">
+            <Tooltip title={tr("Delete")}>
               <IconButton
                 size="small"
                 color="error"
@@ -488,7 +490,7 @@ export default function Volumes() {
           sx={{ mb: 2, borderRadius: 1 }}
           onClose={() => setError(null)}
         >
-          {error}
+          {tr(error)}
         </Alert>
       )}
       {success && (
@@ -497,7 +499,7 @@ export default function Volumes() {
           sx={{ mb: 2, borderRadius: 1 }}
           onClose={() => setSuccess(null)}
         >
-          {success}
+          {tr(success)}
         </Alert>
       )}
 
@@ -516,7 +518,7 @@ export default function Volumes() {
             textAlign: "center",
           }}
         >
-          <Typography color="text.secondary">No volumes yet.</Typography>
+          <Typography color="text.secondary">{tr("No volumes yet.")}</Typography>
         </Paper>
       ) : isMobile || isTablet ? (
         <Box>
@@ -619,7 +621,7 @@ export default function Volumes() {
                         <Stack direction="row" spacing={0.5} alignItems="center">
                           <Chip
                             size="small"
-                            label={st.label}
+                            label={tr(st.label)}
                             color={st.color}
                             variant={st.variant}
                             sx={{ fontWeight: 700, height: 22 }}
@@ -627,7 +629,7 @@ export default function Volumes() {
                           {mounted && (
                             <Chip
                               size="small"
-                              label="Mounted"
+                              label={tr("Mounted")}
                               color="info"
                               sx={{ fontWeight: 700, height: 22 }}
                             />
@@ -636,7 +638,7 @@ export default function Volumes() {
                       </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" spacing={0.25} justifyContent="flex-end">
-                          <Tooltip title="Files">
+                          <Tooltip title={tr("Files")}>
                             <IconButton
                               size="small"
                               onClick={() => handleViewFiles(volume)}
@@ -644,7 +646,7 @@ export default function Volumes() {
                               <VisibilityIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Download">
+                          <Tooltip title={tr("Download")}>
                             <IconButton
                               size="small"
                               onClick={() => handleDownloadVolume(volume)}
@@ -652,7 +654,7 @@ export default function Volumes() {
                               <DownloadIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <Tooltip title="Edit metadata">
+                          <Tooltip title={tr("Edit metadata")}>
                             <IconButton
                               size="small"
                               onClick={() => openEditDialog(volume)}
@@ -661,7 +663,7 @@ export default function Volumes() {
                             </IconButton>
                           </Tooltip>
                           {sid && (
-                            <Tooltip title="Soft-detach">
+                            <Tooltip title={tr("Soft-detach")}>
                               <IconButton
                                 size="small"
                                 onClick={() => handleDetachVolume(volume, false)}
@@ -670,7 +672,7 @@ export default function Volumes() {
                               </IconButton>
                             </Tooltip>
                           )}
-                          <Tooltip title="Delete">
+                          <Tooltip title={tr("Delete")}>
                             <IconButton
                               size="small"
                               color="error"
@@ -698,36 +700,35 @@ export default function Volumes() {
         fullScreen={isMobile}
         PaperProps={{ sx: { borderRadius: isMobile ? 0 : 1 } }}
       >
-        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>Edit volume</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, pb: 1 }}>{tr("Edit volume")}</DialogTitle>
         <DialogContent>
           <Alert severity="info" sx={{ mb: 2, borderRadius: 1 }}>
-            Metadata (path, size, mode) can only change before the volume exists in
-            Docker. After provision, detach/delete and recreate if you need changes.
+            {tr("Metadata (path, size, mode) can only change before the volume exists in Docker. After provision, detach/delete and recreate if you need changes.")}
           </Alert>
           <Stack spacing={2} sx={{ mt: 0.5 }}>
             <TextField
               fullWidth
               size="small"
-              label="Name"
+              label={tr("Name")}
               name="name"
               value={formData.name}
               disabled
-              helperText="Name cannot be changed here"
+              helperText={tr("Name cannot be changed here")}
             />
             <TextField
               fullWidth
               size="small"
-              label="Bind directory"
+              label={tr("Bind directory")}
               name="default_bind"
               value={formData.default_bind}
               onChange={handleFormChange}
               placeholder="/data"
-              helperText="Path inside the container (e.g. /var/lib/mysql)"
+              helperText={tr("Path inside the container (e.g. /var/lib/mysql)")}
             />
             <TextField
               fullWidth
               size="small"
-              label="Size (MB)"
+              label={tr("Size (MB")})
               name="size_mb"
               type="number"
               value={formData.size_mb}
@@ -735,16 +736,16 @@ export default function Volumes() {
               inputProps={{ min: 1 }}
             />
             <FormControl fullWidth size="small">
-              <InputLabel>Access mode</InputLabel>
+              <InputLabel>{tr("Access mode")}</InputLabel>
               <Select
                 name="default_mode"
                 value={formData.default_mode}
-                label="Access mode"
+                label={tr("Access mode")}
                 onChange={handleFormChange}
               >
                 {MODE_OPTIONS.map((o) => (
                   <MenuItem key={o.value} value={o.value}>
-                    {o.label}
+                    {tr(o.label)}
                   </MenuItem>
                 ))}
               </Select>
@@ -761,7 +762,7 @@ export default function Volumes() {
             disabled={saving}
             sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1 }}
           >
-            {saving ? "Saving…" : "Save"}
+            {tr(saving ? "Saving…" : "Save")}
           </Button>
         </DialogActions>
       </Dialog>
