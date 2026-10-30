@@ -1,5 +1,6 @@
 import axios from "axios";
 import { clearStoredAuth, getSessionBoundAccessToken, invalidateSessionlessAuth } from "./authSession.js";
+import { normalizeLanguage, translateText } from "../../i18n/messages.js";
 
 /**
  * Build refresh URL consistently with the rest of the app.
@@ -10,6 +11,42 @@ import { clearStoredAuth, getSessionBoundAccessToken, invalidateSessionlessAuth 
  * exact path and only fall back to the slashed variant once.
  */
 const API_HOST = `https://${import.meta.env.VITE_API_BASE}`.replace(/\/+$/, "");
+
+function getPreferredLanguage() {
+  try {
+    return normalizeLanguage(localStorage.getItem("paas-language")) || "en-us";
+  } catch {
+    return "en-us";
+  }
+}
+
+function localizeApiPayload(value, key = "") {
+  if (getPreferredLanguage() !== "fa" || value == null) return value;
+  if (typeof value === "string") {
+    return ["message", "detail", "error", "errors", "non_field_errors"].includes(key)
+      ? translateText(value, "fa")
+      : value;
+  }
+  if (Array.isArray(value)) return value.map((item) => localizeApiPayload(item, key));
+  if (typeof value !== "object") return value;
+
+  const localized = { ...value };
+  for (const [childKey, childValue] of Object.entries(localized)) {
+    if (["message", "detail", "error", "errors", "non_field_errors"].includes(childKey)) {
+      localized[childKey] = localizeApiPayload(childValue, childKey);
+    } else if (key === "errors") {
+      localized[childKey] = localizeApiPayload(childValue, "error");
+    }
+  }
+  return localized;
+}
+
+function localizeApiError(error) {
+  if (error?.response?.data) {
+    error.response.data = localizeApiPayload(error.response.data, "errors");
+  }
+  return error;
+}
 const REFRESH_URLS = [
   `${API_HOST}/auth/api/login/token/refresh`,
   `${API_HOST}/auth/api/login/token/refresh/`,
@@ -72,6 +109,7 @@ function buildHeaders(accessToken, data) {
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
+  headers["Accept-Language"] = getPreferredLanguage() === "fa" ? "fa" : "en-US";
   // Let the browser set multipart boundary for FormData
   if (!(data instanceof FormData)) {
     headers["Content-Type"] = "application/json";
@@ -87,7 +125,10 @@ async function postRefresh(refreshToken) {
         url,
         { refresh: refreshToken },
         {
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Accept-Language": getPreferredLanguage() === "fa" ? "fa" : "en-US",
+          },
           timeout: 5000,
           // Do not send expired access token to refresh endpoint
           validateStatus: (s) => s >= 200 && s < 300,
@@ -189,6 +230,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
       onUploadProgress,
       ...(responseType ? { responseType } : {}),
     });
+    response.data = localizeApiPayload(response.data);
 
     try {
       window.dispatchEvent(new Event("app-network-recovered"));
@@ -197,7 +239,8 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
     }
 
     return response;
-  } catch (error) {
+  } catch (caughtError) {
+    const error = localizeApiError(caughtError);
     const status = error?.response?.status;
 
     // Only attempt refresh on authenticated-endpoint failures
@@ -220,6 +263,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
           onUploadProgress,
           ...(responseType ? { responseType } : {}),
         });
+        retryResponse.data = localizeApiPayload(retryResponse.data);
         notifyNetworkRecovered();
         return retryResponse;
       } catch (refreshErr) {

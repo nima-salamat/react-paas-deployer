@@ -15,6 +15,8 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import PeopleIcon from "@mui/icons-material/People";
 import { isSessionSuperuser, isSessionStaff, authMediaSrc } from "../adminUtils";
 import ThemeMenuButton from "../../layout/ThemeMenuButton.jsx";
+import LanguageSwitcher from "../../layout/LanguageSwitcher.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 /**
  * AdminTopBar — sticky header.
@@ -39,6 +41,7 @@ export default function AdminTopBar({
   themeMode = "system",
   onThemeModeChange,
 }) {
+  const { t } = useLocale();
   const [profileMenu, setProfileMenu] = useState(null);
   const [notifAnchor, setNotifAnchor] = useState(null);
   const [muted, setMuted] = useState(() => {
@@ -91,7 +94,7 @@ export default function AdminTopBar({
 
         <Box sx={{ minWidth: 0, flex: { xs: 1, sm: 0 } }}>
           <Typography variant="subtitle1" fontWeight={800} noWrap sx={{ lineHeight: 1.2 }}>
-            {title}
+            {t(title)}
           </Typography>
           <Typography
             variant="caption"
@@ -104,6 +107,7 @@ export default function AdminTopBar({
 
         <Box sx={{ flexGrow: 1 }} />
 
+        <LanguageSwitcher />
         <ThemeMenuButton
           themeMode={themeMode}
           onThemeModeChange={onThemeModeChange}

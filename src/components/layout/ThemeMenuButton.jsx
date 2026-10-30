@@ -12,6 +12,7 @@ import { useTheme } from "@mui/material/styles";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightnessOutlined";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const THEME_CHOICES = [
   { value: "light", label: "Light", icon: LightModeOutlinedIcon },
@@ -27,6 +28,7 @@ export default function ThemeMenuButton({
   menuSx = {},
 }) {
   const theme = useTheme();
+  const { t } = useLocale();
   const [anchorEl, setAnchorEl] = useState(null);
   const current =
     THEME_CHOICES.find((choice) => choice.value === themeMode) ||
@@ -41,7 +43,7 @@ export default function ThemeMenuButton({
 
   return (
     <>
-      <Tooltip title={tooltip}>
+      <Tooltip title={t(tooltip)}>
         <IconButton
           size="small"
           onClick={(event) => setAnchorEl(event.currentTarget)}
@@ -102,7 +104,7 @@ export default function ThemeMenuButton({
                 />
               </ListItemIcon>
               <ListItemText
-                primary={choice.label}
+                primary={t(choice.label)}
                 primaryTypographyProps={{ fontWeight: selected ? 800 : 500 }}
               />
             </MenuItem>

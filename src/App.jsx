@@ -55,6 +55,7 @@ import { TicketNotifyProvider } from "./components/tickets/TicketNotifyContext.j
 const MessengerApp = lazy(() => import("./components/messenger/MessengerApp.jsx"));
 
 import { HelmetProvider } from "react-helmet-async";
+import { useLocale } from "./i18n/LocaleProvider.jsx";
 
 const THEME_STORAGE_KEY = "paas-theme-mode";
 
@@ -197,6 +198,7 @@ const Layout = ({
 };
 
 export function App({ prerender = false }) {
+  const { language, isRTL } = useLocale();
   const [themeMode, setThemeMode] = useState(getInitialThemeMode);
   const [systemTheme, setSystemTheme] = useState(getInitialSystemTheme);
 
@@ -280,9 +282,17 @@ export function App({ prerender = false }) {
 
 
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.lang = language;
+    document.documentElement.dir = isRTL ? "rtl" : "ltr";
+    if (document.body) document.body.dir = isRTL ? "rtl" : "ltr";
+  }, [language, isRTL]);
+
   const appTheme = useMemo(
     () =>
       createTheme({
+        direction: isRTL ? "rtl" : "ltr",
         palette: {
           mode: resolvedMode,
 
@@ -325,8 +335,9 @@ export function App({ prerender = false }) {
         },
 
         typography: {
-          fontFamily:
-            '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          fontFamily: isRTL
+            ? '"Vazirmatn", "Noto Sans Arabic", Tahoma, system-ui, sans-serif'
+            : '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 
           button: {
             textTransform: "none",
@@ -361,7 +372,7 @@ export function App({ prerender = false }) {
           },
         },
       }),
-    [resolvedMode]
+    [resolvedMode, language, isRTL]
   );
 
   return (

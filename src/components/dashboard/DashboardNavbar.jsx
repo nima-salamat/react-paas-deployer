@@ -13,6 +13,8 @@ import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import ThemeMenuButton from "../layout/ThemeMenuButton.jsx";
+import LanguageSwitcher from "../layout/LanguageSwitcher.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import AccountMenu from "../layout/AccountMenu.jsx";
 import PlatformIcon from "../plans/PlatformIcon.jsx";
 import { useProfiles } from "../profile/profileContext.jsx";
@@ -42,6 +44,7 @@ export default function DashboardNavbar({
   onThemeModeChange,
 }) {
   const theme = useTheme();
+  const { t } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
   const { profiles, primaryImageUrl } = useProfiles();
@@ -192,7 +195,7 @@ export default function DashboardNavbar({
                   maxWidth: { xs: 170, sm: 280, md: 420 },
                 }}
               >
-                {sectionTitle}
+                {t(sectionTitle)}
               </Typography>
               <Typography
                 noWrap
@@ -204,19 +207,20 @@ export default function DashboardNavbar({
                   lineHeight: 1.1,
                 }}
               >
-                {subtitle}
+                {t(subtitle)}
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" alignItems="center" spacing={{ xs: 0.5, sm: 0.75 }} sx={{ flexShrink: 0 }}>
+            <LanguageSwitcher buttonSx={navButtonSx} />
             <ThemeMenuButton
               themeMode={themeMode}
               onThemeModeChange={onThemeModeChange}
               buttonSx={navButtonSx}
             />
-            <Tooltip title="Home">
-              <IconButton size="small" onClick={() => navigate("/")} sx={navButtonSx} aria-label="Home">
+            <Tooltip title={t("Home")}>
+              <IconButton size="small" onClick={() => navigate("/")} sx={navButtonSx} aria-label={t("Home")}>
                 <HomeOutlinedIcon sx={{ fontSize: { xs: 19, sm: 20 } }} />
               </IconButton>
             </Tooltip>

@@ -732,3 +732,50 @@
 .custom-cursor.variant-crosshair .custom-cursor__dot {
   display: none;
 }
+
+
+/* Persian locale: native RTL flow with readable LTR islands for technical data. */
+html[dir="rtl"],
+html[dir="rtl"] body {
+  direction: rtl;
+  font-family: "Vazirmatn", "Noto Sans Arabic", Tahoma, system-ui, sans-serif;
+}
+
+html[dir="rtl"] .MuiTypography-root,
+html[dir="rtl"] .MuiInputLabel-root,
+html[dir="rtl"] .MuiFormHelperText-root,
+html[dir="rtl"] .MuiFormLabel-root,
+html[dir="rtl"] .MuiAlert-message,
+html[dir="rtl"] .MuiMenuItem-root,
+html[dir="rtl"] .MuiDialogTitle-root,
+html[dir="rtl"] .MuiDialogContent-root {
+  text-align: right;
+}
+
+html[dir="rtl"] .MuiInputBase-input,
+html[dir="rtl"] .MuiSelect-select,
+html[dir="rtl"] textarea {
+  text-align: right;
+}
+
+html[dir="rtl"] input[type="email"],
+html[dir="rtl"] input[type="url"],
+html[dir="rtl"] input[type="password"],
+html[dir="rtl"] input[type="number"],
+html[dir="rtl"] input[type="tel"],
+html[dir="rtl"] code,
+html[dir="rtl"] pre,
+html[dir="rtl"] .xterm,
+html[dir="rtl"] .monaco-editor {
+  direction: ltr;
+  text-align: left;
+}
+
+html[dir="rtl"] .MuiButton-startIcon {
+  margin-left: 8px;
+  margin-right: -4px;
+}
+html[dir="rtl"] .MuiButton-endIcon {
+  margin-right: 8px;
+  margin-left: -4px;
+}

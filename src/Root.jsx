@@ -3,6 +3,7 @@ import { CacheProvider } from "@emotion/react";
 import { createEmotionCache } from "./emotionCache";
 
 import { ProfileProvider } from "./components/profile/profileContext.jsx";
+import { LocaleProvider } from "./i18n/LocaleProvider.jsx";
 import App from "./App.jsx";
 import CustomCursor from "./components/layout/CustomCursor.jsx";
 import { useBootReady } from "./components/error/useBootReady.jsx";
@@ -20,11 +21,13 @@ export default function Root({ prerender = false }) {
 
   return (
     <CacheProvider value={cache}>
-      <BootReadyMarker />
-      <ProfileProvider>
-        <CustomCursor />
-        <App prerender={prerender} />
-      </ProfileProvider>
+      <LocaleProvider>
+        <BootReadyMarker />
+        <ProfileProvider>
+          <CustomCursor />
+          <App prerender={prerender} />
+        </ProfileProvider>
+      </LocaleProvider>
     </CacheProvider>
   );
 }

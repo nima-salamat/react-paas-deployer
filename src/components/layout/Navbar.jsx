@@ -45,6 +45,8 @@ import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import SettingsBrightnessOutlinedIcon from "@mui/icons-material/SettingsBrightnessOutlined";
 import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
 import ThemeMenuButton from "./ThemeMenuButton.jsx";
+import LanguageSwitcher from "./LanguageSwitcher.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 import AccountMenu from "./AccountMenu.jsx";
@@ -72,6 +74,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
+  const { t } = useLocale();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -584,13 +587,14 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                     },
                   }}
                 >
-                  {item.label}
+                  {t(item.label)}
                 </Button>
               );
             })}
           </Stack>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <LanguageSwitcher />
             <ThemeMenuButton
               themeMode={themeMode}
               onThemeModeChange={onThemeModeChange}
@@ -885,7 +889,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                       <Icon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText
-                      primary={item.label}
+                      primary={t(item.label)}
                       primaryTypographyProps={{
                         fontWeight: active ? 800 : 600,
                         noWrap: true,
