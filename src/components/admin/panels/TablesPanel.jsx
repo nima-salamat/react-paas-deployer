@@ -381,7 +381,8 @@ export default function TablesPanel() {
   }
 
   // ─── Rows view ─────────────────────────────────────────────────────────
-  return (
+  return (    <TranslatedTextTree>
+
     <Stack spacing={2.5}>
       <Stack direction="row" alignItems="center" gap={1.5}>
         <IconButton onClick={goBack} aria-label={translate("Back to catalog")}>
@@ -597,7 +598,6 @@ export default function TablesPanel() {
                       const field = fields.find((f) => f.name === k);
                       const isFK = field?.is_relation && field?.related;
                       return (
-    <TranslatedTextTree>
                         <tr key={k} style={{ borderTop: DRY_BORDER_LIGHT }}>
                           <DryTd sx={{ width: 200, bgcolor: "action.hover" }}>
                             <Typography variant="caption" fontWeight={700}>{field?.label || translate(k)}</Typography>
@@ -737,13 +737,15 @@ function CellRenderer({ value, displayValue, t = (value) => value, field, onFkCl
       </Tooltip>
     );
   }
-  return (
+  return (    <TranslatedTextTree>
+
     <Typography
       variant="caption"
       fontFamily={field?.type === "DateTimeField" || field?.type === "DateField" ? "monospace" : "inherit"}
     >
       {str}
     </Typography>
+    </TranslatedTextTree>
   );
 }
 
@@ -792,7 +794,8 @@ function FKDetailCell({ value, relatedModelKey, onNavigate }) {
     return <Typography variant="caption" color="text.disabled">null</Typography>;
   }
 
-  return (
+  return (    <TranslatedTextTree>
+
     <Stack direction="row" alignItems="center" gap={1} sx={{ width: "100%" }}>
       <Chip
         size="small"
@@ -809,5 +812,6 @@ function FKDetailCell({ value, relatedModelKey, onNavigate }) {
         {relatedModelKey}
       </Typography>
     </Stack>
+    </TranslatedTextTree>
   );
 }
