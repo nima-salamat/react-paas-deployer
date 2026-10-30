@@ -34,8 +34,8 @@ export default function ServiceDeleteDialog({
   const busy = ["queued", "deploying", "stopping", "running", "updating...", "pending"].includes(status);
   const platform = String(plan?.platform || service?.platform || "unknown");
 
-  return (
-    <TranslatedTextTree>
+  return (    <TranslatedTextTree>
+
     <Dialog
       open={Boolean(open)}
       onClose={loading ? undefined : onClose}
