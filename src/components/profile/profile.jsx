@@ -1222,17 +1222,17 @@ const Profile = ({ embedded = false }) => {
           <Stack spacing={1} sx={{ mb: 2 }}>
             {error && (
               <Alert severity="error" onClose={() => setError("")} sx={{ borderRadius: 2 }}>
-                {error}
+                {t(error)}
               </Alert>
             )}
             {profileError && (
               <Alert severity="error" sx={{ borderRadius: 2 }}>
-                {profileError}
+                {t(profileError)}
               </Alert>
             )}
             {success && (
               <Alert severity="success" onClose={() => setSuccess("")} sx={{ borderRadius: 2 }}>
-                {success}
+                {t(success)}
               </Alert>
             )}
           </Stack>
@@ -1292,8 +1292,8 @@ const Profile = ({ embedded = false }) => {
                 }}
                 helperText={
                   userData.email_verified
-                    ? "Verified. Changing it requires a code sent to the new address."
-                    : "This address is not verified yet. Verify it with a code."
+                    ? t("Verified. Changing it requires a code sent to the new address.")
+                    : t("This address is not verified yet. Verify it with a code.")
                 }
               />
             </Grid>
@@ -1306,8 +1306,8 @@ const Profile = ({ embedded = false }) => {
                 disabled
                 helperText={
                   userData.phone_number_verified
-                    ? "Verified. Contact changes use verification."
-                    : "Contact changes use the verification flow."
+                    ? t("Verified. Contact changes use verification.")
+                    : t("Contact changes use the verification flow.")
                 }
                 size="small"
               />
@@ -1326,7 +1326,7 @@ const Profile = ({ embedded = false }) => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small" disabled={!editMode}>
-                <InputLabel>Theme preference</InputLabel>
+                <InputLabel>{t("Theme preference")}</InputLabel>
                 <Select
                   name="theme"
                   value={userData.theme}
@@ -1343,7 +1343,7 @@ const Profile = ({ embedded = false }) => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth size="small" disabled={!editMode}>
-                <InputLabel>Accent color</InputLabel>
+                <InputLabel>{t("Accent color")}</InputLabel>
                 <Select
                   name="color"
                   value={userData.color}
@@ -1400,7 +1400,7 @@ const Profile = ({ embedded = false }) => {
             </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Choose how the mouse cursor is displayed. This preference is stored locally in this browser.
+            {t("Choose how the mouse cursor is displayed. This preference is stored locally in this browser.")}
           </Typography>
           <CursorPreferencePicker />
         </Paper>
@@ -1410,12 +1410,12 @@ const Profile = ({ embedded = false }) => {
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
             <PhotoLibraryIcon color="primary" />
             <Typography variant="h6" fontWeight={800}>
-              Profile photos
+              {t("Profile photos")}
             </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Tap a photo to preview. Drag the photo itself to reorder.
-            {enableFileDrop ? " On desktop you can also drop an image below." : ""}
+            {t("Tap a photo to preview. Drag the photo itself to reorder.")}
+            {enableFileDrop ? t("On desktop you can also drop an image below.") : ""}
           </Typography>
 
           <DndContext
@@ -1493,7 +1493,7 @@ const Profile = ({ embedded = false }) => {
                 {t(isDragOver ? "Drop image to edit" : "Drag & drop a photo here")}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Opens Adjust & Decorate automatically · JPG, PNG, WebP…
+                {t("Opens Adjust & Decorate automatically · JPG, PNG, WebP…")}
               </Typography>
             </Box>
           )}
@@ -1522,7 +1522,7 @@ const Profile = ({ embedded = false }) => {
               startIcon={<AddPhotoAlternateIcon />}
               sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
             >
-              Choose photo
+              {t("Choose photo")}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1538,7 +1538,7 @@ const Profile = ({ embedded = false }) => {
                 onClick={openEditor}
                 sx={{ textTransform: "none", borderRadius: 2 }}
               >
-                Adjust & Decorate
+                {t("Adjust & Decorate")}
               </Button>
             )}
             <Button
@@ -1556,7 +1556,7 @@ const Profile = ({ embedded = false }) => {
                 onClick={clearPendingImage}
                 sx={{ textTransform: "none", borderRadius: 2 }}
               >
-                Clear
+                {t("Clear")}
               </Button>
             )}
           </Stack>
@@ -1572,7 +1572,7 @@ const Profile = ({ embedded = false }) => {
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
             <LockIcon color="primary" />
             <Typography variant="h6" fontWeight={800}>
-              Password & security
+              {t("Password & security")}
             </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -1687,7 +1687,7 @@ const Profile = ({ embedded = false }) => {
           }}
         >
           <DialogTitle sx={{ fontWeight: 800, pb: 1, px: { xs: 2, sm: 3 } }}>
-            Adjust & Decorate Photo
+            {t("Adjust & Decorate Photo")}
           </DialogTitle>
           <DialogContent
             onPointerMove={handleEditorPointerMove}
@@ -1701,7 +1701,7 @@ const Profile = ({ embedded = false }) => {
               sx={{ mb: 2, display: "flex", alignItems: "center", gap: 0.75 }}
             >
               <OpenWithIcon fontSize="small" />
-              Drag the photo to reposition · use sliders for zoom & rotation
+              {t("Drag the photo to reposition · use sliders for zoom & rotation")}
             </Typography>
 
             <Box
@@ -1799,7 +1799,7 @@ const Profile = ({ embedded = false }) => {
                 onClick={(e) => setEmojiAnchorEl(e.currentTarget)}
                 sx={{ textTransform: "none", borderRadius: 2 }}
               >
-                Add Emoji / Icon
+                {t("Add Emoji / Icon")}
               </Button>
               <Popover
                 open={Boolean(emojiAnchorEl)}
@@ -1837,7 +1837,7 @@ const Profile = ({ embedded = false }) => {
                   sx={{ mb: 1 }}
                 >
                   <Typography variant="body2" fontWeight="bold">
-                    Emoji size
+                    {t("Emoji size")}
                   </Typography>
                   <IconButton
                     color="error"
@@ -1871,7 +1871,7 @@ const Profile = ({ embedded = false }) => {
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                   <ZoomInIcon fontSize="small" color="action" />
                   <Typography variant="body2" fontWeight={600}>
-                    Zoom
+                    {t("Zoom")}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
                     {zoom.toFixed(2)}×
@@ -1891,7 +1891,7 @@ const Profile = ({ embedded = false }) => {
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
                   <RotateRightIcon fontSize="small" color="action" />
                   <Typography variant="body2" fontWeight={600}>
-                    Rotation
+                    {t("Rotation")}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
                     {rotation}°
@@ -1913,7 +1913,7 @@ const Profile = ({ embedded = false }) => {
                   onChange={(e) => setCircularCrop(e.target.checked)}
                   size="small"
                 />
-                <Typography variant="body2">Circular crop</Typography>
+                <Typography variant="body2">{t("Circular crop")}</Typography>
               </Stack>
             </Stack>
           </DialogContent>
@@ -1946,7 +1946,7 @@ const Profile = ({ embedded = false }) => {
             {emailChangeStep === "request" ? (
               <Stack spacing={1.5} sx={{ mt: 1 }}>
                 <Alert severity="info" sx={{ borderRadius: 2 }}>
-                  Your current email stays unchanged until the new address is verified.
+                  {t("Your current email stays unchanged until the new address is verified.")}
                 </Alert>
                 <TextField
                   autoFocus
@@ -1973,7 +1973,7 @@ const Profile = ({ embedded = false }) => {
             ) : (
               <Stack spacing={1.5} sx={{ mt: 1 }}>
                 <Alert severity="success" icon={<EmailOutlinedIcon />} sx={{ borderRadius: 2 }}>
-                  We sent a verification code to <strong>{emailChangeDestination}</strong>.
+                  {t("We sent a verification code to")} <strong>{emailChangeDestination}</strong>.
                 </Alert>
                 <TextField
                   autoFocus
@@ -2150,7 +2150,7 @@ const Profile = ({ embedded = false }) => {
           fullWidth
           PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <DialogTitle sx={{ fontWeight: 800 }}>Remove password</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 800 }}>{t("Remove password")}</DialogTitle>
           <DialogContent>
             <TextField
               label={t("Current password")}
