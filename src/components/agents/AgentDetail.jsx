@@ -13,6 +13,7 @@ import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { useNavigate, useParams } from "react-router-dom";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, deleteCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest, deleteAgent } from "./agentApi";
 
 function fmt(value) { return value ? new Date(value).toLocaleString() : "Never"; }
@@ -23,6 +24,7 @@ function provisioningLabel(value) {
 }
 
 export default function AgentDetail() {
+  const { t: tr } = useLocale();
   const { id } = useParams();
   const navigate = useNavigate();
   const [agent, setAgent] = useState(null);
@@ -206,28 +208,28 @@ export default function AgentDetail() {
   };
 
   if (loading) return <Box sx={{ minHeight: "50vh", display: "flex", alignItems: "center", justifyContent: "center" }}><CircularProgress /></Box>;
-  if (!agent) return <Container maxWidth="md" sx={{ py: 6 }}><Alert severity="error" sx={{ borderRadius: 2 }}>{error || "Agent not found."}</Alert><Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/agents")} sx={{ mt: 2 }}>Back to Agents</Button></Container>;
+  if (!agent) return <Container maxWidth="md" sx={{ py: 6 }}><Alert severity="error" sx={{ borderRadius: 2 }}>{tr(error || "Agent not found.")}</Alert><Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/agents")} sx={{ mt: 2 }}>{tr("Back to Agents")}</Button></Container>;
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3.5 } }}>
       <Stack spacing={2.5}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between">
           <Box>
-            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/agents")} sx={{ px: 0, mb: 0.8 }}>Agents</Button>
+            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/dashboard/agents")} sx={{ px: 0, mb: 0.8 }}>{tr("Agents")}</Button>
             <Stack direction="row" spacing={1} alignItems="center">
               <SmartToyOutlinedIcon color="primary" />
               <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: "-0.03em" }}>{agent.name}</Typography>
-              <Chip size="small" label={agent.status} color={agent.status === "active" ? "success" : agent.status === "disabled" ? "warning" : "default"} sx={{ height: 24, fontWeight: 750 }} />
-              <Chip size="small" variant="outlined" label={"Provisioned via " + provisioningLabel(agent.provisioning_source)} sx={{ height: 24, fontWeight: 700 }} />
+              <Chip size="small" label={tr(agent.status)} color={agent.status === "active" ? "success" : agent.status === "disabled" ? "warning" : "default"} sx={{ height: 24, fontWeight: 750 }} />
+              <Chip size="small" variant="outlined" label={tr("Provisioned via") + " " + tr(provisioningLabel(agent.provisioning_source))} sx={{ height: 24, fontWeight: 700 }} />
             </Stack>
-            <Typography color="text.secondary" sx={{ mt: 0.55 }}>{agent.description || "No description"}</Typography>
+            <Typography color="text.secondary" sx={{ mt: 0.55 }}>{agent.description || tr("No description")}</Typography>
           </Box>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button variant="outlined" startIcon={<DescriptionRoundedIcon />} onClick={doManifest} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{saving ? "Generating…" : "View AGENT.md"}</Button>
-            <Button variant="outlined" startIcon={<KeyRoundedIcon />} onClick={() => setIssueOpen(true)} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>Issue token</Button>
-            {agent.status === "active" ? <Button color="warning" variant="outlined" startIcon={<BlockRoundedIcon />} onClick={() => statusAction("disable")} disabled={saving} sx={{ borderRadius: 1.5 }}>Disable</Button> : null}
-            {agent.status === "disabled" ? <Button variant="outlined" startIcon={<RestartAltRoundedIcon />} onClick={() => statusAction("enable")} disabled={saving} sx={{ borderRadius: 1.5 }}>Enable</Button> : null}
-            {agent.status !== "revoked" ? <Button color="error" variant="outlined" onClick={() => statusAction("revoke")} disabled={saving} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
+            <Button variant="outlined" startIcon={<DescriptionRoundedIcon />} onClick={doManifest} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{tr(saving ? "Generating…" : "View AGENT.md")}</Button>
+            <Button variant="outlined" startIcon={<KeyRoundedIcon />} onClick={() => setIssueOpen(true)} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{tr("Issue token")}</Button>
+            {agent.status === "active" ? <Button color="warning" variant="outlined" startIcon={<BlockRoundedIcon />} onClick={() => statusAction("disable")} disabled={saving} sx={{ borderRadius: 1.5 }}>{tr("Disable")}</Button> : null}
+            {agent.status === "disabled" ? <Button variant="outlined" startIcon={<RestartAltRoundedIcon />} onClick={() => statusAction("enable")} disabled={saving} sx={{ borderRadius: 1.5 }}>{tr("Enable")}</Button> : null}
+            {agent.status !== "revoked" ? <Button color="error" variant="outlined" onClick={() => statusAction("revoke")} disabled={saving} sx={{ borderRadius: 1.5 }}>{tr("Revoke")}</Button> : null}
             <Button
               color="error"
               variant="contained"
@@ -236,19 +238,19 @@ export default function AgentDetail() {
               disabled={saving}
               sx={{ borderRadius: 1.5, fontWeight: 800 }}
             >
-              {saving ? "Deleting…" : "Delete"}
+              {tr(saving ? "Deleting…" : "Delete")}
             </Button>
           </Stack>
         </Stack>
 
-        {error ? <Alert severity="error" sx={{ borderRadius: 2 }} action={<IconButton color="inherit" onClick={load}><RefreshRoundedIcon /></IconButton>}>{error}</Alert> : null}
+        {error ? <Alert severity="error" sx={{ borderRadius: 2 }} action={<IconButton color="inherit" onClick={load}><RefreshRoundedIcon /></IconButton>}>{tr(error)}</Alert> : null}
 
         <Paper variant="outlined" sx={{ borderRadius: 2.5, overflow: "hidden" }}>
           <Tabs value={tab} onChange={(e, value) => setTab(value)} variant="scrollable" scrollButtons="auto" sx={{ px: 1.5 }}>
-            <Tab label="Overview" />
-            <Tab label={"Permissions (" + agent.scope_count + ")"} />
-            <Tab label={"Credentials (" + agent.active_credential_count + ")"} />
-            <Tab label="Audit" />
+            <Tab label={tr("Overview")} />
+            <Tab label={tr("Permissions") + " (" + agent.scope_count + ")"} />
+            <Tab label={tr("Credentials") + " (" + agent.active_credential_count + ")"} />
+            <Tab label={tr("Audit")} />
           </Tabs>
           <Divider />
 
@@ -265,14 +267,14 @@ export default function AgentDetail() {
                 </Stack>
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Box><Typography variant="subtitle1" fontWeight={850}>Agent profile</Typography><Typography variant="body2" color="text.secondary">The Agent belongs to your account and is independent from individual services.</Typography></Box>
-                    <Button variant={editing ? "contained" : "outlined"} onClick={() => setEditing((v) => !v)} sx={{ borderRadius: 1.5 }}>{editing ? "Cancel" : "Edit"}</Button>
+                    <Box><Typography variant="subtitle1" fontWeight={850}>{tr("Agent profile")}</Typography><Typography variant="body2" color="text.secondary">{tr("The Agent belongs to your account and is independent from individual services.")}</Typography></Box>
+                    <Button variant={editing ? "contained" : "outlined"} onClick={() => setEditing((v) => !v)} sx={{ borderRadius: 1.5 }}>{tr(editing ? "Cancel" : "Edit")}</Button>
                   </Stack>
                   {editing ? (
                     <Stack spacing={1.5} sx={{ mt: 2 }}>
-                      <TextField label="Name" value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} fullWidth />
-                      <TextField label="Description" value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} multiline minRows={2} fullWidth />
-                      <Button variant="contained" onClick={saveProfile} disabled={saving || !draft.name.trim()} sx={{ alignSelf: "flex-start", borderRadius: 1.5 }}>Save changes</Button>
+                      <TextField label={tr("Name")} value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))} fullWidth />
+                      <TextField label={tr("Description")} value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} multiline minRows={2} fullWidth />
+                      <Button variant="contained" onClick={saveProfile} disabled={saving || !draft.name.trim()} sx={{ alignSelf: "flex-start", borderRadius: 1.5 }}>{tr("Save changes")}</Button>
                     </Stack>
                   ) : null}
                 </Paper>
@@ -282,7 +284,7 @@ export default function AgentDetail() {
 
           {tab === 1 ? (
             <Box sx={{ p: { xs: 2, md: 3 } }}>
-              <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>Grant only the permissions the automation client actually needs. Destructive and high-risk scopes are marked.</Alert>
+              <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>{tr("Grant only the permissions the automation client actually needs. Destructive and high-risk scopes are marked.")}</Alert>
               <Stack spacing={2}>
                 {Object.entries(groupedScopes).map(([category, scopes]) => (
                   <Paper key={category} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
@@ -291,33 +293,33 @@ export default function AgentDetail() {
                       {scopes.map((scope) => {
                         const selected = draft.scopes.includes(scope.name);
                         const suffix = scope.destructive ? " · destructive" : scope.high_risk ? " · high risk" : "";
-                        return <Chip key={scope.name} label={scope.label + suffix} icon={selected ? <CheckRoundedIcon /> : undefined} color={selected ? "primary" : "default"} variant={selected ? "filled" : "outlined"} onClick={() => toggleScope(scope.name)} sx={{ height: 31, fontWeight: 650 }} />;
+                        return <Chip key={scope.name} label={tr(scope.label) + (scope.destructive ? " · " + tr("destructive") : scope.high_risk ? " · " + tr("high risk") : "")} icon={selected ? <CheckRoundedIcon /> : undefined} color={selected ? "primary" : "default"} variant={selected ? "filled" : "outlined"} onClick={() => toggleScope(scope.name)} sx={{ height: 31, fontWeight: 650 }} />;
                       })}
                     </Stack>
                   </Paper>
                 ))}
               </Stack>
-              <Button variant="contained" onClick={saveProfile} disabled={saving} sx={{ mt: 2, borderRadius: 1.5 }}>Save permissions</Button>
+              <Button variant="contained" onClick={saveProfile} disabled={saving} sx={{ mt: 2, borderRadius: 1.5 }}>{tr("Save permissions")}</Button>
             </Box>
           ) : null}
 
           {tab === 2 ? (
             <Box sx={{ p: { xs: 2, md: 3 } }}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 2 }}>
-                <Button variant="contained" startIcon={<KeyRoundedIcon />} onClick={() => setIssueOpen(true)} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>Issue new token</Button>
-                <Button variant="outlined" onClick={rotate} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>Rotate all credentials</Button>
+                <Button variant="contained" startIcon={<KeyRoundedIcon />} onClick={() => setIssueOpen(true)} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{tr("Issue new token")}</Button>
+                <Button variant="outlined" onClick={rotate} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{tr("Rotate all credentials")}</Button>
               </Stack>
-              <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>Plaintext access tokens are never listed here. A newly issued or rotated token is shown once only.</Alert>
+              <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>{tr("Plaintext access tokens are never listed here. A newly issued or rotated token is shown once only.")}</Alert>
               <Stack spacing={1}>
                 {credentials.length ? credentials.map((credential) => (
                   <Paper key={credential.id} variant="outlined" sx={{ p: 1.75, borderRadius: 2 }}>
                     <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
                       <Box sx={{ flex: 1 }}><Typography fontFamily="ui-monospace, monospace" fontWeight={800}>{credential.prefix}</Typography><Typography variant="caption" color="text.secondary">Created {fmt(credential.created_at)} · Expires {fmt(credential.expires_at)} · Last used {fmt(credential.last_used_at)}{credential.issued_via ? " · Issued via " + provisioningLabel(credential.issued_via === "api_enrollment" ? "api_enrollment" : "dashboard") : ""}</Typography></Box>
-                      <Chip size="small" label={credential.active ? "active" : "revoked / expired"} color={credential.active ? "success" : "default"} sx={{ fontWeight: 700 }} />
+                      <Chip size="small" label={tr(credential.active ? "active" : "revoked / expired")} color={credential.active ? "success" : "default"} sx={{ fontWeight: 700 }} />
                       {credential.active ? <Button size="small" color="error" variant="outlined" onClick={async () => {
                         if (!window.confirm("Revoke this credential? It will stop authenticating but its record will remain available for audit/history.")) return;
                         try { setSaving(true); setError(""); await revokeCredential(id, credential.id); await load(); } catch (e) { setError(getApiErrorMessage(e, "Failed to revoke credential.")); } finally { setSaving(false); }
-                      }} disabled={saving} sx={{ borderRadius: 1.5 }}>Revoke</Button> : null}
+                      }} disabled={saving} sx={{ borderRadius: 1.5 }}>{tr("Revoke")}</Button> : null}
                       <Button
                         size="small"
                         color="error"
@@ -366,7 +368,7 @@ export default function AgentDetail() {
                           Request {event.request_id || "—"} · {event.duration_ms != null ? event.duration_ms + " ms" : "duration —"}{event.error_code ? " · " + event.error_code : ""}
                         </Typography>
                       </Box>
-                      <Stack direction="row" spacing={0.7} alignItems="center"><Chip size="small" label={event.success ? "success" : "failed"} color={event.success ? "success" : "error"} /><Typography variant="caption" color="text.secondary">{event.http_status || "—"}</Typography></Stack>
+                      <Stack direction="row" spacing={0.7} alignItems="center"><Chip size="small" label={tr(event.success ? "success" : "failed")} color={event.success ? "success" : "error"} /><Typography variant="caption" color="text.secondary">{event.http_status || "—"}</Typography></Stack>
                     </Stack>
                   </Paper>
                 )) : <Typography color="text.secondary">No audit events yet.</Typography>}
