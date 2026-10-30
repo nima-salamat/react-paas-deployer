@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, FormControl, Grid, InputLabel, List, ListItemButton,
@@ -12,10 +13,12 @@ const VARS = ["{{ user.username }}", "{{ user.email }}", "{{ user.first_name }}"
 
 function StatCard({ label, value }) {
   return (
+    <TranslatedTextTree>
     <Paper sx={{ p: 2 }}>
       <Typography variant="body2" color="text.secondary">{label}</Typography>
       <Typography variant="h4" fontWeight={700}>{value ?? "—"}</Typography>
     </Paper>
+    </TranslatedTextTree>
   );
 }
 
@@ -207,6 +210,7 @@ export default function EmailManagement() {
   ];
 
   return (
+    <TranslatedTextTree>
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto" }}>
       <Typography variant="h5" fontWeight={700} mb={2}>Email Management</Typography>
       <Stack direction="row" gap={1} mb={3} flexWrap="wrap">
@@ -416,5 +420,6 @@ export default function EmailManagement() {
         </DialogActions>
       </Dialog>
     </Box>
+    </TranslatedTextTree>
   );
 }
