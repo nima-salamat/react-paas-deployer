@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   Alert,
   Box,
@@ -73,6 +74,7 @@ function statusColor(status) {
 }
 
 export default function ReadyAppInstallation() {
+  const { t } = useLocale();
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -547,7 +549,7 @@ export default function ReadyAppInstallation() {
                       })()}
                       {service.status_message && (
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.6 }}>
-                          {service.status_message}
+                          {t(service.status_message)}
                         </Typography>
                       )}
                       {service.error_message && (
@@ -702,6 +704,7 @@ function Metric({ icon, label, value }) {
 }
 
 function LinearDeploymentState({ stage }) {
+  const { t } = useLocale();
   const states = ["queued", "preparing", "database", "application", "health", "ready"];
   const current = String(stage || "queued").toLowerCase();
   const index = current.includes("health") ? 4 : states.findIndex((item) => current.includes(item));
@@ -711,7 +714,7 @@ function LinearDeploymentState({ stage }) {
     <Stack spacing={0.6}>
       <LinearProgress variant="determinate" value={percent} />
       <Typography variant="caption" color="text.secondary">
-        {pretty(stage || "queued")} · status refreshes automatically
+        {t(pretty(stage || "queued"))} · {t("status refreshes automatically")}
       </Typography>
     </Stack>
     </TranslatedTextTree>
