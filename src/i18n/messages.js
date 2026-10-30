@@ -2598,4 +2598,42 @@ Object.assign(fa, {
   "application": "اپلیکیشن"
 });
 
+
+Object.assign(fa, {
+  "Inspect any user's services.": "سرویس‌های همهٔ کاربران را بررسی کنید.",
+  "You can manage runtime and configuration.": "شما می‌توانید محیط اجرا و پیکربندی را مدیریت کنید.",
+  "You can delete services, but runtime and configuration changes are disabled.": "شما می‌توانید سرویس‌ها را حذف کنید، اما تغییر محیط اجرا و پیکربندی غیرفعال است.",
+  "Read-only access.": "دسترسی فقط خواندنی.",
+  "Delete this service? Its runtime will be purged first.": "این سرویس حذف شود؟ ابتدا محیط اجرای آن پاک‌سازی خواهد شد.",
+  "Start queued": "درخواست شروع در صف قرار گرفت",
+  "Stop queued": "درخواست توقف در صف قرار گرفت",
+  "Restart queued": "درخواست راه‌اندازی مجدد در صف قرار گرفت",
+  "Runtime purged": "محیط اجرا پاک‌سازی شد",
+  "Service deleted": "سرویس حذف شد",
+  "Action failed": "عملیات ناموفق بود",
+  "Creating…": "در حال ایجاد…",
+  "No services found.": "سرویسی پیدا نشد.",
+  "No shared services.": "سرویس اشتراک‌گذاری‌شده‌ای وجود ندارد.",
+  "No services match this filter.": "هیچ سرویسی با این فیلتر مطابقت ندارد.",
+  "Load more": "بارگذاری موارد بیشتر",
+  "Stop requested.": "درخواست توقف ثبت شد.",
+  "Start requested.": "درخواست شروع ثبت شد.",
+  "Full CRUD enabled.": "تمام عملیات ایجاد، مشاهده، ویرایش و حذف فعال است.",
+  "Read-only — you need plans.manage to edit.": "فقط خواندنی — برای ویرایش به مجوز plans.manage نیاز دارید.",
+  "Resource and logging policy tiers offered to services.": "سطوح منابع و سیاست ثبت گزارش ارائه‌شده به سرویس‌ها.",
+  "Update": "به‌روزرسانی",
+  "Deleting…": "در حال حذف…",
+  "inherit": "پیش‌فرض",
+  "persist": "پایدار",
+  "no persist": "ناپایدار",
+  "realtime": "بلادرنگ",
+  "no realtime": "غیرفعال",
+  "fifo_delete": "حذف قدیمی‌ترین گزارش‌ها (FIFO)",
+  "drop_new": "نادیده‌گرفتن گزارش‌های جدید",
+  "realtime_only": "فقط ثبت بلادرنگ",
+  "OPEN": "باز",
+  "CLOSED": "بسته",
+  "You're live": "اپلیکیشن شما فعال شد"
+});
+
 export const PERSIAN_TRANSLATIONS = fa;
