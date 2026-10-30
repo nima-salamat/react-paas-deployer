@@ -2571,4 +2571,31 @@ Object.assign(fa, {
   "Select a plan": "یک پلن انتخاب کنید"
 });
 
+
+Object.assign(fa, {
+  "A curated application, ready to deploy.": "اپلیکیشنی منتخب و آمادهٔ استقرار.",
+  "A curated app, ready to deploy.": "اپلیکیشنی منتخب و آمادهٔ استقرار.",
+  "Try a different search.": "عبارت دیگری را جست‌وجو کنید.",
+  "The library is empty right now.": "کتابخانه در حال حاضر خالی است.",
+  "status refreshes automatically": "وضعیت به‌صورت خودکار به‌روزرسانی می‌شود",
+  "Managed runtime": "محیط اجرای مدیریت‌شده",
+  "Waiting to start": "در انتظار شروع",
+  "Starting services": "در حال راه‌اندازی سرویس‌ها",
+  "Building the app": "در حال ساخت اپلیکیشن",
+  "Setting up the database": "در حال راه‌اندازی پایگاه داده",
+  "Starting the app": "در حال راه‌اندازی اپلیکیشن",
+  "Checking the app": "در حال بررسی اپلیکیشن",
+  "Finishing up": "در حال تکمیل",
+  "Stopping safely": "در حال توقف ایمن",
+  "Cleaning up": "در حال پاک‌سازی",
+  "Deployment failed": "استقرار ناموفق بود",
+  "You're live": "اپلیکیشن شما فعال شد",
+  "Mine": "موارد من",
+  "Plan": "پلن",
+  "Configure": "پیکربندی",
+  "Launch": "راه‌اندازی",
+  "database": "پایگاه داده",
+  "application": "اپلیکیشن"
+});
+
 export const PERSIAN_TRANSLATIONS = fa;
