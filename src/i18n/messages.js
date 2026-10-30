@@ -161,7 +161,7 @@ const fa = {
   "Bad request": "درخواست نامعتبر",
   "Access denied": "دسترسی رد شد",
   "Page not found": "صفحه پیدا نشد",
-  "Something went wrong": "مشکلی پیش آمد",
+
   "Invalid request.": "درخواست نامعتبر است.",
   "Request was throttled.": "تعداد درخواست‌ها بیش از حد مجاز است.",
   "Authentication failed.": "احراز هویت ناموفق بود.",
