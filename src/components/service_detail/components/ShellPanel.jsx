@@ -1611,7 +1611,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                   </Box>
 
                   <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: .6, minWidth: 0 }}>
-                    <Tooltip title={cwdWritable === true ? "Upload files" : cwdWritable === null ? "Checking directory permissions" : "Read-only directory"}>
+                    <Tooltip title={tr(cwdWritable === true ? "Upload files" : cwdWritable === null ? "Checking directory permissions" : "Read-only directory")}>
                       <span style={{ display: "block", minWidth: 0 }}>
                         <Button
                           fullWidth
@@ -1725,7 +1725,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                       <Box key={(item.parent ? "p" : item.directory ? "d" : "f") + "-" + itemPath} onContextMenu={(e) => !item.parent && handleTreeContextMenu(e, item)} onDoubleClick={() => openTreeItem(item)} onClick={(e) => toggleTreeSelection(e, item)} aria-selected={selected} sx={{ display: "flex", alignItems: "center", gap: .5, px: 1, py: .38, cursor: "pointer", color: item.parent ? "#91a9bf" : "#c4ced8", bgcolor: selected ? "rgba(96,165,250,.12)" : "transparent", ":hover": { bgcolor: "rgba(96,165,250,.08)" } }}>
                         {item.parent ? <ChevronRightRoundedIcon sx={{ fontSize: 16, color: "#91a9bf", transform: "rotate(180deg)" }} /> : item.directory ? <FolderRoundedIcon sx={{ fontSize: 16, color: "#77a7d8" }} /> : <InsertDriveFileRoundedIcon sx={{ fontSize: 15, color: fileIconColor(item.name) }} />}
                         <Typography sx={{ fontFamily: MONO, fontSize: 11.5, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: item.parent ? 1 : (item.writable === false ? .72 : 1) }}>{item.name}{item.directory && !item.parent ? "/" : ""}</Typography>
-                        {!item.parent ? <Typography sx={{ fontFamily: MONO, fontSize: 9, color: item.mode === "ro" ? "#e8a08f" : (item.effectiveWritable === null ? "#9aabbc" : (item.writable === false ? "#d7b26e" : "#73a386")), flexShrink: 0 }}>{item.mode === "ro" ? "RO" : (item.effectiveWritable === null ? "Checking" : (item.writable === false ? "Locked" : "RW"))}</Typography> : null}
+                        {!item.parent ? <Typography sx={{ fontFamily: MONO, fontSize: 9, color: item.mode === "ro" ? "#e8a08f" : (item.effectiveWritable === null ? "#9aabbc" : (item.writable === false ? "#d7b26e" : "#73a386")), flexShrink: 0 }}>{tr(item.mode === "ro" ? "RO" : (item.effectiveWritable === null ? "Checking" : (item.writable === false ? "Locked" : "RW")))}</Typography> : null}
                         {!item.parent ? <IconButton size="small" aria-label={"Actions for " + item.name} onClick={(e) => { e.stopPropagation(); setContextMenu({ mouseX: e.currentTarget.getBoundingClientRect().left, mouseY: e.currentTarget.getBoundingClientRect().bottom, item }); }} sx={{ p: .15, color: "#6f8091" }}><MoreVertRoundedIcon sx={{ fontSize: 15 }} /></IconButton> : null}
                       </Box>
                     );
@@ -1795,8 +1795,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                       <Tooltip title={tr("Environment (masked")})}><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Env")}</Button></Tooltip>
                       <Tooltip title={tr("Activity / audit log")}><Button size="small" onClick={(e) => { e.stopPropagation(); setAuditOpen(true); setAuditPage(1); loadAudit(1, auditFilter); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Audit")}</Button></Tooltip>
                       {health?.container?.running ? <Chip size="small" label={tr("healthy")} sx={{ height: 22, color: "#73c9a0", bgcolor: "rgba(53,211,153,.08)" }} /> : session ? <Chip size="small" label={tr("check")} onClick={(e) => { e.stopPropagation(); loadHealth(); }} sx={{ height: 22, cursor: "pointer", color: "#9ab0c4" }} /> : null}
-                      <Tooltip title={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
-                        <IconButton size="small" aria-label={fullscreen ? "Exit fullscreen" : "Fullscreen"} onClick={(e) => { e.stopPropagation(); setFullscreen((value) => !value); }} sx={{ color: fullscreen ? "#b7d5f0" : "#9ab0c4", width: 32, height: 32, flexShrink: 0 }}>
+                      <Tooltip title={tr(fullscreen ? "Exit fullscreen" : "Fullscreen")}>
+                        <IconButton size="small" aria-label={tr(fullscreen ? "Exit fullscreen" : "Fullscreen")} onClick={(e) => { e.stopPropagation(); setFullscreen((value) => !value); }} sx={{ color: fullscreen ? "#b7d5f0" : "#9ab0c4", width: 32, height: 32, flexShrink: 0 }}>
                           {fullscreen ? <FullscreenExitRoundedIcon sx={{ fontSize: 18 }} /> : <FullscreenRoundedIcon sx={{ fontSize: 18 }} />}
                         </IconButton>
                       </Tooltip>
@@ -2110,7 +2110,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       >
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setFullscreen((value) => !value); }}>
           {fullscreen ? <FullscreenExitRoundedIcon sx={{ mr: 1, fontSize: 19 }} /> : <FullscreenRoundedIcon sx={{ mr: 1, fontSize: 19 }} />}
-          {fullscreen ? "Exit fullscreen" : "Fullscreen"}
+          {tr(fullscreen ? "Exit fullscreen" : "Fullscreen")}
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setDryRun((value) => !value); }}>
           {tr(dryRun ? "Disable dry-run" : "Enable dry-run")}
