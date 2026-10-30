@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, FormControlLabel, IconButton, Stack, Switch,
@@ -145,6 +146,7 @@ export default function DepartmentsPanel() {
   };
 
   return (
+    <TranslatedTextTree>
     <Stack spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
@@ -353,5 +355,6 @@ export default function DepartmentsPanel() {
         onConfirm={() => void deactivateDepartment()}
       />
     </Stack>
+    </TranslatedTextTree>
   );
 }
