@@ -8,6 +8,7 @@ import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import { useNavigate } from "react-router-dom";
 import apiRequest from "../customHooks/apiRequest";
 import { TICKETS_API } from "./api";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { useTicketNotify } from "./TicketNotifyContext";
 
 const STATUS_COLOR = {
@@ -34,6 +35,7 @@ function saveUnread(set) {
 }
 
 export default function TicketList() {
+  const { t: tr } = useLocale();
   const { subscribe, connected } = useTicketNotify();
   const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
@@ -145,7 +147,7 @@ export default function TicketList() {
         </FormControl>
       </Stack>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{tr(error)}</Alert>}
 
       {initialLoading ? (
         <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
@@ -202,8 +204,8 @@ export default function TicketList() {
                           {t.subject}
                         </Typography>
                       </TableCell>
-                      <TableCell><Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
-                      <TableCell><Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
+                      <TableCell><Chip size="small" label={tr(t.status)} color={STATUS_COLOR[t.status] || "default"} /></TableCell>
+                      <TableCell><Chip size="small" label={tr(t.priority)} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" /></TableCell>
                       <TableCell>
                         <Typography variant="caption">
                           {t.last_message_at || t.updated_at
@@ -286,8 +288,8 @@ export default function TicketList() {
                           </Typography>
                           <Stack direction={{ xs: "column", sm: "row" }} gap={0.75} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
                             <Stack direction="row" gap={0.75} flexWrap="wrap">
-                              <Chip size="small" label={t.status} color={STATUS_COLOR[t.status] || "default"} />
-                              <Chip size="small" label={t.priority} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
+                              <Chip size="small" label={tr(t.status)} color={STATUS_COLOR[t.status] || "default"} />
+                              <Chip size="small" label={tr(t.priority)} color={PRIORITY_COLOR[t.priority] || "default"} variant="outlined" />
                             </Stack>
                             <Button
                               size="small"
