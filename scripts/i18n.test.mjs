@@ -191,3 +191,11 @@ test("Persian sign-in, sign-up and account recovery flows use the active locale"
     assert.notEqual(translateText(source, "fa"), source, "Missing Persian auth translation: " + source);
   }
 });
+
+test("Login labels and structured authentication errors are translated", async () => {
+  const auth = await readFile(new URL("../src/components/signin_or_signup/signin_or_signup.jsx", import.meta.url), "utf8");
+  assert.match(auth, /const formatAuthError = \(err, fallback = "Failed"\)/);
+  assert.match(auth, /Object\.values\(value\)\.map\(translateErrorValue\)/);
+  assert.match(auth, /formatAuthError\(err, "Login failed"\)/);
+  assert.equal(translateText("Login", "fa"), "ورود");
+});
