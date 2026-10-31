@@ -239,8 +239,9 @@ test("Persian translations keep repeated keys consistent across screens", async 
   const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
   const valuesByKey = new Map();
 
-  for (const line of messages.split(/\\r?\\n/)) {
-    const match = line.match(/^\\s*"((?:\\\\.|[^"])*)"\\s*:\\s*"((?:\\\\.|[^"])*)"\\s*,?\\s*$/);
+  const propertyPattern = /^\s*"((?:\\.|[^"])*)"\s*:\s*"((?:\\.|[^"])*)"\s*,?\s*$/;
+  for (const line of messages.split(/\r?\n/)) {
+    const match = line.match(propertyPattern);
     if (!match) continue;
     const key = JSON.parse('"'+match[1]+'"');
     const value = JSON.parse('"'+match[2]+'"');
