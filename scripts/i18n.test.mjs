@@ -234,3 +234,22 @@ test("Persian interface uses familiar and consistent developer terminology", () 
   assert.equal(translateText("Theme", "en-us"), "Theme");
   assert.equal(translateText("Volume", "en-us"), "Volume");
 });
+
+test("Persian translations keep repeated keys consistent across screens", async () => {
+  const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
+  const valuesByKey = new Map();
+
+  for (const line of messages.split(/\\r?\\n/)) {
+    const match = line.match(/^\\s*"((?:\\\\.|[^"])*)"\\s*:\\s*"((?:\\\\.|[^"])*)"\\s*,?\\s*$/);
+    if (!match) continue;
+    const key = JSON.parse('"'+match[1]+'"');
+    const value = JSON.parse('"'+match[2]+'"');
+    if (!valuesByKey.has(key)) valuesByKey.set(key, new Set());
+    valuesByKey.get(key).add(value);
+  }
+
+  const conflicts = [...valuesByKey.entries()]
+    .filter(([, values]) => values.size > 1)
+    .map(([key]) => key);
+  assert.deepEqual(conflicts, [], "Repeated Persian keys must not have conflicting translations");
+});
