@@ -70,7 +70,7 @@ test("explicit language preference markers are scoped to the authenticated accou
 test("Persian locale includes secure-chat recovery, language API and admin table messages", async () => {
   const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
   assert.match(messages, /"Secure chat recovery":/);
-  assert.match(messages, /"Database tables": "جدول‌های پایگاه داده"/);
+  assert.match(messages, /"Database tables": "جدول‌های دیتابیس"/);
   assert.match(messages, /"Language preference updated.":/);
 });
 
@@ -116,7 +116,7 @@ test("Persian locale covers admin console, Services and all Ready Apps screens",
 
   for (const [english, persian] of [
     ["App Library", "کتابخانهٔ اپلیکیشن‌ها"],
-    ["Deployed Apps", "اپلیکیشن‌های مستقرشده"],
+    ["Deployed Apps", "اپلیکیشن‌های دیپلوی‌شده"],
     ["Users & access", "کاربران و دسترسی‌ها"],
     ["Departments", "دپارتمان‌ها"],
     ["cms", "مدیریت محتوا"],
@@ -159,9 +159,9 @@ test("Persian locale includes documentation, service creation, editing and detai
     ["Documentation page not found", "صفحهٔ مستندات پیدا نشد"],
     ["Service name is required.", "واردکردن نام سرویس الزامی است."],
     ["Please select or create a network.", "یک شبکه انتخاب یا ایجاد کنید."],
-    ["Volume name is required.", "واردکردن نام فضای ذخیره‌سازی الزامی است."],
-    ["No deploy history available. Start a deploy to see live events.", "تاریخچهٔ استقراری موجود نیست. برای مشاهدهٔ رویدادهای زنده یک استقرار آغاز کنید."],
-    ["The backend reports that volume changes are unavailable until the service is idle.", "طبق اعلام بک‌اند، تا زمانی که سرویس در حالت بیکار قرار نگیرد امکان تغییر فضاهای ذخیره‌سازی وجود ندارد."],
+    ["Volume name is required.", "نام Volume الزامی است."],
+    ["No deploy history available. Start a deploy to see live events.", "هنوز سابقه‌ای از دیپلوی‌ها وجود ندارد. برای دیدن رویدادهای زنده، یک دیپلوی شروع کنید."],
+    ["The backend reports that volume changes are unavailable until the service is idle.", "طبق اعلام بک‌اند، تا وقتی سرویس مشغول است، امکان تغییر Volumeها وجود ندارد."],
   ]) {
     assert.equal(translateText(english, "fa"), persian);
   }
@@ -198,4 +198,39 @@ test("Login labels and structured authentication errors are translated", async (
   assert.match(auth, /Object\.values\(value\)\.map\(translateErrorValue\)/);
   assert.match(auth, /formatAuthError\(err, "Login failed"\)/);
   assert.equal(translateText("Login", "fa"), "ورود");
+});
+
+
+test("Persian interface uses familiar and consistent developer terminology", () => {
+  const examples = [
+    ["Theme", "تم"],
+    ["Change theme", "تغییر تم"],
+    ["Dark theme", "تم تیره"],
+    ["Agents", "ایجنت‌ها"],
+    ["Create agent", "ساخت ایجنت"],
+    ["Deploy", "دیپلوی"],
+    ["Deployments", "دیپلوی‌ها"],
+    ["Deployed Apps", "اپلیکیشن‌های دیپلوی‌شده"],
+    ["Refresh", "رفرش"],
+    ["Volume", "Volume"],
+    ["Volumes", "Volumeها"],
+    ["Database", "دیتابیس"],
+    ["Database tables", "جدول‌های دیتابیس"],
+    ["Logs", "لاگ‌ها"],
+    ["Download", "دانلود"],
+    ["Upload", "آپلود"],
+    ["Password", "رمز عبور"],
+    ["Minimum {count} characters", "حداقل {count} کاراکتر"],
+    ["Control plane", "پنل مدیریت"],
+    ["Workflow", "ورک‌فلو"],
+    ["Danger zone", "بخش عملیات حساس"],
+  ];
+
+  for (const [english, persian] of examples) {
+    assert.equal(translateText(english, "fa"), persian, "Unexpected terminology for: " + english);
+  }
+
+  assert.equal(translateText("Theme", "fa"), "تم");
+  assert.equal(translateText("Theme", "en-us"), "Theme");
+  assert.equal(translateText("Volume", "en-us"), "Volume");
 });
