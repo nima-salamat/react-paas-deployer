@@ -3645,3 +3645,7 @@ Object.assign(fa, {
   "Required for app deploys": "برای دیپلوی اپلیکیشن الزامی است",
   "No networks yet. Create one with the New button.": "هنوز شبکه‌ای نساخته‌اید. برای ساخت یکی روی دکمهٔ «جدید» بزنید."
 });
+
+Object.assign(fa, {
+  "Upload": "آپلود"
+});
