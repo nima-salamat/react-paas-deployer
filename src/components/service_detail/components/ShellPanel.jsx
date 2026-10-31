@@ -2328,5 +2328,6 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       </Dialog>
 
     </>
+    </TranslatedTextTree>
   );
 }
