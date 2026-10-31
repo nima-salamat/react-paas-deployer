@@ -167,3 +167,27 @@ test("Persian locale includes documentation, service creation, editing and detai
   }
   assert.equal(translateText("An operator-authored paragraph that is not in the catalogue.", "fa"), "An operator-authored paragraph that is not in the catalogue.");
 });
+
+
+test("Persian sign-in, sign-up and account recovery flows use the active locale", async () => {
+  const auth = await readFile(new URL("../src/components/signin_or_signup/signin_or_signup.jsx", import.meta.url), "utf8");
+  assert.match(auth, /useLocale/);
+  assert.match(auth, /const \{ language, t \} = useLocale\(\)/);
+  assert.match(auth, /Accept-Language/);
+  assert.match(auth, /label=\{t\("Email"\)\}/);
+  assert.match(auth, /stepTitle = \{[\s\S]*t\("Welcome"\)/);
+
+  for (const source of [
+    "Welcome", "Verification", "Sign in or sign up with a verification code.",
+    "Enter the verification code we sent you.", "Recover Username",
+    "Enter your email or phone to recover your username.", "Forgot Password",
+    "Reset Password", "Username Found", "New Password", "Confirm Password",
+    "Verification Code", "Send Verification Code",
+    "New accounts require an invite link. If you already have an account, just enter your credentials below and continue — login works without an invite.",
+    "Email is required", "Phone is required", "Verification code is required",
+    "Password is required", "Password must be at least {count} characters",
+    "Please confirm your password", "Passwords do not match.", "Invalid or expired invite link",
+  ]) {
+    assert.notEqual(translateText(source, "fa"), source, "Missing Persian auth translation: " + source);
+  }
+});
