@@ -570,7 +570,7 @@ Object.assign(fa, {
   "Plan storage quota": "سهمیهٔ فضای ذخیره‌سازی پلن",
   "Edit is allowed only if this volume is not yet provisioned in Docker.": "ویرایش فقط زمانی مجاز است که این Volume هنوز در Docker ایجاد نشده باشد.",
   "Currently attached": "در حال حاضر متصل است",
-  "No networks yet. Create one with the New button.": "هنوز شبکه‌ای وجود ندارد. با دکمهٔ «جدید» یک شبکه بسازید.",
+  "No networks yet. Create one with the New button.": "هنوز شبکه‌ای نساخته‌اید. برای ساخت یکی روی دکمهٔ «جدید» بزنید.",
   "Database declared by this Ready App": "دیتابیس تعریف‌شده برای این Ready App",
   "Connect a database resource or service": "اتصال منبع یا سرویس پایگاه داده",
   "To use an existing database service, attach this service and the database service to the same private network first.": "برای استفاده از یک سرویس پایگاه دادهٔ موجود، ابتدا این سرویس و سرویس پایگاه داده را به یک شبکهٔ خصوصی مشترک متصل کنید.",
@@ -1538,7 +1538,7 @@ Object.assign(fa, {
   "Detach": "قطع اتصال",
   "Hide networks": "پنهان‌کردن شبکه‌ها",
   "Show all networks": "نمایش همهٔ شبکه‌ها",
-  "No networks yet. Create one with the New button.": "هنوز شبکه‌ای وجود ندارد. با دکمهٔ «جدید» یک شبکه ایجاد کنید.",
+  "No networks yet. Create one with the New button.": "هنوز شبکه‌ای نساخته‌اید. برای ساخت یکی روی دکمهٔ «جدید» بزنید.",
   "Databases": "دیتابیس‌ها",
   "Choose a managed database resource or an existing database service. The backend checks ownership and shared private-network configuration; credentials stay in the backend secret store.": "یک منبع دیتابیس مدیریت‌شده یا سرویس دیتابیس موجود انتخاب کنید. بک‌اند مالکیت و تنظیمات شبکهٔ خصوصی مشترک را بررسی می‌کند و اطلاعات ورود را در مخزن امن نگه می‌دارد.",
   "Database declared by this Ready App": "دیتابیس تعریف‌شده برای این Ready App",
@@ -3583,5 +3583,5 @@ Object.assign(fa, {
 });
 
 Object.assign(fa, {
-  "No networks yet. Create one with the New button.": "هنوز شبکه‌ای نساخته‌اید. برای ساخت یکی روی دکمهٔ «جدید» بزنید."
+  "No networks yet. Create one with the New button.": "هنوز شبکه‌ای نساخته‌اید. برای ساخت یکی روی دکمهٔ «جدید» بزنید.",
 });
