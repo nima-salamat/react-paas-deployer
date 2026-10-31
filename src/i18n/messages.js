@@ -40,6 +40,7 @@ const fa = {
   "Loading...": "در حال بارگذاری...",
   "Sign in / Sign up": "ورود / ثبت‌نام",
   "Sign in": "ورود",
+  "Login": "ورود",
   "Sign up": "ثبت‌نام",
   "Logout": "خروج",
   "Log out": "خروج",
