@@ -87,8 +87,22 @@ export default function SigninOrSignup() {
   const [copied, setCopied] = useState(false);
 
   const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const translateErrorValue = (value) => {
+    if (Array.isArray(value)) {
+      return value.map(translateErrorValue).filter(Boolean).join(" ");
+    }
+    if (value && typeof value === "object") {
+      return Object.values(value).map(translateErrorValue).filter(Boolean).join(" ");
+    }
+    return value == null ? "" : t(String(value));
+  };
+  const formatAuthError = (err, fallback = "Failed") => {
+    const data = err?.response?.data;
+    const message = data?.message ?? data?.errors ?? err?.message ?? fallback;
+    return translateErrorValue(message) || t(fallback);
+  };
   const showError = (msg) => {
-    setError(typeof msg === "string" ? t(msg) : String(msg ?? ""));
+    setError(translateErrorValue(msg));
     setSnackOpen(true);
   };
 
@@ -194,8 +208,7 @@ export default function SigninOrSignup() {
       if (next === "done" && res.data.access) completeLogin(res.data.access, res.data.refresh);
       else setStep(next);
     } catch (err) {
-      const errors = err.response?.data?.errors;
-      showError(err.response?.data?.message || (errors ? JSON.stringify(errors) : err.message || "Failed"));
+      showError(formatAuthError(err));
     } finally { setLoading(false); }
   };
 
@@ -216,7 +229,7 @@ export default function SigninOrSignup() {
         setStep(next || "done");
       }
     } catch (err) {
-      showError(err.response?.data?.message || "Invalid code");
+      showError(formatAuthError(err, "Invalid code"));
     } finally { setLoading(false); }
   };
 
@@ -239,8 +252,7 @@ export default function SigninOrSignup() {
       else if (res.data.next_step === "otp") setStep("otp");
       else showError(res.data.message || "Unexpected response");
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.errors || err.message || "Login failed";
-      showError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      showError(formatAuthError(err, "Login failed"));
     } finally { setLoading(false); }
   };
 
@@ -254,7 +266,7 @@ export default function SigninOrSignup() {
       await axios.post(`${BASE_URL}/recovery/request/`, payload, getAuthRequestConfig());
       setStep("recovery_otp");
     } catch (err) {
-      showError(err.response?.data?.message || "Failed");
+      showError(formatAuthError(err));
     } finally { setLoading(false); }
   };
 
@@ -271,7 +283,7 @@ export default function SigninOrSignup() {
       setRecoveredUsername(res.data.username || "");
       setStep("recovery_result");
     } catch (err) {
-      showError(err.response?.data?.message || "Invalid code");
+      showError(formatAuthError(err, "Invalid code"));
     } finally { setLoading(false); }
   };
 
@@ -285,7 +297,7 @@ export default function SigninOrSignup() {
       await axios.post(`${BASE_URL}/password-recovery/request/`, payload, getAuthRequestConfig());
       setStep("password_recovery_otp");
     } catch (err) {
-      showError(err.response?.data?.message || "Failed");
+      showError(formatAuthError(err));
     } finally { setLoading(false); }
   };
 
@@ -311,7 +323,7 @@ export default function SigninOrSignup() {
       if (res.data.access) completeLogin(res.data.access, res.data.refresh);
       else showError(res.data.message || "Unexpected response");
     } catch (err) {
-      showError(err.response?.data?.message || "Invalid code or failed to reset");
+      showError(formatAuthError(err, "Invalid code or failed to reset"));
     } finally { setLoading(false); }
   };
 
@@ -377,11 +389,11 @@ export default function SigninOrSignup() {
             background: theme.palette.mode === "dark" ? "rgba(17,24,39,0.6)" : "rgba(255,255,255,0.85)" }}>
           <Block sx={{ fontSize: 56, color: "error.main", mb: 2 }} />
           <Typography variant={isSm ? "h5" : "h4"} sx={{ fontWeight: 700, mb: 2 }}>
-            {settings.custom_login_closed_title || t("Login temporarily unavailable")}
+            {t(settings.custom_login_closed_title || "Login temporarily unavailable")}
           </Typography>
           {settings.custom_login_closed_message ? (
             <Typography variant="body1" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
-              {settings.custom_login_closed_message}
+              {t(settings.custom_login_closed_message)}
             </Typography>
           ) : (
             <Typography variant="body1" color="text.secondary">
