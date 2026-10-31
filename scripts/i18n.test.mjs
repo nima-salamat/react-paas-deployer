@@ -224,6 +224,15 @@ test("Persian interface uses familiar and consistent developer terminology", () 
     ["Control plane", "پنل مدیریت"],
     ["Workflow", "ورک‌فلو"],
     ["Danger zone", "بخش عملیات حساس"],
+    ["Build", "بیلد"],
+    ["Interactive", "تعاملی"],
+    ["Storage type", "نوع استوریج"],
+    ["No networks yet. Create one with the New button.", "هنوز شبکه‌ای نساخته‌اید. برای ساخت یکی روی دکمهٔ «جدید» بزنید."],
+    ["Volume created successfully.", "Volume با موفقیت ساخته شد."],
+    ["Failed to load platforms.", "دریافت فهرست پلتفرم‌ها انجام نشد."],
+    ["No pending join requests.", "در حال حاضر درخواست عضویتِ در انتظاری ندارید."],
+    ["Nothing deployed yet", "هنوز هیچ اپلیکیشنی دیپلوی نکرده‌اید."],
+    ["Deployed apps unavailable", "فهرست اپلیکیشن‌های دیپلوی‌شده در دسترس نیست."],
   ];
 
   for (const [english, persian] of examples) {
