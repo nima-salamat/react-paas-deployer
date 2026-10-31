@@ -25,6 +25,7 @@ import Block from "@mui/icons-material/Block";
 import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
 import { isSessionBoundToken } from "../customHooks/authSession.js";
 import { getDeviceAuthPayload } from "../security/deviceIdentity.js";
+import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 const BASE_URL = `https://${import.meta.env.VITE_API_BASE}/auth/api`;
 const MotionPaper = motion.create(Paper);
@@ -59,6 +60,10 @@ export default function SigninOrSignup() {
   const [searchParams] = useSearchParams();
   const theme = useTheme();
   const isSm = useMediaQuery(theme.breakpoints.down("sm"));
+  const { language, t } = useLocale();
+  const getAuthRequestConfig = (headers = {}) => ({
+    headers: { "Accept-Language": language === "fa" ? "fa" : "en-US", ...headers },
+  });
 
   const inviteFromUrl = (searchParams.get("invite") || "").trim();
 
@@ -82,7 +87,10 @@ export default function SigninOrSignup() {
   const [copied, setCopied] = useState(false);
 
   const onChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
-  const showError = (msg) => { setError(msg); setSnackOpen(true); };
+  const showError = (msg) => {
+    setError(typeof msg === "string" ? t(msg) : String(msg ?? ""));
+    setSnackOpen(true);
+  };
 
   const getPayload = async () => {
     const base = {};
@@ -113,19 +121,19 @@ export default function SigninOrSignup() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/settings/`);
+        const res = await axios.get(`${BASE_URL}/settings/`, getAuthRequestConfig());
         if (res.data?.settings) setSettings({ ...DEFAULT_SETTINGS, ...res.data.settings });
       } catch { /* keep defaults */ }
       finally { setSettingsLoaded(true); }
     })();
-  }, []);
+  }, [language]);
 
   useEffect(() => {
     if (!inviteFromUrl) return;
     setInviteToken(inviteFromUrl);
     (async () => {
       try {
-        const res = await axios.get(`${BASE_URL}/invite/validate/`, { params: { token: inviteFromUrl } });
+        const res = await axios.get(`${BASE_URL}/invite/validate/`, { ...getAuthRequestConfig(), params: { token: inviteFromUrl } });
         setInviteInfo(res.data);
         setInviteError("");
       } catch (err) {
@@ -133,7 +141,7 @@ export default function SigninOrSignup() {
         setInviteError(err.response?.data?.message || "Invalid or expired invite link");
       }
     })();
-  }, [inviteFromUrl]);
+  }, [inviteFromUrl, language]);
 
   useEffect(() => {
     if (settings.allow_email) setMethod("email");
@@ -150,7 +158,7 @@ export default function SigninOrSignup() {
     (async () => {
       try {
         await axios.get(`${BASE_URL}/validateToken/`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthRequestConfig({ Authorization: `Bearer ${token}` }).headers,
           timeout: 4000,
         });
         completeLogin(token, localStorage.getItem("refresh"));
@@ -179,7 +187,7 @@ export default function SigninOrSignup() {
     if (method === "phone" && !form.phone.trim()) return showError("Phone is required");
     setLoading(true);
     try {
-      const res = await axios.post(`${BASE_URL}/authentication/`, await getPayload());
+      const res = await axios.post(`${BASE_URL}/authentication/`, await getPayload(), getAuthRequestConfig());
       if (res.data.created) setAccountCreated(true);
       let next = res.data.next_step || "otp";
       if (res.data.created && (next === "password" || res.data.must_set_password)) next = "set_password";
@@ -196,7 +204,7 @@ export default function SigninOrSignup() {
     if (!form.code.trim()) return showError("Verification code is required");
     setLoading(true);
     try {
-      const res = await axios.post(`${BASE_URL}/login/validate/`, { ...(await getPayload()), code: form.code.trim() });
+      const res = await axios.post(`${BASE_URL}/login/validate/`, { ...(await getPayload()), code: form.code.trim() }, getAuthRequestConfig());
       let next = res.data.next_step;
       if (next === "set_password" || res.data.must_set_password || (accountCreated && (next === "password" || res.data.twofactor))) {
         setStep("set_password");
@@ -215,18 +223,18 @@ export default function SigninOrSignup() {
   const handlePassword = async (e) => {
     if (e) e.preventDefault();
     if (!form.password.trim()) return showError("Password is required");
-    if (form.password.length < minPassLen) return showError(`Password must be at least ${minPassLen} characters`);
+    if (form.password.length < minPassLen) return showError(t("Password must be at least {count} characters").replace("{count}", String(minPassLen)));
     const isSetPassword = step === "set_password" || accountCreated;
     if (isSetPassword && needConfirm) {
       if (!form.password_confirm.trim()) return showError("Please confirm your password");
-      if (form.password !== form.password_confirm) return showError("Passwords do not match");
+      if (form.password !== form.password_confirm) return showError("Passwords do not match.");
     }
     setLoading(true);
     try {
       const endpoint = (step === "set_password" || accountCreated) ? "/set-password/" : "/login/token/";
       const body = { ...(await getPayload()), code: form.code.trim(), password: form.password };
       if (isSetPassword && needConfirm) body.password_confirm = form.password_confirm;
-      const res = await axios.post(`${BASE_URL}${endpoint}`, body);
+      const res = await axios.post(`${BASE_URL}${endpoint}`, body, getAuthRequestConfig());
       if (res.data.access) completeLogin(res.data.access, res.data.refresh);
       else if (res.data.next_step === "otp") setStep("otp");
       else showError(res.data.message || "Unexpected response");
@@ -243,7 +251,7 @@ export default function SigninOrSignup() {
     setLoading(true);
     try {
       const payload = method === "email" ? { email: form.email.trim() } : { phone_number: form.phone.trim() };
-      await axios.post(`${BASE_URL}/recovery/request/`, payload);
+      await axios.post(`${BASE_URL}/recovery/request/`, payload, getAuthRequestConfig());
       setStep("recovery_otp");
     } catch (err) {
       showError(err.response?.data?.message || "Failed");
@@ -259,7 +267,7 @@ export default function SigninOrSignup() {
         code: form.code.trim(),
         ...(method === "email" ? { email: form.email.trim() } : { phone_number: form.phone.trim() }),
       };
-      const res = await axios.post(`${BASE_URL}/recovery/confirm/`, payload);
+      const res = await axios.post(`${BASE_URL}/recovery/confirm/`, payload, getAuthRequestConfig());
       setRecoveredUsername(res.data.username || "");
       setStep("recovery_result");
     } catch (err) {
@@ -274,7 +282,7 @@ export default function SigninOrSignup() {
     setLoading(true);
     try {
       const payload = method === "email" ? { email: form.email.trim() } : { phone_number: form.phone.trim() };
-      await axios.post(`${BASE_URL}/password-recovery/request/`, payload);
+      await axios.post(`${BASE_URL}/password-recovery/request/`, payload, getAuthRequestConfig());
       setStep("password_recovery_otp");
     } catch (err) {
       showError(err.response?.data?.message || "Failed");
@@ -285,10 +293,10 @@ export default function SigninOrSignup() {
     e.preventDefault();
     if (!form.code.trim()) return showError("Code required");
     if (!form.password.trim()) return showError("New password is required");
-    if (form.password.length < minPassLen) return showError(`Password must be at least ${minPassLen} characters`);
+    if (form.password.length < minPassLen) return showError(t("Password must be at least {count} characters").replace("{count}", String(minPassLen)));
     if (needConfirm) {
       if (!form.password_confirm.trim()) return showError("Please confirm your password");
-      if (form.password !== form.password_confirm) return showError("Passwords do not match");
+      if (form.password !== form.password_confirm) return showError("Passwords do not match.");
     }
     setLoading(true);
     try {
@@ -299,7 +307,7 @@ export default function SigninOrSignup() {
         ...(method === "email" ? { email: form.email.trim() } : { phone_number: form.phone.trim() }),
       };
       if (needConfirm) payload.password_confirm = form.password_confirm;
-      const res = await axios.post(`${BASE_URL}/password-recovery/confirm/`, payload);
+      const res = await axios.post(`${BASE_URL}/password-recovery/confirm/`, payload, getAuthRequestConfig());
       if (res.data.access) completeLogin(res.data.access, res.data.refresh);
       else showError(res.data.message || "Unexpected response");
     } catch (err) {
@@ -325,27 +333,27 @@ export default function SigninOrSignup() {
   const isSetPasswordStep = step === "set_password" || (step === "password" && accountCreated);
 
   const stepTitle = {
-    credentials: "Welcome",
-    otp: "Verification",
-    password: isSetPasswordStep ? "Set Password" : "Password",
-    set_password: "Set Password",
-    recovery: "Recover Username",
-    recovery_otp: "Enter Code",
-    recovery_result: "Username Found",
-    password_recovery: "Forgot Password",
-    password_recovery_otp: "Reset Password",
+    credentials: t("Welcome"),
+    otp: t("Verification"),
+    password: t(isSetPasswordStep ? "Set Password" : "Password"),
+    set_password: t("Set Password"),
+    recovery: t("Recover Username"),
+    recovery_otp: t("Enter Code"),
+    recovery_result: t("Username Found"),
+    password_recovery: t("Forgot Password"),
+    password_recovery_otp: t("Reset Password"),
   };
 
   const stepSubtitle = {
-    credentials: "Sign in or sign up with a verification code.",
-    otp: "Enter the verification code we sent you.",
-    password: isSetPasswordStep ? "Choose a secure password for your new account." : "This account requires a password.",
-    set_password: "Choose a secure password for your new account.",
-    recovery: "Enter your email or phone to recover your username.",
-    recovery_otp: "Enter the code we sent you.",
-    recovery_result: "Your username is ready. You can copy it.",
-    password_recovery: "Enter your email or phone to receive a reset code.",
-    password_recovery_otp: "Enter the code and choose a new password.",
+    credentials: t("Sign in or sign up with a verification code."),
+    otp: t("Enter the verification code we sent you."),
+    password: t(isSetPasswordStep ? "Choose a secure password for your new account." : "This account requires a password."),
+    set_password: t("Choose a secure password for your new account."),
+    recovery: t("Enter your email or phone to recover your username."),
+    recovery_otp: t("Enter the code we sent you."),
+    recovery_result: t("Your username is ready. You can copy it."),
+    password_recovery: t("Enter your email or phone to receive a reset code."),
+    password_recovery_otp: t("Enter the code and choose a new password."),
   };
 
   if (loginClosed) {
@@ -369,7 +377,7 @@ export default function SigninOrSignup() {
             background: theme.palette.mode === "dark" ? "rgba(17,24,39,0.6)" : "rgba(255,255,255,0.85)" }}>
           <Block sx={{ fontSize: 56, color: "error.main", mb: 2 }} />
           <Typography variant={isSm ? "h5" : "h4"} sx={{ fontWeight: 700, mb: 2 }}>
-            {settings.custom_login_closed_title || "Login temporarily unavailable"}
+            {settings.custom_login_closed_title || t("Login temporarily unavailable")}
           </Typography>
           {settings.custom_login_closed_message ? (
             <Typography variant="body1" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
@@ -377,7 +385,7 @@ export default function SigninOrSignup() {
             </Typography>
           ) : (
             <Typography variant="body1" color="text.secondary">
-              Authentication is currently disabled. Please try again later or contact support.
+              {t("Authentication is currently disabled. Please try again later or contact support.")}
             </Typography>
           )}
         </MotionPaper>
@@ -387,14 +395,14 @@ export default function SigninOrSignup() {
 
   const renderPasswordFields = ({ isSetPassword, autoFocus = true }) => (
     <>
-      <TextField fullWidth label={isSetPassword ? "New Password" : "Password"} name="password"
+      <TextField fullWidth label={t(isSetPassword ? "New Password" : "Password")} name="password"
         type={showPassword ? "text" : "password"} value={form.password} onChange={onChange}
         autoFocus={autoFocus} margin="normal"
-        helperText={isSetPassword ? `Minimum ${minPassLen} characters` : undefined}
+        helperText={isSetPassword ? t("Minimum {count} characters").replace("{count}", String(minPassLen)) : undefined}
         InputProps={{
           endAdornment: (
             <InputAdornment position="end">
-              <IconButton onClick={() => setShowPassword((p) => !p)} edge="end">
+              <IconButton aria-label={t(showPassword ? "Hide password" : "Show password")} onClick={() => setShowPassword((p) => !p)} edge="end">
                 {showPassword ? <VisibilityOff /> : <Visibility />}
               </IconButton>
             </InputAdornment>
@@ -403,13 +411,13 @@ export default function SigninOrSignup() {
         }}
       />
       {isSetPassword && needConfirm && (
-        <TextField fullWidth label="Confirm Password" name="password_confirm"
+        <TextField fullWidth label={t("Confirm Password")} name="password_confirm"
           type={showPasswordConfirm ? "text" : "password"} value={form.password_confirm}
           onChange={onChange} margin="normal"
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton onClick={() => setShowPasswordConfirm((p) => !p)} edge="end">
+                <IconButton aria-label={t(showPasswordConfirm ? "Hide password" : "Show password")} onClick={() => setShowPasswordConfirm((p) => !p)} edge="end">
                   {showPasswordConfirm ? <VisibilityOff /> : <Visibility />}
                 </IconButton>
               </InputAdornment>
@@ -464,7 +472,7 @@ export default function SigninOrSignup() {
       >
 
         <Typography component="h1" variant={isSm ? "h5" : "h4"} align="center" sx={{ fontWeight: 700, mb: 1 }}>
-          {stepTitle[step] || "Welcome"}
+          {stepTitle[step] || t("Welcome")}
         </Typography>
         <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
           {stepSubtitle[step] || ""}
@@ -474,29 +482,29 @@ export default function SigninOrSignup() {
           <Box sx={{ mb: 2 }}>
             {inviteInfo?.valid ? (
               <Alert severity="success" icon={<LinkIcon />} variant="outlined">
-                Valid invite{inviteInfo.label ? `: ${inviteInfo.label}` : ""}
+                {t("Valid invite")}{inviteInfo.label ? `: ${inviteInfo.label}` : ""}
                 {inviteInfo.remaining_uses != null && (
-                  <Chip size="small" label={`${inviteInfo.remaining_uses} use(s) left`} sx={{ ml: 1 }} />
+                  <Chip size="small" label={t("{count} use(s) left").replace("{count}", String(inviteInfo.remaining_uses))} sx={{ ml: 1 }} />
                 )}
               </Alert>
             ) : inviteError ? (
-              <Alert severity="error" variant="outlined">{inviteError}</Alert>
+              <Alert severity="error" variant="outlined">{t(inviteError)}</Alert>
             ) : (
-              <Alert severity="info" variant="outlined">Checking invite…</Alert>
+              <Alert severity="info" variant="outlined">{t("Checking invite…")}</Alert>
             )}
           </Box>
         )}
 
         {signupClosed && !inviteToken && step === "credentials" && (
           <Alert severity="info" sx={{ mb: 2 }} variant="outlined">
-            New accounts require an invite link. If you already have an account, just enter your credentials below and continue — login works without an invite.
+            {t("New accounts require an invite link. If you already have an account, just enter your credentials below and continue — login works without an invite.")}
           </Alert>
         )}
 
         {step === "credentials" && (
           <Box component="form" onSubmit={handleCredentials} noValidate>
             {settings.allow_username && (
-              <TextField fullWidth label="Username" name="username" value={form.username}
+              <TextField fullWidth label={t("Username")} name="username" value={form.username}
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
             {showMethodToggle && (
@@ -506,7 +514,7 @@ export default function SigninOrSignup() {
                 spacing={{ xs: 0.75, sm: 1 }}
                 sx={{ mt: 1, mb: 1 }}
               >
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>Method</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>{t("Method")}</Typography>
                 <ToggleButtonGroup
                   value={method}
                   exclusive
@@ -522,34 +530,34 @@ export default function SigninOrSignup() {
                     },
                   }}
                 >
-                  {settings.allow_email && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> Email</ToggleButton>}
-                  {settings.allow_phone && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> Phone</ToggleButton>}
+                  {settings.allow_email && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> {t("Email")}</ToggleButton>}
+                  {settings.allow_phone && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> {t("Phone")}</ToggleButton>}
                 </ToggleButtonGroup>
               </Stack>
             )}
             {method === "email" && settings.allow_email && (
-              <TextField fullWidth label="Email" name="email" type="email" value={form.email}
+              <TextField fullWidth label={t("Email")} name="email" type="email" value={form.email}
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
             {method === "phone" && settings.allow_phone && (
-              <TextField fullWidth label="Phone" name="phone" type="tel" value={form.phone}
+              <TextField fullWidth label={t("Phone")} name="phone" type="tel" value={form.phone}
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
             <Button type="submit" fullWidth variant="contained" disabled={loading} sx={{ mt: 3, py: 1.5, minHeight: 48, borderRadius: 3 }}>
-              {settings.require_otp ? "Send Verification Code" : "Continue"}
+              {t(settings.require_otp ? "Send Verification Code" : "Continue")}
             </Button>
             <Divider sx={{ my: 2 }} />
             <Stack spacing={1}>
               {settings.allow_password_recovery && (
                 <Button fullWidth startIcon={<LockReset />}
                   onClick={() => { setStep("password_recovery"); setError(""); setForm((p) => ({ ...p, code: "", password: "", password_confirm: "" })); }}>
-                  Forgot Password?
+                  {t("Forgot Password?")}
                 </Button>
               )}
               {settings.allow_username_recovery && (
                 <Button fullWidth startIcon={<PersonSearch />}
                   onClick={() => { setStep("recovery"); setError(""); }}>
-                  Forgot Username?
+                  {t("Forgot Username?")}
                 </Button>
               )}
             </Stack>
@@ -558,11 +566,11 @@ export default function SigninOrSignup() {
 
         {step === "otp" && (
           <Box component="form" onSubmit={handleOtp}>
-            <TextField fullWidth label="Verification Code" name="code" value={form.code}
+            <TextField fullWidth label={t("Verification Code")} name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Verify</Button>
+              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>{t("Back")}</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>{t("Verify")}</Button>
             </Stack>
           </Box>
         )}
@@ -573,14 +581,14 @@ export default function SigninOrSignup() {
             <Box component="form" onSubmit={handlePassword}>
               {renderPasswordFields({ isSetPassword })}
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {isSetPassword ? "This is a new account. Choose a secure password." : "This account requires a password."}
+                {t(isSetPassword ? "This is a new account. Choose a secure password." : "This account requires a password.")}
               </Typography>
               <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
                 <Button fullWidth variant="outlined"
                   onClick={() => setStep(settings.require_otp ? "otp" : "credentials")}
-                  sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
+                  sx={{ minHeight: 48, borderRadius: 3 }}>{t("Back")}</Button>
                 <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>
-                  {isSetPassword ? "Save & Login" : "Login"}
+                  {t(isSetPassword ? "Save & Login" : "Login")}
                 </Button>
               </Stack>
             </Box>
@@ -606,45 +614,45 @@ export default function SigninOrSignup() {
                   },
                 }}
               >
-                {recoveryEmailOk && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> Email</ToggleButton>}
-                {recoveryPhoneOk && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> Phone</ToggleButton>}
+                {recoveryEmailOk && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> {t("Email")}</ToggleButton>}
+                {recoveryPhoneOk && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> {t("Phone")}</ToggleButton>}
               </ToggleButtonGroup>
             )}
             {method === "email" && recoveryEmailOk ? (
-              <TextField fullWidth label="Email" name="email" value={form.email} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
+              <TextField fullWidth label={t("Email")} name="email" value={form.email} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             ) : (
-              <TextField fullWidth label="Phone" name="phone" value={form.phone} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
+              <TextField fullWidth label={t("Phone")} name="phone" value={form.phone} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
             <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Send Code</Button>
+              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>{t("Back")}</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>{t("Send Code")}</Button>
             </Stack>
           </Box>
         )}
 
         {step === "recovery_otp" && (
           <Box component="form" onSubmit={handleRecoveryConfirm}>
-            <TextField fullWidth label="Verification Code" name="code" value={form.code}
+            <TextField fullWidth label={t("Verification Code")} name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("recovery")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Verify</Button>
+              <Button fullWidth variant="outlined" onClick={() => setStep("recovery")} sx={{ minHeight: 48, borderRadius: 3 }}>{t("Back")}</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>{t("Verify")}</Button>
             </Stack>
           </Box>
         )}
 
         {step === "recovery_result" && (
           <Box textAlign="center">
-            <Typography variant="h6" sx={{ mb: 2 }}>Your username:</Typography>
+            <Typography variant="h6" sx={{ mb: 2 }}>{t("Your username:")}</Typography>
             <Paper variant="outlined" sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 3, mb: 3 }}>
               <Typography variant="h5" fontFamily="monospace">{recoveredUsername}</Typography>
-              <Tooltip title={copied ? "Copied!" : "Copy"}>
-                <IconButton onClick={copyUsername} color={copied ? "success" : "primary"}><ContentCopy /></IconButton>
+              <Tooltip title={t(copied ? "Copied!" : "Copy")}>
+                <IconButton aria-label={t("Copy")} onClick={copyUsername} color={copied ? "success" : "primary"}><ContentCopy /></IconButton>
               </Tooltip>
             </Paper>
             <Button fullWidth variant="contained" sx={{ borderRadius: 3 }}
               onClick={() => { setForm((p) => ({ ...p, username: recoveredUsername, code: "" })); setStep("credentials"); }}>
-              Back to Login
+              {t("Back to Login")}
             </Button>
           </Box>
         )}
@@ -668,30 +676,30 @@ export default function SigninOrSignup() {
                   },
                 }}
               >
-                {recoveryEmailOk && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> Email</ToggleButton>}
-                {recoveryPhoneOk && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> Phone</ToggleButton>}
+                {recoveryEmailOk && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> {t("Email")}</ToggleButton>}
+                {recoveryPhoneOk && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> {t("Phone")}</ToggleButton>}
               </ToggleButtonGroup>
             )}
             {method === "email" && recoveryEmailOk ? (
-              <TextField fullWidth label="Email" name="email" type="email" value={form.email} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
+              <TextField fullWidth label={t("Email")} name="email" type="email" value={form.email} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             ) : (
-              <TextField fullWidth label="Phone" name="phone" type="tel" value={form.phone} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
+              <TextField fullWidth label={t("Phone")} name="phone" type="tel" value={form.phone} onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
             <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Send Reset Code</Button>
+              <Button fullWidth variant="outlined" onClick={() => setStep("credentials")} sx={{ minHeight: 48, borderRadius: 3 }}>{t("Back")}</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>{t("Send Reset Code")}</Button>
             </Stack>
           </Box>
         )}
 
         {step === "password_recovery_otp" && (
           <Box component="form" onSubmit={handlePasswordRecoveryConfirm}>
-            <TextField fullWidth label="Verification Code" name="code" value={form.code}
+            <TextField fullWidth label={t("Verification Code")} name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             {renderPasswordFields({ isSetPassword: true, autoFocus: false })}
             <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} sx={{ mt: 3 }}>
-              <Button fullWidth variant="outlined" onClick={() => setStep("password_recovery")} sx={{ minHeight: 48, borderRadius: 3 }}>Back</Button>
-              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>Reset & Login</Button>
+              <Button fullWidth variant="outlined" onClick={() => setStep("password_recovery")} sx={{ minHeight: 48, borderRadius: 3 }}>{t("Back")}</Button>
+              <Button type="submit" fullWidth variant="contained" sx={{ minHeight: 48, borderRadius: 3 }}>{t("Reset & Login")}</Button>
             </Stack>
           </Box>
         )}
