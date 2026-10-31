@@ -233,6 +233,11 @@ test("Persian interface uses familiar and consistent developer terminology", () 
     ["No pending join requests.", "در حال حاضر درخواست عضویتِ در انتظاری ندارید."],
     ["Nothing deployed yet", "هنوز هیچ اپلیکیشنی دیپلوی نکرده‌اید."],
     ["Deployed apps unavailable", "فهرست اپلیکیشن‌های دیپلوی‌شده در دسترس نیست."],
+    ["Credentials", "اطلاعات دسترسی"],
+    ["Service logs", "لاگ‌های سرویس"],
+    ["Logging", "لاگ‌گیری"],
+    ["Application runtime", "Runtime اپلیکیشن"],
+    ["Slug", "Slug"],
   ];
 
   for (const [english, persian] of examples) {
