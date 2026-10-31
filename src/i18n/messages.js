@@ -3581,3 +3581,7 @@ Object.assign(fa, {
   "Self-hosted uptime monitoring with persistent data and HTTPS routing.": "ابزار خودمیزبان پایش دسترس‌پذیری سرویس‌ها، همراه با استوریج پایدار و مسیریابی HTTPS.",
   "Self-hosted Git collaboration with PostgreSQL and persistent storage.": "سرویس خودمیزبان Git برای همکاری تیمی، همراه با PostgreSQL و استوریج پایدار."
 });
+
+Object.assign(fa, {
+  "No networks yet. Create one with the New button.": "هنوز شبکه‌ای نساخته‌اید. برای ساخت یکی روی دکمهٔ «جدید» بزنید."
+});
