@@ -202,19 +202,7 @@ export default function PlansPanel() {
         </Stack>
       </Stack>
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "minmax(0, 1fr)",
-            md: "minmax(220px, 1fr) minmax(180px, 200px) minmax(160px, 180px)",
-          },
-          gap: 2,
-          width: "100%",
-          mb: 2,
-          alignItems: "start",
-        }}
-      >
+      <Box className="admin-filter-grid" sx={{ mb: 2 }}>
         <TextField size="small" label="Search name / platform" value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }} fullWidth
           sx={{ minWidth: 0 }} />
