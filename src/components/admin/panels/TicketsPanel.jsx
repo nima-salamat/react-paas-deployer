@@ -70,6 +70,7 @@ export default function TicketsPanel({
       <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1.5 }}>
         <Box className="admin-filter-grid">
           <TextField
+            className="admin-filter-search"
             size="small"
             label="Search subject / number"
             value={search}
@@ -77,9 +78,9 @@ export default function TicketsPanel({
               setSearch(e.target.value);
               setPage(1);
             }}
-            sx={{ minWidth: 200, flex: 1 }}
+            sx={{ minWidth: 0, flex: 1 }}
           />
-          <FormControl size="small" sx={{ minWidth: 150 }}>
+          <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
             <InputLabel>Status</InputLabel>
             <Select
               label="Status"
@@ -98,7 +99,7 @@ export default function TicketsPanel({
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 130 }}>
+          <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
             <InputLabel>Priority</InputLabel>
             <Select
               label="Priority"
@@ -116,7 +117,7 @@ export default function TicketsPanel({
               ))}
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
+          <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
             <InputLabel>Assigned</InputLabel>
             <Select
               label="Assigned"
