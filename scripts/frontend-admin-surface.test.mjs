@@ -199,6 +199,25 @@ test("admin topbar includes keyboard-driven, permission-filtered quick navigatio
   assert.match(dashboard, /filter\(\(\[id\]\) => id === "profile" \|\| canSeeNav\(id\)\)/);
 });
 
+test("admin topbar preserves back navigation and notifications at narrow widths", () => {
+  const topbar = read("src/components/admin/layout/AdminTopBar.jsx");
+
+  assert.match(topbar, /Back to Deployer/);
+  assert.match(topbar, /Notifications/);
+  assert.match(topbar, /aria-label="Notifications"/);
+  assert.match(topbar, /display: \{ xs: "inline-flex", lg: "none" \}/);
+  assert.match(topbar, /display: "inline-flex"[\s\S]*?minWidth: \{ xs: 36, sm: "auto" \}/);
+});
+
+test("plan filters use full-width controls on compact screens", () => {
+  const plans = read("src/components/admin/panels/PlansPanel.jsx");
+
+  assert.match(plans, /gridTemplateColumns:[\s\S]*?xs: "minmax\(0, 1fr\)"/);
+  assert.match(plans, /<InputLabel>Platform<\/InputLabel>/);
+  assert.match(plans, /<InputLabel>Type<\/InputLabel>/);
+  assert.match(plans, /<FormControl size="small" fullWidth sx=\{\{ minWidth: 0 \}\}>/);
+});
+
 test("admin operational tables use adaptive card layouts on phones and tablets", () => {
   const responsive = read("src/components/admin/components/ResponsiveTable.jsx");
   const tickets = read("src/components/admin/panels/TicketsPanel.jsx");
