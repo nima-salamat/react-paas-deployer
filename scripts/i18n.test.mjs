@@ -287,7 +287,9 @@ test("Persian admin dashboard covers its navigation, filters, dialogs and dynami
   const ticketComposer = await readFile(new URL("../src/components/admin/components/AdminTicketComposer.jsx", import.meta.url), "utf8");
 
   assert.match(responsiveTable, /translateLabel\(col\.label\)/);
-  assert.match(responsiveTable, /TranslatedTextTree>\{col\.render\(row\)\}<\/TranslatedTextTree>/);
+  assert.match(responsiveTable, /TranslatedTextTree>\\{col\\.render\\(row\\)\\}<\\/TranslatedTextTree>/);
+  const authCodesPanel = await readFile(new URL("../src/components/admin/panels/AuthCodesPanel.jsx", import.meta.url), "utf8");
+  assert.match(authCodesPanel, /label=\\{t\\(code\\.purpose \\|\\| "—"\\)\\}/);
   assert.match(usersPanel, /t\(group\.group\)/);
   assert.match(overviewPanel, /accessible\.map\(\(item\) => t\(item\)\)/);
   assert.match(overviewPanel, /Ticket created/);
