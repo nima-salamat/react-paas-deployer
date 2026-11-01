@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Chip, Grid, Paper, Stack, Typography, Divider, alpha, useTheme,
 } from "@mui/material";
@@ -31,6 +32,7 @@ export default function OverviewPanel({
   onOpenTicket,
 }) {
   useTheme(); // keep theme hook stable for future styling
+  const { t } = useLocale();
   const rules = useMemo(() => getSessionRules(), []);
   const superuser = isSessionSuperuser();
   const canTickets = hasAnyRule("tickets.view") || hasAnyRule("tickets.manage");
@@ -138,7 +140,7 @@ export default function OverviewPanel({
         )}
         {accessible.length > 0 && (
           <Typography variant="caption" color="text.secondary" display="block" mt={1.5}>
-            You can open: {accessible.join(" · ")}
+            {t("You can open:")} {accessible.map((item) => t(item)).join(" · ")}
           </Typography>
         )}
       </Paper>
