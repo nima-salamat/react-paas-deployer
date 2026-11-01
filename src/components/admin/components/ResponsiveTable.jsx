@@ -4,6 +4,7 @@ import {
   Typography, useMediaQuery, useTheme,
 } from "@mui/material";
 import { useLocale } from "../../../i18n/LocaleProvider.jsx";
+import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 
 /**
  * ResponsiveTable — desktop: classic MUI table; mobile: stacked card list.
@@ -78,7 +79,7 @@ export default function ResponsiveTable({
                         sx={{ textAlign: "right", minWidth: 0, maxWidth: "68%", overflowWrap: "anywhere" }}
                         onClick={col.stopPropagation ? (event) => event.stopPropagation() : undefined}
                       >
-                        {value ?? "—"}
+                        {col.render ? <TranslatedTextTree>{value}</TranslatedTextTree> : (value ?? "—")}
                       </Box>
                     </Stack>
                   );
@@ -127,7 +128,7 @@ export default function ResponsiveTable({
                     align={col.align || "left"}
                     onClick={col.stopPropagation ? (e) => e.stopPropagation() : undefined}
                   >
-                    {col.render ? col.render(row) : (row[col.id] ?? "—")}
+                    {col.render ? <TranslatedTextTree>{col.render(row)}</TranslatedTextTree> : (row[col.id] ?? "—")}
                   </TableCell>
                 ))}
               </TableRow>
