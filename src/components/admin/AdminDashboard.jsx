@@ -3,7 +3,7 @@ import "./admin-console.css";
 import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Box, CircularProgress, Drawer, Stack, Typography,
-  useMediaQuery, useTheme,
+  useMediaQuery, useTheme, alpha,
 } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ToastProvider } from "./components/ToastContext.jsx";

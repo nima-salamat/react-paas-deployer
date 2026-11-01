@@ -9,13 +9,13 @@ import AddIcon from "@mui/icons-material/Add";
  *
  * Exports:
  *   - DRY_BORDER / DRY_BORDER_LIGHT  — shared border constants
- *   - DryPanel                        — sharp-cornered Box wrapper
+ *   - DryPanel                        — softly rounded surface wrapper
  *   - DryInfoBanner                   — left-stripe info banner
  *   - DryTh / DryTd                   — table cell primitives
- *   - DryChip / DryWarningChip        — sharp-cornered chips
+ *   - DryChip / DryWarningChip        — compact status chips
  *   - DryCreateButton                 — prominent "create row" button
  *   - DryEmptyState                   — empty-state placeholder
- *   - DryToolbar                       — sharp-cornered table toolbar
+ *   - DryToolbar                       — compact table toolbar
  */
 
 export const DRY_BORDER = "1px solid rgba(127, 127, 127, 0.24)";
