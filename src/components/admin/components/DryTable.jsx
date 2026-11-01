@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Chip, Stack, Typography, Button } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 /**
  * Shared table primitives for the unified admin design system.
@@ -118,7 +119,7 @@ export function DryChip({ label, yes = false, color, ...rest }) {
   return (
     <Chip
       size="small"
-      label={label}
+      label={typeof label === "string" ? t(label) : label}
       {...rest}
       sx={{
         height: 22,
@@ -133,6 +134,7 @@ export function DryChip({ label, yes = false, color, ...rest }) {
 }
 
 export function DryWarningChip({ label = "deletable", ...rest }) {
+  const { t } = useLocale();
   return (
     <Chip
       size="small"
@@ -208,10 +210,11 @@ export function DryCreateButton({ children, onClick, disabled, sx, ...rest }) {
 // Empty state
 // ---------------------------------------------------------------------------
 export function DryEmptyState({ children = "No rows", sx }) {
+  const { t } = useLocale();
   return (
     <Box sx={{ p: 3, textAlign: "center", ...sx }}>
       <Typography variant="caption" color="text.secondary">
-        {children}
+        {typeof children === "string" ? t(children) : children}
       </Typography>
     </Box>
   );
