@@ -222,6 +222,37 @@ test("plan filters use full-width controls on compact screens", () => {
   assert.match(plans, /<FormControl size="small" fullWidth sx=\{\{ minWidth: 0 \}\}>/);
 });
 
+test("admin quick search uses a compact keycap and icons for page results", () => {
+  const topbar = read("src/components/admin/layout/AdminTopBar.jsx");
+
+  assert.match(topbar, /width: 152/);
+  assert.match(topbar, /fontWeight: 500/);
+  assert.match(topbar, /Ctrl\\+K/);
+  assert.match(topbar, /QUICK_NAV_ICONS\\[item\\.id\\]/);
+  assert.match(topbar, /DashboardRoundedIcon/);
+  assert.doesNotMatch(topbar, /item\\.label\\.slice\\(0, 1\\)/);
+});
+
+test("all admin filter groups share a responsive grid and constrained search fields", () => {
+  const styles = read("src/components/admin/admin-console.css");
+  const panels = [
+    "src/components/admin/panels/TicketsPanel.jsx",
+    "src/components/admin/panels/UsersPanel.jsx",
+    "src/components/admin/panels/PlansPanel.jsx",
+    "src/components/admin/panels/docs/DocsPanel.jsx",
+    "src/components/emails/EmailManagement.jsx",
+  ];
+
+  assert.match(styles, /\\.admin-filter-grid/);
+  assert.match(styles, /repeat\\(auto-fit, minmax\\(min\\(100%, 190px\\), 1fr\\)\\)/);
+  for (const path of panels) {
+    assert.match(read(path), /admin-filter-grid/, path + " is missing the shared filter layout");
+  }
+  assert.match(read("src/components/admin/panels/AuthCodesPanel.jsx"), /admin-filter-search/);
+  assert.match(read("src/components/admin/panels/ServicesPanel.jsx"), /admin-filter-search/);
+  assert.match(read("src/components/admin/panels/docs/DocsPanel.jsx"), /admin-filter-search/);
+});
+
 test("admin operational tables use adaptive card layouts on phones and tablets", () => {
   const responsive = read("src/components/admin/components/ResponsiveTable.jsx");
   const tickets = read("src/components/admin/panels/TicketsPanel.jsx");
