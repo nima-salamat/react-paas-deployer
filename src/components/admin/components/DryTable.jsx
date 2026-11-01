@@ -116,6 +116,7 @@ export function DryTd({ children, align = "left", sx, ...rest }) {
 // Chips — sharp corners only
 // ---------------------------------------------------------------------------
 export function DryChip({ label, yes = false, color, ...rest }) {
+  const { t } = useLocale();
   return (
     <Chip
       size="small"
