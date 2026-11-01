@@ -417,6 +417,7 @@ export default function TablesPanel() {
       {activeTable.searchable && (
         <DryPanel sx={{ p: 1.5 }}>
           <TextField
+            className="admin-filter-search"
             size="small"
             placeholder={translate("Search rows…")}
             value={search}
