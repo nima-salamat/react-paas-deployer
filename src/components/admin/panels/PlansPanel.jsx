@@ -170,7 +170,7 @@ export default function PlansPanel() {
     setBusy(true);
     try {
       await apiRequest({ method: "DELETE", url: `${API}/${deleteTarget.id}/` });
-      pushToast(`Plan deleted: ${deleteTarget.name} / ${deleteTarget.platform}`);
+      pushToast(t("Plan deleted") + ": " + deleteTarget.name + " / " + deleteTarget.platform);
       setDeleteTarget(null);
       // If deleting last row of current page, go back a page
       if (list.length === 1 && page > 1) setPage((p) => p - 1);
