@@ -274,6 +274,19 @@ test("Persian admin dashboard covers its navigation, filters, dialogs and dynami
     ["Service created", "سرویس ساخته شد."],
     ["Row deleted:", "ردیف حذف شد:"],
     ["Select or create a document first, then insert media.", "ابتدا یک سند را انتخاب یا ایجاد کنید، سپس رسانه را به آن اضافه کنید."],
+    ["Operational snapshot and live activity", "نمای کلی وضعیت سیستم و فعالیت‌های لحظه‌ای"],
+    ["Support queue and customer conversations", "صف پشتیبانی و گفت‌وگوهای کاربران"],
+    ["Support routing and team structure", "ارجاع درخواست‌های پشتیبانی و ساختار تیم"],
+    ["Accounts, access rules and active sessions", "حساب‌ها، مجوزهای دسترسی و نشست‌های فعال"],
+    ["Runtime status and service administration", "وضعیت Runtime و مدیریت سرویس‌ها"],
+    ["Resource limits, pricing and plan policies", "محدودیت منابع، قیمت‌گذاری و سیاست پلن‌ها"],
+    ["Managed database records and relationships", "رکوردها و ارتباطات مدیریت‌شدهٔ دیتابیس"],
+    ["Authentication and account security settings", "تنظیمات احراز هویت و امنیت حساب"],
+    ["Signup invitation links", "لینک‌های دعوت برای ثبت‌نام"],
+    ["One-time authentication codes", "کدهای یک‌بارمصرف احراز هویت"],
+    ["Email templates and delivery records", "قالب‌های ایمیل و گزارش ارسال"],
+    ["Your admin identity and security", "اطلاعات حساب مدیریتی و امنیت آن"],
+    ["Documentation content and publishing", "محتوای مستندات و انتشار آن"],
   ];
 
   for (const [english, persian] of examples) {
