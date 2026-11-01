@@ -203,7 +203,7 @@ export default function PlansPanel() {
       </Stack>
 
       <Box className="admin-filter-grid" sx={{ mb: 2 }}>
-        <TextField size="small" label="Search name / platform" value={search}
+        <TextField className="admin-filter-search" size="small" label="Search name / platform" value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }} fullWidth
           sx={{ minWidth: 0 }} />
         <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
