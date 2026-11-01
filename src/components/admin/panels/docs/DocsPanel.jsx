@@ -668,7 +668,7 @@ function AssetLibrary({
             />
           </Button>
         </Stack>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1.5 }}>
+        <Box className="admin-filter-grid" sx={{ mt: 1.5 }}>
           <TextField
             size="small"
             fullWidth
@@ -684,7 +684,7 @@ function AssetLibrary({
             }}
             sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0.5 } }}
           />
-          <FormControl size="small" sx={{ minWidth: 140, "& .MuiOutlinedInput-root": { borderRadius: 0.5 } }}>
+          <FormControl size="small" fullWidth sx={{ minWidth: 0, "& .MuiOutlinedInput-root": { borderRadius: 0.5 } }}>
             <InputLabel id="asset-kind-label">Type</InputLabel>
             <Select
               labelId="asset-kind-label"
@@ -699,7 +699,7 @@ function AssetLibrary({
               <MenuItem value="file">Files</MenuItem>
             </Select>
           </FormControl>
-        </Stack>
+        </Box>
       </Box>
       <Divider />
       <Box sx={{ maxHeight: 360, overflow: "auto", p: 1 }}>
@@ -1648,6 +1648,7 @@ export default function DocsPanel() {
                 </Box>
                 <Box sx={{ p: 1, borderBottom: 1, borderColor: "divider" }}>
                   <TextField
+                    className="admin-filter-search"
                     size="small"
                     fullWidth
                     placeholder="Filter articles…"
