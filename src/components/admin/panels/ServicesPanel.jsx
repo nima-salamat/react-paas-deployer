@@ -240,7 +240,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
           network: createNetwork || null,
         },
       });
-      setToast(`Service "${name}" created`);
+      setToast(t("Service created") + ": " + name);
       setCreateOpen(false);
       setSvcPage(1);
       await loadServices();
