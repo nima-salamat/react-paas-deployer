@@ -670,6 +670,7 @@ function AssetLibrary({
         </Stack>
         <Box className="admin-filter-grid" sx={{ mt: 1.5 }}>
           <TextField
+            className="admin-filter-search"
             size="small"
             fullWidth
             placeholder="Search files…"
