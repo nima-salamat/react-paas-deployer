@@ -209,16 +209,16 @@ export default function AdminTopBar({
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                minWidth: 34,
-                height: 20,
-                px: 0.55,
+                minWidth: 32,
+                height: 18,
+                px: 0.45,
                 borderRadius: 1,
                 border: "1px solid",
                 borderColor: "divider",
                 bgcolor: "background.paper",
                 color: "text.secondary",
                 fontFamily: '"Inter", ui-sans-serif, sans-serif',
-                fontSize: 9,
+                fontSize: 8,
                 fontWeight: 700,
                 letterSpacing: 0,
                 lineHeight: 1,
@@ -231,9 +231,9 @@ export default function AdminTopBar({
           }
           sx={{
             display: { xs: "none", lg: "inline-flex" },
-            width: 152,
-            minWidth: 152,
-            maxWidth: 152,
+            width: 190,
+            minWidth: 190,
+            maxWidth: 190,
             height: 35,
             minHeight: 35,
             flexShrink: 0,
@@ -248,16 +248,32 @@ export default function AdminTopBar({
             fontSize: 12,
             fontWeight: 500,
             letterSpacing: 0,
+            overflow: "hidden",
             "& .MuiButton-startIcon": {
               mr: 0.75,
               ml: 0,
+              flexShrink: 0,
               "& svg": { fontSize: 17 },
             },
-            "& .MuiButton-endIcon": { ml: "auto", mr: 0 },
+            "& .MuiButton-endIcon": {
+              ml: "auto",
+              mr: 0,
+              flexShrink: 0,
+            },
             "&:hover": { borderColor: "primary.main", bgcolor: "action.selected" },
           }}
         >
-          {t("Jump to page")}
+          <Box
+            component="span"
+            sx={{
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t("Jump to page")}
+          </Box>
         </Button>
 
         <LanguageSwitcher />

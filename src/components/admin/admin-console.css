@@ -106,23 +106,32 @@
 }
 
 .admin-console .admin-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
-  align-items: start;
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
   width: 100%;
   min-width: 0;
 }
 
 .admin-console .admin-filter-grid > * {
+  box-sizing: border-box;
+  flex: 0 1 168px;
   width: 100%;
-  min-width: 0;
-  max-width: 100%;
+  min-width: min(100%, 136px);
+  max-width: 176px;
 }
 
 .admin-console .admin-filter-grid .MuiFormControl-root {
   width: 100%;
   min-width: 0;
+  max-width: 176px;
+}
+
+.admin-console .admin-filter-grid > .admin-filter-search {
+  flex: 1 1 360px;
+  min-width: min(100%, 280px);
+  max-width: none;
 }
 
 .admin-console .admin-filter-search {

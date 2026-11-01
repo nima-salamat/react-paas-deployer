@@ -224,7 +224,9 @@ test("plan filters use the shared responsive admin filter grid", () => {
 test("admin quick search uses a compact keycap and icons for page results", () => {
   const topbar = read("src/components/admin/layout/AdminTopBar.jsx");
 
-  assert.ok(topbar.includes("width: 152"));
+  assert.ok(topbar.includes("width: 190"));
+  assert.ok(topbar.includes('textOverflow: "ellipsis"'));
+  assert.ok(topbar.includes("flexShrink: 0"));
   assert.ok(topbar.includes("fontWeight: 500"));
   assert.ok(topbar.includes("Ctrl+K"));
   assert.ok(topbar.includes("QUICK_NAV_ICONS[item.id]"));
@@ -242,7 +244,10 @@ test("all admin filter groups share a responsive grid and constrained search fie
   ];
 
   assert.ok(styles.includes(".admin-filter-grid"));
-  assert.ok(styles.includes("repeat(auto-fit, minmax(min(100%, 190px), 1fr))"));
+  assert.match(styles, /\.admin-filter-grid\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*wrap;/s);
+  assert.ok(styles.includes("flex: 0 1 168px;"));
+  assert.ok(styles.includes("flex: 1 1 360px;"));
+  assert.ok(styles.includes("max-width: 176px;"));
   for (const panelPath of panels) {
     assert.ok(read(panelPath).includes("admin-filter-grid"), panelPath + " is missing the shared filter layout");
   }
