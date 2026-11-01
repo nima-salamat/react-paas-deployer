@@ -3893,3 +3893,8 @@ Object.assign(fa, {
   "verify_email": "تأیید ایمیل",
   "verify_phone": "تأیید شماره تلفن",
 });
+
+Object.assign(fa, {
+  "Select or create a document first, then insert media.": "ابتدا یک سند را انتخاب یا ایجاد کنید، سپس رسانه را به آن اضافه کنید."
+});
+
