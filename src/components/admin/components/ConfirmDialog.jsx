@@ -2,6 +2,7 @@ import React from "react";
 import {
   Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
 } from "@mui/material";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 /**
  * Shared confirm dialog for destructive / unusual actions.
@@ -20,6 +21,8 @@ export default function ConfirmDialog({
   onCancel,
   loading = false,
 }) {
+  const { t } = useLocale();
+  const localize = (value) => typeof value === "string" ? t(value) : value;
   return (
     <Dialog
       open={open}
@@ -28,10 +31,10 @@ export default function ConfirmDialog({
       fullWidth
       PaperProps={{ sx: { borderRadius: 2 } }}
     >
-      <DialogTitle sx={{ fontWeight: 800, pb: 0.5 }}>{title}</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 800, pb: 0.5 }}>{localize(title)}</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ color: "text.secondary", fontSize: 14 }}>
-          {message}
+          {localize(message)}
         </DialogContentText>
       </DialogContent>
       <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
@@ -40,7 +43,7 @@ export default function ConfirmDialog({
           disabled={loading}
           sx={{ textTransform: "none", borderRadius: 1 }}
         >
-          {cancelLabel}
+          {localize(cancelLabel)}
         </Button>
         <Button
           variant="contained"
@@ -50,7 +53,7 @@ export default function ConfirmDialog({
           autoFocus
           sx={{ textTransform: "none", borderRadius: 1, fontWeight: 700 }}
         >
-          {loading ? "…" : confirmLabel}
+          {loading ? "…" : localize(confirmLabel)}
         </Button>
       </DialogActions>
     </Dialog>
