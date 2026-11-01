@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { Alert, Snackbar } from "@mui/material";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 const ToastCtx = createContext(null);
 
@@ -11,23 +12,27 @@ const ToastCtx = createContext(null);
  *   pushToast({ severity: "error", message: "Failed" });
  */
 export function ToastProvider({ children }) {
+  const { t } = useLocale();
   const [toast, setToast] = useState(null);
   const timerRef = useRef(null);
 
   const push = useCallback((msgOrObj) => {
-    if (typeof msgOrObj === "string" || React.isValidElement(msgOrObj)) {
+    if (typeof msgOrObj === "string") {
+      setToast({ severity: "success", message: t(msgOrObj) });
+    } else if (React.isValidElement(msgOrObj)) {
       setToast({ severity: "success", message: msgOrObj });
     } else if (msgOrObj && typeof msgOrObj === "object") {
+      const message = msgOrObj.message ?? "";
       setToast({
         severity: msgOrObj.severity || "success",
-        message: msgOrObj.message ?? "",
+        message: typeof message === "string" ? t(message) : message,
       });
     } else {
       return;
     }
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setToast(null), 4500);
-  }, []);
+  }, [t]);
 
   const close = useCallback(() => setToast(null), []);
 
