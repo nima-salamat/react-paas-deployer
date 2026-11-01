@@ -257,7 +257,7 @@ export default function AdminTopBar({
             "&:hover": { borderColor: "primary.main", bgcolor: "action.selected" },
           }}
         >
-          {t("Search pages")}
+          {t("Jump to page")}
         </Button>
 
         <LanguageSwitcher />
