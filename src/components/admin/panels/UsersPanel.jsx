@@ -272,6 +272,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
         <DryPanel sx={{ p: 2 }}>
           <Box className="admin-filter-grid">
             <TextField
+              className="admin-filter-search"
               size="small"
               placeholder="Search username / email"
               value={userSearch}
