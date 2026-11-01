@@ -57,7 +57,7 @@ function statusLabel(status, deletionPending) {
   if (value === "failed") return "Failed";
   if (value === "cancelled") return "Cancelled";
   if (value === "degraded") return "Needs attention";
-  if (value === "stopped") return "Stopped";
+  if (value === "stopped") return "Ready App stopped";
   return "Deploying";
 }
 

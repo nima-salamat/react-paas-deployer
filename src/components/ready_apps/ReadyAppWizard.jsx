@@ -53,7 +53,7 @@ const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replac
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
 const PLANS_ROOT = API_ROOT + "/plans";
 
-const STEPS = ["Configure", "Service plans", "Review", "Install"];
+const STEPS = ["Configure", "Service plans", "Installation overview", "Install"];
 
 function listFrom(data) {
   if (Array.isArray(data)) return data;
