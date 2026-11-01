@@ -220,7 +220,7 @@ export default function PlansPanel() {
           <Select label="Type" value={planType} onChange={(e) => { setPlanType(e.target.value); setPage(1); }}>
             <MenuItem value="">All</MenuItem>
             {PLAN_TYPE_CHOICES.map((p) => (
-              <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>
+              <MenuItem key={p.value} value={p.value}>{t(p.label)}</MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -393,6 +393,7 @@ export default function PlansPanel() {
 
 // ─── Inline table component ─────────────────────────────────────────────────
 function PlansTable({ rows, canManage, onEdit, onDelete }) {
+  const { t } = useLocale();
   if (!rows.length) {
     return (
       <Box sx={{ p: 4, textAlign: "center", border: 1, borderColor: "divider" }}>
@@ -438,7 +439,7 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
                   />
                 </Td>
                 <Td><Typography variant="caption" fontWeight={600}>{r.platform}</Typography></Td>
-                <Td>{r.plan_type}</Td>
+                <Td>{t(({ APP: "Application", DB: "Database", READY: "Ready-made" })[r.plan_type] || r.plan_type)}</Td>
                 <Td align="right">{r.max_cpu}</Td>
                 <Td align="right">{Number(r.max_ram).toLocaleString()} MB</Td>
                 <Td align="right">{r.max_storage} GB</Td>
