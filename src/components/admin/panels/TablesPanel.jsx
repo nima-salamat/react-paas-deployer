@@ -281,7 +281,7 @@ export default function TablesPanel() {
         method: "DELETE",
         url: `${adminTablesApi()}/${activeTable.key}/${deleteTarget.pk}/`,
       });
-      pushToast(`Row deleted: ${deleteTarget.label || deleteTarget.pk}`);
+      pushToast(translate("Row deleted:") + " " + (deleteTarget.label || deleteTarget.pk));
       setDeleteTarget(null);
       if (rows.length === 1 && page > 1) setPage((p) => p - 1);
       else loadRows();
