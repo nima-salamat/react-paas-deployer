@@ -273,6 +273,7 @@ test("Persian admin dashboard covers its navigation, filters, dialogs and dynami
     ["Recent tickets", "تیکت‌های اخیر"],
     ["Service created", "سرویس ساخته شد."],
     ["Row deleted:", "ردیف حذف شد:"],
+    ["Select or create a document first, then insert media.", "ابتدا یک سند را انتخاب یا ایجاد کنید، سپس رسانه را به آن اضافه کنید."],
   ];
 
   for (const [english, persian] of examples) {
