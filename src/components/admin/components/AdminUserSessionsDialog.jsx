@@ -230,7 +230,7 @@ export default function AdminUserSessionsDialog({
                         <Typography variant="caption" color="text.secondary">
                           Created {formatDate(session?.created_at, language)} · {t("Last active")} {formatRelative(session?.last_seen_at, t)} · {t("Expires")} {formatDate(session?.expires_at, language)}
                         </Typography>
-                        {deviceSummary(session).ua && (
+                        {deviceSummary(session, t).ua && (
                           <Tooltip title={deviceSummary(session, t).ua} placement="bottom-start">
                             <Typography variant="caption" color="text.disabled" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {deviceSummary(session, t).ua}
