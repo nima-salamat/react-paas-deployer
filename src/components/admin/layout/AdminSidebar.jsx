@@ -17,6 +17,7 @@ import StorageIcon from "@mui/icons-material/Storage";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import SettingsIcon from "@mui/icons-material/Settings";
 import LogoutIcon from "@mui/icons-material/Logout";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
@@ -49,11 +50,10 @@ export default function AdminSidebar({
   onTabChange,
   liveConnected,
   onLogout,
-  onBackToDeployer: _unused = null,
+  onBackToDeployer,
   collapsed = false,
   onToggleCollapse,
 }) {
-  void _unused;
 
   const nav = useMemo(
     () => NAV_ITEMS.filter((n) => n.id === "profile" || canSeeNav(n.id)),
@@ -321,6 +321,43 @@ export default function AdminSidebar({
       <Divider />
 
       <Box sx={{ p: 1 }}>
+        <Tooltip
+          title={collapsed ? "Back to deployer" : ""}
+          placement="right"
+          disableHoverListener={!collapsed}
+        >
+          <ListItemButton
+            onClick={onBackToDeployer}
+            sx={{
+              borderRadius: 2,
+              color: "text.secondary",
+              justifyContent: collapsed ? "center" : "flex-start",
+              px: collapsed ? 1 : 1.15,
+              py: 0.85,
+              mb: 0.5,
+              "&:hover": {
+                bgcolor: (t) => alpha(t.palette.primary.main, 0.08),
+                color: "text.primary",
+              },
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                minWidth: collapsed ? 0 : 34,
+                color: "inherit",
+                justifyContent: "center",
+              }}
+            >
+              <ArrowBackIcon fontSize="small" />
+            </ListItemIcon>
+            {!collapsed && (
+              <ListItemText
+                primary="Back to deployer"
+                primaryTypographyProps={{ fontSize: 13 }}
+              />
+            )}
+          </ListItemButton>
+        </Tooltip>
         <Tooltip title={collapsed ? "Sign out" : ""} placement="right" disableHoverListener={!collapsed}>
           <ListItemButton
             onClick={onLogout}
