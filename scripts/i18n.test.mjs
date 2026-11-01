@@ -287,17 +287,17 @@ test("Persian admin dashboard covers its navigation, filters, dialogs and dynami
   const toastContext = await readFile(new URL("../src/components/admin/components/ToastContext.jsx", import.meta.url), "utf8");
   const ticketComposer = await readFile(new URL("../src/components/admin/components/AdminTicketComposer.jsx", import.meta.url), "utf8");
 
-  assert.match(responsiveTable, /translateLabel\(col\.label\)/);
+  assert.ok(responsiveTable.includes("translateLabel(col.label)"));
   assert.ok(responsiveTable.includes("TranslatedTextTree>{col.render(row)}</TranslatedTextTree>"));
   const authCodesPanel = await readFile(new URL("../src/components/admin/panels/AuthCodesPanel.jsx", import.meta.url), "utf8");
   assert.ok(authCodesPanel.includes('label={t(code.purpose || "—")}'));
-  assert.match(usersPanel, /t\(group\.group\)/);
-  assert.match(overviewPanel, /accessible\.map\(\(item\) => t\(item\)\)/);
-  assert.match(overviewPanel, /Ticket created/);
-  assert.match(sessionsDialog, /deviceSummary\(session, t\)\.ua/);
-  assert.match(sessionsDialog, /toLocaleString\(language === "fa" \? "fa-IR" : undefined\)/);
-  assert.match(toastContext, /message: t\(msgOrObj\)/);
-  assert.match(ticketComposer, /placeholder=\{t\(placeholder\)\}/);
+  assert.ok(usersPanel.includes("t(group.group)"));
+  assert.ok(overviewPanel.includes("accessible.map((item) => t(item))"));
+  assert.ok(overviewPanel.includes("Ticket created"));
+  assert.ok(sessionsDialog.includes("deviceSummary(session, t).ua"));
+  assert.ok(sessionsDialog.includes('toLocaleString(language === "fa" ? "fa-IR" : undefined)'));
+  assert.ok(toastContext.includes("message: t(msgOrObj)"));
+  assert.ok(ticketComposer.includes("placeholder={t(placeholder)}"));
 });
 
 test("Persian translations keep repeated keys consistent across screens", async () => {
