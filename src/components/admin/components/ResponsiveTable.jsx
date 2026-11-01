@@ -3,6 +3,7 @@ import {
   Box, Paper, Stack, Table, TableBody, TableCell, TableHead, TableRow,
   Typography, useMediaQuery, useTheme,
 } from "@mui/material";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 
 /**
  * ResponsiveTable — desktop: classic MUI table; mobile: stacked card list.
@@ -19,13 +20,15 @@ export default function ResponsiveTable({
   size = "small",
 }) {
   const theme = useTheme();
+  const { t } = useLocale();
+  const translateLabel = (value) => typeof value === "string" ? t(value) : value;
   // Wide datasets become stacked cards on phones and tablets; desktop keeps the table.
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   if (!rows.length) {
     return (
       <Paper className="admin-responsive-row" sx={{ textAlign: "center" }}>
-        <Typography color="text.secondary">{emptyMessage}</Typography>
+        <Typography color="text.secondary">{translateLabel(emptyMessage)}</Typography>
       </Paper>
     );
   }
@@ -69,7 +72,7 @@ export default function ResponsiveTable({
                       gap={1}
                     >
                       <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, pt: 0.25 }}>
-                        {col.label}
+                        {translateLabel(col.label)}
                       </Typography>
                       <Box
                         sx={{ textAlign: "right", minWidth: 0, maxWidth: "68%", overflowWrap: "anywhere" }}
