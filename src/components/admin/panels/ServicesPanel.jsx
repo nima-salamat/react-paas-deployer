@@ -556,7 +556,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
               <MenuItem value=""><em>— select plan —</em></MenuItem>
               {planOptions.map((p) => (
                 <MenuItem key={p.id} value={p.id}>
-                  {p.name} · {p.platform} · {p.type}
+                  {p.name} · {p.platform} · {t(p.type)}
                 </MenuItem>
               ))}
             </TextField>
