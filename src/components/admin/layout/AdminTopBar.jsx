@@ -119,10 +119,11 @@ export default function AdminTopBar({
     >
       <Toolbar
         sx={{
-          gap: { xs: 0.5, sm: 0.9, lg: 1.25 },
+          gap: { xs: 0.35, sm: 0.75, lg: 1.1 },
           px: { xs: 1, sm: 2, lg: 2.5 },
           minHeight: { xs: 58, sm: 64 },
           flexWrap: "nowrap",
+          minWidth: 0,
         }}
       >
         {showMenuButton && (
@@ -131,7 +132,7 @@ export default function AdminTopBar({
           </IconButton>
         )}
 
-        <Box sx={{ minWidth: 0, flex: { xs: 1, sm: 0 } }}>
+        <Box sx={{ minWidth: 0, flex: { xs: "1 1 auto", sm: "0 1 auto" }, flexShrink: 1 }}>
           <Typography variant="subtitle1" fontWeight={800} noWrap sx={{ lineHeight: 1.2 }}>
             {t(title)}
           </Typography>
@@ -144,7 +145,7 @@ export default function AdminTopBar({
           </Typography>
         </Box>
 
-        <Box sx={{ flexGrow: 1, minWidth: { xs: 0, sm: 1 } }} />
+        <Box sx={{ flex: "1 1 0", minWidth: { xs: 0, sm: 4 }, display: { xs: "none", sm: "block" } }} />
 
         <Tooltip title={t("Search admin pages (Ctrl+K)")}>
           <IconButton
@@ -155,7 +156,7 @@ export default function AdminTopBar({
             aria-label={t("Search admin pages")}
             size="small"
             sx={{
-              display: { xs: "inline-flex", md: "none" },
+              display: { xs: "inline-flex", lg: "none" },
               width: 36,
               height: 36,
               flexShrink: 0,
@@ -193,8 +194,9 @@ export default function AdminTopBar({
             </Box>
           }
           sx={{
-            display: { xs: "none", md: "inline-flex" },
-            minWidth: 190,
+            display: { xs: "none", lg: "inline-flex" },
+            minWidth: { lg: 144, xl: 190 },
+            flexShrink: 1,
             justifyContent: "flex-start",
             px: 1.25,
             minHeight: 38,
@@ -229,8 +231,11 @@ export default function AdminTopBar({
           startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
           onClick={onBackToDeployer}
           sx={{
-            display: { xs: "none", md: "inline-flex" },
-            borderRadius: 1,
+            display: "inline-flex",
+            minWidth: { xs: 36, sm: "auto" },
+            px: { xs: 0.5, sm: 1.25 },
+            flexShrink: 0,
+            borderRadius: 1.5,
             textTransform: "none",
             fontWeight: 600,
             borderColor: "divider",
@@ -239,9 +244,13 @@ export default function AdminTopBar({
               borderColor: "primary.main",
               bgcolor: (t) => alpha(t.palette.primary.main, 0.04),
             },
+            "& .MuiButton-startIcon": { mr: { xs: 0, sm: 1 } },
           }}
+          aria-label="Back to Deployer"
         >
-          Deployer
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+            {t("Back to deployer")}
+          </Box>
         </Button>
 
         <Tooltip title={liveConnected ? "WebSocket connected" : "Realtime offline"}>
@@ -256,7 +265,7 @@ export default function AdminTopBar({
             label={liveConnected ? "Live" : "Offline"}
             sx={{
               mr: 0.25,
-              display: { xs: "none", md: "inline-flex" },
+              display: { xs: "none", lg: "inline-flex" },
               borderRadius: 1,
               height: 26,
               fontWeight: 600,
@@ -266,7 +275,17 @@ export default function AdminTopBar({
 
         {/* Notifications */}
         <Tooltip title={muted ? "Notifications muted" : "Notifications"}>
-          <IconButton onClick={(e) => setNotifAnchor(e.currentTarget)} size="small">
+          <IconButton
+            onClick={(e) => setNotifAnchor(e.currentTarget)}
+            size="small"
+            aria-label="Notifications"
+            sx={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              borderRadius: 1.5,
+            }}
+          >
             {muted ? (
               <NotificationsOffIcon fontSize="small" />
             ) : (
@@ -489,7 +508,7 @@ export default function AdminTopBar({
             }}
           >
             <ArrowBackIcon fontSize="small" sx={{ mr: 1.5 }} />
-            Back to deployer
+            {t("Back to deployer")}
           </MenuItem>
           <Divider />
           <MenuItem
