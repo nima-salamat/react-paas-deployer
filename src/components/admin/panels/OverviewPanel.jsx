@@ -219,7 +219,11 @@ export default function OverviewPanel({
                 {liveEvents.map((ev, i) => (
                   <Paper key={i} variant="outlined" sx={{ p: 1.25, borderColor: (t) => alpha(resolveThemeColor(t, "primary.main"), 0.15) }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
-                      <Chip size="small" label={ev.type} sx={{ height: 20, fontSize: 11 }} />
+                      <Chip
+                        size="small"
+                        label={t(({ "ticket.created": "Ticket created", "ticket.message": "Ticket reply" })[ev.type] || ev.type)}
+                        sx={{ height: 20, fontSize: 11 }}
+                      />
                       {ev.public_id && (
                         <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
                           {ev.public_id}
