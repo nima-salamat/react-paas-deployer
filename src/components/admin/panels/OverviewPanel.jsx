@@ -4,6 +4,12 @@ import {
   Box, Chip, Grid, Paper, Stack, Typography, Divider, alpha, useTheme,
 } from "@mui/material";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
+import SupportAgentRoundedIcon from "@mui/icons-material/SupportAgentRounded";
+import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
+import TimelapseRoundedIcon from "@mui/icons-material/TimelapseRounded";
+import HourglassBottomRoundedIcon from "@mui/icons-material/HourglassBottomRounded";
+import PriorityHighRoundedIcon from "@mui/icons-material/PriorityHighRounded";
+import PersonOffRoundedIcon from "@mui/icons-material/PersonOffRounded";
 import {
   hasAnyRule, hasRule, getSessionRules, isSessionSuperuser,
   resolveThemeColor,
@@ -47,22 +53,60 @@ export default function OverviewPanel({
 
   return (    <TranslatedTextTree>
 
-    <Stack spacing={2.5}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
-        <Box>
-          <Typography variant="h5" fontWeight={800}>Overview</Typography>
-          <Typography variant="body2" color="text.secondary">
-            Welcome back, <strong>{me?.username || "Admin"}</strong> — here's what's happening.
-          </Typography>
-        </Box>
-        <Chip
-          size="small"
-          icon={<FiberManualRecordIcon sx={{ fontSize: 12 }} />}
-          label={liveConnected ? "Realtime connected" : "Realtime offline"}
-          color={liveConnected ? "success" : "default"}
-          variant="outlined"
-        />
-      </Stack>
+    <Stack spacing={3}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: { xs: 2, sm: 2.75, md: 3.25 },
+          borderRadius: 3,
+          overflow: "hidden",
+          position: "relative",
+          background: (t) =>
+            `linear-gradient(118deg, ${alpha(t.palette.primary.main, 0.13)} 0%, ${alpha(t.palette.background.paper, 0.98)} 62%, ${alpha(t.palette.info.main, 0.07)} 100%)`,
+          borderColor: (t) => alpha(t.palette.primary.main, 0.18),
+          "&::after": {
+            content: '""',
+            position: "absolute",
+            width: 220,
+            height: 220,
+            borderRadius: "50%",
+            right: -85,
+            top: -120,
+            background: (t) => alpha(t.palette.primary.main, 0.07),
+            pointerEvents: "none",
+          },
+        }}
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          justifyContent="space-between"
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          gap={2}
+          sx={{ position: "relative", zIndex: 1 }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Chip size="small" label="ADMIN WORKSPACE" variant="outlined" sx={{ mb: 1.1, fontWeight: 800, letterSpacing: 0.7 }} />
+            <Typography
+              variant="h4"
+              fontWeight={900}
+              sx={{ fontSize: "clamp(1.65rem, 3vw, 2.4rem)", letterSpacing: "-0.045em", lineHeight: 1.12 }}
+            >
+              Welcome back, {me?.username || "Admin"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+              Your operational overview, access and live support activity in one place.
+            </Typography>
+          </Box>
+          <Chip
+            size="medium"
+            icon={<FiberManualRecordIcon sx={{ fontSize: 12 }} />}
+            label={liveConnected ? "Realtime connected" : "Realtime offline"}
+            color={liveConnected ? "success" : "default"}
+            variant="outlined"
+            sx={{ flexShrink: 0, fontWeight: 700, bgcolor: "background.paper" }}
+          />
+        </Stack>
+      </Paper>
 
       {/* Identity card — always shown */}
       <Paper variant="outlined" sx={{ p: 2.5 }}>
@@ -103,15 +147,15 @@ export default function OverviewPanel({
       {canTickets && stats && (
         <Grid container spacing={2}>
           {[
-            { label: "Total", value: stats.total, color: "primary.main" },
-            { label: "Open", value: stats.open, color: "info.main" },
-            { label: "In Progress", value: stats.in_progress, color: "warning.main" },
-            { label: "Waiting", value: stats.waiting_user, color: "secondary.main" },
-            { label: "Urgent", value: stats.urgent, color: "error.main" },
-            { label: "Unassigned", value: stats.unassigned, color: "text.primary" },
+            { label: "Total", value: stats.total, color: "primary.main", icon: <SupportAgentRoundedIcon /> },
+            { label: "Open", value: stats.open, color: "info.main", icon: <LockOpenRoundedIcon /> },
+            { label: "In Progress", value: stats.in_progress, color: "warning.main", icon: <TimelapseRoundedIcon /> },
+            { label: "Waiting", value: stats.waiting_user, color: "secondary.main", icon: <HourglassBottomRoundedIcon /> },
+            { label: "Urgent", value: stats.urgent, color: "error.main", icon: <PriorityHighRoundedIcon /> },
+            { label: "Unassigned", value: stats.unassigned, color: "text.primary", icon: <PersonOffRoundedIcon /> },
           ].map((s) => (
-            <Grid key={s.label} size={{ xs: 6, sm: 4, md: 2 }}>
-              <StatCard label={s.label} value={s.value} color={s.color} />
+            <Grid key={s.label} size={{ xs: 6, sm: 4, md: 3, lg: 2 }}>
+              <StatCard label={s.label} value={s.value} color={s.color} icon={s.icon} />
             </Grid>
           ))}
         </Grid>

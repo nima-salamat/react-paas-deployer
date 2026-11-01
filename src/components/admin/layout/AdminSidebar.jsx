@@ -83,13 +83,15 @@ export default function AdminSidebar({
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.paper",
-        borderRight: 1,
-        borderColor: "divider",
+        backgroundImage: (t) =>
+          `linear-gradient(180deg, ${alpha(t.palette.primary.main, 0.055)} 0%, transparent 32%)`,
+        borderRight: "1px solid",
+        borderColor: (t) => alpha(t.palette.divider, 0.8),
         overflow: "hidden",
       }}
     >
       {/* Brand only — no collapse button here */}
-      <Box sx={{ px: collapsed ? 1 : 1.75, pt: 1.75, pb: 1.25 }}>
+      <Box sx={{ px: collapsed ? 1 : 2, pt: 2, pb: 1.5 }}>
         <Stack direction="row" alignItems="center" gap={1} justifyContent={collapsed ? "center" : "flex-start"}>
           <Avatar
             src={avatarSrc || undefined}
@@ -100,7 +102,7 @@ export default function AdminSidebar({
               fontWeight: 800,
               fontSize: 14,
               flexShrink: 0,
-              borderRadius: 1.25,
+              borderRadius: 2,
             }}
           >
             {initial}
@@ -108,8 +110,16 @@ export default function AdminSidebar({
 
           {!collapsed && (
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography fontWeight={800} fontSize={13.5} noWrap>
+              <Typography fontWeight={850} fontSize={13.5} noWrap>
                 {me?.username || "Admin"}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+                sx={{ display: "block", fontSize: 10.5, mt: 0.1 }}
+              >
+                Admin workspace
               </Typography>
               <Stack direction="row" alignItems="center" gap={0.4}>
                 <FiberManualRecordIcon
@@ -170,8 +180,8 @@ export default function AdminSidebar({
       <List
         dense
         sx={{
-          px: collapsed ? 0.75 : 1,
-          py: 1,
+          px: collapsed ? 0.75 : 1.25,
+          py: 1.25,
           flex: 1,
           overflowY: "auto",
           overflowX: "hidden",
@@ -186,10 +196,10 @@ export default function AdminSidebar({
               <ListItemButton
                 onClick={onToggleCollapse}
                 sx={{
-                  borderRadius: 1.25,
+                  borderRadius: 2,
                   px: collapsed ? 1 : 1.15,
-                  py: 0.85,
-                  minHeight: 38,
+                  py: 0.95,
+                  minHeight: 42,
                   justifyContent: collapsed ? "center" : "flex-start",
                   color: "text.secondary",
                   border: 1,
@@ -237,14 +247,14 @@ export default function AdminSidebar({
                   selected={selected}
                   onClick={() => onTabChange(n.id)}
                   sx={{
-                    borderRadius: 1.25,
+                    borderRadius: 2,
                     px: collapsed ? 1 : 1.15,
-                    py: 0.85,
-                    minHeight: 38,
+                    py: 0.95,
+                    minHeight: 44,
                     justifyContent: collapsed ? "center" : "flex-start",
                     position: "relative",
                     "&.Mui-selected": {
-                      bgcolor: (t) => alpha(t.palette.primary.main, 0.09),
+                      bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
                       "&::before": {
                         content: '""',
                         position: "absolute",
@@ -262,7 +272,7 @@ export default function AdminSidebar({
                       },
                     },
                     "&:hover": {
-                      bgcolor: (t) => alpha(t.palette.primary.main, 0.05),
+                      bgcolor: (t) => alpha(t.palette.primary.main, 0.075),
                     },
                   }}
                 >
@@ -315,7 +325,7 @@ export default function AdminSidebar({
           <ListItemButton
             onClick={onLogout}
             sx={{
-              borderRadius: 1.25,
+              borderRadius: 2,
               color: "error.main",
               justifyContent: collapsed ? "center" : "flex-start",
               px: collapsed ? 1 : 1.15,

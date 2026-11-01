@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import "./admin-console.css";
 import TranslatedTextTree from "../../i18n/TranslatedTextTree.jsx";
 import {
   Box, CircularProgress, Drawer, Stack, Typography,
@@ -46,6 +47,22 @@ const PAGE_TITLES = {
   emails: "Email",
   profile: "My profile",
   docs: "Documentation",
+};
+
+const PAGE_DESCRIPTIONS = {
+  overview: "Operational snapshot and live activity",
+  tickets: "Support queue and customer conversations",
+  departments: "Support routing and team structure",
+  users: "Accounts, access rules and active sessions",
+  services: "Runtime status and service administration",
+  plans: "Resource limits, pricing and plan policies",
+  tables: "Managed database records and relationships",
+  login: "Authentication and account security settings",
+  invites: "Signup invitation links",
+  codes: "One-time authentication codes",
+  emails: "Email templates and delivery records",
+  profile: "Your admin identity and security",
+  docs: "Documentation content and publishing",
 };
 
 /** Alt+key → tab id */
@@ -306,7 +323,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
     );
   }
 
-  const sidebar = (
+  const renderSidebar = (collapsed = sidebarCollapsed) => (
     <AdminSidebar
       me={effectiveMe}
       tab={tab}
@@ -314,14 +331,32 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
       liveConnected={liveConnected}
       onLogout={requestLogout}
       onBackToDeployer={backToDeployer}
-      collapsed={sidebarCollapsed}
+      collapsed={collapsed}
       onToggleCollapse={toggleSidebar}
     />
   );
 
+  const quickNavItems = Object.entries(PAGE_TITLES)
+    .filter(([id]) => id === "profile" || canSeeNav(id))
+    .map(([id, label]) => ({
+      id,
+      label,
+      description: PAGE_DESCRIPTIONS[id] || "Admin workspace",
+    }));
+
   return (    <TranslatedTextTree>
 
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box
+      className="admin-console"
+      sx={{
+        display: "flex",
+        width: "100%",
+        minHeight: "100dvh",
+        bgcolor: "background.default",
+        backgroundImage: (t) =>
+          `radial-gradient(ellipse at 0% 0%, ${alpha(t.palette.primary.main, 0.065)} 0%, transparent 36%), radial-gradient(ellipse at 100% 0%, ${alpha(t.palette.info.main, 0.045)} 0%, transparent 30%)`,
+      }}
+    >
       {isDesktop && (
         <Box
           component="nav"
@@ -336,7 +371,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
             zIndex: 10,
           }}
         >
-          {sidebar}
+          {renderSidebar()}
         </Box>
       )}
 
@@ -344,9 +379,16 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
         ModalProps={{ keepMounted: true }}
-        PaperProps={{ sx: { width: DRAWER_W } }}
+        PaperProps={{
+          sx: {
+            width: "min(88vw, 328px)",
+            maxWidth: 360,
+            border: 0,
+            boxShadow: "0 24px 70px rgba(15, 23, 42, 0.22)",
+          },
+        }}
       >
-        {sidebar}
+        {renderSidebar(false)}
       </Drawer>
 
       <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
@@ -359,6 +401,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
           onBackToDeployer={backToDeployer}
           onLogout={requestLogout}
           onNavigate={setTabAndUrl}
+          navItems={quickNavItems}
           notifications={notifications}
           unreadCount={unreadCount}
           onMarkAllRead={markAllRead}
@@ -368,8 +411,10 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
 
         <Box
           component="main"
-          sx={{ flex: 1, p: { xs: 1.5, sm: 2.5, md: 3 }, minWidth: 0 }}
+          className="admin-console-main"
+          sx={{ flex: 1, minWidth: 0, width: "100%" }}
         >
+          <Box className="admin-console-content">
           {tab === "overview" && (
             <OverviewPanel
               me={effectiveMe}
@@ -448,6 +493,7 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
           {tab === "login" && canSeeNav("login") && <LoginSettingsPanel />}
           {tab === "tables" && canSeeNav("tables") && <TablesPanel />}
           {tab === "docs" && canSeeNav("docs") && <DocsPanel />}
+          </Box>
         </Box>
       </Box>
 

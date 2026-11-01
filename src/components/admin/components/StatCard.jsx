@@ -17,10 +17,13 @@ export default function StatCard({ label, value, color, icon }) {
     <Paper
       variant="outlined"
       sx={{
-        p: 2,
+        p: { xs: 1.5, sm: 2 },
+        minHeight: { xs: 112, sm: 128 },
         height: "100%",
-        background: `linear-gradient(135deg, ${alpha(c, 0.06)} 0%, ${theme.palette.background.paper} 100%)`,
-        borderColor: alpha(c, 0.18),
+        borderRadius: 2.5,
+        background: `linear-gradient(135deg, ${alpha(c, 0.09)} 0%, ${theme.palette.background.paper} 78%)`,
+        borderColor: alpha(c, 0.2),
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.035)",
         transition: "transform .15s ease, box-shadow .15s ease",
         "&:hover": {
           transform: "translateY(-2px)",
@@ -30,21 +33,32 @@ export default function StatCard({ label, value, color, icon }) {
     >
       <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
         <Box>
-          <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1, lineHeight: 1 }}>
+          <Typography
+            variant="overline"
+            color="text.secondary"
+            sx={{ letterSpacing: 0.8, lineHeight: 1.2, fontWeight: 800, fontSize: 10.5 }}
+          >
             {label}
           </Typography>
-          <Typography variant="h4" fontWeight={800} sx={{ mt: 0.5, color: color || "text.primary" }}>
+          <Typography
+            variant="h4"
+            fontWeight={900}
+            sx={{ mt: 0.75, color: color || "text.primary", fontSize: "clamp(1.55rem, 2.5vw, 2.05rem)", lineHeight: 1 }}
+          >
             {value ?? "—"}
           </Typography>
         </Box>
         {icon && (
           <Box
             sx={{
-              width: 40, height: 40,
-              display: "grid", placeItems: "center",
-              bgcolor: alpha(c, 0.12),
+              width: { xs: 34, sm: 42 },
+              height: { xs: 34, sm: 42 },
+              display: "grid",
+              placeItems: "center",
+              bgcolor: alpha(c, 0.13),
               color: color || "primary.main",
-              borderRadius: 1.5,
+              borderRadius: 2,
+              "& svg": { fontSize: { xs: 18, sm: 21 } },
             }}
           >
             {icon}

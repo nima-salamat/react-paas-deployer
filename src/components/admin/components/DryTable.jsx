@@ -3,13 +3,9 @@ import { Box, Chip, Stack, Typography, Button } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 
 /**
- * DryTable — shared hard-edge table primitives for the admin panel.
- *
- * Design philosophy (locked-in by the project's "no curves" requirement):
- *   - Every surface has borderRadius: 0
- *   - Borders are thin gray hairlines (no shadows)
- *   - No gradients, no glassmorphism, no rounded chips
- *   - Typography is compact, uppercase headers, monospace for IDs
+ * Shared table primitives for the unified admin design system.
+ * Surfaces use soft radii, quiet borders and restrained depth while keeping
+ * dense tabular data readable and horizontally scrollable on smaller screens.
  *
  * Exports:
  *   - DRY_BORDER / DRY_BORDER_LIGHT  — shared border constants
@@ -22,8 +18,8 @@ import AddIcon from "@mui/icons-material/Add";
  *   - DryToolbar                       — sharp-cornered table toolbar
  */
 
-export const DRY_BORDER = "1px solid rgba(127, 127, 127, 0.35)";
-export const DRY_BORDER_LIGHT = "1px solid rgba(127, 127, 127, 0.18)";
+export const DRY_BORDER = "1px solid rgba(127, 127, 127, 0.24)";
+export const DRY_BORDER_LIGHT = "1px solid rgba(127, 127, 127, 0.14)";
 
 // ---------------------------------------------------------------------------
 // Surfaces
@@ -32,11 +28,13 @@ export function DryPanel({ sx, children, ...rest }) {
   return (
     <Box
       {...rest}
+      className={["admin-surface", rest.className].filter(Boolean).join(" ")}
       sx={{
         bgcolor: "background.paper",
         border: DRY_BORDER,
-        borderRadius: 0,
-        boxShadow: "none",
+        borderRadius: 2.5,
+        boxShadow: "0 8px 26px rgba(15, 23, 42, 0.035)",
+        transition: "border-color 160ms ease, box-shadow 160ms ease",
         ...sx,
       }}
     >
@@ -49,12 +47,13 @@ export function DryInfoBanner({ children, color = "info.main", icon: Icon, sx, .
   return (
     <Box
       {...rest}
+      className={["admin-info-banner", rest.className].filter(Boolean).join(" ")}
       sx={{
         p: 1.5,
         border: DRY_BORDER,
         borderLeft: `4px solid ${color}`,
         bgcolor: "action.hover",
-        borderRadius: 0,
+        borderRadius: 2,
         ...sx,
       }}
     >
@@ -122,11 +121,11 @@ export function DryChip({ label, yes = false, color, ...rest }) {
       label={label}
       {...rest}
       sx={{
-        height: 18,
-        fontSize: 10,
+        height: 22,
+        fontSize: 10.5,
         bgcolor: yes ? "success.main" : (color || "action.hover"),
         color: yes ? "#fff" : "text.secondary",
-        borderRadius: 0,
+        borderRadius: 1.25,
         border: DRY_BORDER_LIGHT,
       }}
     />
@@ -140,11 +139,11 @@ export function DryWarningChip({ label = "deletable", ...rest }) {
       label={label}
       {...rest}
       sx={{
-        height: 18,
-        fontSize: 10,
+        height: 22,
+        fontSize: 10.5,
         bgcolor: "warning.main",
         color: "#fff",
-        borderRadius: 0,
+        borderRadius: 1.25,
         border: DRY_BORDER_LIGHT,
       }}
     />
@@ -157,7 +156,7 @@ export const dryChipSx = (yes) => ({
   fontSize: 10,
   bgcolor: yes ? "success.main" : "action.hover",
   color: yes ? "#fff" : "text.secondary",
-  borderRadius: 0,
+  borderRadius: 1.25,
   border: DRY_BORDER_LIGHT,
 });
 
@@ -166,7 +165,7 @@ export const dryWarningChipSx = {
   fontSize: 10,
   bgcolor: "warning.main",
   color: "#fff",
-  borderRadius: 0,
+  borderRadius: 1.25,
   border: DRY_BORDER_LIGHT,
 };
 
@@ -188,9 +187,10 @@ export function DryCreateButton({ children, onClick, disabled, sx, ...rest }) {
       disabled={disabled}
       {...rest}
       sx={{
-        borderRadius: 0,
+        borderRadius: 1.5,
         textTransform: "none",
-        fontWeight: 700,
+        fontWeight: 750,
+        minHeight: 36,
         border: DRY_BORDER,
         "&:hover": {
           border: DRY_BORDER,
@@ -231,7 +231,7 @@ export function DryToolbar({ children, sx, ...rest }) {
         p: 1,
         borderBottom: DRY_BORDER_LIGHT,
         bgcolor: "action.hover",
-        borderRadius: 0,
+        borderRadius: 1.25,
         ...sx,
       }}
     >

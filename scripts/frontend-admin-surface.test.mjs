@@ -171,6 +171,34 @@ test("Admin permission strings used in admin UI belong to the fallback catalog",
   );
 });
 
+test("admin console applies a shared responsive design system to every panel", () => {
+  const dashboard = read("src/components/admin/AdminDashboard.jsx");
+  const styles = read("src/components/admin/admin-console.css");
+  const dryTable = read("src/components/admin/components/DryTable.jsx");
+
+  assert.match(dashboard, /admin-console-main/);
+  assert.match(dashboard, /admin-console-content/);
+  assert.match(dashboard, /navItems=\{quickNavItems\}/);
+  assert.match(dashboard, /renderSidebar\(false\)/);
+  assert.match(styles, /container-type:\s*inline-size/);
+  assert.match(styles, /clamp\(/);
+  assert.match(styles, /max-width:\s*599\.98px/);
+  assert.match(styles, /MuiTableContainer-root/);
+  assert.match(dryTable, /admin-surface/);
+  assert.match(dryTable, /borderRadius:\s*2\.5/);
+});
+
+test("admin topbar includes keyboard-driven, permission-filtered quick navigation", () => {
+  const topbar = read("src/components/admin/layout/AdminTopBar.jsx");
+  const dashboard = read("src/components/admin/AdminDashboard.jsx");
+
+  assert.match(topbar, /Ctrl\+K/);
+  assert.match(topbar, /metaKey/);
+  assert.match(topbar, /filteredNavItems/);
+  assert.match(topbar, /openAdminPage/);
+  assert.match(dashboard, /filter\(\(\[id\]\) => id === "profile" \|\| canSeeNav\(id\)\)/);
+});
+
 test("credential-bearing admin API hooks stay behind apiRequest", () => {
   const helpers = [
     "src/components/security/sessionApi.js",

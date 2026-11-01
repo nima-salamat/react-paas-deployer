@@ -23,7 +23,7 @@ export default function ResponsiveTable({
 
   if (!rows.length) {
     return (
-      <Paper sx={{ p: 3, textAlign: "center" }}>
+      <Paper sx={{ p: { xs: 2, sm: 3 }, textAlign: "center", borderRadius: 2.5 }}>
         <Typography color="text.secondary">{emptyMessage}</Typography>
       </Paper>
     );
@@ -40,7 +40,8 @@ export default function ResponsiveTable({
               key={key}
               variant="outlined"
               sx={{
-                p: 1.5,
+                p: { xs: 1.25, sm: 1.5 },
+                borderRadius: 2,
                 cursor: onRowClick ? "pointer" : "default",
                 "&:active": onRowClick ? { bgcolor: "action.selected" } : undefined,
               }}
@@ -81,7 +82,7 @@ export default function ResponsiveTable({
   }
 
   return (
-    <Paper sx={{ overflow: "auto" }}>
+    <Paper sx={{ overflowX: "auto", overflowY: "hidden", width: "100%", maxWidth: "100%", borderRadius: 2.5 }}>
       <Table size={size} sx={{ minWidth }}>
         <TableHead>
           <TableRow>

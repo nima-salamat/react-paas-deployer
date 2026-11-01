@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
 import {
-  AppBar, Avatar, Badge, Box, Button, Chip, Divider, FormControlLabel,
-  IconButton, List, ListItem, ListItemText, Menu, MenuItem, Popover,
-  Stack, Switch, Toolbar, Tooltip, Typography, alpha,
+  AppBar, Avatar, Badge, Box, Button, Chip, Dialog, DialogContent,
+  DialogTitle, Divider, FormControlLabel, IconButton, InputAdornment, List,
+  ListItem, ListItemButton, ListItemText, Menu, MenuItem, Popover, Stack,
+  Switch, TextField, Toolbar, Tooltip, Typography, alpha,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import SearchRoundedIcon from "@mui/icons-material/Search";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import NotificationsOffIcon from "@mui/icons-material/NotificationsOff";
@@ -36,6 +39,7 @@ export default function AdminTopBar({
   onBackToDeployer,
   onLogout,
   onNavigate,
+  navItems = [],
   notifications = [],
   onMarkAllRead,
   unreadCount = 0,
@@ -45,6 +49,8 @@ export default function AdminTopBar({
   const { t } = useLocale();
   const [profileMenu, setProfileMenu] = useState(null);
   const [notifAnchor, setNotifAnchor] = useState(null);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
   const [muted, setMuted] = useState(() => {
     try {
       return localStorage.getItem("admin_notifications_muted") === "1";
@@ -58,6 +64,30 @@ export default function AdminTopBar({
       localStorage.setItem("admin_notifications_muted", muted ? "1" : "0");
     } catch { /* */ }
   }, [muted]);
+
+  useEffect(() => {
+    const handleCommandShortcut = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen((open) => !open);
+        setCommandQuery("");
+      }
+    };
+    window.addEventListener("keydown", handleCommandShortcut);
+    return () => window.removeEventListener("keydown", handleCommandShortcut);
+  }, []);
+
+  const filteredNavItems = navItems.filter((item) => {
+    const query = commandQuery.trim().toLocaleLowerCase();
+    if (!query) return true;
+    return `${item.label} ${item.description || ""}`.toLocaleLowerCase().includes(query);
+  });
+
+  const openAdminPage = (id) => {
+    setCommandOpen(false);
+    setCommandQuery("");
+    onNavigate?.(id);
+  };
 
   const isSuper = isSessionSuperuser();
   const isStaff = isSessionStaff();
@@ -87,7 +117,14 @@ export default function AdminTopBar({
         backdropFilter: "blur(10px)",
       }}
     >
-      <Toolbar sx={{ gap: 1.25, px: { xs: 1.25, sm: 2 }, minHeight: { xs: 56, sm: 60 } }}>
+      <Toolbar
+        sx={{
+          gap: { xs: 0.5, sm: 0.9, lg: 1.25 },
+          px: { xs: 1, sm: 2, lg: 2.5 },
+          minHeight: { xs: 58, sm: 64 },
+          flexWrap: "nowrap",
+        }}
+      >
         {showMenuButton && (
           <IconButton onClick={onMenuClick} aria-label="open navigation" size="small">
             <MenuIcon />
@@ -107,7 +144,74 @@ export default function AdminTopBar({
           </Typography>
         </Box>
 
-        <Box sx={{ flexGrow: 1 }} />
+        <Box sx={{ flexGrow: 1, minWidth: { xs: 0, sm: 1 } }} />
+
+        <Tooltip title={t("Search admin pages (Ctrl+K)")}>
+          <IconButton
+            onClick={() => {
+              setCommandOpen(true);
+              setCommandQuery("");
+            }}
+            aria-label={t("Search admin pages")}
+            size="small"
+            sx={{
+              display: { xs: "inline-flex", md: "none" },
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
+          >
+            <SearchRoundedIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Button
+          onClick={() => {
+            setCommandOpen(true);
+            setCommandQuery("");
+          }}
+          startIcon={<SearchRoundedIcon />}
+          endIcon={
+            <Box
+              component="kbd"
+              sx={{
+                px: 0.65,
+                py: 0.2,
+                borderRadius: 0.75,
+                border: 1,
+                borderColor: "divider",
+                bgcolor: "action.hover",
+                color: "text.secondary",
+                fontFamily: "inherit",
+                fontSize: 10,
+                lineHeight: 1.3,
+              }}
+            >
+              Ctrl K
+            </Box>
+          }
+          sx={{
+            display: { xs: "none", md: "inline-flex" },
+            minWidth: 190,
+            justifyContent: "flex-start",
+            px: 1.25,
+            minHeight: 38,
+            borderRadius: 2,
+            border: 1,
+            borderColor: "divider",
+            color: "text.secondary",
+            bgcolor: "action.hover",
+            textTransform: "none",
+            fontWeight: 600,
+            "& .MuiButton-startIcon": { mr: 1 },
+            "& .MuiButton-endIcon": { ml: "auto" },
+            "&:hover": { borderColor: "primary.main", bgcolor: "action.selected" },
+          }}
+        >
+          {t("Jump to page")}
+        </Button>
 
         <LanguageSwitcher />
         <ThemeMenuButton
@@ -125,7 +229,7 @@ export default function AdminTopBar({
           startIcon={<ArrowBackIcon sx={{ fontSize: 16 }} />}
           onClick={onBackToDeployer}
           sx={{
-            display: { xs: "none", sm: "inline-flex" },
+            display: { xs: "none", md: "inline-flex" },
             borderRadius: 1,
             textTransform: "none",
             fontWeight: 600,
@@ -399,6 +503,102 @@ export default function AdminTopBar({
             Sign out
           </MenuItem>
         </Menu>
+
+        <Dialog
+          open={commandOpen}
+          onClose={() => setCommandOpen(false)}
+          fullWidth
+          maxWidth="sm"
+          slotProps={{
+            paper: {
+              sx: {
+                mt: { xs: 0, sm: 5 },
+                alignSelf: { xs: "stretch", sm: "flex-start" },
+                borderRadius: { xs: 0, sm: 3 },
+                overflow: "hidden",
+                border: 1,
+                borderColor: "divider",
+                boxShadow: "0 28px 90px rgba(2, 8, 23, 0.28)",
+              },
+            },
+          }}
+        >
+          <DialogTitle sx={{ px: { xs: 2, sm: 2.5 }, pt: 2.25, pb: 1 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+              <Box>
+                <Typography fontWeight={850}>{t("Quick navigation")}</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {t("Find an admin section without leaving your keyboard")}
+                </Typography>
+              </Box>
+              <Chip size="small" label="ESC" variant="outlined" sx={{ fontFamily: "monospace" }} />
+            </Stack>
+          </DialogTitle>
+          <DialogContent sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              size="medium"
+              placeholder={t("Search pages and tools…")}
+              value={commandQuery}
+              onChange={(event) => setCommandQuery(event.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRoundedIcon color="action" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2.25 } }}
+            />
+            <Stack spacing={0.5} sx={{ mt: 1.25, maxHeight: "min(52vh, 440px)", overflowY: "auto" }}>
+              {filteredNavItems.length ? filteredNavItems.map((item) => (
+                <ListItemButton
+                  key={item.id}
+                  onClick={() => openAdminPage(item.id)}
+                  sx={{
+                    borderRadius: 2,
+                    px: 1.25,
+                    py: 1,
+                    minHeight: 58,
+                    gap: 1.25,
+                    "&:hover": { bgcolor: "action.hover" },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 1.5,
+                      flexShrink: 0,
+                      display: "grid",
+                      placeItems: "center",
+                      bgcolor: (t) => alpha(t.palette.primary.main, 0.1),
+                      color: "primary.main",
+                      fontWeight: 850,
+                    }}
+                  >
+                    {item.label.slice(0, 1)}
+                  </Box>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Typography fontWeight={750} fontSize={13.5}>{t(item.label)}</Typography>
+                    <Typography variant="caption" color="text.secondary" noWrap>
+                      {t(item.description || "Open this admin section")}
+                    </Typography>
+                  </Box>
+                  <ArrowForwardRoundedIcon fontSize="small" color="disabled" />
+                </ListItemButton>
+              )) : (
+                <Box sx={{ py: 4, textAlign: "center" }}>
+                  <Typography fontWeight={700}>{t("No matching admin pages")}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {t("Try another page name or keyword")}
+                  </Typography>
+                </Box>
+              )}
+            </Stack>
+          </DialogContent>
+        </Dialog>
       </Toolbar>
     </AppBar>
     </TranslatedTextTree>

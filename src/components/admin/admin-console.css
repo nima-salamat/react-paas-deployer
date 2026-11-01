@@ -1,0 +1,178 @@
+/* Unified admin workspace layout and responsive design tokens. */
+.admin-console {
+  position: relative;
+  isolation: isolate;
+  overflow-x: clip;
+  min-width: 0;
+}
+
+.admin-console-main {
+  box-sizing: border-box;
+  padding: clamp(14px, 2.15vw, 34px) clamp(12px, 2.35vw, 38px) clamp(28px, 3vw, 48px);
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-console-content {
+  width: min(100%, 1780px);
+  min-width: 0;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(18px, 1.8vw, 28px);
+  container-type: inline-size;
+}
+
+.admin-console-content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-console-content .MuiPaper-root,
+.admin-console-content .admin-surface {
+  border-radius: 18px;
+  border-color: rgba(127, 143, 166, 0.23);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.045);
+}
+
+.admin-console-content .MuiPaper-root .MuiPaper-root {
+  box-shadow: none;
+}
+
+.admin-console-content .MuiTypography-h4,
+.admin-console-content .MuiTypography-h5,
+.admin-console-content .MuiTypography-h6 {
+  letter-spacing: -0.025em;
+}
+
+.admin-console-content .MuiButton-root {
+  min-height: 36px;
+  border-radius: 11px;
+  text-transform: none;
+  font-weight: 700;
+}
+
+.admin-console-content .MuiIconButton-root {
+  border-radius: 11px;
+}
+
+.admin-console-content .MuiChip-root {
+  border-radius: 9px;
+  font-weight: 650;
+}
+
+.admin-console-content .MuiOutlinedInput-root {
+  border-radius: 12px;
+}
+
+.admin-console-content .MuiAlert-root {
+  border-radius: 14px;
+}
+
+.admin-console-content .MuiTableContainer-root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 15px;
+}
+
+.admin-console-content .MuiTable-root {
+  width: 100%;
+}
+
+.admin-console-content .MuiTableCell-head {
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+  color: inherit;
+}
+
+.admin-console-content .MuiTableCell-root {
+  border-color: rgba(127, 143, 166, 0.16);
+}
+
+.admin-console-content .MuiTableRow-root {
+  transition: background-color 140ms ease;
+}
+
+.admin-console-content .MuiPagination-ul {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.admin-console-content .admin-info-banner {
+  border-radius: 14px;
+}
+
+.admin-console-content .admin-surface {
+  overflow: hidden;
+}
+
+@media (min-width: 1600px) {
+  .admin-console-main {
+    padding-inline: clamp(36px, 3vw, 60px);
+  }
+}
+
+@media (max-width: 1199.98px) {
+  .admin-console-content {
+    gap: 20px;
+  }
+}
+
+@media (max-width: 899.98px) {
+  .admin-console-main {
+    padding-top: 18px;
+  }
+
+  .admin-console-content .MuiTableContainer-root {
+    border-radius: 13px;
+  }
+}
+
+@media (max-width: 599.98px) {
+  .admin-console-main {
+    padding: 13px 10px 28px;
+  }
+
+  .admin-console-content {
+    gap: 16px;
+  }
+
+  .admin-console-content .MuiPaper-root,
+  .admin-console-content .admin-surface {
+    border-radius: 14px;
+  }
+
+  .admin-console-content .MuiTableCell-root {
+    padding: 9px 10px;
+  }
+
+  .admin-console-content .MuiTableCell-head {
+    font-size: 0.68rem;
+  }
+
+  .admin-console-content .MuiDialogContent-root {
+    padding-inline: 14px;
+  }
+
+  .admin-console-content .MuiPagination-ul {
+    justify-content: center;
+  }
+
+  .admin-console-content .MuiButton-root {
+    max-width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-console-content *,
+  .admin-console-content *::before,
+  .admin-console-content *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
