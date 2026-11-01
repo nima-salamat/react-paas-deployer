@@ -249,6 +249,51 @@ test("Persian interface uses familiar and consistent developer terminology", () 
   assert.equal(translateText("Volume", "en-us"), "Volume");
 });
 
+test("Persian admin dashboard covers its navigation, filters, dialogs and dynamic feedback", async () => {
+  const examples = [
+    ["Search admin pages", "جستجو در بخش‌های ادمین"],
+    ["Jump to page", "رفتن به بخش موردنظر"],
+    ["Search pages and tools…", "جستجوی بخش‌ها و ابزارها…"],
+    ["No matching admin pages", "بخشی با این مشخصات پیدا نشد."],
+    ["Account type", "نوع حساب"],
+    ["Account status", "وضعیت حساب"],
+    ["User updated", "اطلاعات کاربر ذخیره شد."],
+    ["Department created", "دپارتمان ساخته شد."],
+    ["Name and platform are required", "نام و پلتفرم را وارد کنید."],
+    ["Plan created", "پلن ساخته شد."],
+    ["Login settings saved", "تنظیمات ورود ذخیره شد."],
+    ["Identifiers", "شناسه‌های ورود"],
+    ["Authentication factors", "روش‌های احراز هویت"],
+    ["OTP settings", "تنظیمات رمز یک‌بارمصرف"],
+    ["Write a staff reply…", "پاسخ خود را برای کاربر بنویسید…"],
+    ["This user has no active authentication sessions.", "این کاربر در حال حاضر نشست فعالی ندارد."],
+    ["Last active", "آخرین فعالیت"],
+    ["Revoke all sessions", "لغو همهٔ نشست‌ها"],
+    ["Realtime connected", "اتصال لحظه‌ای برقرار است"],
+    ["Recent tickets", "تیکت‌های اخیر"],
+    ["Service created", "سرویس ساخته شد."],
+    ["Row deleted:", "ردیف حذف شد:"],
+  ];
+
+  for (const [english, persian] of examples) {
+    assert.equal(translateText(english, "fa"), persian, "Missing or incorrect Persian admin copy: " + english);
+  }
+
+  const responsiveTable = await readFile(new URL("../src/components/admin/components/ResponsiveTable.jsx", import.meta.url), "utf8");
+  const usersPanel = await readFile(new URL("../src/components/admin/panels/UsersPanel.jsx", import.meta.url), "utf8");
+  const overviewPanel = await readFile(new URL("../src/components/admin/panels/OverviewPanel.jsx", import.meta.url), "utf8");
+  const sessionsDialog = await readFile(new URL("../src/components/admin/components/AdminUserSessionsDialog.jsx", import.meta.url), "utf8");
+  const toastContext = await readFile(new URL("../src/components/admin/components/ToastContext.jsx", import.meta.url), "utf8");
+  const ticketComposer = await readFile(new URL("../src/components/admin/components/AdminTicketComposer.jsx", import.meta.url), "utf8");
+
+  assert.match(responsiveTable, /translateLabel\(col\.label\)/);
+  assert.match(usersPanel, /t\(group\.group\)/);
+  assert.match(overviewPanel, /accessible\.map\(\(item\) => t\(item\)\)/);
+  assert.match(sessionsDialog, /toLocaleString\(language === "fa" \? "fa-IR" : undefined\)/);
+  assert.match(toastContext, /message: t\(msgOrObj\)/);
+  assert.match(ticketComposer, /placeholder=\{t\(placeholder\)\}/);
+});
+
 test("Persian translations keep repeated keys consistent across screens", async () => {
   const messages = await readFile(new URL("../src/i18n/messages.js", import.meta.url), "utf8");
   const valuesByKey = new Map();
