@@ -311,6 +311,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
       {/* Search — responsive data surface */}
       <DryPanel sx={{ p: 2 }}>
         <TextField
+          className="admin-filter-search"
           size="small"
           placeholder="Search by service name or owner username…"
           value={svcSearch}
