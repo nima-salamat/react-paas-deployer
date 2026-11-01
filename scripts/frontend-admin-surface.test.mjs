@@ -213,26 +213,24 @@ test("admin topbar and sidebar preserve back navigation and notifications at nar
   assert.match(topbar, /display: "inline-flex"[\s\S]*?minWidth: \{ xs: 36, sm: "auto" \}/);
 });
 
-test("plan filters use full-width controls on compact screens", () => {
+test("plan filters use the shared responsive admin filter grid", () => {
   const plans = read("src/components/admin/panels/PlansPanel.jsx");
 
-  assert.match(plans, /gridTemplateColumns:[\s\S]*?xs: "minmax\(0, 1fr\)"/);
-  assert.match(plans, /<InputLabel>Platform<\/InputLabel>/);
-  assert.match(plans, /<InputLabel>Type<\/InputLabel>/);
-  assert.match(plans, /<FormControl size="small" fullWidth sx=\{\{ minWidth: 0 \}\}>/);
+  assert.ok(plans.includes('className="admin-filter-grid"'));
+  assert.ok(plans.includes("<InputLabel>Platform</InputLabel>"));
+  assert.ok(plans.includes("<InputLabel>Type</InputLabel>"));
+  assert.ok(plans.includes('fullWidth sx={{ minWidth: 0 }}'));
 });
-
 test("admin quick search uses a compact keycap and icons for page results", () => {
   const topbar = read("src/components/admin/layout/AdminTopBar.jsx");
 
-  assert.match(topbar, /width: 152/);
-  assert.match(topbar, /fontWeight: 500/);
-  assert.match(topbar, /Ctrl\\+K/);
-  assert.match(topbar, /QUICK_NAV_ICONS\\[item\\.id\\]/);
-  assert.match(topbar, /DashboardRoundedIcon/);
-  assert.doesNotMatch(topbar, /item\\.label\\.slice\\(0, 1\\)/);
+  assert.ok(topbar.includes("width: 152"));
+  assert.ok(topbar.includes("fontWeight: 500"));
+  assert.ok(topbar.includes("Ctrl+K"));
+  assert.ok(topbar.includes("QUICK_NAV_ICONS[item.id]"));
+  assert.ok(topbar.includes("DashboardRoundedIcon"));
+  assert.equal(topbar.includes("item.label.slice(0, 1)"), false);
 });
-
 test("all admin filter groups share a responsive grid and constrained search fields", () => {
   const styles = read("src/components/admin/admin-console.css");
   const panels = [
@@ -243,16 +241,15 @@ test("all admin filter groups share a responsive grid and constrained search fie
     "src/components/emails/EmailManagement.jsx",
   ];
 
-  assert.match(styles, /\\.admin-filter-grid/);
-  assert.match(styles, /repeat\\(auto-fit, minmax\\(min\\(100%, 190px\\), 1fr\\)\\)/);
+  assert.ok(styles.includes(".admin-filter-grid"));
+  assert.ok(styles.includes("repeat(auto-fit, minmax(min(100%, 190px), 1fr))"));
   for (const path of panels) {
-    assert.match(read(path), /admin-filter-grid/, path + " is missing the shared filter layout");
+    assert.ok(read(path).includes("admin-filter-grid"), path + " is missing the shared filter layout");
   }
-  assert.match(read("src/components/admin/panels/AuthCodesPanel.jsx"), /admin-filter-search/);
-  assert.match(read("src/components/admin/panels/ServicesPanel.jsx"), /admin-filter-search/);
-  assert.match(read("src/components/admin/panels/docs/DocsPanel.jsx"), /admin-filter-search/);
+  assert.ok(read("src/components/admin/panels/AuthCodesPanel.jsx").includes("admin-filter-search"));
+  assert.ok(read("src/components/admin/panels/ServicesPanel.jsx").includes("admin-filter-search"));
+  assert.ok(read("src/components/admin/panels/docs/DocsPanel.jsx").includes("admin-filter-search"));
 });
-
 test("admin operational tables use adaptive card layouts on phones and tablets", () => {
   const responsive = read("src/components/admin/components/ResponsiveTable.jsx");
   const tickets = read("src/components/admin/panels/TicketsPanel.jsx");
