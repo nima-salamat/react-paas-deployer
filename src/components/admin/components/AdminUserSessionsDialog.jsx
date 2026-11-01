@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Alert,
   Box,
@@ -30,26 +31,26 @@ import {
   revokeAdminUserSession,
 } from "../../security/sessionApi";
 
-function formatDate(value) {
+function formatDate(value, language) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(language === "fa" ? "fa-IR" : undefined);
 }
 
-function formatRelative(value) {
+function formatRelative(value, t) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 45) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  return `${Math.floor(seconds / 86400)}d ago`;
+  if (seconds < 45) return t("just now");
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} ${t("minutes ago")}`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} ${t("hours ago")}`;
+  return `${Math.floor(seconds / 86400)} ${t("days ago")}`;
 }
 
-function titleFor(session) {
+function titleFor(session, t) {
   const device = session?.device || {};
-  return device.name || [device.browser, device.os].filter(Boolean).join(" on ") || device.client || "Web browser";
+  return device.name || [device.browser, device.os].filter(Boolean).join(" on ") || device.client || t("Web browser");
 }
 
 function DeviceIcon({ type }) {
@@ -58,7 +59,7 @@ function DeviceIcon({ type }) {
   return <ComputerOutlinedIcon />;
 }
 
-function deviceSummary(session) {
+function deviceSummary(session, t) {
   const device = session?.device || {};
   const browser = [device.browser, device.browser_version].filter(Boolean).join(" ");
   const os = [device.os, device.os_version].filter(Boolean).join(" ");
@@ -66,12 +67,12 @@ function deviceSummary(session) {
   const meta = device.client_metadata || {};
   const location = device.ip || device.last_ip || "";
   return {
-    primary: [browser, os, model].filter(Boolean).join(" · ") || device.client || "Browser session",
+    primary: [browser, os, model].filter(Boolean).join(" · ") || device.client || t("Browser session"),
     secondary: [
       location ? `IP ${location}` : "",
       meta.timezone || "",
       meta.locale || "",
-    ].filter(Boolean).join(" · ") || "Network details unavailable",
+    ].filter(Boolean).join(" · ") || t("Network details unavailable"),
     ua: device.user_agent || "",
   };
 }
@@ -83,6 +84,7 @@ export default function AdminUserSessionsDialog({
   onClose,
   onToast,
 }) {
+  const { t, language } = useLocale();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [actionId, setActionId] = useState(null);
@@ -98,7 +100,7 @@ export default function AdminUserSessionsDialog({
       setError(
         err?.response?.data?.message ||
         err?.response?.data?.detail ||
-        "Could not load user sessions."
+        t("Could not load user sessions.")
       );
     } finally {
       setLoading(false);
@@ -115,18 +117,18 @@ export default function AdminUserSessionsDialog({
 
   const revoke = async (session) => {
     if (!canManage || !user?.id || !session?.id) return;
-    if (!window.confirm(`Revoke the ${titleFor(session)} session?`)) return;
+    if (!window.confirm(t("Revoke this session?"))) return;
     setActionId(session.id);
     setError("");
     try {
       await revokeAdminUserSession(user.id, session.id);
-      onToast?.("Session revoked");
+      onToast?.(t("Session revoked"));
       await load();
     } catch (err) {
       setError(
         err?.response?.data?.message ||
         err?.response?.data?.detail ||
-        "Could not revoke the session."
+        t("Could not revoke the session.")
       );
     } finally {
       setActionId(null);
@@ -135,18 +137,18 @@ export default function AdminUserSessionsDialog({
 
   const revokeAll = async () => {
     if (!canManage || !user?.id) return;
-    if (!window.confirm(`Revoke all active sessions for @${user.username}?`)) return;
+    if (!window.confirm(t("Revoke all active sessions for this user?"))) return;
     setActionId("__all__");
     setError("");
     try {
       const result = await logoutAllAdminUserSessions(user.id);
-      onToast?.(`${Number(result?.revoked || 0)} session(s) revoked`);
+      onToast?.(t("Sessions revoked") + ": " + Number(result?.revoked || 0));
       await load();
     } catch (err) {
       setError(
         err?.response?.data?.message ||
         err?.response?.data?.detail ||
-        "Could not revoke all sessions."
+        t("Could not revoke all sessions.")
       );
     } finally {
       setActionId(null);
@@ -171,9 +173,9 @@ export default function AdminUserSessionsDialog({
       <DialogContent dividers>
         <Stack spacing={1.5}>
           <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Chip size="small" label={`${Number(data?.active_count || 0)} active`} />
+            <Chip size="small" label={`${Number(data?.active_count || 0)} ${t("active")}`} />
             {data?.max_active_sessions != null && (
-              <Chip size="small" variant="outlined" label={`Limit ${data.max_active_sessions}`} />
+              <Chip size="small" variant="outlined" label={`${t("Limit")} ${data.max_active_sessions}`} />
             )}
             <Box sx={{ flex: 1 }} />
             <Button
@@ -211,7 +213,7 @@ export default function AdminUserSessionsDialog({
                         disabled={actionId === session.id || actionId === "__all__"}
                         sx={{ textTransform: "none" }}
                       >
-                        {actionId === session.id ? "Revoking…" : "Revoke"}
+                        {t(actionId === session.id ? "Revoking…" : "Revoke")}
                       </Button>
                     ) : null
                   }
@@ -220,18 +222,18 @@ export default function AdminUserSessionsDialog({
                     <DeviceIcon type={session?.device?.device_type} />
                   </ListItemIcon>
                   <ListItemText
-                    primary={<Typography fontWeight={700} pr={10}>{titleFor(session)}</Typography>}
+                    primary={<Typography fontWeight={700} pr={10}>{titleFor(session, t)}</Typography>}
                     secondary={
                       <Stack spacing={0.35} sx={{ mt: 0.35, pr: 8 }}>
-                        <Typography variant="caption" color="text.secondary">{deviceSummary(session).primary}</Typography>
-                        <Typography variant="caption" color="text.secondary">{deviceSummary(session).secondary}</Typography>
+                        <Typography variant="caption" color="text.secondary">{deviceSummary(session, t).primary}</Typography>
+                        <Typography variant="caption" color="text.secondary">{deviceSummary(session, t).secondary}</Typography>
                         <Typography variant="caption" color="text.secondary">
-                          Created {formatDate(session?.created_at)} · Last active {formatRelative(session?.last_seen_at)} · Expires {formatDate(session?.expires_at)}
+                          Created {formatDate(session?.created_at, language)} · {t("Last active")} {formatRelative(session?.last_seen_at, t)} · {t("Expires")} {formatDate(session?.expires_at, language)}
                         </Typography>
                         {deviceSummary(session).ua && (
-                          <Tooltip title={deviceSummary(session).ua} placement="bottom-start">
+                          <Tooltip title={deviceSummary(session, t).ua} placement="bottom-start">
                             <Typography variant="caption" color="text.disabled" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {deviceSummary(session).ua}
+                              {deviceSummary(session, t).ua}
                             </Typography>
                           </Tooltip>
                         )}
@@ -242,12 +244,12 @@ export default function AdminUserSessionsDialog({
               ))}
             </List>
           ) : (
-            <Alert severity="info">This user has no active authentication sessions.</Alert>
+            <Alert severity="info">{t("This user has no active authentication sessions.")}</Alert>
           )}
 
           {!canManage && (
             <Alert severity="info">
-              You have session view permission only. Grant <code>auth_sessions.manage</code> for revoke controls.
+              {t("You have session view permission only.")} <code>auth_sessions.manage</code> {t("to enable revoke controls.")}
             </Alert>
           )}
         </Stack>
@@ -263,7 +265,7 @@ export default function AdminUserSessionsDialog({
             disabled={actionId != null}
             sx={{ textTransform: "none", fontWeight: 700 }}
           >
-            Revoke all sessions
+            {t("Revoke all sessions")}
           </Button>
         )}
       </DialogActions>
