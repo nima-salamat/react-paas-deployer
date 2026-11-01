@@ -202,6 +202,7 @@ export default function DryResizableTable({
                       bottom: 0,
                       width: RESIZE_HANDLE_WIDTH,
                       cursor: "col-resize",
+                      touchAction: "none",
                       bgcolor: isActive
                         ? "primary.main"
                         : "transparent",

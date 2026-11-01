@@ -145,7 +145,7 @@ export default function OverviewPanel({
 
       {/* Ticket stats — only with tickets.view */}
       {canTickets && stats && (
-        <Grid container spacing={2}>
+        <Grid container spacing={2} className="admin-kpi-grid">
           {[
             { label: "Total", value: stats.total, color: "primary.main", icon: <SupportAgentRoundedIcon /> },
             { label: "Open", value: stats.open, color: "info.main", icon: <LockOpenRoundedIcon /> },
@@ -161,7 +161,7 @@ export default function OverviewPanel({
         </Grid>
       )}
 
-      <Grid container spacing={2}>
+      <Grid container spacing={2} className="admin-dashboard-columns">
         {canTickets && (
           <Grid size={{ xs: 12, md: 7 }}>
             <Paper variant="outlined" sx={{ p: 2 }}>
