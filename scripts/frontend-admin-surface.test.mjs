@@ -237,6 +237,7 @@ test("all admin filter groups share a responsive grid and constrained search fie
     "src/components/admin/panels/TicketsPanel.jsx",
     "src/components/admin/panels/UsersPanel.jsx",
     "src/components/admin/panels/PlansPanel.jsx",
+    "src/components/admin/panels/TablesPanel.jsx",
     "src/components/admin/panels/docs/DocsPanel.jsx",
     "src/components/emails/EmailManagement.jsx",
   ];
@@ -246,8 +247,16 @@ test("all admin filter groups share a responsive grid and constrained search fie
   for (const path of panels) {
     assert.ok(read(path).includes("admin-filter-grid"), path + " is missing the shared filter layout");
   }
-  assert.ok(read("src/components/admin/panels/AuthCodesPanel.jsx").includes("admin-filter-search"));
-  assert.ok(read("src/components/admin/panels/ServicesPanel.jsx").includes("admin-filter-search"));
+  for (const path of [
+    "src/components/admin/panels/TicketsPanel.jsx",
+    "src/components/admin/panels/UsersPanel.jsx",
+    "src/components/admin/panels/PlansPanel.jsx",
+    "src/components/admin/panels/TablesPanel.jsx",
+    "src/components/admin/panels/AuthCodesPanel.jsx",
+    "src/components/admin/panels/ServicesPanel.jsx",
+  ]) {
+    assert.ok(read(path).includes("admin-filter-search"), path + " is missing shared search sizing");
+  }
   assert.ok(read("src/components/admin/panels/docs/DocsPanel.jsx").includes("admin-filter-search"));
 });
 test("admin operational tables use adaptive card layouts on phones and tablets", () => {
