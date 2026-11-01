@@ -1,5 +1,6 @@
 import React from "react";
 import { Box, Chip, IconButton, Stack, Tooltip } from "@mui/material";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import SendIcon from "@mui/icons-material/Send";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import CloseIcon from "@mui/icons-material/Close";
@@ -18,6 +19,7 @@ export default function AdminTicketComposer({
   disabled = false,
   placeholder = "Write a staff reply…",
 }) {
+  const { t } = useLocale();
   const canSend =
     !disabled &&
     !sending &&
@@ -61,9 +63,9 @@ export default function AdminTicketComposer({
       )}
 
       <Stack direction="row" alignItems="flex-end" gap={0.5}>
-        <Tooltip title="Attach files">
+        <Tooltip title={t("Attach files")}>
           <span>
-            <IconButton size="medium" aria-label="Attach files" component="label" disabled={disabled || sending} sx={{ mb: 0.25 }}>
+            <IconButton size="medium" aria-label={t("Attach files")} component="label" disabled={disabled || sending} sx={{ mb: 0.25 }}>
               <AttachFileIcon />
               <input hidden type="file" multiple onChange={handleAttach} />
             </IconButton>
@@ -73,7 +75,7 @@ export default function AdminTicketComposer({
         <SimpleHtmlEditor
           value={value}
           onChange={onChange}
-          placeholder={placeholder}
+          placeholder={t(placeholder)}
           minHeight={48}
           maxHeight={180}
           compact
@@ -81,11 +83,11 @@ export default function AdminTicketComposer({
           disabled={disabled || sending}
         />
 
-        <Tooltip title="Send reply">
+        <Tooltip title={t("Send reply")}>
           <span>
             <IconButton
               color="primary"
-              aria-label="Send reply"
+              aria-label={t("Send reply")}
               disabled={!canSend}
               onClick={() => onSend?.(value)}
               size="medium"
