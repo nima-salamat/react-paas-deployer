@@ -345,10 +345,17 @@ export default function EmailManagement() {
 
       {(tab === "logs" || tab === "failed") && (
         <>
-          <Stack direction={{ xs: "column", sm: "row" }} gap={2} mb={2}>
-            <TextField size="small" label="Search" value={logSearch} onChange={(e) => { setLogSearch(e.target.value); setLogPage(1); }} />
+          <Box className="admin-filter-grid" sx={{ mb: 2 }}>
+            <TextField
+              className="admin-filter-search"
+              size="small"
+              fullWidth
+              label="Search"
+              value={logSearch}
+              onChange={(e) => { setLogSearch(e.target.value); setLogPage(1); }}
+            />
             {tab === "logs" && (
-              <FormControl size="small" sx={{ minWidth: 120 }}>
+              <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
                 <InputLabel>Status</InputLabel>
                 <Select label="Status" value={logStatus} onChange={(e) => { setLogStatus(e.target.value); setLogPage(1); }}>
                   <MenuItem value="">All</MenuItem>
@@ -359,7 +366,7 @@ export default function EmailManagement() {
                 </Select>
               </FormControl>
             )}
-          </Stack>
+          </Box>
           {loading ? <CircularProgress /> : (
             <Paper>
               <Table size="small">
