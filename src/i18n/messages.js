@@ -3705,6 +3705,7 @@ Object.assign(fa, {
 
 // Ready Apps install wizard and Agent setup prompt UX.
 Object.assign(fa, {
+  "Database tables": "جدول‌های پایگاه داده",
   "Service plans": "پلن سرویس‌ها",
   "Install": "نصب",
   "Step": "مرحله",
