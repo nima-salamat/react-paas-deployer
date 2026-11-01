@@ -105,6 +105,32 @@
   max-width: 100%;
 }
 
+.admin-console .admin-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  align-items: start;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-console .admin-filter-grid > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-console .admin-filter-grid .MuiFormControl-root {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-console .admin-filter-search {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .admin-console-content .MuiAlert-root {
   border-radius: 14px !important;
 }
