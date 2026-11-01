@@ -270,7 +270,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
         <>
         {/* Filter card */}
         <DryPanel sx={{ p: 2 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} gap={2}>
+          <Box className="admin-filter-grid">
             <TextField
               size="small"
               placeholder="Search username / email"
@@ -281,21 +281,21 @@ export default function UsersPanel({ setToast: setToastProp }) {
                 startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: "text.secondary" }} />,
               }}
             />
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <Select value={userStaffOnly} onChange={(e) => { setUserStaffOnly(e.target.value); setUserPage(1); }}>
+            <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
+              <Select aria-label="Account type" value={userStaffOnly} onChange={(e) => { setUserStaffOnly(e.target.value); setUserPage(1); }}>
                 <MenuItem value="">All types</MenuItem>
                 <MenuItem value="1">Staff</MenuItem>
                 <MenuItem value="0">Users</MenuItem>
               </Select>
             </FormControl>
-            <FormControl size="small" sx={{ minWidth: 130 }}>
-              <Select value={userActive} onChange={(e) => { setUserActive(e.target.value); setUserPage(1); }}>
+            <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
+              <Select aria-label="Account status" value={userActive} onChange={(e) => { setUserActive(e.target.value); setUserPage(1); }}>
                 <MenuItem value="">Any status</MenuItem>
                 <MenuItem value="1">Active</MenuItem>
                 <MenuItem value="0">Inactive</MenuItem>
               </Select>
             </FormControl>
-          </Stack>
+          </Box>
         </DryPanel>
 
         {/* Table */}
