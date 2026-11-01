@@ -455,7 +455,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 1.5,
+            gap: { xs: 2.5, sm: 3, lg: 1.5 },
             minHeight: { xs: 64, sm: 72 },
           }}
         >
@@ -593,7 +593,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
             })}
           </Stack>
 
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
             <LanguageSwitcher />
             <ThemeMenuButton
               themeMode={themeMode}
