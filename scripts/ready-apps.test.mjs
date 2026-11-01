@@ -129,5 +129,5 @@ testFn("Ready App detail shows child plans and statuses without a duplicate aggr
   assert.match(detail, /status === "degraded"/);
   assert.match(detail, /status === "stopped"/);
   assert.match(list, /Needs attention/);
-  assert.match(list, /Stopped/);
+  assert.match(list, /Ready App stopped/);
 });
