@@ -199,9 +199,13 @@ test("admin topbar includes keyboard-driven, permission-filtered quick navigatio
   assert.match(dashboard, /filter\(\(\[id\]\) => id === "profile" \|\| canSeeNav\(id\)\)/);
 });
 
-test("admin topbar preserves back navigation and notifications at narrow widths", () => {
+test("admin topbar and sidebar preserve back navigation and notifications at narrow widths", () => {
   const topbar = read("src/components/admin/layout/AdminTopBar.jsx");
+  const sidebar = read("src/components/admin/layout/AdminSidebar.jsx");
 
+  assert.match(sidebar, /onBackToDeployer/);
+  assert.match(sidebar, /ArrowBackIcon/);
+  assert.match(sidebar, /Back to deployer/);
   assert.match(topbar, /Back to Deployer/);
   assert.match(topbar, /Notifications/);
   assert.match(topbar, /aria-label="Notifications"/);
