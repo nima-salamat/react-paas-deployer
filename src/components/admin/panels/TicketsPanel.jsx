@@ -68,7 +68,7 @@ export default function TicketsPanel({
       </Stack>
 
       <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1.5 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} gap={2} flexWrap="wrap" useFlexGap>
+        <Box className="admin-filter-grid">
           <TextField
             size="small"
             label="Search subject / number"
@@ -131,7 +131,7 @@ export default function TicketsPanel({
               <MenuItem value="unassigned">Unassigned</MenuItem>
             </Select>
           </FormControl>
-        </Stack>
+        </Box>
       </Box>
 
       <ResponsiveTable
