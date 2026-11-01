@@ -3876,3 +3876,20 @@ Object.assign(fa, {
 Object.assign(fa, {
   "Row deleted:": "ردیف حذف شد:"
 });
+
+Object.assign(fa, {
+  "Ticket created": "تیکت جدید ثبت شد",
+  "Ticket reply": "پاسخ جدید برای تیکت ثبت شد",
+  "ticket.created": "ایجاد تیکت",
+  "ticket.message": "پیام تیکت",
+  "created": "ایجادشده",
+  "password_reset": "بازیابی رمز عبور",
+  "password_recovery": "بازیابی رمز عبور",
+  "username_recovery": "بازیابی نام کاربری",
+  "signup": "ثبت‌نام",
+  "login": "ورود",
+  "email_verification": "تأیید ایمیل",
+  "phone_verification": "تأیید شماره تلفن",
+  "verify_email": "تأیید ایمیل",
+  "verify_phone": "تأیید شماره تلفن",
+});
