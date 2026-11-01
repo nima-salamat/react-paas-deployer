@@ -238,7 +238,9 @@ test("Ready App cleanup only redirects while its detail route is still active", 
   assert.match(source, /useLocation/);
   assert.match(source, /useLayoutEffect\(\(\) => \{\s*locationPathRef\.current = location\.pathname/);
   assert.match(source, /location\.pathname !== installationPath/);
-  assert.match(source, /locationPathRef\.current === installationPath\) navigate/);
+  assert.match(source, /const shouldNavigateAfterDelete =\s*locationPathRef\.current === installationPath/);
+  assert.match(source, /shouldNavigate && locationPathRef\.current === installationPath/);
+  assert.match(source, /cleanupDeleteNavigateRef\.current = false/);
 });
 
 test("Home Ready Apps uses authentic local brand marks and keeps mobile copy visible", () => {
