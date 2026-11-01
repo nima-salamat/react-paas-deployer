@@ -3871,3 +3871,8 @@ Object.assign(fa, {
   "Failed to load plans": "بارگذاری پلن‌ها انجام نشد.",
   "Plan saved": "پلن ذخیره شد.",
 });
+
+
+Object.assign(fa, {
+  "Row deleted:": "ردیف حذف شد:"
+});
