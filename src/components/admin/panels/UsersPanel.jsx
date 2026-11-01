@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Alert, Box, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControl, FormControlLabel,
@@ -61,6 +62,7 @@ function adminApiErrorMessage(error, fallback) {
 }
 
 export default function UsersPanel({ setToast: setToastProp }) {
+  const { t } = useLocale();
   const pushToast = useToast();
   const setToast = setToastProp || pushToast;
   const [users, setUsers] = useState([]);
@@ -525,7 +527,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
                   <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, maxHeight: 320, overflow: "auto" }}>
                     <Stack gap={1.5}>
                       {grouped.map((group) => (
-                        <Box key={group.group}>
+                        <Box key={t(group.group)}>
                           <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1 }}>
                             {group.group}
                           </Typography>
