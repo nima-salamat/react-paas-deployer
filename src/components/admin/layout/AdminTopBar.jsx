@@ -17,10 +17,38 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import MarkChatReadIcon from "@mui/icons-material/MarkChatRead";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import PeopleIcon from "@mui/icons-material/People";
+import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
+import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
+import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
+import StorageOutlinedIcon from "@mui/icons-material/StorageOutlined";
+import TableChartOutlinedIcon from "@mui/icons-material/TableChartOutlined";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import LinkOutlinedIcon from "@mui/icons-material/LinkOutlined";
+import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import { isSessionSuperuser, isSessionStaff, authMediaSrc } from "../adminUtils";
 import ThemeMenuButton from "../../layout/ThemeMenuButton.jsx";
 import LanguageSwitcher from "../../layout/LanguageSwitcher.jsx";
 import { useLocale } from "../../../i18n/LocaleProvider.jsx";
+
+const QUICK_NAV_ICONS = {
+  overview: <DashboardRoundedIcon fontSize="small" />,
+  tickets: <ConfirmationNumberOutlinedIcon fontSize="small" />,
+  departments: <AccountTreeOutlinedIcon fontSize="small" />,
+  users: <PeopleAltOutlinedIcon fontSize="small" />,
+  services: <DnsOutlinedIcon fontSize="small" />,
+  plans: <StorageOutlinedIcon fontSize="small" />,
+  tables: <TableChartOutlinedIcon fontSize="small" />,
+  docs: <MenuBookOutlinedIcon fontSize="small" />,
+  login: <SettingsOutlinedIcon fontSize="small" />,
+  invites: <LinkOutlinedIcon fontSize="small" />,
+  codes: <VpnKeyOutlinedIcon fontSize="small" />,
+  emails: <EmailOutlinedIcon fontSize="small" />,
+  profile: <PersonOutlineIcon fontSize="small" />,
+};
 
 /**
  * AdminTopBar — sticky header.
@@ -178,41 +206,58 @@ export default function AdminTopBar({
             <Box
               component="kbd"
               sx={{
-                px: 0.65,
-                py: 0.2,
-                borderRadius: 0.75,
-                border: 1,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: 34,
+                height: 20,
+                px: 0.55,
+                borderRadius: 1,
+                border: "1px solid",
                 borderColor: "divider",
-                bgcolor: "action.hover",
+                bgcolor: "background.paper",
                 color: "text.secondary",
-                fontFamily: "inherit",
-                fontSize: 10,
-                lineHeight: 1.3,
+                fontFamily: '"Inter", ui-sans-serif, sans-serif',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 0,
+                lineHeight: 1,
+                whiteSpace: "nowrap",
+                boxShadow: "0 1px 0 rgba(15, 23, 42, 0.08)",
               }}
             >
-              Ctrl K
+              Ctrl+K
             </Box>
           }
           sx={{
             display: { xs: "none", lg: "inline-flex" },
-            minWidth: { lg: 144, xl: 190 },
-            flexShrink: 1,
+            width: 152,
+            minWidth: 152,
+            maxWidth: 152,
+            height: 35,
+            minHeight: 35,
+            flexShrink: 0,
             justifyContent: "flex-start",
-            px: 1.25,
-            minHeight: 38,
-            borderRadius: 2,
-            border: 1,
+            px: 1,
+            borderRadius: 1.5,
+            border: "1px solid",
             borderColor: "divider",
             color: "text.secondary",
             bgcolor: "action.hover",
             textTransform: "none",
-            fontWeight: 600,
-            "& .MuiButton-startIcon": { mr: 1 },
-            "& .MuiButton-endIcon": { ml: "auto" },
+            fontSize: 12,
+            fontWeight: 500,
+            letterSpacing: 0,
+            "& .MuiButton-startIcon": {
+              mr: 0.75,
+              ml: 0,
+              "& svg": { fontSize: 17 },
+            },
+            "& .MuiButton-endIcon": { ml: "auto", mr: 0 },
             "&:hover": { borderColor: "primary.main", bgcolor: "action.selected" },
           }}
         >
-          {t("Jump to page")}
+          {t("Search pages")}
         </Button>
 
         <LanguageSwitcher />
@@ -550,7 +595,20 @@ export default function AdminTopBar({
                   {t("Find an admin section without leaving your keyboard")}
                 </Typography>
               </Box>
-              <Chip size="small" label="ESC" variant="outlined" sx={{ fontFamily: "monospace" }} />
+              <Chip
+                size="small"
+                label="ESC"
+                variant="outlined"
+                sx={{
+                  height: 22,
+                  minWidth: 38,
+                  borderRadius: 1.25,
+                  fontFamily: '"Inter", ui-sans-serif, sans-serif',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: 0.02,
+                }}
+              />
             </Stack>
           </DialogTitle>
           <DialogContent sx={{ px: { xs: 2, sm: 2.5 }, pb: 2.5 }}>
@@ -597,7 +655,7 @@ export default function AdminTopBar({
                       fontWeight: 850,
                     }}
                   >
-                    {item.label.slice(0, 1)}
+                    {QUICK_NAV_ICONS[item.id] || <SearchRoundedIcon fontSize="small" />}
                   </Box>
                   <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography fontWeight={750} fontSize={13.5}>{t(item.label)}</Typography>
