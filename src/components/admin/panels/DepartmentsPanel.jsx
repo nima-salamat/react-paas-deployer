@@ -174,7 +174,7 @@ export default function DepartmentsPanel() {
             startIcon={loading ? <CircularProgress size={15} /> : <RefreshIcon />}
             onClick={() => void loadDepartments()}
             disabled={loading || busy}
-            sx={{ borderRadius: 0, textTransform: "none" }}
+            sx={{ borderRadius: 1.5, textTransform: "none" }}
           >
             Refresh
           </Button>
@@ -196,7 +196,7 @@ export default function DepartmentsPanel() {
             Loading departments…
           </DryEmptyState>
         ) : (
-          <Box sx={{ overflowX: "auto" }}>
+          <Box className="admin-table-scroll" sx={{ overflowX: "auto" }}>
             <Box
               component="table"
               sx={{ width: "100%", borderCollapse: "collapse", minWidth: 820 }}
@@ -238,7 +238,7 @@ export default function DepartmentsPanel() {
                         size="small"
                         label={department.is_active ? "Active" : "Inactive"}
                         color={department.is_active ? "success" : "default"}
-                        sx={{ height: 20, borderRadius: 0, fontSize: 10 }}
+                        sx={{ height: 20, borderRadius: 1.5, fontSize: 10 }}
                       />
                     </DryTd>
                     <DryTd align="right">{department.staff_count ?? "—"}</DryTd>

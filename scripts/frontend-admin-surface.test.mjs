@@ -199,6 +199,38 @@ test("admin topbar includes keyboard-driven, permission-filtered quick navigatio
   assert.match(dashboard, /filter\(\(\[id\]\) => id === "profile" \|\| canSeeNav\(id\)\)/);
 });
 
+test("admin operational tables use adaptive card layouts on phones and tablets", () => {
+  const responsive = read("src/components/admin/components/ResponsiveTable.jsx");
+  const tickets = read("src/components/admin/panels/TicketsPanel.jsx");
+  const authCodes = read("src/components/admin/panels/AuthCodesPanel.jsx");
+  const users = read("src/components/admin/panels/UsersPanel.jsx");
+  const styles = read("src/components/admin/admin-console.css");
+
+  assert.match(responsive, /breakpoints\.down\("md"\)/);
+  assert.match(responsive, /col\.stopPropagation/);
+  assert.match(tickets, /<ResponsiveTable/);
+  assert.match(authCodes, /<ResponsiveTable/);
+  assert.match(users, /<ResponsiveTable/);
+  assert.match(users, /breakpoints\.up\("md"\)/);
+  assert.match(styles, /\.admin-table-scroll/);
+  assert.match(styles, /overscroll-behavior-inline:\s*contain/);
+  assert.match(styles, /--admin-control-height:\s*44px/);
+});
+
+test("wide admin datasets remain contained instead of expanding the whole viewport", () => {
+  const panels = [
+    "src/components/admin/panels/DepartmentsPanel.jsx",
+    "src/components/admin/panels/ServicesPanel.jsx",
+    "src/components/admin/panels/TablesPanel.jsx",
+    "src/components/admin/panels/InvitesPanel.jsx",
+    "src/components/admin/panels/PlansPanel.jsx",
+  ];
+
+  for (const path of panels) {
+    assert.match(read(path), /admin-table-scroll/, path + " lost its contained table viewport");
+  }
+});
+
 test("credential-bearing admin API hooks stay behind apiRequest", () => {
   const helpers = [
     "src/components/security/sessionApi.js",

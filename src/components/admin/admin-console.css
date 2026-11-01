@@ -1,25 +1,36 @@
-/* Unified admin workspace layout and responsive design tokens. */
+/* Unified admin workspace: fluid sizing, readable density, and contained data views. */
 .admin-console {
+  --admin-content-max: 1880px;
+  --admin-radius-xl: 20px;
+  --admin-radius-lg: 16px;
+  --admin-radius-md: 12px;
+  --admin-radius-sm: 9px;
+  --admin-control-height: 44px;
+  --admin-border: rgba(127, 143, 166, 0.22);
   position: relative;
   isolation: isolate;
   overflow-x: clip;
   min-width: 0;
+  width: 100%;
 }
 
 .admin-console-main {
   box-sizing: border-box;
-  padding: clamp(14px, 2.15vw, 34px) clamp(12px, 2.35vw, 38px) clamp(28px, 3vw, 48px);
-  min-width: 0;
   width: 100%;
+  min-width: 0;
+  padding:
+    clamp(14px, 2.15vw, 36px)
+    clamp(12px, 2.35vw, 40px)
+    max(30px, env(safe-area-inset-bottom));
 }
 
 .admin-console-content {
-  width: min(100%, 1780px);
+  width: min(100%, var(--admin-content-max));
   min-width: 0;
   margin-inline: auto;
   display: flex;
   flex-direction: column;
-  gap: clamp(18px, 1.8vw, 28px);
+  gap: clamp(18px, 1.8vw, 30px);
   container-type: inline-size;
 }
 
@@ -28,59 +39,109 @@
   max-width: 100%;
 }
 
+.admin-console-content :where(.MuiBox-root, .MuiStack-root, .MuiGrid-root) {
+  min-width: 0;
+}
+
 .admin-console-content .MuiPaper-root,
 .admin-console-content .admin-surface {
-  border-radius: 18px;
-  border-color: rgba(127, 143, 166, 0.23);
+  border-radius: var(--admin-radius-lg) !important;
+  border-color: var(--admin-border);
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.045);
 }
 
 .admin-console-content .MuiPaper-root .MuiPaper-root {
+  border-radius: var(--admin-radius-md) !important;
   box-shadow: none;
 }
 
-.admin-console-content .MuiTypography-h4,
-.admin-console-content .MuiTypography-h5,
+.admin-console-content .MuiTypography-h4 {
+  font-size: clamp(1.58rem, 1.25rem + 0.9cqi, 2rem);
+  line-height: 1.16;
+  letter-spacing: -0.035em;
+}
+
+.admin-console-content .MuiTypography-h5 {
+  font-size: clamp(1.38rem, 1.13rem + 0.65cqi, 1.72rem);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+}
+
 .admin-console-content .MuiTypography-h6 {
-  letter-spacing: -0.025em;
+  font-size: clamp(1.12rem, 1rem + 0.35cqi, 1.34rem);
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
 .admin-console-content .MuiButton-root {
-  min-height: 36px;
-  border-radius: 11px;
+  min-height: 38px;
+  border-radius: var(--admin-radius-sm) !important;
   text-transform: none;
   font-weight: 700;
+  max-width: 100%;
 }
 
 .admin-console-content .MuiIconButton-root {
-  border-radius: 11px;
+  border-radius: var(--admin-radius-sm) !important;
 }
 
 .admin-console-content .MuiChip-root {
-  border-radius: 9px;
+  border-radius: 8px !important;
   font-weight: 650;
+  max-width: 100%;
 }
 
 .admin-console-content .MuiOutlinedInput-root {
-  border-radius: 12px;
+  min-height: var(--admin-control-height);
+  border-radius: var(--admin-radius-md) !important;
+}
+
+.admin-console-content .MuiInputBase-input {
+  min-width: 0;
+}
+
+.admin-console-content .MuiFormControl-root {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-console-content .MuiAlert-root {
-  border-radius: 14px;
+  border-radius: 14px !important;
+}
+
+.admin-console-content .MuiGrid-root {
+  min-width: 0;
+}
+
+.admin-console-content .MuiTableContainer-root,
+.admin-console-content .admin-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-lg);
 }
 
 .admin-console-content .MuiTableContainer-root {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  border-radius: 15px;
+  border: 0;
 }
 
+.admin-console-content .admin-table-scroll > table,
 .admin-console-content .MuiTable-root {
   width: 100%;
 }
 
-.admin-console-content .MuiTableCell-head {
+.admin-console-content .admin-table-scroll > table {
+  max-width: none;
+}
+
+.admin-console-content .MuiTableCell-head,
+.admin-console-content .admin-table-scroll th {
   white-space: nowrap;
   font-size: 0.72rem;
   font-weight: 800;
@@ -88,12 +149,27 @@
   color: inherit;
 }
 
-.admin-console-content .MuiTableCell-root {
+.admin-console-content .MuiTableCell-root,
+.admin-console-content .admin-table-scroll td,
+.admin-console-content .admin-table-scroll th {
   border-color: rgba(127, 143, 166, 0.16);
 }
 
-.admin-console-content .MuiTableRow-root {
+.admin-console-content .MuiTableRow-root,
+.admin-console-content .admin-table-scroll tr {
   transition: background-color 140ms ease;
+}
+
+.admin-console-content .admin-responsive-row {
+  border: 1px solid var(--admin-border);
+  border-radius: 14px !important;
+  padding: clamp(12px, 2vw, 18px);
+  background: var(--mui-palette-background-paper, #fff);
+  min-width: 0;
+}
+
+.admin-console-content .admin-responsive-row + .admin-responsive-row {
+  margin-top: 2px;
 }
 
 .admin-console-content .MuiPagination-ul {
@@ -102,16 +178,33 @@
 }
 
 .admin-console-content .admin-info-banner {
-  border-radius: 14px;
+  border-radius: 14px !important;
 }
 
 .admin-console-content .admin-surface {
   overflow: hidden;
 }
 
+.admin-console .MuiAppBar-root .MuiToolbar-root {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@container (max-width: 720px) {
+  .admin-console-content .admin-dashboard-columns > .MuiGrid-item {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+
+  .admin-console-content .admin-kpi-grid > .MuiGrid-item {
+    flex-basis: 50%;
+    max-width: 50%;
+  }
+}
+
 @media (min-width: 1600px) {
   .admin-console-main {
-    padding-inline: clamp(36px, 3vw, 60px);
+    padding-inline: clamp(36px, 3vw, 64px);
   }
 }
 
@@ -126,14 +219,15 @@
     padding-top: 18px;
   }
 
-  .admin-console-content .MuiTableContainer-root {
-    border-radius: 13px;
+  .admin-console-content .MuiTableContainer-root,
+  .admin-console-content .admin-table-scroll {
+    border-radius: 14px;
   }
 }
 
 @media (max-width: 599.98px) {
   .admin-console-main {
-    padding: 13px 10px 28px;
+    padding: 13px 10px max(28px, env(safe-area-inset-bottom));
   }
 
   .admin-console-content {
@@ -142,14 +236,15 @@
 
   .admin-console-content .MuiPaper-root,
   .admin-console-content .admin-surface {
-    border-radius: 14px;
+    border-radius: 14px !important;
   }
 
   .admin-console-content .MuiTableCell-root {
     padding: 9px 10px;
   }
 
-  .admin-console-content .MuiTableCell-head {
+  .admin-console-content .MuiTableCell-head,
+  .admin-console-content .admin-table-scroll th {
     font-size: 0.68rem;
   }
 
@@ -162,14 +257,22 @@
   }
 
   .admin-console-content .MuiButton-root {
-    max-width: 100%;
+    min-height: 40px;
+  }
+
+  .admin-console-content .MuiOutlinedInput-root {
+    min-height: 42px;
+  }
+
+  .admin-console-content .admin-responsive-row {
+    padding: 13px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .admin-console-content *,
-  .admin-console-content *::before,
-  .admin-console-content *::after {
+  .admin-console *,
+  .admin-console *::before,
+  .admin-console *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;

@@ -23,13 +23,13 @@ import {
 /**
  * Staff service inspector — resources are owned by the service's user, not the admin.
  *
- * Hard-edge styling (no border-radius anywhere). All resource lists are
+ * Unified rounded surfaces and responsive data containers. All resource lists are
  * rendered as proper <table> elements using the shared DryTable primitives,
  * matching the look of TablesPanel / PlansPanel / ServicesPanel.
  *
  * Create-row capability is exposed as a prominent outlined button at the
  * top of each resource table (Deploys / Volumes / Networks), opening a
- * Dialog form with sharp-cornered inputs.
+ * Dialog form with rounded, consistently sized inputs.
  *
  * Props:
  *   canManage: boolean — hide create/destroy affordances if false.
@@ -166,7 +166,13 @@ export default function ServiceAdminDrawer({
         anchor="right"
         open={Boolean(svcDetail)}
         onClose={onClose}
-        PaperProps={{ sx: { width: { xs: "100%", sm: "min(640px, 100vw)" }, maxWidth: 720, borderRadius: 0 } }}
+        PaperProps={{
+          sx: {
+            width: { xs: "100vw", sm: "min(680px, 100vw)", lg: "min(760px, 100vw)" },
+            maxWidth: 780,
+            borderRadius: { xs: 0, sm: "18px 0 0 18px" },
+          },
+        }}
       >
         <Toolbar sx={{ justifyContent: "space-between", borderBottom: 1, borderColor: "divider" }}>
           <Box sx={{ minWidth: 0 }}>
@@ -187,7 +193,7 @@ export default function ServiceAdminDrawer({
                 color={String(svcDetail.status || "").toLowerCase() === "running" ? "success"
                   : ["failed", "error"].includes(String(svcDetail.status || "").toLowerCase()) ? "error" : "default"}
                 variant={svcDetail.status === "running" ? "filled" : "outlined"}
-                sx={{ borderRadius: 0, height: 20, fontSize: 10 }}
+                sx={{ borderRadius: 1.5, height: 20, fontSize: 10 }}
               />
               <Typography variant="caption" fontFamily="monospace" color="text.secondary">
                 {svcDetail.id}
@@ -236,7 +242,7 @@ export default function ServiceAdminDrawer({
                   color={detailTab === id ? "primary" : "default"}
                   variant={detailTab === id ? "filled" : "outlined"}
                   onClick={() => setDetailTab(id)}
-                  sx={{ borderRadius: 0, height: 22, fontSize: 11 }}
+                  sx={{ borderRadius: 1.5, height: 22, fontSize: 11 }}
                 />
               ))}
             </Stack>
@@ -249,7 +255,7 @@ export default function ServiceAdminDrawer({
               </Typography>
             )}
 
-            {/* ─── Deploys — hard-edge table ─────────────────────────────── */}
+            {/* ─── Deploys — responsive data table ─────────────────────────────── */}
             {detailTab === "deploys" && (
               <DryPanel sx={{ overflow: "hidden" }}>
                 <Box sx={{
@@ -290,7 +296,7 @@ export default function ServiceAdminDrawer({
                           <DryTd><code style={{ fontSize: 11 }}>v{d.version}</code></DryTd>
                           <DryTd>
                             <Chip size="small" label={d.status || "—"}
-                              sx={{ height: 18, fontSize: 10, borderRadius: 0 }} />
+                              sx={{ height: 18, fontSize: 10, borderRadius: 1.5 }} />
                           </DryTd>
                           <DryTd align="right">
                             <Stack direction="row" gap={0.5} justifyContent="flex-end" flexWrap="wrap">
@@ -329,7 +335,7 @@ export default function ServiceAdminDrawer({
               </DryPanel>
             )}
 
-            {/* ─── Volumes — hard-edge table ─────────────────────────────── */}
+            {/* ─── Volumes — responsive data table ─────────────────────────────── */}
             {detailTab === "volumes" && (
               <DryPanel sx={{ overflow: "hidden" }}>
                 <Box sx={{
@@ -364,7 +370,7 @@ export default function ServiceAdminDrawer({
                             <Chip size="small" label={v.is_mounted ? "mounted" : "detached"}
                               color={v.is_mounted ? "success" : "default"}
                               variant={v.is_mounted ? "filled" : "outlined"}
-                              sx={{ height: 18, fontSize: 10, borderRadius: 0 }} />
+                              sx={{ height: 18, fontSize: 10, borderRadius: 1.5 }} />
                           </DryTd>
                           <DryTd align="right">
                             {canManage && (
@@ -393,7 +399,7 @@ export default function ServiceAdminDrawer({
               </DryPanel>
             )}
 
-            {/* ─── Networks — hard-edge table ────────────────────────────── */}
+            {/* ─── Networks — responsive data table ────────────────────────────── */}
             {detailTab === "networks" && (
               <DryPanel sx={{ overflow: "hidden" }}>
                 <Box sx={{
@@ -449,9 +455,9 @@ export default function ServiceAdminDrawer({
         </Box>
       </Drawer>
 
-      {/* Create deploy dialog — hard edge */}
+      {/* Create deploy dialog — responsive data surface */}
       <Dialog open={deployOpen} onClose={() => !busy && setDeployOpen(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: 0 } }}>
+        PaperProps={{ sx: { borderRadius: 1.5 } }}>
         <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>Create deploy for {ownerName}</DialogTitle>
         <DialogContent dividers>
           <Stack gap={2} mt={1}>
@@ -466,7 +472,7 @@ export default function ServiceAdminDrawer({
               inputProps={{ style: { fontFamily: "monospace", fontSize: 12 } }}
               sx={dryInputSx} />
             <Button component="label" variant="outlined" startIcon={<CloudUploadIcon />} fullWidth
-              sx={{ borderRadius: 0, textTransform: "none" }}>
+              sx={{ borderRadius: 1.5, textTransform: "none" }}>
               {deployFile ? deployFile.name : "Choose ZIP (optional)"}
               <input type="file" hidden accept=".zip,application/zip"
                 onChange={(e) => setDeployFile(e.target.files?.[0] || null)} />
@@ -475,17 +481,17 @@ export default function ServiceAdminDrawer({
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setDeployOpen(false)} disabled={busy}
-            sx={{ borderRadius: 0, textTransform: "none" }}>Cancel</Button>
+            sx={{ borderRadius: 1.5, textTransform: "none" }}>Cancel</Button>
           <Button variant="contained" onClick={createDeploy} disabled={busy || !deployName.trim()}
-            sx={{ borderRadius: 0, textTransform: "none", fontWeight: 700 }}>
+            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}>
             {busy ? "…" : "Create"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Create volume dialog — hard edge */}
+      {/* Create volume dialog — responsive data surface */}
       <Dialog open={volOpen} onClose={() => !busy && setVolOpen(false)} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { borderRadius: 0 } }}>
+        PaperProps={{ sx: { borderRadius: 1.5 } }}>
         <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>Create volume for {ownerName}</DialogTitle>
         <DialogContent dividers>
           <Stack gap={2} mt={1}>
@@ -502,17 +508,17 @@ export default function ServiceAdminDrawer({
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setVolOpen(false)} disabled={busy}
-            sx={{ borderRadius: 0, textTransform: "none" }}>Cancel</Button>
+            sx={{ borderRadius: 1.5, textTransform: "none" }}>Cancel</Button>
           <Button variant="contained" onClick={createVolume} disabled={busy}
-            sx={{ borderRadius: 0, textTransform: "none", fontWeight: 700 }}>
+            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}>
             {busy ? "…" : "Create"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Create network dialog — hard edge */}
+      {/* Create network dialog — responsive data surface */}
       <Dialog open={netOpen} onClose={() => !busy && setNetOpen(false)} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { borderRadius: 0 } }}>
+        PaperProps={{ sx: { borderRadius: 1.5 } }}>
         <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>Create network for {ownerName}</DialogTitle>
         <DialogContent dividers>
           <Stack gap={2} mt={1}>
@@ -527,9 +533,9 @@ export default function ServiceAdminDrawer({
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setNetOpen(false)} disabled={busy}
-            sx={{ borderRadius: 0, textTransform: "none" }}>Cancel</Button>
+            sx={{ borderRadius: 1.5, textTransform: "none" }}>Cancel</Button>
           <Button variant="contained" onClick={createNetwork} disabled={busy}
-            sx={{ borderRadius: 0, textTransform: "none", fontWeight: 700 }}>
+            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}>
             {busy ? "…" : "Create"}
           </Button>
         </DialogActions>
@@ -541,7 +547,7 @@ export default function ServiceAdminDrawer({
 
 // ─── Local styling constants ────────────────────────────────────────────────
 const dryBtnSx = {
-  borderRadius: 0,
+  borderRadius: 1.5,
   textTransform: "none",
   fontWeight: 600,
   fontSize: 11,
@@ -549,5 +555,5 @@ const dryBtnSx = {
 };
 
 const dryInputSx = {
-  "& .MuiOutlinedInput-root": { borderRadius: 0 },
+  "& .MuiOutlinedInput-root": { borderRadius: 1.5 },
 };

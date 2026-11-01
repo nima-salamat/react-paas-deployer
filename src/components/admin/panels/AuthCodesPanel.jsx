@@ -6,27 +6,9 @@ import {
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import ResponsiveTable from "../components/ResponsiveTable.jsx";
 
 const PAGE_SIZE = 25;
-
-const thSx = {
-  textAlign: "left",
-  px: 1.5,
-  py: 1.1,
-  fontWeight: 700,
-  fontSize: 12,
-  color: "text.secondary",
-  whiteSpace: "nowrap",
-  borderBottom: 1,
-  borderColor: "divider",
-};
-
-const tdSx = {
-  px: 1.5,
-  py: 1.15,
-  fontSize: 13,
-  verticalAlign: "middle",
-};
 
 /**
  * AuthCodesPanel — OTP codes list with confirm on delete / purge.
@@ -103,80 +85,65 @@ export default function AuthCodesPanel({
         }}
       />
 
-      <Box sx={{ border: 1, borderColor: "divider", overflow: "auto", borderRadius: 1.5 }}>
-        <Box
-          component="table"
-          sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}
-        >
-          <Box component="thead" sx={{ bgcolor: "action.hover" }}>
-            <Box component="tr">
-              <Box component="th" sx={thSx}>User</Box>
-              <Box component="th" sx={thSx}>Contact</Box>
-              <Box component="th" sx={thSx}>Purpose</Box>
-              <Box component="th" sx={thSx}>Code</Box>
-              <Box component="th" sx={{ ...thSx, textAlign: "right" }}>Attempts</Box>
-              <Box component="th" sx={{ ...thSx, textAlign: "center" }}>Status</Box>
-              <Box component="th" sx={{ ...thSx, textAlign: "right" }}> </Box>
-            </Box>
-          </Box>
-          <Box component="tbody">
-            {codes.map((c) => (
-              <Box
-                component="tr"
-                key={c.id}
-                sx={{ borderTop: "1px solid rgba(127,127,127,0.18)" }}
-              >
-                <Box component="td" sx={tdSx}>
-                  {c.username || c.user?.username || "—"}
-                </Box>
-                <Box component="td" sx={tdSx}>
-                  {c.contact || "—"}
-                </Box>
-                <Box component="td" sx={tdSx}>
-                  <Chip
-                    size="small"
-                    label={c.purpose}
-                    sx={{ height: 20, fontSize: 11, borderRadius: 1 }}
-                  />
-                </Box>
-                <Box component="td" sx={tdSx}>
-                  <Typography variant="caption" fontFamily="monospace" sx={{ letterSpacing: 1 }}>
-                    {c.code}
-                  </Typography>
-                </Box>
-                <Box component="td" sx={{ ...tdSx, textAlign: "right" }}>
-                  {c.attempts}
-                </Box>
-                <Box component="td" sx={{ ...tdSx, textAlign: "center" }}>
-                  {c.is_expired ? (
-                    <Chip size="small" label="expired" sx={{ height: 20, fontSize: 11, borderRadius: 1 }} />
-                  ) : c.is_locked ? (
-                    <Chip size="small" color="warning" label="locked" sx={{ height: 20, fontSize: 11, borderRadius: 1 }} />
-                  ) : (
-                    <Chip size="small" color="success" label="valid" sx={{ height: 20, fontSize: 11, borderRadius: 1 }} />
-                  )}
-                </Box>
-                {canManage && (
-                  <Box component="td" sx={{ ...tdSx, textAlign: "right" }}>
-                    <IconButton size="small" color="error" onClick={() => setDeleteId(c.id)}>
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                )}
-              </Box>
-            ))}
-            {!codes.length && (
-              <Box component="tr">
-                <Box component="td" colSpan={canManage ? 7 : 6} sx={{ p: 3, textAlign: "center" }}>
-                  <Typography color="text.secondary">
-                    {codeLoading ? "Loading…" : "No codes"}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-          </Box>
-        </Box>
-      </Box>
+      <ResponsiveTable
+        rows={codes}
+        minWidth={760}
+        emptyMessage={codeLoading ? "Loading…" : "No codes"}
+        columns={[
+          {
+            id: "username",
+            label: "User",
+            render: (code) => code.username || code.user?.username || "—",
+          },
+          {
+            id: "contact",
+            label: "Contact",
+            render: (code) => code.contact || "—",
+          },
+          {
+            id: "purpose",
+            label: "Purpose",
+            render: (code) => <Chip size="small" label={code.purpose || "—"} />,
+          },
+          {
+            id: "code",
+            label: "Code",
+            render: (code) => (
+              <Typography variant="caption" fontFamily="monospace" sx={{ letterSpacing: 1 }}>
+                {code.code}
+              </Typography>
+            ),
+          },
+          {
+            id: "attempts",
+            label: "Attempts",
+            align: "right",
+            render: (code) => code.attempts ?? 0,
+          },
+          {
+            id: "status",
+            label: "Status",
+            render: (code) => code.is_expired ? (
+              <Chip size="small" label="expired" />
+            ) : code.is_locked ? (
+              <Chip size="small" color="warning" label="locked" />
+            ) : (
+              <Chip size="small" color="success" label="valid" />
+            ),
+          },
+          ...(canManage ? [{
+            id: "actions",
+            label: "Actions",
+            align: "right",
+            stopPropagation: true,
+            render: (code) => (
+              <IconButton size="small" color="error" onClick={() => setDeleteId(code.id)}>
+                <DeleteOutlineIcon fontSize="small" />
+              </IconButton>
+            ),
+          }] : []),
+        ]}
+      />
 
       {pages > 1 && (
         <Box display="flex" justifyContent="center" p={2}>

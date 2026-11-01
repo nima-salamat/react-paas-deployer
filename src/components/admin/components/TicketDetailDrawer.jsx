@@ -92,9 +92,10 @@ export default function TicketDetailDrawer({
         onClose={onClose}
         PaperProps={{
           sx: {
-            width: { xs: "100%", sm: "min(600px, 100vw)" },
-            maxWidth: 680,
+            width: { xs: "100vw", sm: "min(680px, 100vw)", lg: "min(760px, 100vw)" },
+            maxWidth: 780,
             height: "100%",
+            borderRadius: { xs: 0, sm: "18px 0 0 18px" },
             display: "flex",
             flexDirection: "row",
             overflow: "hidden",

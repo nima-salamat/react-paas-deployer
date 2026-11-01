@@ -19,11 +19,12 @@ export default function ResponsiveTable({
   size = "small",
 }) {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  // Wide datasets become stacked cards on phones and tablets; desktop keeps the table.
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
   if (!rows.length) {
     return (
-      <Paper sx={{ p: { xs: 2, sm: 3 }, textAlign: "center", borderRadius: 2.5 }}>
+      <Paper className="admin-responsive-row" sx={{ textAlign: "center" }}>
         <Typography color="text.secondary">{emptyMessage}</Typography>
       </Paper>
     );
@@ -42,6 +43,7 @@ export default function ResponsiveTable({
               sx={{
                 p: { xs: 1.25, sm: 1.5 },
                 borderRadius: 2,
+                minWidth: 0,
                 cursor: onRowClick ? "pointer" : "default",
                 "&:active": onRowClick ? { bgcolor: "action.selected" } : undefined,
               }}
@@ -69,7 +71,12 @@ export default function ResponsiveTable({
                       <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, pt: 0.25 }}>
                         {col.label}
                       </Typography>
-                      <Box sx={{ textAlign: "right", minWidth: 0 }}>{value ?? "—"}</Box>
+                      <Box
+                        sx={{ textAlign: "right", minWidth: 0, maxWidth: "68%", overflowWrap: "anywhere" }}
+                        onClick={col.stopPropagation ? (event) => event.stopPropagation() : undefined}
+                      >
+                        {value ?? "—"}
+                      </Box>
                     </Stack>
                   );
                 })}
@@ -82,7 +89,7 @@ export default function ResponsiveTable({
   }
 
   return (
-    <Paper sx={{ overflowX: "auto", overflowY: "hidden", width: "100%", maxWidth: "100%", borderRadius: 2.5 }}>
+    <Paper className="admin-table-scroll" sx={{ overflowX: "auto", overflowY: "hidden", width: "100%", maxWidth: "100%" }}>
       <Table size={size} sx={{ minWidth }}>
         <TableHead>
           <TableRow>

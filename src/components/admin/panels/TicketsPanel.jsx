@@ -8,27 +8,9 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { STATUS_COLOR } from "../adminUtils";
 import ConfirmDialog from "../components/ConfirmDialog.jsx";
+import ResponsiveTable from "../components/ResponsiveTable.jsx";
 
 const PAGE_SIZE = 15;
-
-const thSx = {
-  textAlign: "left",
-  px: 1.5,
-  py: 1.1,
-  fontWeight: 700,
-  fontSize: 12,
-  color: "text.secondary",
-  whiteSpace: "nowrap",
-  borderBottom: 1,
-  borderColor: "divider",
-};
-
-const tdSx = {
-  px: 1.5,
-  py: 1.15,
-  fontSize: 13,
-  verticalAlign: "middle",
-};
 
 /**
  * TicketsPanel — list + filters + delete (with confirm).
@@ -152,80 +134,63 @@ export default function TicketsPanel({
         </Stack>
       </Box>
 
-      <Box sx={{ border: 1, borderColor: "divider", overflow: "auto", borderRadius: 1.5 }}>
-        <Box
-          component="table"
-          sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}
-        >
-          <Box component="thead" sx={{ bgcolor: "action.hover" }}>
-            <Box component="tr">
-              <Box component="th" sx={thSx}>Number</Box>
-              <Box component="th" sx={thSx}>Subject</Box>
-              <Box component="th" sx={thSx}>User</Box>
-              <Box component="th" sx={thSx}>Status</Box>
-              <Box component="th" sx={thSx}>Priority</Box>
-              <Box component="th" sx={{ ...thSx, textAlign: "right" }}>Actions</Box>
-            </Box>
-          </Box>
-          <Box component="tbody">
-            {tickets.map((t) => (
-              <Box
-                component="tr"
-                key={t.id}
-                onClick={() => onOpen?.(t.id)}
-                sx={{
-                  borderTop: "1px solid rgba(127,127,127,0.18)",
-                  cursor: "pointer",
-                  "&:hover": { bgcolor: "action.hover" },
-                }}
-              >
-                <Box component="td" sx={tdSx}>
-                  <code style={{ fontSize: 11 }}>{t.public_id}</code>
-                </Box>
-                <Box component="td" sx={tdSx}>
-                  <Typography fontWeight={600} fontSize={13} noWrap sx={{ maxWidth: 320 }}>
-                    {t.subject}
-                  </Typography>
-                </Box>
-                <Box component="td" sx={tdSx}>
-                  {t.user?.username || "—"}
-                </Box>
-                <Box component="td" sx={tdSx}>
-                  <Chip
-                    size="small"
-                    label={t.status}
-                    color={STATUS_COLOR[t.status] || "default"}
-                    sx={{ height: 20, fontSize: 11, borderRadius: 1 }}
-                  />
-                </Box>
-                <Box component="td" sx={tdSx}>
-                  {t.priority || "—"}
-                </Box>
-                <Box
-                  component="td"
-                  sx={{ ...tdSx, textAlign: "right" }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Tooltip title="Delete ticket">
-                    <IconButton size="small" color="error" onClick={() => setDeleteId(t.id)}>
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Box>
-            ))}
-            {!tickets.length && (
-              <Box component="tr">
-                <Box component="td" colSpan={6} sx={{ p: 3, textAlign: "center" }}>
-                  <Typography color="text.secondary">
-                    {tLoading ? "Loading…" : "No tickets"}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-          </Box>
-        </Box>
-      </Box>
+      <ResponsiveTable
+        rows={tickets}
+        minWidth={760}
+        emptyMessage={tLoading ? "Loading…" : "No tickets"}
+        onRowClick={(ticket) => onOpen?.(ticket.id)}
+        columns={[
+          {
+            id: "public_id",
+            label: "Number",
+            render: (ticket) => <code style={{ fontSize: 11 }}>{ticket.public_id}</code>,
+          },
+          {
+            id: "subject",
+            label: "Subject",
+            render: (ticket) => (
+              <Typography fontWeight={650} fontSize={13} sx={{ maxWidth: 360, overflowWrap: "anywhere" }}>
+                {ticket.subject || "—"}
+              </Typography>
+            ),
+          },
+          {
+            id: "user",
+            label: "User",
+            render: (ticket) => ticket.user?.username || "—",
+          },
+          {
+            id: "status",
+            label: "Status",
+            render: (ticket) => (
+              <Chip
+                size="small"
+                label={ticket.status}
+                color={STATUS_COLOR[ticket.status] || "default"}
+                sx={{ height: 22, fontSize: 11 }}
+              />
+            ),
+          },
+          {
+            id: "priority",
+            label: "Priority",
+            render: (ticket) => ticket.priority || "—",
+          },
+          {
+            id: "actions",
+            label: "Actions",
+            align: "right",
+            stopPropagation: true,
+            render: (ticket) => (
+              <Tooltip title="Delete ticket">
+                <IconButton size="small" color="error" onClick={() => setDeleteId(ticket.id)}>
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ),
+          },
+        ]}
+      />
 
       {pages > 1 && (
         <Box display="flex" justifyContent="center" p={2}>

@@ -43,7 +43,7 @@ function statusColor(s) {
 /**
  * ServicesPanel — admin inspector for any user's services.
  *
- * Hard-edge styling (no border-radius anywhere). All tables use the shared
+ * Unified rounded surfaces and responsive data containers. All tables use the shared
  * DryTable primitives so the look matches TablesPanel / PlansPanel / etc.
  *
  * Create-row capability:
@@ -281,13 +281,13 @@ export default function ServicesPanel({ setToast: setToastProp }) {
             </DryCreateButton>
           )}
           <Button startIcon={<RefreshIcon />} onClick={loadServices} disabled={svcLoading}
-            variant="outlined" sx={{ borderRadius: 0, textTransform: "none" }}>
+            variant="outlined" sx={{ borderRadius: 1.5, textTransform: "none" }}>
             Refresh
           </Button>
         </Stack>
       </Stack>
 
-      {/* Stats — hard edge */}
+      {/* Stats — responsive data surface */}
       <Grid container spacing={2}>
         {[
           ["Total", stats.total, "primary.main"],
@@ -308,7 +308,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         ))}
       </Grid>
 
-      {/* Search — hard edge */}
+      {/* Search — responsive data surface */}
       <DryPanel sx={{ p: 2 }}>
         <TextField
           size="small"
@@ -324,16 +324,16 @@ export default function ServicesPanel({ setToast: setToastProp }) {
               </InputAdornment>
             ),
           }}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
         />
       </DryPanel>
 
-      {/* Table — hard edge */}
+      {/* Table — responsive data surface */}
       <DryPanel sx={{ overflow: "hidden" }}>
         {svcLoading && !svcList.length ? (
           <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
         ) : isDesktop ? (
-          <Box sx={{ overflowX: "auto" }}>
+          <Box className="admin-table-scroll" sx={{ overflowX: "auto" }}>
             <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
               <Box component="thead" sx={{ bgcolor: "action.hover" }}>
                 <tr>
@@ -356,7 +356,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
                           width: 30, height: 30,
                           bgcolor: alpha(theme.palette.primary.main, 0.10),
                           color: "primary.main", fontWeight: 700,
-                          borderRadius: 0,
+                          borderRadius: 1.5,
                         }}>
                           {(s.name || "?").charAt(0).toUpperCase()}
                         </Avatar>
@@ -377,7 +377,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
                         label={s.status || "—"}
                         color={statusColor(s.status)}
                         variant={s.status === "running" ? "filled" : "outlined"}
-                        sx={{ height: 20, fontSize: 10, fontWeight: 600, borderRadius: 0 }}
+                        sx={{ height: 20, fontSize: 10, fontWeight: 600, borderRadius: 1.5 }}
                       />
                     </DryTd>
                     <DryTd align="right" onClick={(e) => e.stopPropagation()}>
@@ -436,7 +436,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
           /* Mobile / tablet — square cards instead of rounded */
           <Stack spacing={1} divider={<Box sx={{ borderBottom: 1, borderColor: "divider" }} />} sx={{ p: 1.5 }}>
             {svcList.map((s) => (
-              <Box key={s.id} sx={{ border: DRY_BORDER_LIGHT, p: 1.25, borderRadius: 0, cursor: "pointer" }}
+              <Box key={s.id} sx={{ border: DRY_BORDER_LIGHT, p: 1.25, borderRadius: 1.5, cursor: "pointer" }}
                 onClick={() => openSvcDetail(s)}>
                 <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={1}>
                   <Box sx={{ minWidth: 0 }}>
@@ -450,7 +450,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
                     label={s.status || "—"}
                     color={statusColor(s.status)}
                     variant={s.status === "running" ? "filled" : "outlined"}
-                    sx={{ height: 20, fontSize: 10, fontWeight: 600, borderRadius: 0 }}
+                    sx={{ height: 20, fontSize: 10, fontWeight: 600, borderRadius: 1.5 }}
                   />
                 </Stack>
                 {canManage && (
@@ -497,9 +497,9 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         canDelete={canDelete}
       />
 
-      {/* Create service dialog — hard edge */}
+      {/* Create service dialog — responsive data surface */}
       <Dialog open={createOpen} onClose={() => !createBusy && setCreateOpen(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { borderRadius: 0 } }}>
+        PaperProps={{ sx: { borderRadius: 1.5 } }}>
         <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>Create service for a user</DialogTitle>
         <DialogContent dividers>
           <Stack gap={2} mt={1}>
@@ -509,10 +509,10 @@ export default function ServicesPanel({ setToast: setToastProp }) {
               value={ownerSearch}
               onChange={(e) => { setOwnerSearch(e.target.value); searchOwners(e.target.value); }}
               fullWidth
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
             />
             {ownerOptions.length > 0 && (
-              <Box sx={{ border: DRY_BORDER_LIGHT, maxHeight: 160, overflowY: "auto", borderRadius: 0 }}>
+              <Box sx={{ border: DRY_BORDER_LIGHT, maxHeight: 160, overflowY: "auto", borderRadius: 1.5 }}>
                 {ownerOptions.map((u) => (
                   <Box
                     key={u.id}
@@ -541,7 +541,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
               onChange={(e) => setCreateName(e.target.value)}
               fullWidth
               inputProps={{ maxLength: 30 }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
             />
             <TextField
               size="small"
@@ -550,7 +550,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
               value={createPlan}
               onChange={(e) => setCreatePlan(e.target.value)}
               fullWidth
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
             >
               <MenuItem value=""><em>— select plan —</em></MenuItem>
               {planOptions.map((p) => (
@@ -568,7 +568,7 @@ export default function ServicesPanel({ setToast: setToastProp }) {
               fullWidth
               disabled={!ownerNetworks.length}
               helperText={!ownerNetworks.length ? "Owner has no networks yet — service will be created without one." : ""}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
             >
               <MenuItem value=""><em>— none —</em></MenuItem>
               {ownerNetworks.map((n) => (
@@ -579,10 +579,10 @@ export default function ServicesPanel({ setToast: setToastProp }) {
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setCreateOpen(false)} disabled={createBusy}
-            sx={{ borderRadius: 0, textTransform: "none" }}>Cancel</Button>
+            sx={{ borderRadius: 1.5, textTransform: "none" }}>Cancel</Button>
           <Button variant="contained" onClick={submitCreate}
             disabled={createBusy || !createOwner || !createName.trim() || !createPlan}
-            sx={{ borderRadius: 0, textTransform: "none", fontWeight: 700 }}>
+            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}>
             {t(createBusy ? "Creating…" : "Create service")}
           </Button>
         </DialogActions>

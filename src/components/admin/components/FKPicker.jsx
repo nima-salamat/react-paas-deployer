@@ -95,7 +95,7 @@ export default function FKPicker({
             {...params}
             placeholder={relatedModelKey ? `Search ${relatedLabel || relatedModelKey}…` : "No related model"}
             variant="outlined"
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5, minHeight: 44 } }}
             InputProps={{
               ...params.InputProps,
               startAdornment: (

@@ -4,8 +4,7 @@ import {
   Alert, Box, Avatar, Button, Chip, CircularProgress, Dialog, DialogActions,
   DialogContent, DialogTitle, Divider, FormControl, FormControlLabel,
   Grid, IconButton, InputLabel, MenuItem, Pagination, Paper, Select, Stack,
-  Switch, Table, TableBody, TableCell, TableHead, TableRow, TextField,
-  Tooltip, Typography, useMediaQuery, useTheme, Checkbox,
+  Switch, TextField, Tooltip, Typography, useMediaQuery, useTheme, Checkbox,
   Collapse,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -29,6 +28,7 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import DevicesOutlinedIcon from "@mui/icons-material/DevicesOutlined";
 import AdminUserSessionsDialog from "../components/AdminUserSessionsDialog.jsx";
 import { DryPanel } from "../components/DryTable";
+import ResponsiveTable from "../components/ResponsiveTable.jsx";
 
 
 const PAGE_SIZE = 20;
@@ -79,7 +79,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
   const [sessionUser, setSessionUser] = useState(null);
 
   const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up("sm"));
+  const isDesktop = useMediaQuery(theme.breakpoints.up("md"));
 
   const canManage = hasAnyRule("users.manage");
   const canCreate = canManage || hasAnyRule("users.create");
@@ -303,117 +303,127 @@ export default function UsersPanel({ setToast: setToastProp }) {
           {userLoading ? (
             <Box display="flex" justifyContent="center" py={6}><CircularProgress /></Box>
           ) : (
-            <Box sx={{ overflowX: "auto" }}>
-              <Table size="small" sx={{ minWidth: 640 }}>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: "action.hover" }}>
-                    <TableCell>User</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Flags</TableCell>
-                    <TableCell>Rules</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.id} hover>
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" gap={1.25}>
-                          <Avatar
-                            src={profileThumb(u) || undefined}
-                            onClick={() => setViewUser(u)}
-                            sx={{
-                              width: 32, height: 32, bgcolor: "primary.main", fontSize: 13, fontWeight: 700,
-                              cursor: "pointer",
-                              "&:hover": { outline: "2px solid", outlineColor: "primary.main" },
-                            }}
-                          >
-                            {(u.username || "?").charAt(0).toUpperCase()}
-                          </Avatar>
-                          <Box>
-                            <Typography fontWeight={600} fontSize={14}>{u.username}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Joined {u.date_joined ? new Date(u.date_joined).toLocaleDateString() : "—"}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>{u.email || "—"}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
-                          {u.is_superuser && (
-                            <Tooltip title="Superuser — bypasses all permission checks">
-                              <Chip size="small" color="error" icon={<ShieldIcon sx={{ fontSize: 13 }} />} label="super" sx={{ height: 22, fontSize: 11 }} />
-                            </Tooltip>
-                          )}
-                          {u.is_staff && (
-                            <Tooltip title="Staff">
-                              <Chip size="small" color="primary" icon={<VerifiedUserIcon sx={{ fontSize: 13 }} />} label="staff" sx={{ height: 22, fontSize: 11 }} />
-                            </Tooltip>
-                          )}
-                          {!u.is_active && (
-                            <Chip size="small" color="default" icon={<LockIcon sx={{ fontSize: 13 }} />} label="inactive" sx={{ height: 22, fontSize: 11 }} />
-                          )}
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        {(u.rules || []).length === 0 ? (
-                          <Typography variant="caption" color="text.secondary">—</Typography>
-                        ) : (
-                          <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
-                            {(u.rules || []).slice(0, 4).map((r) => (
-                              <Chip key={r} size="small" variant="outlined" label={r.split(".").pop()} sx={{ height: 22, fontSize: 11 }} />
-                            ))}
-                            {(u.rules || []).length > 4 && (
-                              <Chip size="small" label={`+${u.rules.length - 4}`} sx={{ height: 22, fontSize: 11 }} />
-                            )}
-                          </Stack>
-                        )}
-                      </TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" justifyContent="flex-end" gap={0.5}>
-                          <Tooltip title={`Open chat with ${u.username}`}>
-                            <IconButton size="small" onClick={() => goToUserChat(u.username)}>
-                              <ChatBubbleOutlineIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          {canViewSessions && (
-                            <Tooltip title="View active sessions">
-                              <IconButton size="small" onClick={() => setSessionUser(u)}>
-                                <DevicesOutlinedIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {(canCreate || canManageRules) && (
-                            <Tooltip title="Edit user">
-                              <IconButton size="small" onClick={() => setEditUser({ ...u, rules: u.rules || [], password: "" })}>
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                          {canDelete && u.id !== (editUser?.id || -1) && (
-                            <Tooltip title="Deactivate">
-                              <IconButton size="small" color="error" disabled={deleting === u.id} onClick={() => deactivateUser(u.id)}>
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          )}
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!users.length && (
-                    <TableRow>
-                      <TableCell colSpan={5}>
-                        <Typography color="text.secondary" align="center" py={4}>No users found</Typography>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </Box>
+            <ResponsiveTable
+              rows={users}
+              minWidth={760}
+              emptyMessage="No users found"
+              columns={[
+                {
+                  id: "username",
+                  label: "User",
+                  render: (user) => (
+                    <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
+                      <Avatar
+                        src={profileThumb(user) || undefined}
+                        onClick={() => setViewUser(user)}
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          flexShrink: 0,
+                          bgcolor: "primary.main",
+                          fontSize: 13,
+                          fontWeight: 750,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {(user.username || "?").charAt(0).toUpperCase()}
+                      </Avatar>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography fontWeight={700} fontSize={13.5} sx={{ overflowWrap: "anywhere" }}>
+                          {user.username}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Joined {user.date_joined ? new Date(user.date_joined).toLocaleDateString() : "—"}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                  ),
+                },
+                {
+                  id: "email",
+                  label: "Email",
+                  render: (user) => (
+                    <Typography variant="body2" sx={{ maxWidth: 220, overflowWrap: "anywhere" }}>
+                      {user.email || "—"}
+                    </Typography>
+                  ),
+                },
+                {
+                  id: "flags",
+                  label: "Account status",
+                  render: (user) => (
+                    <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
+                      {user.is_superuser && (
+                        <Tooltip title="Superuser — bypasses all permission checks">
+                          <Chip size="small" color="error" icon={<ShieldIcon sx={{ fontSize: 13 }} />} label="super" />
+                        </Tooltip>
+                      )}
+                      {user.is_staff && (
+                        <Tooltip title="Staff">
+                          <Chip size="small" color="primary" icon={<VerifiedUserIcon sx={{ fontSize: 13 }} />} label="staff" />
+                        </Tooltip>
+                      )}
+                      {!user.is_active && <Chip size="small" label="inactive" />}
+                      {user.is_active && !user.is_staff && !user.is_superuser && (
+                        <Chip size="small" color="success" variant="outlined" label="active" />
+                      )}
+                    </Stack>
+                  ),
+                },
+                {
+                  id: "rules",
+                  label: "Access rules",
+                  render: (user) => (user.rules || []).length === 0 ? (
+                    <Typography variant="caption" color="text.secondary">—</Typography>
+                  ) : (
+                    <Stack direction="row" gap={0.5} flexWrap="wrap" useFlexGap>
+                      {(user.rules || []).slice(0, 4).map((rule) => (
+                        <Chip key={rule} size="small" variant="outlined" label={rule.split(".").pop()} />
+                      ))}
+                      {(user.rules || []).length > 4 && (
+                        <Chip size="small" label={`+${user.rules.length - 4}`} />
+                      )}
+                    </Stack>
+                  ),
+                },
+                {
+                  id: "actions",
+                  label: "Actions",
+                  align: "right",
+                  stopPropagation: true,
+                  render: (user) => (
+                    <Stack direction="row" justifyContent="flex-end" gap={0.5} flexWrap="wrap" useFlexGap>
+                      <Tooltip title={`Open chat with ${user.username}`}>
+                        <IconButton size="small" onClick={() => goToUserChat(user.username)}>
+                          <ChatBubbleOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      {canViewSessions && (
+                        <Tooltip title="View active sessions">
+                          <IconButton size="small" onClick={() => setSessionUser(user)}>
+                            <DevicesOutlinedIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {(canCreate || canManageRules) && (
+                        <Tooltip title="Edit user">
+                          <IconButton size="small" onClick={() => setEditUser({ ...user, rules: user.rules || [], password: "" })}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      {canDelete && user.id !== (editUser?.id || -1) && (
+                        <Tooltip title="Deactivate">
+                          <IconButton size="small" color="error" disabled={deleting === user.id} onClick={() => deactivateUser(user.id)}>
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
+                  ),
+                },
+              ]}
+            />
           )}
           {pages > 1 && (
             <Box display="flex" justifyContent="center" p={2}>
@@ -511,7 +521,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
                       <> You have <code>users.manage_rules</code> only — you can edit rules but not other fields.</>
                     )}
                   </Typography>
-                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 0, maxHeight: 320, overflow: "auto" }}>
+                  <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5, maxHeight: 320, overflow: "auto" }}>
                     <Stack gap={1.5}>
                       {grouped.map((group) => (
                         <Box key={group.group}>
@@ -550,7 +560,7 @@ export default function UsersPanel({ setToast: setToastProp }) {
                   </Paper>
                 </Box>
               ) : (
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 0, bgcolor: "action.hover" }}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: 1.5, bgcolor: "action.hover" }}>
                   <Stack direction="row" gap={1.5} alignItems="flex-start">
                     <LockIcon color="action" sx={{ mt: 0.5 }} />
                     <Box>

@@ -4,8 +4,8 @@ import AddIcon from "@mui/icons-material/Add";
 
 /**
  * Shared table primitives for the unified admin design system.
- * Surfaces use soft radii, quiet borders and restrained depth while keeping
- * dense tabular data readable and horizontally scrollable on smaller screens.
+ * Surfaces use consistent radii, quiet borders and restrained depth while
+ * keeping dense tabular data readable inside responsive scroll containers.
  *
  * Exports:
  *   - DRY_BORDER / DRY_BORDER_LIGHT  — shared border constants

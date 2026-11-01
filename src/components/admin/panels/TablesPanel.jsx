@@ -308,7 +308,7 @@ export default function TablesPanel() {
             </Typography>
           </Box>
           <Button startIcon={<RefreshIcon />} onClick={loadTables} disabled={tablesLoading} variant="outlined"
-            sx={{ borderRadius: 0, textTransform: "none" }}>
+            sx={{ borderRadius: 1.5, textTransform: "none" }}>
             {translate("Refresh")}
           </Button>
         </Stack>
@@ -328,7 +328,7 @@ export default function TablesPanel() {
           </DryPanel>
         ) : (
           <DryPanel sx={{ overflow: "hidden" }}>
-            <Box sx={{ overflowX: "auto" }}>
+            <Box className="admin-table-scroll" sx={{ overflowX: "auto" }}>
               <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <Box component="thead" sx={{ bgcolor: "action.hover" }}>
                   <tr>
@@ -365,7 +365,7 @@ export default function TablesPanel() {
                       </DryTd>
                       <DryTd align="right">
                         <Button size="small" onClick={() => openTable(t)} variant="outlined"
-                          sx={{ borderRadius: 0, textTransform: "none" }}>
+                          sx={{ borderRadius: 1.5, textTransform: "none" }}>
                           {translate("Open")}
                         </Button>
                       </DryTd>
@@ -399,13 +399,13 @@ export default function TablesPanel() {
         <Tooltip title={translate("Create / Update endpoints are not exposed by the backend for safety. Use the Django admin or a dedicated admin API for write operations.")}>
           <span>
             <Button size="small" variant="outlined" disabled
-              sx={{ borderRadius: 0, textTransform: "none" }}>
+              sx={{ borderRadius: 1.5, textTransform: "none" }}>
               {translate("New row (locked)")}
             </Button>
           </span>
         </Tooltip>
         <Button startIcon={<RefreshIcon />} onClick={loadRows} disabled={rowsLoading} variant="outlined"
-          sx={{ borderRadius: 0, textTransform: "none" }}>
+          sx={{ borderRadius: 1.5, textTransform: "none" }}>
           Refresh
         </Button>
       </Stack>
@@ -430,7 +430,7 @@ export default function TablesPanel() {
                 </InputAdornment>
               ),
             }}
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 0 } }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 1.5 } }}
           />
         </DryPanel>
       )}
@@ -443,7 +443,7 @@ export default function TablesPanel() {
             <Typography color="text.secondary">{translate("No rows")}</Typography>
           </Box>
         ) : (
-          <Box sx={{ overflowX: "auto" }}>
+          <Box className="admin-table-scroll" sx={{ overflowX: "auto" }}>
             <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 720 }}>
               <Box component="thead" sx={{ bgcolor: "action.hover" }}>
                 <tr>
@@ -499,7 +499,7 @@ export default function TablesPanel() {
                       <DryTd align="right">
                         <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                           <Button size="small" onClick={() => openRowDetail(r)}
-                            sx={{ borderRadius: 0, textTransform: "none", fontSize: 11 }}>{translate("View")}</Button>
+                            sx={{ borderRadius: 1.5, textTransform: "none", fontSize: 11 }}>{translate("View")}</Button>
                           {canManage && activeTable.deletable && (
                             <Tooltip title={translate("Delete row")}>
                               <IconButton
@@ -541,7 +541,7 @@ export default function TablesPanel() {
 
       {/* Delete confirmation */}
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { borderRadius: 0 } }}>
+        PaperProps={{ sx: { borderRadius: 1.5 } }}>
         <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>{translate("Delete row?")}</DialogTitle>
         <DialogContent>
           <Stack gap={1}>
@@ -558,9 +558,9 @@ export default function TablesPanel() {
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setDeleteTarget(null)} disabled={deleting}
-            sx={{ borderRadius: 0, textTransform: "none" }}>{translate("Cancel")}</Button>
+            sx={{ borderRadius: 1.5, textTransform: "none" }}>{translate("Cancel")}</Button>
           <Button color="error" variant="contained" onClick={confirmDelete} disabled={deleting}
-            sx={{ borderRadius: 0, textTransform: "none", fontWeight: 700 }}>
+            sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 700 }}>
             {deleting ? translate("Deleting…") : translate("Delete row")}
           </Button>
         </DialogActions>
@@ -572,7 +572,7 @@ export default function TablesPanel() {
         onClose={() => setDetailRow(null)}
         maxWidth="md"
         fullWidth
-        PaperProps={{ sx: { borderRadius: 0 } }}
+        PaperProps={{ sx: { borderRadius: 1.5 } }}
       >
         <DialogTitle sx={{ borderBottom: DRY_BORDER_LIGHT }}>
           <Stack direction="row" alignItems="center" gap={1}>
@@ -635,7 +635,7 @@ export default function TablesPanel() {
         </DialogContent>
         <DialogActions sx={{ borderTop: DRY_BORDER_LIGHT, p: 1.5 }}>
           <Button onClick={() => setDetailRow(null)}
-            sx={{ borderRadius: 0, textTransform: "none" }}>{translate("Close")}</Button>
+            sx={{ borderRadius: 1.5, textTransform: "none" }}>{translate("Close")}</Button>
         </DialogActions>
       </Dialog>
     </Stack>
@@ -649,7 +649,7 @@ function CellRenderer({ value, displayValue, t = (value) => value, field, onFkCl
     return <Typography variant="caption" color="text.disabled">—</Typography>;
   }
   if (field?.sensitive) {
-    return <Chip size="small" label={t("REDACTED")} variant="outlined" sx={{ height: 18, fontSize: 10, borderRadius: 0 }} />;
+    return <Chip size="small" label={t("REDACTED")} variant="outlined" sx={{ height: 18, fontSize: 10, borderRadius: 1.5 }} />;
   }
   if (displayValue !== null && displayValue !== undefined) {
     return <Typography variant="caption">{displayValue}</Typography>;
@@ -662,7 +662,7 @@ function CellRenderer({ value, displayValue, t = (value) => value, field, onFkCl
         sx={{
           height: 18,
           fontSize: 10,
-          borderRadius: 0,
+          borderRadius: 1.5,
           bgcolor: value ? "success.main" : "action.hover",
           color: value ? "#fff" : "text.secondary",
         }}
@@ -679,7 +679,7 @@ function CellRenderer({ value, displayValue, t = (value) => value, field, onFkCl
             size="small"
             label={typeof v === "object" ? (v.str || v.pk || JSON.stringify(v)) : String(v)}
             variant="outlined"
-            sx={{ height: 18, fontSize: 10, borderRadius: 0, maxWidth: MAX_CELL_WIDTH }}
+            sx={{ height: 18, fontSize: 10, borderRadius: 1.5, maxWidth: MAX_CELL_WIDTH }}
           />
         ))}
         {value.length > 2 && (
@@ -701,7 +701,7 @@ function CellRenderer({ value, displayValue, t = (value) => value, field, onFkCl
             variant="outlined"
             onClick={() => onFkClick(pk)}
             sx={{
-              height: 20, fontSize: 10, maxWidth: MAX_CELL_WIDTH, borderRadius: 0,
+              height: 20, fontSize: 10, maxWidth: MAX_CELL_WIDTH, borderRadius: 1.5,
               cursor: "pointer",
               "&:hover": { bgcolor: "primary.main", color: "#fff" },
             }}
@@ -711,7 +711,7 @@ function CellRenderer({ value, displayValue, t = (value) => value, field, onFkCl
     }
     return (
       <Tooltip title={JSON.stringify(value)}>
-        <Chip size="small" label={label} variant="outlined" sx={{ height: 20, fontSize: 10, maxWidth: MAX_CELL_WIDTH, borderRadius: 0 }} />
+        <Chip size="small" label={label} variant="outlined" sx={{ height: 20, fontSize: 10, maxWidth: MAX_CELL_WIDTH, borderRadius: 1.5 }} />
       </Tooltip>
     );
   }
@@ -760,7 +760,7 @@ function CellValueDetail({ value }) {
         component="pre"
         sx={{
           m: 0, p: 1, fontSize: 11, fontFamily: "monospace",
-          bgcolor: "action.hover", border: DRY_BORDER_LIGHT, borderRadius: 0,
+          bgcolor: "action.hover", border: DRY_BORDER_LIGHT, borderRadius: 1.5,
           overflow: "auto", maxHeight: 240,
         }}
       >
@@ -774,7 +774,7 @@ function CellValueDetail({ value }) {
         component="pre"
         sx={{
           m: 0, p: 1, fontSize: 11, fontFamily: "monospace",
-          bgcolor: "action.hover", border: DRY_BORDER_LIGHT, borderRadius: 0,
+          bgcolor: "action.hover", border: DRY_BORDER_LIGHT, borderRadius: 1.5,
           overflow: "auto", maxHeight: 240, whiteSpace: "pre-wrap", wordBreak: "break-word",
         }}
       >
@@ -803,7 +803,7 @@ function FKDetailCell({ value, relatedModelKey, onNavigate }) {
         variant="outlined"
         onClick={() => onNavigate(pk)}
         sx={{
-          height: 22, fontSize: 11, borderRadius: 0, cursor: "pointer",
+          height: 22, fontSize: 11, borderRadius: 1.5, cursor: "pointer",
           "&:hover": { bgcolor: "primary.main", color: "#fff" },
           maxWidth: 320,
         }}

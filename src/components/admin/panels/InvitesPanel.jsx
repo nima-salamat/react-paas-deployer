@@ -132,7 +132,7 @@ export default function InvitesPanel({
         {invLoading && !slice.length ? (
           <DryEmptyState>Loading…</DryEmptyState>
         ) : (
-          <Box sx={{ overflowX: "auto" }}>
+          <Box className="admin-table-scroll" sx={{ overflowX: "auto" }}>
             <Box
               component="table"
               sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}

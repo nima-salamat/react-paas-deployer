@@ -3,10 +3,10 @@ import { Box, Tooltip, Typography } from "@mui/material";
 import { DRY_BORDER, DRY_BORDER_LIGHT, DryEmptyState } from "./DryTable.jsx";
 
 /**
- * DryResizableTable — hard-edge table with Excel-like column resizing.
+ * DryResizableTable — responsive table with Excel-like column resizing.
  *
  * Features:
- *   - Sharp corners only (borderRadius: 0 everywhere)
+ *   - Soft surfaces with a contained horizontal scroll area
  *   - Each column header has a draggable resize handle on its right edge
  *   - Column widths persist in localStorage (per `storageKey`)
  *   - Min width 60px, max width 600px (sane bounds)
@@ -87,7 +87,7 @@ export default function DryResizableTable({
   });
   const [activeHandle, setActiveHandle] = useState(null);
 
-  const onHandleMouseDown = (columnId) => (e) => {
+  const onHandlePointerDown = (columnId) => (e) => {
     e.preventDefault();
     e.stopPropagation();
     dragState.current = {
@@ -120,11 +120,11 @@ export default function DryResizableTable({
         requestAnimationFrame(() => persistWidths.current?.());
       }
     };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("pointermove", onMouseMove);
+    window.addEventListener("pointerup", onMouseUp);
     return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
+      window.removeEventListener("pointermove", onMouseMove);
+      window.removeEventListener("pointerup", onMouseUp);
     };
   }, []);
 
@@ -138,7 +138,7 @@ export default function DryResizableTable({
   }
 
   return (
-    <Box sx={{ overflowX: "auto", width: "100%" }}>
+    <Box className="admin-table-scroll" sx={{ overflowX: "auto", width: "100%" }}>
       <Box
         component="table"
         sx={{
@@ -192,7 +192,7 @@ export default function DryResizableTable({
                   </Box>
                   {/* Resize handle */}
                   <Box
-                    onMouseDown={onHandleMouseDown(col.id)}
+                    onPointerDown={onHandlePointerDown(col.id)}
                     onClick={(e) => e.stopPropagation()}
                     title="Drag to resize"
                     sx={{

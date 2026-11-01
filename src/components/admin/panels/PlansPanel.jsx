@@ -401,7 +401,7 @@ function PlansTable({ rows, canManage, onEdit, onDelete }) {
   }
   return (    <TranslatedTextTree>
 
-    <Box sx={{ border: 1, borderColor: "divider", overflow: "auto" }}>
+    <Box className="admin-table-scroll" sx={{ border: 1, borderColor: "divider", overflow: "auto" }}>
       <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 1120 }}>
         <Box component="thead" sx={{ bgcolor: "action.hover" }}>
           <tr>
