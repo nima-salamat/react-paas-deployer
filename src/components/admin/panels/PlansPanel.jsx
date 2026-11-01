@@ -202,10 +202,23 @@ export default function PlansPanel() {
         </Stack>
       </Stack>
 
-      <Stack direction={{ xs: "column", sm: "row" }} gap={2} mb={2}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "minmax(0, 1fr)",
+            md: "minmax(220px, 1fr) minmax(180px, 200px) minmax(160px, 180px)",
+          },
+          gap: 2,
+          width: "100%",
+          mb: 2,
+          alignItems: "start",
+        }}
+      >
         <TextField size="small" label="Search name / platform" value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }} fullWidth />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }} fullWidth
+          sx={{ minWidth: 0 }} />
+        <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
           <InputLabel>Platform</InputLabel>
           <Select label="Platform" value={platform} onChange={(e) => { setPlatform(e.target.value); setPage(1); }}>
             <MenuItem value="">All</MenuItem>
@@ -214,7 +227,7 @@ export default function PlansPanel() {
             ))}
           </Select>
         </FormControl>
-        <FormControl size="small" sx={{ minWidth: 140 }}>
+        <FormControl size="small" fullWidth sx={{ minWidth: 0 }}>
           <InputLabel>Type</InputLabel>
           <Select label="Type" value={planType} onChange={(e) => { setPlanType(e.target.value); setPage(1); }}>
             <MenuItem value="">All</MenuItem>
@@ -223,7 +236,7 @@ export default function PlansPanel() {
             ))}
           </Select>
         </FormControl>
-      </Stack>
+      </Box>
 
       <Box sx={{ overflowX: "auto" }}>
         {loading && !list.length ? (
