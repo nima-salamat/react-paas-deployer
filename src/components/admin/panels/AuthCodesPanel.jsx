@@ -106,7 +106,7 @@ export default function AuthCodesPanel({
           {
             id: "purpose",
             label: "Purpose",
-            render: (code) => <Chip size="small" label={code.purpose || "—"} />,
+            render: (code) => <Chip size="small" label={t(code.purpose || "—")} />,
           },
           {
             id: "code",
