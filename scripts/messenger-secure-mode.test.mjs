@@ -341,7 +341,7 @@ test("admin database tables render translated schema labels and choice display v
   assert.match(panel, /f\.label \|\| translate\(f\.name\)/);
   assert.match(panel, /displayValue=\{r\?\._display\?\.\[f\.name\]\}/);
   assert.match(panel, /displayValue !== null && displayValue !== undefined/);
-  assert.match(messages, /"Database tables": "جدول‌های پایگاه داده"/);
+  assert.match(messages, /"Database tables": "جدول‌های دیتابیس"/);
 });
 
 test("home, dashboard, messenger and admin have Persian navigation and visible-label translations", () => {
