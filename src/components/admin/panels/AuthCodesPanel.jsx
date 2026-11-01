@@ -74,6 +74,7 @@ export default function AuthCodesPanel({
       </Stack>
 
       <TextField
+        className="admin-filter-search"
         size="small"
         fullWidth
         label="Search username / email / contact / code"
