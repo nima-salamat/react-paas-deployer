@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import TranslatedTextTree from "../../../i18n/TranslatedTextTree.jsx";
+import { useLocale } from "../../../i18n/LocaleProvider.jsx";
 import {
   Box, Button, Chip, IconButton, Pagination, Stack, TextField, Typography,
 } from "@mui/material";
@@ -27,6 +28,7 @@ export default function AuthCodesPanel({
   onDelete,
   onRefresh,
 }) {
+  const { t } = useLocale();
   const pages = Math.max(1, Math.ceil((codeCount || 0) / PAGE_SIZE));
   const [deleteId, setDeleteId] = useState(null);
   const [confirmPurge, setConfirmPurge] = useState(false);
