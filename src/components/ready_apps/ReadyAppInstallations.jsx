@@ -31,7 +31,7 @@ const API_ROOT =
     .replace(/^https?:\/\//, "")
     .replace(/\/+$/, "");
 const ROOT = API_ROOT + "/api/application-catalog";
-const TERMINAL = new Set(["running", "failed", "cancelled"]);
+const TERMINAL = new Set(["running", "stopped", "failed", "cancelled"]);
 
 function isDeletionPending(installation) {
   return (
@@ -56,6 +56,8 @@ function statusLabel(status, deletionPending) {
   if (value === "running") return "Running";
   if (value === "failed") return "Failed";
   if (value === "cancelled") return "Cancelled";
+  if (value === "degraded") return "Needs attention";
+  if (value === "stopped") return "Stopped";
   return "Deploying";
 }
 
@@ -64,13 +66,17 @@ function statusTone(status, deletionPending) {
   const value = String(status || "").toLowerCase();
   if (value === "running") return "success";
   if (value === "failed") return "error";
+  if (value === "degraded") return "warning";
+  if (value === "stopped") return "default";
   return "primary";
 }
 
 function StatusIcon({ status, deleting }) {
   if (deleting) return <HourglassTopRoundedIcon sx={{ fontSize: 15 }} />;
   if (status === "running") return <CheckCircleRoundedIcon sx={{ fontSize: 15 }} />;
+  if (status === "degraded") return <ErrorOutlineRoundedIcon color="warning" sx={{ fontSize: 15 }} />;
   if (status === "failed") return <ErrorOutlineRoundedIcon sx={{ fontSize: 15 }} />;
+  if (status === "stopped") return <CheckCircleRoundedIcon color="disabled" sx={{ fontSize: 15 }} />;
   return <HourglassTopRoundedIcon sx={{ fontSize: 15 }} />;
 }
 

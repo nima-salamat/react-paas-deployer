@@ -19,9 +19,11 @@ import {
   IconButton,
   LinearProgress,
   MenuItem,
+  Paper,
   Radio,
   RadioGroup,
   Stack,
+  useMediaQuery,
   Step,
   StepLabel,
   Stepper,
@@ -29,7 +31,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
@@ -51,7 +53,7 @@ const API_ROOT = "https://" + String(import.meta.env.VITE_API_BASE || "").replac
 const CATALOG_ROOT = API_ROOT + "/api/application-catalog";
 const PLANS_ROOT = API_ROOT + "/plans";
 
-const STEPS = ["Configure", "Plan", "Launch"];
+const STEPS = ["Configure", "Service plans", "Review", "Install"];
 
 function listFrom(data) {
   if (Array.isArray(data)) return data;
@@ -225,7 +227,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
   const [config, setConfig] = useState({});
   const [showAdvancedFields, setShowAdvancedFields] = useState(false);
   const [plans, setPlans] = useState([]);
-  const [planId, setPlanId] = useState("");
+  const [servicePlanIds, setServicePlanIds] = useState({});
   const [plansLoading, setPlansLoading] = useState(false);
   const [plansError, setPlansError] = useState("");
   const [activeStep, setActiveStep] = useState(0);
@@ -236,11 +238,52 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
   const [installation, setInstallation] = useState(null);
   const [existingInstallationId, setExistingInstallationId] = useState("");
   const [polling, setPolling] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const variant = useMemo(
     () => variants.find((item) => item.id === variantId) || defaultVariant,
     [variants, variantId, defaultVariant]
   );
+
+  const serviceSpecs = useMemo(() => {
+    const source = Array.isArray(variant?.services) ? variant.services : [];
+    if (source.length) return source;
+    return [{
+      key: "app",
+      label: app?.name || "Application",
+      role: "application",
+      platform: "docker",
+      plan_type: "APP",
+      required: true,
+      replicas: 1,
+    }];
+  }, [variant, app]);
+
+  const planOptionsByKey = useMemo(() => {
+    const result = {};
+    for (const spec of serviceSpecs) {
+      const platform = String(spec.platform || "docker").toLowerCase();
+      const planType = String(spec.plan_type || "APP").toUpperCase();
+      result[String(spec.key)] = plans.filter((plan) => {
+        const matchesPlatform = String(plan?.platform || "").toLowerCase() === platform;
+        const candidateType = String(plan?.plan_type || "").toUpperCase();
+        const matchesType = ["APP", "READY"].includes(planType)
+          ? ["APP", "READY"].includes(candidateType)
+          : candidateType === planType;
+        return matchesPlatform && matchesType;
+      });
+    }
+    return result;
+  }, [serviceSpecs, plans]);
+
+  const servicePlansComplete = serviceSpecs.length > 0 && serviceSpecs.every((spec) => {
+    const key = String(spec.key);
+    const selected = String(servicePlanIds[key] || "");
+    return selected && (planOptionsByKey[key] || []).some(
+      (plan) => String(plan.id ?? plan.pk ?? plan.uuid) === selected
+    );
+  });
 
   useEffect(() => {
     if (!open || !app) return;
@@ -256,7 +299,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
     setConfig(defaults);
     setShowAdvancedFields(false);
     setPlans([]);
-    setPlanId("");
+    setServicePlanIds({});
     setActiveStep(0);
     setResolved(null);
     setError("");
@@ -277,13 +320,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           url: PLANS_ROOT + "/?page_size=100",
         });
         if (!mounted) return;
-        const items = listFrom(response.data).filter((plan) => {
-          const platform = String(plan?.platform || "").toLowerCase();
-          const type = String(plan?.plan_type || "").toUpperCase();
-          return platform === "docker" && (type === "APP" || type === "READY");
-        });
-        setPlans(items);
-        if (items.length) setPlanId((current) => current || String(items[0].id ?? items[0].pk ?? items[0].uuid));
+        setPlans(listFrom(response.data));
       } catch (err) {
         if (!mounted) return;
         setPlansError(errorText(err, "Resource plans could not be loaded."));
@@ -295,6 +332,29 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
       mounted = false;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !serviceSpecs.length || !plans.length) return;
+    setServicePlanIds((current) => {
+      const next = {};
+      for (const spec of serviceSpecs) {
+        const key = String(spec.key);
+        const options = planOptionsByKey[key] || [];
+        const existing = String(current[key] || "");
+        const stillAvailable = options.some(
+          (plan) => String(plan.id ?? plan.pk ?? plan.uuid) === existing
+        );
+        const first = options[0];
+        next[key] = stillAvailable
+          ? existing
+          : first
+            ? String(first.id ?? first.pk ?? first.uuid)
+            : "";
+      }
+      return next;
+    });
+    setResolved(null);
+  }, [open, serviceSpecs, planOptionsByKey, plans.length]);
 
   const updateField = (id, value) => {
     setConfig((current) => ({ ...current, [id]: value }));
@@ -322,8 +382,14 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
       setActiveStep(0);
       return false;
     }
-    if (!planId) {
-      setError("Select a resource plan.");
+    const missingService = serviceSpecs.find((spec) => {
+      const key = String(spec.key);
+      return !(servicePlanIds[key] && (planOptionsByKey[key] || []).some(
+        (plan) => String(plan.id ?? plan.pk ?? plan.uuid) === String(servicePlanIds[key])
+      ));
+    });
+    if (missingService) {
+      setError("Choose a resource plan for " + (missingService.label || missingService.key) + ".");
       return false;
     }
     setResolveLoading(true);
@@ -334,7 +400,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
         url: CATALOG_ROOT + "/apps/" + encodeURIComponent(app.id) + "/resolve/",
         data: {
           name: name.trim(),
-          plan_id: planId,
+          service_plan_ids: servicePlanIds,
           variant: variantId,
           config,
         },
@@ -361,13 +427,13 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           catalog_id: app.id,
           variant: variantId,
           name: name.trim(),
-          plan_id: planId,
+          service_plan_ids: servicePlanIds,
           config,
         },
       });
       const data = response.data || {};
       setInstallation(data);
-      setActiveStep(2);
+      setActiveStep(3);
       setPolling(true);
     } catch (err) {
       const data = err?.response?.data;
@@ -401,7 +467,10 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           nextStatus === "cancelled" &&
           Array.isArray(next?.services) &&
           next.services.length > 0;
-        if (["running", "failed"].includes(nextStatus) || (nextStatus === "cancelled" && !cleanupPending)) {
+        if (
+          ["running", "degraded", "stopped", "failed"].includes(nextStatus)
+          || (nextStatus === "cancelled" && !cleanupPending)
+        ) {
           setPolling(false);
         }
       } catch (err) {
@@ -433,13 +502,13 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
     }
   };
 
-  const isTerminal = ["running", "failed", "cancelled"].includes(
-    String(installation?.status || "").toLowerCase()
-  );
+  const installationStatus = String(installation?.status || "").toLowerCase();
+  const isTerminal = ["running", "degraded", "stopped", "failed"].includes(installationStatus)
+    || (installationStatus === "cancelled" && !(installation?.services || []).length);
   const isSuccessful = String(installation?.status || "").toLowerCase() === "running";
 
   const canAdvanceFromConfigure = !resolveLoading;
-  const canAdvanceFromResources = !resolveLoading && Boolean(planId);
+  const canAdvanceFromResources = !resolveLoading && servicePlansComplete;
   const visibleFields = useMemo(
     () => (variant?.fields || []).filter(
       (field) => fieldVisible(field, config) && field?.user_editable !== false
@@ -476,7 +545,12 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
 
     <Dialog
       open={open}
-      onClose={installing ? undefined : onClose}
+      onClose={(event, reason) => {
+        if (reason === "backdropClick" || reason === "escapeKeyDown") return;
+        if (!installing) onClose?.();
+      }}
+      disableEscapeKeyDown
+      fullScreen={isMobile}
       fullWidth
       maxWidth="md"
       PaperProps={{
@@ -508,30 +582,29 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
             <Typography sx={{ fontSize: 18, fontWeight: 900, letterSpacing: "-.02em" }}>
               Install {app?.name || "app"}
             </Typography>
-            <Stack direction="row" spacing={1} sx={{ mt: .35 }} alignItems="center">
-              {STEPS.map((label, index) => (
-                <React.Fragment key={label}>
-                  {index > 0 && (
-                    <Box
+            {isMobile ? (
+              <Typography variant="caption" color="text.secondary" sx={{ mt: .35, display: "block" }}>
+                {t("Step")} {activeStep + 1} {t("of")} {STEPS.length} · <Box component="span" sx={{ color: "primary.main", fontWeight: 850 }}>{t(STEPS[activeStep])}</Box>
+              </Typography>
+            ) : (
+              <Stack direction="row" spacing={1} sx={{ mt: .35 }} alignItems="center">
+                {STEPS.map((label, index) => (
+                  <React.Fragment key={label}>
+                    {index > 0 && <Box sx={{ width: 16, height: 1, bgcolor: "divider" }} />}
+                    <Typography
+                      variant="caption"
                       sx={{
-                        width: 16,
-                        height: 1,
-                        bgcolor: "divider",
+                        fontWeight: index === activeStep ? 850 : 650,
+                        color: index === activeStep ? "primary.main" : "text.secondary",
+                        whiteSpace: "nowrap",
                       }}
-                    />
-                  )}
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      fontWeight: index === activeStep ? 850 : 650,
-                      color: index === activeStep ? "primary.main" : "text.secondary",
-                    }}
-                  >
-                    {index + 1} {t(label)}
-                  </Typography>
-                </React.Fragment>
-              ))}
-            </Stack>
+                    >
+                      {index + 1} {t(label)}
+                    </Typography>
+                  </React.Fragment>
+                ))}
+              </Stack>
+            )}
           </Box>
 
           <IconButton onClick={onClose} disabled={installing} size="small">
@@ -588,6 +661,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                   });
                   setVariantId(event.target.value);
                   setConfig(defaults);
+                  setServicePlanIds({});
                   setShowAdvancedFields(false);
                   setResolved(null);
                 }}
@@ -638,10 +712,10 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           <Stack spacing={2}>
             <Box>
               <Typography sx={{ fontWeight: 900, fontSize: 22, letterSpacing: "-.03em" }}>
-                Choose a plan
+                Choose a plan for each service
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: .45 }}>
-                Your app will use this plan for its managed runtime.
+                Each component has its own resource needs. Select its plan separately.
               </Typography>
             </Box>
 
@@ -651,82 +725,155 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               </Box>
             ) : plansError ? (
               <Alert severity="error" sx={{ borderRadius: 2.5 }}>{plansError}</Alert>
-            ) : plans.length === 0 ? (
-              <Alert severity="warning" sx={{ borderRadius: 2.5 }}>No plans are available.</Alert>
             ) : (
-              <Stack spacing={1}>
-                {plans.map((plan) => {
-                  const id = String(plan.id ?? plan.pk ?? plan.uuid);
-                  const selected = id === String(planId);
+              <Stack spacing={1.5}>
+                {serviceSpecs.map((spec) => {
+                  const key = String(spec.key);
+                  const options = planOptionsByKey[key] || [];
+                  const selectedId = String(servicePlanIds[key] || "");
+                  const selectedPlan = options.find(
+                    (plan) => String(plan.id ?? plan.pk ?? plan.uuid) === selectedId
+                  );
                   return (
-                    <Box
-                      key={id}
-                      onClick={() => {
-                        setPlanId(id);
-                        setResolved(null);
-                      }}
-                      sx={(theme) => ({
-                        p: 1.7,
-                        border: "1px solid",
-                        borderColor: selected ? "primary.main" : "divider",
-                        bgcolor: selected
-                          ? alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? .11 : .055)
-                          : "background.paper",
-                        borderRadius: 2.2,
-                        cursor: "pointer",
-                        transition: "border-color 150ms ease, background-color 150ms ease",
-                      })}
-                    >
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Radio checked={selected} onChange={() => {
-                          setPlanId(id);
-                          setResolved(null);
-                        }} />
-                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                          <Typography sx={{ fontWeight: 850 }}>
-                            {plan.name || plan.title || "Plan"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {plan.max_cpu} vCPU · {plan.max_ram} MB RAM · {plan.max_storage} GB
-                          </Typography>
-                        </Box>
-                        {plan.price_per_hour != null && Number(plan.price_per_hour) > 0 && (
-                          <Typography variant="body2" sx={{ fontWeight: 850, whiteSpace: "nowrap" }}>
-                            {plan.price_per_hour}/hr
-                          </Typography>
+                    <Paper key={key} variant="outlined" sx={{ p: { xs: 1.6, sm: 2 }, borderRadius: 2.5 }}>
+                      <Stack spacing={1.25}>
+                        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} spacing={1}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontWeight: 850 }}>
+                              {spec.label || String(key).replace(/[-_]/g, " ")}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {String(spec.role || "application").toLowerCase() === "database" ? "Database" : "Application"} · {String(spec.platform || "docker").toUpperCase()} · {String(spec.plan_type || "APP").toUpperCase()}
+                              {Number(spec.replicas || 1) > 1 ? " · " + spec.replicas + " replicas" : ""}
+                            </Typography>
+                          </Box>
+                          <Chip size="small" variant="outlined" label={options.length + " available plans"} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }} />
+                        </Stack>
+
+                        {options.length ? (
+                          <TextField
+                            select
+                            fullWidth
+                            label="Resource plan"
+                            value={selectedId}
+                            onChange={(event) => {
+                              setServicePlanIds((current) => ({ ...current, [key]: event.target.value }));
+                              setResolved(null);
+                              setError("");
+                            }}
+                          >
+                            {options.map((plan) => {
+                              const id = String(plan.id ?? plan.pk ?? plan.uuid);
+                              return (
+                                <MenuItem key={id} value={id}>
+                                  <Box sx={{ py: .25 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                                      {plan.name || plan.title || "Plan"}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {plan.max_cpu} vCPU · {plan.max_ram} MB RAM · {plan.max_storage} GB storage
+                                      {plan.price_per_hour != null ? " · " + plan.price_per_hour + "/hr" : ""}
+                                    </Typography>
+                                  </Box>
+                                </MenuItem>
+                              );
+                            })}
+                          </TextField>
+                        ) : (
+                          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                            No {String(spec.platform || "").toUpperCase()} {String(spec.plan_type || "").toUpperCase()} plans are available for this service.
+                          </Alert>
                         )}
+
+                        {selectedPlan ? (
+                          <Box sx={(theme) => ({
+                            p: 1.1,
+                            borderRadius: 1.8,
+                            bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === "dark" ? .09 : .045),
+                          })}>
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} justifyContent="space-between">
+                              <Typography variant="caption" color="text.secondary">
+                                Selected: <Box component="strong" sx={{ color: "text.primary" }}>{selectedPlan.name || selectedPlan.title || "Plan"}</Box>
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {selectedPlan.max_cpu} vCPU · {selectedPlan.max_ram} MB RAM · {selectedPlan.max_storage} GB storage
+                              </Typography>
+                            </Stack>
+                          </Box>
+                        ) : null}
                       </Stack>
-                    </Box>
+                    </Paper>
                   );
                 })}
               </Stack>
-            )}
-
-            {resolved && (
-              <Box
-                sx={(theme) => ({
-                  p: 1.8,
-                  borderRadius: 2.8,
-                  bgcolor: alpha(theme.palette.success.main, .07),
-                  border: "1px solid",
-                  borderColor: alpha(theme.palette.success.main, .18),
-                })}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <CheckCircleRoundedIcon sx={{ color: "success.main" }} />
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 850 }}>Plan ready</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {resolved.resource_summary?.cpu_vcpu ?? "—"} vCPU · {resolved.resource_summary?.ram_mb ?? "—"} MB RAM · {resolved.resource_summary?.storage_mb ?? "—"} MB storage
-                    </Typography>
-                  </Box>
-                </Stack>
-              </Box>
             )}
           </Stack>
         )}
 
         {activeStep === 2 && (
+          <Stack spacing={2}>
+            <Box>
+              <Typography sx={{ fontWeight: 900, fontSize: 22, letterSpacing: "-.03em" }}>
+                Review your installation
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: .45 }}>
+                Check the services and resource plans below. Nothing is created until you confirm.
+              </Typography>
+            </Box>
+
+            {resolved ? (
+              <>
+                <Paper variant="outlined" sx={{ p: { xs: 1.6, sm: 2 }, borderRadius: 2.5 }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
+                    <Box>
+                      <Typography variant="overline" color="text.secondary">Application</Typography>
+                      <Typography sx={{ fontWeight: 900, fontSize: 18 }}>{name}</Typography>
+                    </Box>
+                    <Chip color="success" variant="outlined" label={variant?.label || variantId} sx={{ alignSelf: { xs: "flex-start", sm: "center" } }} />
+                  </Stack>
+                </Paper>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2,minmax(0,1fr))", sm: "repeat(4,minmax(0,1fr))" }, gap: 1 }}>
+                  {[
+                    ["CPU", (resolved.resource_summary?.cpu_vcpu ?? "—") + " vCPU"],
+                    ["RAM", (resolved.resource_summary?.ram_mb ?? "—") + " MB"],
+                    ["Storage", (resolved.resource_summary?.storage_mb ?? "—") + " MB"],
+                    ["Hourly estimate", resolved.resource_summary?.hourly_price == null ? "—" : resolved.resource_summary.hourly_price + "/hr"],
+                  ].map(([label, value]) => (
+                    <Paper key={label} variant="outlined" sx={{ p: 1.2, borderRadius: 2 }}>
+                      <Typography variant="caption" color="text.secondary">{label}</Typography>
+                      <Typography sx={{ fontWeight: 850, overflowWrap: "anywhere" }}>{value}</Typography>
+                    </Paper>
+                  ))}
+                </Box>
+
+                <Typography sx={{ fontWeight: 850 }}>Service breakdown</Typography>
+                <Stack spacing={1}>
+                  {(resolved.resource_summary?.services || []).map((service) => (
+                    <Paper key={service.key || service.name} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 850 }}>{service.name || service.key}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {service.role || "application"} · {service.platform} · {service.plan?.plan_type || ""}
+                          </Typography>
+                        </Box>
+                        <Chip size="small" color="primary" variant="outlined" label={service.plan?.name || "Selected plan"} sx={{ alignSelf: { xs: "flex-start", sm: "center" }, maxWidth: "100%" }} />
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: .8 }}>
+                        {service.cpu_vcpu ?? "—"} vCPU · {service.ram_mb ?? "—"} MB RAM · {service.storage_mb ?? "—"} MB storage
+                      </Typography>
+                    </Paper>
+                  ))}
+                </Stack>
+              </>
+            ) : (
+              <Alert severity="warning">Review details are not available yet. Go back and validate the selected plans.</Alert>
+            )}
+          </Stack>
+        )}
+
+        {activeStep === 3 && (
           <Stack spacing={2}>
             <Box
               sx={{
@@ -738,6 +885,8 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                 <CheckCircleRoundedIcon sx={{ fontSize: 56, color: "success.main" }} />
               ) : installation?.status === "failed" ? (
                 <ErrorOutlineRoundedIcon sx={{ fontSize: 56, color: "error.main" }} />
+              ) : installation?.status === "degraded" || installation?.status === "stopped" ? (
+                <ErrorOutlineRoundedIcon sx={{ fontSize: 56, color: "warning.main" }} />
               ) : installation?.status === "cancelled" ? (
                 <ErrorOutlineRoundedIcon sx={{ fontSize: 56, color: "warning.main" }} />
               ) : (
@@ -749,9 +898,13 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
                   ? "You're live"
                   : installation?.status === "failed"
                     ? "Install failed"
-                    : installation?.status === "cancelled"
-                      ? "Install cancelled"
-                      : "Installing…"}
+                    : installation?.status === "degraded"
+                      ? "App needs attention"
+                      : installation?.status === "stopped"
+                        ? "App is stopped"
+                        : installation?.status === "cancelled"
+                          ? "Install cancelled"
+                          : "Installing…"}
               </Typography>
 
               {!isSuccessful && (
@@ -842,9 +995,11 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           py: 1.5,
           borderTop: "1px solid",
           borderColor: "divider",
+          gap: 1,
+          flexWrap: "wrap",
         }}
       >
-        {activeStep < 2 && (
+        {activeStep < 3 && (
           <Button onClick={onClose} disabled={installing} color="inherit">
             Close
           </Button>
@@ -888,12 +1043,12 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               variant="contained"
               endIcon={<ArrowForwardRoundedIcon />}
               onClick={async () => {
-                if (resolved || await resolvePlan()) setActiveStep(2);
+                if (await resolvePlan()) setActiveStep(2);
               }}
-              disabled={!planId || resolveLoading}
+              disabled={!canAdvanceFromResources}
               sx={{ borderRadius: 2.2, px: 2, fontWeight: 900 }}
             >
-              {resolveLoading ? "Checking…" : resolved ? "Continue" : "Review"}
+              {resolveLoading ? "Checking…" : "Review installation"}
             </Button>
           </>
         )}
@@ -905,21 +1060,22 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
               disabled={installing}
               sx={{ borderRadius: 2.2, fontWeight: 800 }}
             >
-              Back
+              Back to plans
             </Button>
             <Button
               variant="contained"
+              color="primary"
               onClick={createInstallation}
               disabled={installing || !resolved}
               sx={{ borderRadius: 2.2, px: 2.2, fontWeight: 900 }}
-              startIcon={installing ? <CircularProgress size={16} color="inherit" /> : undefined}
+              startIcon={installing ? <CircularProgress size={16} color="inherit" /> : <CheckCircleRoundedIcon />}
             >
-              {installing ? "Launching…" : "Install"}
+              {installing ? "Starting…" : "Confirm & install"}
             </Button>
           </>
         )}
 
-        {activeStep === 2 && installation?.id && !isTerminal && (
+        {activeStep === 3 && installation?.id && !isTerminal && (
           <Button
             color="warning"
             variant="outlined"
@@ -930,7 +1086,7 @@ export default function ReadyAppWizard({ open, app, onClose, onOpenInstallation 
           </Button>
         )}
 
-        {activeStep === 2 && installation?.id && isTerminal && (
+        {activeStep === 3 && installation?.id && isTerminal && (
           <Button
             variant="contained"
             onClick={() => onOpenInstallation(String(installation.id))}

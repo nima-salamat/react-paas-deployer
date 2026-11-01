@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Pagination, Paper, Stack, Tab, Tabs, TextField, Tooltip, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Pagination, Paper, Stack, Tab, Tabs, TextField, Tooltip, Typography, useMediaQuery } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
@@ -7,11 +7,11 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
 import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, deleteCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest, deleteAgent } from "./agentApi";
@@ -27,6 +27,8 @@ export default function AgentDetail() {
   const { t: tr } = useLocale();
   const { id } = useParams();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [agent, setAgent] = useState(null);
   const [scopeCatalog, setScopeCatalog] = useState({ scopes: [], defaults: [] });
   const [credentials, setCredentials] = useState([]);
@@ -224,8 +226,13 @@ export default function AgentDetail() {
             </Stack>
             <Typography color="text.secondary" sx={{ mt: 0.55 }}>{agent.description || tr("No description")}</Typography>
           </Box>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button variant="outlined" startIcon={<DescriptionRoundedIcon />} onClick={doManifest} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{tr(saving ? "Generating…" : "View AGENT.md")}</Button>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" useFlexGap alignItems={{ xs: "stretch", sm: "center" }}>
+            <Button variant="contained" color="primary" startIcon={<SmartToyOutlinedIcon />} onClick={doManifest} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.7, fontWeight: 850, minHeight: 42 }}>
+              {tr(saving ? "Preparing setup prompt…" : "Get setup prompt")}
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ maxWidth: 280 }}>
+              {tr("Open the setup instructions and copy the prompt into your AI assistant.")}
+            </Typography>
             <Button variant="outlined" startIcon={<KeyRoundedIcon />} onClick={() => setIssueOpen(true)} disabled={saving || agent.status !== "active"} sx={{ borderRadius: 1.5 }}>{tr("Issue token")}</Button>
             {agent.status === "active" ? <Button color="warning" variant="outlined" startIcon={<BlockRoundedIcon />} onClick={() => statusAction("disable")} disabled={saving} sx={{ borderRadius: 1.5 }}>{tr("Disable")}</Button> : null}
             {agent.status === "disabled" ? <Button variant="outlined" startIcon={<RestartAltRoundedIcon />} onClick={() => statusAction("enable")} disabled={saving} sx={{ borderRadius: 1.5 }}>{tr("Enable")}</Button> : null}
@@ -450,62 +457,88 @@ export default function AgentDetail() {
 
       <Dialog
         open={manifestDialog.open}
-        onClose={() => setManifestDialog({ open: false, content: "", filename: "" })}
+        onClose={(event, reason) => {
+          if (reason === "backdropClick" || reason === "escapeKeyDown") return;
+          setManifestDialog({ open: false, content: "", filename: "" });
+        }}
+        disableEscapeKeyDown
+        fullScreen={isMobile}
         fullWidth
         maxWidth="lg"
+        PaperProps={{ sx: { borderRadius: { xs: 0, sm: 2.5 }, overflow: "hidden" } }}
       >
-        <DialogTitle sx={{ fontWeight: 850 }}>{tr("AGENT.md")}</DialogTitle>
-        <DialogContent dividers>
-          <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
-            This generated file contains a short-lived, single-use enrollment token. Copy or save it only where the automation client can use it, and do not publish it.
-          </Alert>
-          <Box
-            component="pre"
-            sx={{
-              m: 0,
-              p: 2,
-              minHeight: 320,
-              maxHeight: "62vh",
-              overflow: "auto",
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 1.5,
-              bgcolor: "action.hover",
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              fontSize: { xs: 12, sm: 13 },
-              lineHeight: 1.6,
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {manifestDialog.content}
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between", flexWrap: "wrap", gap: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            {manifestDialog.filename || "AGENT.md"} · generated on demand
+        <DialogTitle sx={{ fontWeight: 900, px: { xs: 2, sm: 3 }, py: 2 }}>
+          {tr("Setup prompt for your AI agent")}
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.35, fontWeight: 500 }}>
+            {manifestDialog.filename || "AGENT.md"} · {tr("Generated securely for this Agent")}
           </Typography>
-          <Stack direction="row" spacing={1}>
+        </DialogTitle>
+        <DialogContent dividers sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+          <Stack spacing={1.5}>
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              {tr("Click Copy setup prompt below, then paste it into your AI coding assistant or automation client.")}
+            </Alert>
+            <Alert severity="warning" sx={{ borderRadius: 2 }}>
+              {tr("This generated file contains a short-lived, single-use enrollment token. Copy or save it only where the automation client can use it, and do not publish it.")}
+            </Alert>
+            {manifestCopied ? (
+              <Alert severity="success" icon={<CheckRoundedIcon />} sx={{ borderRadius: 2 }}>
+                {tr("Prompt copied. Paste it into your AI assistant to get started.")}
+              </Alert>
+            ) : null}
+            <Box
+              component="pre"
+              sx={{
+                m: 0,
+                p: { xs: 1.4, sm: 2 },
+                minHeight: { xs: 220, sm: 320 },
+                maxHeight: { xs: "calc(100dvh - 340px)", sm: "62vh" },
+                overflow: "auto",
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1.8,
+                bgcolor: "action.hover",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                fontSize: { xs: 11, sm: 13 },
+                lineHeight: 1.6,
+                whiteSpace: "pre-wrap",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {manifestDialog.content}
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.7, borderTop: "1px solid", borderColor: "divider" }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: "100%" }}>
             <Button
+              variant="contained"
+              color="primary"
               startIcon={manifestCopied ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />}
               onClick={copyManifest}
               disabled={!manifestDialog.content}
+              fullWidth={isMobile}
+              sx={{ borderRadius: 1.7, fontWeight: 850, minHeight: 42 }}
             >
-              {manifestCopied ? "Copied" : "Copy"}
+              {tr(manifestCopied ? "Copied — paste into your AI assistant" : "Copy setup prompt")}
             </Button>
             <Button
               variant="outlined"
               startIcon={<DownloadRoundedIcon />}
               onClick={() => downloadManifest(manifestDialog.content, manifestDialog.filename || "AGENT.md")}
               disabled={!manifestDialog.content}
+              fullWidth={isMobile}
+              sx={{ borderRadius: 1.7, minHeight: 42 }}
             >
-              Download
+              {tr("Download")}
             </Button>
             <Button
-              variant="contained"
+              color="inherit"
               onClick={() => setManifestDialog({ open: false, content: "", filename: "" })}
+              fullWidth={isMobile}
+              sx={{ borderRadius: 1.7, minHeight: 42 }}
             >
-              Done
+              {tr("Close")}
             </Button>
           </Stack>
         </DialogActions>

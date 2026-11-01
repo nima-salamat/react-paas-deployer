@@ -69,7 +69,7 @@ function statusColor(status) {
   const value = String(status || "").toLowerCase();
   if (value === "running") return "success";
   if (value === "failed") return "error";
-  if (value === "cancelled") return "warning";
+  if (value === "cancelled" || value === "degraded") return "warning";
   return "default";
 }
 
@@ -81,10 +81,17 @@ export default function ReadyAppInstallation() {
   const installationPath = `/dashboard/ready-apps/installations/${encodeURIComponent(id)}`;
   const locationPathRef = useRef(location.pathname);
   const cleanupDeleteTargetRef = useRef(null);
+  const cleanupDeleteNavigateRef = useRef(false);
 
   useLayoutEffect(() => {
     locationPathRef.current = location.pathname;
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (location.pathname !== installationPath) {
+      cleanupDeleteNavigateRef.current = false;
+    }
+  }, [location.pathname, installationPath]);
   const [installation, setInstallation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -116,9 +123,11 @@ export default function ReadyAppInstallation() {
             response.data.services.length > 0);
         setCleanupDeletePending(cleanupPending);
         cleanupDeleteTargetRef.current = cleanupPending ? String(id) : null;
+        cleanupDeleteNavigateRef.current =
+          cleanupPending && locationPathRef.current === installationPath;
         setPolling(
           !cleanupPending &&
-          (!["running", "failed"].includes(nextStatus) &&
+          (!["running", "stopped", "failed"].includes(nextStatus) &&
             !(nextStatus === "cancelled" && !cleanupPending))
         );
       } catch (err) {
@@ -160,10 +169,14 @@ export default function ReadyAppInstallation() {
         if (!deletionPending) {
           const status = String(current?.status || "").toLowerCase();
           const services = Array.isArray(current?.services) ? current.services : [];
-          if (status === "cancelled" && services.length === 0) {
+          if (services.length === 0) {
             setCleanupDeletePending(false);
             cleanupDeleteTargetRef.current = null;
-            if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
+            const shouldNavigate = cleanupDeleteNavigateRef.current;
+            cleanupDeleteNavigateRef.current = false;
+            if (shouldNavigate && locationPathRef.current === installationPath) {
+              navigate("/dashboard/ready-apps/installations");
+            }
           }
         }
       } catch (err) {
@@ -172,7 +185,11 @@ export default function ReadyAppInstallation() {
         if (statusCode === 404) {
           setCleanupDeletePending(false);
           cleanupDeleteTargetRef.current = null;
-          if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
+          const shouldNavigate = cleanupDeleteNavigateRef.current;
+          cleanupDeleteNavigateRef.current = false;
+          if (shouldNavigate && locationPathRef.current === installationPath) {
+            navigate("/dashboard/ready-apps/installations");
+          }
           return;
         }
         setError(
@@ -216,7 +233,7 @@ export default function ReadyAppInstallation() {
             Array.isArray(response.data?.services) &&
             response.data.services.length > 0);
         setCleanupDeletePending(cleanupPending);
-        if (cleanupPending || ["running", "failed"].includes(nextStatus)) {
+        if (cleanupPending || ["running", "stopped", "failed"].includes(nextStatus)) {
           setPolling(false);
         }
       } catch (err) {
@@ -250,6 +267,9 @@ export default function ReadyAppInstallation() {
   };
 
   const deleteInstallation = async () => {
+    const shouldNavigateAfterDelete =
+      locationPathRef.current === installationPath;
+    cleanupDeleteNavigateRef.current = shouldNavigateAfterDelete;
     cleanupDeleteTargetRef.current = String(id);
     setDeleting(true);
     setError("");
@@ -265,12 +285,22 @@ export default function ReadyAppInstallation() {
         setError("");
         return;
       }
-      if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
+      if (
+        shouldNavigateAfterDelete
+        && locationPathRef.current === installationPath
+      ) {
+        cleanupDeleteNavigateRef.current = false;
+        navigate("/dashboard/ready-apps/installations");
+      }
     } catch (err) {
       if (err?.response?.status === 404) {
-        if (locationPathRef.current === installationPath) navigate("/dashboard/ready-apps/installations");
+        if (shouldNavigateAfterDelete && locationPathRef.current === installationPath) {
+          cleanupDeleteNavigateRef.current = false;
+          navigate("/dashboard/ready-apps/installations");
+        }
         return;
       }
+      cleanupDeleteNavigateRef.current = false;
       setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The App could not be deleted."));
     } finally {
       setDeleting(false);
@@ -288,7 +318,6 @@ export default function ReadyAppInstallation() {
       installation?.application_url?.replace(/^https?:\/\//i, "").replace(/\/.*$/, "") ||
       ""
   ).trim();
-  const resources = installation?.resource_summary || {};
   const serviceRows = installation?.services || [];
   const serviceMetricsKey = serviceRows.map((item) => String(item?.service_id || "")).filter(Boolean).join(",");
 
@@ -320,7 +349,10 @@ export default function ReadyAppInstallation() {
   useEffect(() => {
     if (!serviceRows.length) return undefined;
     refreshServiceMetrics(serviceRows);
-    if (status !== "running" || deletionPending) return undefined;
+    const hasRunningChild = serviceRows.some(
+      (service) => String(service?.status || "").toLowerCase() === "running"
+    );
+    if (!hasRunningChild || deletionPending) return undefined;
     const timer = window.setInterval(() => refreshServiceMetrics(serviceRows), 3000);
     return () => window.clearInterval(timer);
   }, [serviceMetricsKey, status, deletionPending, refreshServiceMetrics]);
@@ -427,7 +459,7 @@ export default function ReadyAppInstallation() {
             )}
           </Stack>
 
-          {!deletionPending && !["running", "failed", "cancelled"].includes(status) && (
+          {!deletionPending && !["running", "stopped", "degraded", "failed"].includes(status) && (
             <Box sx={{ mt: 2 }}>
               <LinearDeploymentState stage={installation.stage} />
             </Box>
@@ -446,7 +478,7 @@ export default function ReadyAppInstallation() {
         </Paper>
 
         <Grid container spacing={2}>
-          <Grid item xs={12} md={7}>
+          <Grid item xs={12} md={12}>
             <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
               <CardContent>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
@@ -476,7 +508,8 @@ export default function ReadyAppInstallation() {
                             {service.service_name}
                           </Typography>
                         </Box>
-                        <Stack direction="row" spacing={0.8} alignItems="center">
+                        <Stack direction="row" spacing={0.8} alignItems="center" flexWrap="wrap" useFlexGap>
+                          {service.plan?.name ? <Chip size="small" variant="outlined" label={service.plan.name} /> : null}
                           <Chip size="small" color={statusColor(service.status)} label={pretty(service.status)} />
                           <Button
                             size="small"
@@ -564,27 +597,21 @@ export default function ReadyAppInstallation() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={4}>
-            <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
-              <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>Resources</Typography>
-                <Stack spacing={1.2} sx={{ mt: 1.5 }}>
-                  <Metric icon={<ComputerRoundedIcon />} label="CPU" value={(resources.cpu_vcpu ?? "—") + " vCPU"} />
-                  <Metric icon={<MemoryRoundedIcon />} label="RAM" value={(resources.ram_mb ?? "—") + " MB"} />
-                  <Metric icon={<StorageRoundedIcon />} label="Storage" value={(resources.storage_mb ?? "—") + " MB"} />
-                </Stack>
-                <Divider sx={{ my: 1.7 }} />
-                <Typography variant="caption" color="text.secondary">
-                  Plan allocation for this app.
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
         </Grid>
 
         {status === "running" && (
           <Alert severity="success" sx={{ borderRadius: 2 }}>
             Deployment completed successfully. The application URL is ready to use.
+          </Alert>
+        )}
+        {status === "degraded" && (
+          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+            One or more services are not in the requested running state. Review the service statuses and resource plans below.
+          </Alert>
+        )}
+        {status === "stopped" && (
+          <Alert severity="info" sx={{ borderRadius: 2 }}>
+            All services in this Ready App are stopped.
           </Alert>
         )}
 
@@ -602,7 +629,7 @@ export default function ReadyAppInstallation() {
             </Button>
           )}
 
-          {["running", "failed", "cancelled"].includes(status) && (
+          {["running", "stopped", "degraded", "failed"].includes(status) && (
             <Button
               color="error"
               variant="outlined"

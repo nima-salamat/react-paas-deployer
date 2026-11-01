@@ -3701,3 +3701,40 @@ Object.assign(fa, {
   "Unassigned": "بدون تخصیص",
   "You can view departments assigned to you. Managing department metadata requires": "می‌توانید دپارتمان‌هایی را که به شما اختصاص داده شده‌اند ببینید. برای مدیریت تنظیمات دپارتمان به این مجوز نیاز دارید:"
 });
+
+
+// Ready Apps install wizard and Agent setup prompt UX.
+Object.assign(fa, {
+  "Service plans": "پلن سرویس‌ها",
+  "Review": "مرور نهایی",
+  "Install": "نصب",
+  "Step": "مرحله",
+  "of": "از",
+  "Choose a plan for each service": "برای هر سرویس یک پلن انتخاب کنید",
+  "Each component has its own resource needs. Select its plan separately.": "هر سرویس منابع مخصوص خودش را نیاز دارد. پلن هر کدام را جداگانه انتخاب کنید.",
+  "Resource plan": "پلن منابع",
+  "available plans": "پلن در دسترس",
+  "No plans are available for this service.": "برای این سرویس پلنی در دسترس نیست.",
+  "Review your installation": "مرور نهایی نصب",
+  "Check the services and resource plans below. Nothing is created until you confirm.": "سرویس‌ها و پلن‌های انتخاب‌شده را بررسی کنید. تا وقتی تأیید نکنید چیزی ساخته نمی‌شود.",
+  "Confirm & install": "تأیید و نصب",
+  "Back to plans": "بازگشت به انتخاب پلن‌ها",
+  "Service breakdown": "جزئیات سرویس‌ها",
+  "Hourly estimate": "هزینه تخمینی ساعتی",
+  "Needs attention": "نیازمند بررسی",
+  "Stopped": "متوقف‌شده",
+  "All services in this Ready App are stopped.": "تمام سرویس‌های این Ready App متوقف شده‌اند.",
+  "One or more services are not in the requested running state. Review the service statuses and resource plans below.": "وضعیت اجرایی یک یا چند سرویس با حالت درخواستی فرق دارد. وضعیت و پلن منابع سرویس‌ها را بررسی کنید.",
+  "Copy setup prompt": "کپی پرامپت راه‌اندازی",
+  "Preparing setup prompt…": "در حال آماده‌سازی پرامپت راه‌اندازی…",
+  "Generate a ready-to-paste setup prompt for your AI assistant.": "یک پرامپت آماده برای کپی در دستیار هوش مصنوعی شما می‌سازد.",
+  "Setup prompt for your AI agent": "پرامپت راه‌اندازی Agent",
+  "Click Copy setup prompt below, then paste it into your AI coding assistant or automation client.": "روی دکمهٔ «کپی پرامپت راه‌اندازی» بزنید و متن را در دستیار برنامه‌نویسی یا ابزار اتوماسیون خود وارد کنید.",
+  "Prompt copied. Paste it into your AI assistant to get started.": "پرامپت کپی شد. برای شروع آن را در دستیار هوش مصنوعی خود وارد کنید.",
+  "Copied — paste into your AI assistant": "کپی شد؛ در دستیار هوش مصنوعی جای‌گذاری کنید",
+  "Generated securely for this Agent": "به‌صورت امن برای این Agent ساخته شده است",
+  "Download": "دانلود",
+  "Close": "بستن",
+  "Get setup prompt": "دریافت پرامپت راه‌اندازی",
+  "Open the setup instructions and copy the prompt into your AI assistant.": "راهنمای راه‌اندازی را باز کنید و پرامپت را در دستیار هوش مصنوعی خود کپی کنید."
+});

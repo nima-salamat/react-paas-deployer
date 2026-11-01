@@ -100,3 +100,34 @@ testFn("Ready App brands stay consistent from catalog to details, install flow a
   assert.match(wizard, /ReadyAppBrandMark/);
   assert.match(installations, /ReadyAppBrandMark/);
 });
+
+
+testFn("Ready App wizard assigns a validated plan to every child and confirms from a review step", () => {
+  const wizard = read("src/components/ready_apps/ReadyAppWizard.jsx");
+
+  assert.match(wizard, /const serviceSpecs = useMemo/);
+  assert.match(wizard, /const planOptionsByKey = useMemo/);
+  assert.match(wizard, /const servicePlansComplete/);
+  assert.match(wizard, /service_plan_ids: servicePlanIds/);
+  assert.match(wizard, /Choose a plan for each service/);
+  assert.match(wizard, /Review your installation/);
+  assert.match(wizard, /Confirm & install/);
+  assert.doesNotMatch(wizard, /const \[planId, setPlanId\]/);
+  assert.match(wizard, /reason === "backdropClick"/);
+  assert.match(wizard, /disableEscapeKeyDown/);
+  assert.match(wizard, /fullScreen=\{isMobile\}/);
+});
+
+testFn("Ready App detail shows child plans and statuses without a duplicate aggregate resource card", () => {
+  const detail = read("src/components/ready_apps/ReadyAppInstallation.jsx");
+  const list = read("src/components/ready_apps/ReadyAppInstallations.jsx");
+
+  assert.match(detail, /service\.plan\?\.name/);
+  assert.doesNotMatch(detail, />Resources<\/Typography>/);
+  assert.match(detail, /cleanupDeleteNavigateRef/);
+  assert.match(detail, /shouldNavigateAfterDelete/);
+  assert.match(detail, /status === "degraded"/);
+  assert.match(detail, /status === "stopped"/);
+  assert.match(list, /Needs attention/);
+  assert.match(list, /Stopped/);
+});

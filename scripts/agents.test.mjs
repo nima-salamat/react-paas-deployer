@@ -25,9 +25,14 @@ test("agent detail exposes manifest content for review, copy and download", () =
 
   assert.match(source, /generateManifest\(id\)/);
   assert.match(source, /setManifestDialog\(/);
+  assert.match(source, /Get setup prompt/);
+  assert.match(source, /Open the setup instructions and copy the prompt into your AI assistant/);
   assert.match(source, /const copyManifest = async/);
   assert.match(source, /navigator\.clipboard\.writeText\(manifestDialog\.content\)/);
-  assert.match(source, /\{manifestCopied \? "Copied" : "Copy"\}/);
+  assert.match(source, /Copy setup prompt/);
+  assert.match(source, /Click Copy setup prompt below, then paste it into your AI coding assistant or automation client/);
+  assert.match(source, /Prompt copied\. Paste it into your AI assistant to get started/);
+  assert.match(source, /fullScreen=\{isMobile\}/);
   assert.match(source, /downloadManifest\(manifestDialog\.content/);
   assert.match(source, /This generated file contains a short-lived, single-use enrollment token/);
   assert.doesNotMatch(source, /await downloadManifest\(id\)/);
