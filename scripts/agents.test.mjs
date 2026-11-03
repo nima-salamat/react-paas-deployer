@@ -143,3 +143,25 @@ test("agent create All-scope preset warns before granting every high-risk capabi
   assert.match(source, /Select all Agent scopes\?/);
   assert.match(source, /elevated shell and destructive operations/);
 });
+
+test("Agent scope categories can be selected as a tri-state group in create and edit flows", () => {
+  const picker = read("src/components/agents/AgentScopePicker.jsx");
+  const create = read("src/components/agents/Agents.jsx");
+  const detail = read("src/components/agents/AgentDetail.jsx");
+
+  assert.match(picker, /checked=\{allSelected\}/);
+  assert.match(picker, /indeterminate=\{partiallySelected\}/);
+  assert.match(picker, /selectedCount \} \/ \{categoryScopes\.length/);
+  assert.match(picker, /onToggleCategory\?\.\(category, categoryScopes\)/);
+  assert.match(picker, /onToggleScope\?\.\(scope\.name\)/);
+
+  assert.match(create, /const toggleScopeCategory = \(category, scopes\)/);
+  assert.match(create, /category includes high-risk or destructive capabilities/);
+  assert.match(create, /onToggleCategory=\{toggleScopeCategory\}/);
+  assert.match(create, /groups=\{groupedScopes\}/);
+
+  assert.match(detail, /const toggleScopeCategory = \(_category, scopes\)/);
+  assert.match(detail, /onToggleCategory=\{toggleScopeCategory\}/);
+  assert.match(detail, /groups=\{groupedScopes\}/);
+  assert.match(detail, /newlyGrantedHighRisk/);
+});
