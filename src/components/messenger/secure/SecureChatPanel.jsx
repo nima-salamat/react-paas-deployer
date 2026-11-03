@@ -534,7 +534,7 @@ export default function SecureChatPanel({
       // Keep the receipt retryable when the homeserver is temporarily unavailable.
       readReceiptSentRef.current.delete(eventId);
     }
-  }, [matrixClient, onSecureUnreadCountChange]);
+  }, [matrixClient, roomId, onSecureUnreadCountChange]);
 
   useEffect(() => {
     const root = timelineRef.current;
