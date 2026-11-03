@@ -1408,7 +1408,7 @@ export default function SecureChatPanel({
             </Box>
             <Typography variant="h6" fontWeight={800}>Secure room unavailable</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 390, lineHeight: 1.7 }}>
-              The normal Messenger timeline is intentionally hidden. Check Matrix configuration, device authentication, room membership and key recovery, then retry.
+              The normal Messenger timeline is intentionally not shown. Check Matrix configuration, device authentication, room membership and key recovery, then retry.
             </Typography>
             <Button variant="contained" onClick={() => setRevision((value) => value + 1)} sx={{ mt: 0.5, px: 3, borderRadius: 2.5 }}>
               Try again
@@ -1460,7 +1460,7 @@ export default function SecureChatPanel({
             <Chip label="Waiting for participants" color="warning" variant="outlined" size="small" />
             <Typography variant="h6" fontWeight={800}>Waiting for secure-room participants</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, lineHeight: 1.7 }}>
-              The encrypted invitation is ready, but one or more participants have not joined with a Matrix device yet. Sending stays paused so message keys are not shared only with this device. They can accept the invitation when they come online.
+              The encrypted invitation is ready, but one or more participants have not joined with a Matrix device yet. Sending stays paused so message keys are not shared only with this device. The other person does not need to create a secure chat manually; they can do that when they come online.
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Your standard Messenger history remains separate and unchanged.
@@ -1996,7 +1996,7 @@ export default function SecureChatPanel({
               onClick={() => mediaInputRef.current?.click()}
               sx={{
                 flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42,
-                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.5, p: 0,
+                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
                 color: "text.secondary", bgcolor: "action.hover",
                 "&:hover": { bgcolor: "action.selected", color: "primary.main" },
               }}
@@ -2011,7 +2011,7 @@ export default function SecureChatPanel({
               onClick={() => void toggleVoiceRecording()}
               sx={{
                 flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42,
-                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.5, p: 0,
+                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
                 bgcolor: recordingVoice ? "error.main" : "action.hover",
                 color: recordingVoice ? "error.contrastText" : "text.secondary",
                 "&:hover": { bgcolor: recordingVoice ? "error.dark" : "action.selected", color: recordingVoice ? "error.contrastText" : "primary.main" },
