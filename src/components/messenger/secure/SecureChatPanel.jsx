@@ -999,6 +999,7 @@ export default function SecureChatPanel({
               {recordingVoice ? <StopIcon /> : <MicIcon />}
             </IconButton>
             <TextField
+              inputRef={draftInputRef}
               fullWidth multiline minRows={1} maxRows={5}
               placeholder={recordingVoice ? "Recording voice message…" : "Write an end-to-end encrypted message…"}
               value={draft}
