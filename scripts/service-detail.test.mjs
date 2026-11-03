@@ -574,13 +574,17 @@ test("developer shell commands always use the PTY transport and preserve termina
 
   assert.match(shell, /message\.type === "command\.output"/);
   assert.match(shell, /message\.type === "process\.exit"[\s\S]*?runningRef\.current = false/);
-  assert.match(shell, /keepMounted=\{isDeveloperSession\}/);
-  assert.match(shell, /disabled=\{isDeveloperSession\}/);
   assert.match(shell, /const handleTerminalSurfaceClick = useCallback/);
   assert.match(shell, /onClick=\{handleTerminalSurfaceClick\}/);
   assert.match(shell, /range\.collapse\(false\)/);
   assert.match(shell, /if \(selection && !selection\.isCollapsed\) return/);
-  assert.match(xterm, /keepMounted = false/);
+  assert.match(shell, /onReady=\{handleXtermReady\}/);
+  assert.match(shell, /ptyOutputRef\.current = \(ptyOutputRef\.current \+ raw\)/);
+  assert.match(shell, /const transcript = cleanOutput\(ptyOutputRef\.current\)/);
+  assert.match(shell, /\{interactiveRunning \? \(/);
+  assert.doesNotMatch(shell, /keepMounted=\{isDeveloperSession\}/);
+  assert.match(xterm, /onReady,/);
+  assert.match(xterm, /callbacksRef\.current\.onReady\?\.\(\)/);
   assert.match(xterm, /disableStdin: !activeRef\.current/);
   assert.match(xterm, /if \(activeRef\.current\) callbacksRef\.current\.onData/);
 });
