@@ -344,6 +344,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const xtermWriteRef = useRef(null);
   const ptyOutputRef = useRef("");
   const pendingXtermOutputRef = useRef("");
+  const lastShellCommandRef = useRef("");
   const editorInputRef = useRef(null);
 
   const serviceId = service?.id ?? service?.pk;
@@ -620,7 +621,12 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         setSession((prev) => (prev ? { ...prev, cwd: nextCwd } : prev));
         const stdout = cleanOutput(message.stdout);
         const stderr = cleanOutput(message.stderr);
-        if (isDeveloperSession && xtermWriteRef.current) {
+        // A successful cd is silent in an ordinary shell; the updated working
+        // directory is reflected by the next prompt instead of printing a path.
+        const isCdCommand = /^cd(?:\s|$)/.test(lastShellCommandRef.current);
+        if (isDeveloperSession && isCdCommand) {
+          // no output
+        } else if (isDeveloperSession && xtermWriteRef.current) {
           if (stdout) xtermWriteRef.current(stdout.endsWith("\n") ? stdout : `${stdout}\r\n`);
           if (stderr) xtermWriteRef.current(stderr.endsWith("\n") ? stderr : `${stderr}\r\n`);
         } else {
@@ -737,7 +743,9 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       setCommandHistory([]);
       setCommandHistoryIndex(null);
       setCommand("");
-      appendHistory({ type: "system", text: `Connected · ${service?.name || "service"} · ${data.platform || platform}` });
+      if (data.mode !== "developer") {
+        appendHistory({ type: "system", text: `Connected · ${service?.name || "service"} · ${data.platform || platform}` });
+      }
       focusTerminal();
     } catch (err) {
       const status = err?.response?.status;
@@ -1093,6 +1101,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       // Developer mode intentionally has no one-shot /command/ fallback.
       runningRef.current = true;
       setCommandRunning(true);
+      lastShellCommandRef.current = cmd;
       try {
         socket.send(JSON.stringify({ type: "command", command: cmd }));
       } catch (error) {
