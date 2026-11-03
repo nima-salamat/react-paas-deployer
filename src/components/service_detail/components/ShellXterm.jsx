@@ -11,6 +11,7 @@ import "@xterm/xterm/css/xterm.css";
 export default function ShellXterm({
   active,
   onData,
+  onReady,
   onResize,
   writeRef,
   height = 360,
@@ -20,19 +21,19 @@ export default function ShellXterm({
   const termRef = useRef(null);
   const fitRef = useRef(null);
   const activeRef = useRef(active);
-  const callbacksRef = useRef({ onData, onResize });
+  const callbacksRef = useRef({ onData, onReady, onResize });
 
   // Keep the same xterm instance alive in Developer mode between commands.
   // A completed command closes its Docker exec PTY, not the browser terminal.
   useEffect(() => {
     activeRef.current = active;
-    callbacksRef.current = { onData, onResize };
+    callbacksRef.current = { onData, onReady, onResize };
     const term = termRef.current;
     if (term) {
       term.options.disableStdin = !active;
       if (active) term.focus();
     }
-  }, [active, onData, onResize]);
+  }, [active, onData, onReady, onResize]);
 
   useEffect(() => {
     if ((!active && !keepMounted) || !hostRef.current) return undefined;
@@ -79,6 +80,7 @@ export default function ShellXterm({
         }
       };
     }
+    callbacksRef.current.onReady?.();
 
     const dataDisp = term.onData((data) => {
       if (activeRef.current) callbacksRef.current.onData?.(data);
