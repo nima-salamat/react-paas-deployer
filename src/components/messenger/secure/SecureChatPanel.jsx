@@ -769,6 +769,7 @@ export default function SecureChatPanel({
       setError(err?.message || "Encrypted message could not be sent.");
     } finally {
       setSending(false);
+      requestAnimationFrame(() => draftInputRef.current?.focus());
     }
   };
 
