@@ -52,6 +52,7 @@ import {
 import {
   getDeployPlatform,
   isDbPlatform,
+  getDbCredentialRotationPolicy,
   buildConfigPayload,
   parseDeployConfig,
   mergeObjects,
@@ -200,6 +201,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
   const [editOriginalName, setEditOriginalName] = useState("");
   const [editZipFile, setEditZipFile] = useState(null);
   const [editDbFields, setEditDbFields] = useState({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
+  const [editDbOriginalFields, setEditDbOriginalFields] = useState({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false, type: null, deployId: null, title: "", message: "", loading: false });
   const [serviceLoading, setServiceLoading] = useState(false);
@@ -979,14 +981,16 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
     // fetch via /deploy/<id>/reveal_db_credentials/ below to get the
     // real values so the user sees them in the edit form and doesn't
     // accidentally overwrite them with "" by saving without typing.
-    setEditDbFields({
+    const initialDbFields = {
       root_password: cfg.root_password != null ? String(cfg.root_password) : "",
       password: cfg.password != null ? String(cfg.password) : "",
       username: cfg.username != null ? String(cfg.username) : "",
       database: cfg.database != null ? String(cfg.database) : "",
       port: cfg.port != null ? String(cfg.port) : "",
       env: cfg.env != null ? (typeof cfg.env === "string" ? cfg.env : JSON.stringify(cfg.env, null, 2)) : "",
-    });
+    };
+    setEditDbFields(initialDbFields);
+    setEditDbOriginalFields(initialDbFields);
     setEditOriginalName(deploy.name || "");
     setEditZipFile(null);
     setError(null);
@@ -1008,17 +1012,20 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
           const data = resp?.data || {};
           if (data.result === "success" && data.config) {
             const c = data.config;
-            setEditDbFields((prev) => ({
-              ...prev,
-              root_password: c.root_password != null ? String(c.root_password) : prev.root_password,
-              password:      c.password      != null ? String(c.password)      : prev.password,
-              username:      c.username      != null ? String(c.username)      : prev.username,
-              database:      c.database      != null ? String(c.database)      : prev.database,
-              port:          c.port          != null ? String(c.port)          : prev.port,
-              env:           c.env           != null
-                              ? (typeof c.env === "string" ? c.env : JSON.stringify(c.env, null, 2))
-                              : prev.env,
-            }));
+            const revealedFields = {
+              root_password: c.root_password != null ? String(c.root_password) : null,
+              password: c.password != null ? String(c.password) : null,
+              username: c.username != null ? String(c.username) : null,
+              database: c.database != null ? String(c.database) : null,
+              port: c.port != null ? String(c.port) : null,
+              env: c.env != null ? (typeof c.env === "string" ? c.env : JSON.stringify(c.env, null, 2)) : null,
+            };
+            setEditDbFields((prev) => Object.fromEntries(
+              Object.entries(revealedFields).map(([key, value]) => [key, value == null ? prev[key] : value]),
+            ));
+            setEditDbOriginalFields((prev) => Object.fromEntries(
+              Object.entries(revealedFields).map(([key, value]) => [key, value == null ? prev[key] : value]),
+            ));
           }
         } catch {
           // Network error — leave the pre-filled (masked) values in place.
@@ -1031,6 +1038,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
     setEditingDeployId(null);
     setEditData({ name: "", version: "", config: "", platform: "docker" });
     setEditDbFields({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
+    setEditDbOriginalFields({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
     setEditOriginalName("");
     setEditZipFile(null);
     if (editZipInputRef.current) editZipInputRef.current.value = "";
@@ -1111,6 +1119,7 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
 
   const handleUpdateDeploy = async (deployId) => {
     setError(null); setSnackbar(null); setAction(deployId, { updating: true });
+    let databaseRevisionSaved = false;
 
     try {
       if (!editData.name || editData.name.length < 4) { setError("Name must be at least 4 characters."); setAction(deployId, { updating: false }); return; }
@@ -1120,20 +1129,131 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
 
       const effectivePlatform = editData.platform || planPlatform || createPlatform || "docker";
       const effectiveIsDb = isDbPlatform(effectivePlatform);
-      let configPayload;
-      try {
-        configPayload = buildConfigPayload(effectivePlatform, { configText: editData.config, dbFields: editDbFields, isDb: effectiveIsDb });
-      } catch (cfgErr) {
-        setError(cfgErr?.message || "Invalid config JSON.");
-        setSubmitting(false);
+
+      if (effectiveIsDb) {
+        // The backend no longer accepts database configuration through the
+        // generic Deploy PUT serializer. Metadata and immutable DB revisions
+        // are deliberately saved through their separate contracts.
+        const policy = getDbCredentialRotationPolicy(effectivePlatform);
+        const credentialFields = ["username", "password", "root_password", "database"];
+        const normalizeValue = (key, value) => {
+          if (key === "port") {
+            const raw = String(value ?? "").trim();
+            if (!raw) return "";
+            const numeric = Number(raw);
+            return Number.isFinite(numeric) ? String(numeric) : raw;
+          }
+          if (key === "env") {
+            const raw = String(value ?? "").trim();
+            if (!raw) return "{}";
+            try {
+              return JSON.stringify(JSON.parse(raw));
+            } catch {
+              return raw;
+            }
+          }
+          return String(value ?? "").trim();
+        };
+
+        const unsupportedChanges = credentialFields.filter((key) =>
+          !policy.editableFields.includes(key)
+          && normalizeValue(key, editDbFields[key]) !== normalizeValue(key, editDbOriginalFields[key]),
+        );
+        if (unsupportedChanges.length) {
+          setError(
+            `This database engine does not support in-place changes to: ${unsupportedChanges.join(", ")}. Create a new database and migrate its data instead.`,
+          );
+          return;
+        }
+
+        const dbUpdates = {};
+        for (const key of MUTABLE_DB_CONFIG_KEYS) {
+          const currentValue = editDbFields[key];
+          if (normalizeValue(key, currentValue) === normalizeValue(key, editDbOriginalFields[key])) continue;
+
+          // Empty password values are the backend's explicit "keep existing"
+          // convention and must never be sent as attempts to clear a secret.
+          if ((key === "password" || key === "root_password") && !String(currentValue ?? "").trim()) continue;
+
+          if (key === "env") {
+            const raw = String(currentValue ?? "").trim();
+            let parsed;
+            try {
+              parsed = raw ? JSON.parse(raw) : {};
+            } catch {
+              setError("Extra environment settings must be valid JSON.");
+              return;
+            }
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+              setError("Extra environment settings must be a JSON object.");
+              return;
+            }
+            dbUpdates.env = parsed;
+          } else if (key === "port") {
+            const raw = String(currentValue ?? "").trim();
+            if (!raw) {
+              dbUpdates.port = null;
+            } else {
+              const numeric = Number(raw);
+              if (!Number.isInteger(numeric) || numeric < 1 || numeric > 65535) {
+                setError("Database port must be an integer between 1 and 65535.");
+                return;
+              }
+              dbUpdates.port = numeric;
+            }
+          } else {
+            dbUpdates[key] = String(currentValue ?? "").trim();
+          }
+        }
+
+        if (Object.keys(dbUpdates).length) {
+          const revisionResponse = await apiRequest({
+            method: "PATCH",
+            url: `${DEPLOY_BASE}${deployId}/update_db_config/`,
+            data: dbUpdates,
+          });
+          if (revisionResponse?.data?.result !== "success" && revisionResponse?.status !== 200) {
+            throw new Error(revisionResponse?.data?.detail || "Database configuration revision was not saved.");
+          }
+          databaseRevisionSaved = true;
+        }
+
+        // Do not include config in this PUT. DB config has just been saved via
+        // update_db_config (or left unchanged), while this request only edits
+        // the Deploy's metadata.
+        const metadataResponse = await apiRequest({
+          method: "PUT",
+          url: `${DEPLOY_BASE}${deployId}/`,
+          data: { name: editData.name, version: editData.version },
+        });
+        if (metadataResponse?.status === 200) {
+          const detail = databaseRevisionSaved
+            ? "Database settings were saved as a new immutable revision. Rebuild the service to apply them. Deploy metadata updated."
+            : "Deploy metadata updated.";
+          safeSetSnackbar("success", detail);
+          await fetchDeploys(pageInfo.page);
+          handleCancelEdit();
+        } else {
+          setError(databaseRevisionSaved
+            ? "Database settings were saved as a new revision, but the Deploy name or version could not be updated."
+            : (metadataResponse?.data?.detail || "Deploy metadata update failed."));
+        }
         return;
       }
 
-      if (effectiveIsDb || !editZipFile) {
+      let configPayload;
+      try {
+        configPayload = buildConfigPayload(effectivePlatform, { configText: editData.config, dbFields: editDbFields, isDb: false });
+      } catch (cfgErr) {
+        setError(cfgErr?.message || "Invalid config JSON.");
+        return;
+      }
+
+      if (!editZipFile) {
         const payload = { name: editData.name, version: editData.version, config: configPayload };
         const resp = await apiRequest({ method: "PUT", url: `${DEPLOY_BASE}${deployId}/`, data: payload });
         if (resp.status === 200) { safeSetSnackbar("success", "Deploy updated."); await fetchDeploys(pageInfo.page); handleCancelEdit(); }
-        else setError("Update failed.");
+        else setError(resp.data?.detail || "Update failed.");
       } else {
         const fd = new FormData();
         fd.append("name", editData.name); fd.append("service", id);
@@ -1148,10 +1268,12 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
         });
 
         if (resp.status === 200) { safeSetSnackbar("success", "Deploy updated."); await fetchDeploys(pageInfo.page); handleCancelEdit(); }
-        else setError("Update file upload failed.");
+        else setError(resp.data?.detail || "Update file upload failed.");
       }
     } catch (err) {
-      setError(err, "Unexpected error while updating the deployment.");
+      setError(err, databaseRevisionSaved
+        ? "Database settings were saved as a new immutable revision, but updating the Deploy metadata failed."
+        : "Unexpected error while updating the deployment.");
     } finally {
       setAction(deployId, { updating: false });
     }
