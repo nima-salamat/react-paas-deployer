@@ -103,6 +103,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
 
   const navigate = useNavigate();
   const meId = useAuthUserId();
+  const [matrixRecoveryState, setMatrixRecoveryState] = useState(null);
 
   // Layout
   const [drawerOpen, setDrawerOpen] = useState(true);
@@ -145,6 +146,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       .map((conversation) => [String(conversation.matrix_room_id), String(conversation.id)]));
   }, [conversations, activeDetail]);
   const secureRoomToConversationIdRef = useRef(secureRoomToConversationId);
+  const secureUnreadCountsRef = useRef(new Map());
   secureRoomToConversationIdRef.current = secureRoomToConversationId;
   const isMatrixConversationId = useCallback((conversationId) =>
     secureConversationIdsRef.current.has(String(conversationId ?? "")), []);
@@ -542,7 +544,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [headerMenu, setHeaderMenu] = useState(null);
   const [callChoiceOpen, setCallChoiceOpen] = useState(false);
   const secureReconnectRef = useRef(null);
-  const secureUnreadCountsRef = useRef(new Map());
   const registerSecureReconnect = useCallback((handler) => {
     secureReconnectRef.current = typeof handler === "function" ? handler : null;
   }, []);
@@ -555,7 +556,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [secureGroupMembers, setSecureGroupMembers] = useState([]);
   const [secureRecoveryOpen, setSecureRecoveryOpen] = useState(false);
   const [secureDevicesOpen, setSecureDevicesOpen] = useState(false);
-  const [matrixRecoveryState, setMatrixRecoveryState] = useState(null);
   const [matrixNotice, setMatrixNotice] = useState(null);
   const matrixStatusRequestRef = useRef(0);
   const pendingSecureOperationRef = useRef(null);
