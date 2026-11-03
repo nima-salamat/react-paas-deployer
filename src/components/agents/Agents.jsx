@@ -7,6 +7,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { createAgent, deleteAgent, listAgents, listScopes } from "./agentApi";
+import AgentScopePicker from "./AgentScopePicker";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
 import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
@@ -65,6 +66,27 @@ export default function Agents() {
     ...prev,
     scopes: prev.scopes.includes(name) ? prev.scopes.filter((item) => item !== name) : [...prev.scopes, name],
   }));
+
+  const toggleScopeCategory = (category, scopes) => {
+    const names = scopes.map((scope) => scope.name);
+    const current = new Set(draft.scopes);
+    const fullySelected = names.length > 0 && names.every((name) => current.has(name));
+    if (!fullySelected) {
+      const newlyGrantedHighRisk = scopes.some(
+        (scope) => (scope.destructive || scope.high_risk) && !current.has(scope.name),
+      );
+      if (
+        newlyGrantedHighRisk
+        && !window.confirm(
+          `Select all permissions in "${category.replace(/_/g, " ")}"? This category includes high-risk or destructive capabilities.`,
+        )
+      ) return;
+      names.forEach((name) => current.add(name));
+    } else {
+      names.forEach((name) => current.delete(name));
+    }
+    setDraft((prev) => ({ ...prev, scopes: Array.from(current) }));
+  };
 
   const openCreate = () => {
     setDraft({ name: "", description: "", scopes: scopeCatalog.defaults || [] });
@@ -306,17 +328,17 @@ export default function Agents() {
                   </Button>
                 </Stack>
               </Stack>
-              {catalogLoading ? <CircularProgress size={20} /> : Object.entries(groupedScopes).map(([category, scopes]) => (
-                <Box key={category}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: "text.secondary", textTransform: "uppercase", letterSpacing: ".08em" }}>{category.replace(/_/g, " ")}</Typography>
-                  <Stack direction="row" spacing={0.7} flexWrap="wrap" useFlexGap sx={{ mt: 0.65 }}>
-                    {scopes.map((scope) => {
-                      const selected = draft.scopes.includes(scope.name);
-                      return <Chip key={scope.name} label={tr(scope.label)} size="small" color={selected ? "primary" : "default"} variant={selected ? "filled" : "outlined"} onClick={() => toggleScope(scope.name)} sx={{ fontWeight: 650, height: 28 }} />;
-                    })}
-                  </Stack>
-                </Box>
-              ))}
+              {catalogLoading ? (
+                <CircularProgress size={20} />
+              ) : (
+                <AgentScopePicker
+                  groups={groupedScopes}
+                  selectedScopes={draft.scopes}
+                  onToggleScope={toggleScope}
+                  onToggleCategory={toggleScopeCategory}
+                  disabled={saving}
+                />
+              )}
               {!catalogLoading && !(scopeCatalog.scopes || []).length ? <Typography color="text.secondary">{tr("No scope metadata available.")}</Typography> : null}
             </Stack>
           </Stack>
