@@ -14,16 +14,32 @@ export default function ShellXterm({
   onResize,
   writeRef,
   height = 360,
+  keepMounted = false,
 }) {
   const hostRef = useRef(null);
   const termRef = useRef(null);
   const fitRef = useRef(null);
+  const activeRef = useRef(active);
+  const callbacksRef = useRef({ onData, onResize });
+
+  // Keep the same xterm instance alive in Developer mode between commands.
+  // A completed command closes its Docker exec PTY, not the browser terminal.
+  useEffect(() => {
+    activeRef.current = active;
+    callbacksRef.current = { onData, onResize };
+    const term = termRef.current;
+    if (term) {
+      term.options.disableStdin = !active;
+      if (active) term.focus();
+    }
+  }, [active, onData, onResize]);
 
   useEffect(() => {
-    if (!active || !hostRef.current) return undefined;
+    if ((!active && !keepMounted) || !hostRef.current) return undefined;
 
     const term = new Terminal({
       cursorBlink: true,
+      disableStdin: !activeRef.current,
       fontSize: 13,
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
       theme: {
@@ -65,13 +81,13 @@ export default function ShellXterm({
     }
 
     const dataDisp = term.onData((data) => {
-      if (onData) onData(data);
+      if (activeRef.current) callbacksRef.current.onData?.(data);
     });
 
     const notifyResize = () => {
       try {
         fit.fit();
-        if (onResize) onResize(term.cols, term.rows);
+        callbacksRef.current.onResize?.(term.cols, term.rows);
       } catch {
         /* noop */
       }
@@ -92,9 +108,9 @@ export default function ShellXterm({
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [active, onData, onResize, writeRef]);
+  }, [keepMounted, writeRef]);
 
-  if (!active) return null;
+  if (!active && !keepMounted) return null;
 
   return (
     <Box
