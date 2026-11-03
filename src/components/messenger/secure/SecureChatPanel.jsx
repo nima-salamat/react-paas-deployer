@@ -954,19 +954,6 @@ export default function SecureChatPanel({
                 </Button>
               </Box>
             )}
-            {pendingUpload && (
-              <Paper elevation={0} sx={{ maxWidth: 900, mx: "auto", mb: 1.25, p: 1.25, border: "1px solid", borderColor: "primary.main", borderRadius: 2 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <LockOutlinedIcon color="success" fontSize="small" />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="body2" fontWeight={650} noWrap>{pendingUpload.filename}</Typography>
-                    <Typography variant="caption" color="text.secondary">{pendingUpload.status}</Typography>
-                  </Box>
-                  <CircularProgress size={18} />
-                </Stack>
-                <LinearProgress sx={{ mt: 1 }} />
-              </Paper>
-            )}
             {messages.length > 0 && filteredMessages.length === 0 && (
               <Typography color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
                 No matches in the decrypted messages currently loaded on this device.
@@ -1122,6 +1109,21 @@ export default function SecureChatPanel({
                 </Box>
                 </React.Fragment>
               ))}
+              {pendingUpload && (
+                <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                  <Paper elevation={0} sx={{ width: "min(78%, 420px)", p: 1.25, border: "1px solid", borderColor: "primary.main", bgcolor: "action.selected", borderRadius: 1.5 }}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <LockOutlinedIcon color="success" fontSize="small" />
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="body2" fontWeight={650} noWrap>{pendingUpload.filename}</Typography>
+                        <Typography variant="caption" color="text.secondary">{pendingUpload.status}</Typography>
+                      </Box>
+                      <CircularProgress size={17} />
+                    </Stack>
+                    <LinearProgress sx={{ mt: 1 }} />
+                  </Paper>
+                </Box>
+              )}
             </Stack>
           </Box>
           <Divider />
