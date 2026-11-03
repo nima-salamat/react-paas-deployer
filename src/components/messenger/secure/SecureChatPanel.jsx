@@ -129,6 +129,13 @@ function appConversationTitle(conversation, currentUserId) {
   return appNameForParticipant(peer) || "Secure conversation";
 }
 
+function relationForMatrixEvent(event) {
+  return event?.getRelation?.()
+    || event?.getWireContent?.()?.["m.relates_to"]
+    || event?.getContent?.()?.["m.relates_to"]
+    || {};
+}
+
 function describeEvent(event, ownUserId, profilesByMatrixId = {}) {
   const type = event.getType();
   const unsigned = event.getUnsigned?.() || {};
@@ -194,6 +201,7 @@ function describeEvent(event, ownUserId, profilesByMatrixId = {}) {
     info: media ? content.info : null,
     filename: media ? (content.filename || content.body || "Encrypted attachment") : null,
     msgtype,
+    edited: Boolean(event.replacingEvent?.() || event.replacingEventId?.() || event.getServerAggregatedRelation?.("m.replace")),
   };
 }
 
@@ -202,6 +210,7 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
   const events = room.getLiveTimeline?.().getEvents?.() || [];
   const seen = new Set();
   const rows = events
+    .filter((event) => relationForMatrixEvent(event).rel_type !== "m.replace")
     .map((event) => describeEvent(event, ownUserId, profilesByMatrixId))
     .filter((row) => {
       if (!row || seen.has(row.id)) return false;
@@ -211,10 +220,10 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
   const rowsById = new Map(rows.map((row) => [row.id, row]));
   for (const event of events) {
     const content = event.getContent?.() || {};
-    const relation = content["m.relates_to"] || {};
+    const relation = relationForMatrixEvent(event);
     if (event.getType?.() === "m.room.message" && relation.rel_type === "m.replace" && relation.event_id) {
       const target = rowsById.get(relation.event_id);
-      const replacement = content["m.new_content"] || {};
+      const replacement = content["m.new_content"] || event.getClearContent?.()?.["m.new_content"] || {};
       if (
         target
         && !target.redacted
@@ -239,11 +248,7 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
       senderId: event.getSender?.() || "",
     });
   }
-  return rows.filter((row) => {
-    const event = events.find((candidate) => candidate.getId?.() === row.id);
-    const relation = event?.getContent?.()?.["m.relates_to"];
-    return relation?.rel_type !== "m.replace";
-  }).sort((a, b) => a.timestamp - b.timestamp);
+  return rows.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 function getReadReceiptStatus(room, messageId, ownUserId) {
