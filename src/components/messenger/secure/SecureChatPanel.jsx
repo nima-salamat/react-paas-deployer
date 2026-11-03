@@ -551,7 +551,13 @@ export default function SecureChatPanel({
       // Receipts are Matrix room metadata, not plaintext Messenger messages.
       await matrixClient.sendReadReceipt(event);
       setReceiptRevision((value) => value + 1);
-      setUnreadAnchorId((current) => current === eventId ? null : current);
+      const timelineEvents = matrixClient.getRoom(roomId)?.getLiveTimeline?.().getEvents?.() || [];
+      const readIndex = timelineEvents.findIndex((candidate) => candidate.getId?.() === eventId);
+      setUnreadAnchorId((current) => {
+        if (!current) return null;
+        const anchorIndex = timelineEvents.findIndex((candidate) => candidate.getId?.() === current);
+        return anchorIndex >= 0 && readIndex >= anchorIndex ? null : current;
+      });
       const unreadCount = Number(matrixClient.getRoom(roomId)?.getUnreadNotificationCount?.("total") || 0);
       onSecureUnreadCountChange?.(unreadCount);
     } catch {
