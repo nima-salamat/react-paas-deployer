@@ -383,8 +383,27 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   }, []);
 
   const focusTerminal = useCallback(() => {
-    requestAnimationFrame(() => terminalInputRef.current?.focus());
+    requestAnimationFrame(() => {
+      const input = terminalInputRef.current;
+      if (!input) return;
+      input.focus();
+      const range = document.createRange();
+      range.selectNodeContents(input);
+      range.collapse(false);
+      const selection = window.getSelection?.();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    });
   }, []);
+
+  const handleTerminalSurfaceClick = useCallback((event) => {
+    if (!session || interactiveRunning) return;
+    if (terminalInputRef.current?.contains(event.target)) return;
+    if (event.target?.closest?.("button, a, input, textarea, [role='button'], [role='menuitem']")) return;
+    const selection = window.getSelection?.();
+    if (selection && !selection.isCollapsed) return;
+    focusTerminal();
+  }, [focusTerminal, interactiveRunning, session]);
 
   const getCaretRect = useCallback(() => {
     const element = terminalInputRef.current;
@@ -1898,7 +1917,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 )}
               </Box>
 
-              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58, userSelect: "text", WebkitUserSelect: "text" }} onScroll={() => completionOpen && requestAnimationFrame(updateHelperPosition)}>
+              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58, userSelect: "text", WebkitUserSelect: "text" }} onScroll={() => completionOpen && requestAnimationFrame(updateHelperPosition)} onClick={handleTerminalSurfaceClick}>
                 {terminalLines.map((line) => (
                   line.type === "command" ? (
                     <Box key={line.key} sx={{ minHeight: 20, whiteSpace: "pre-wrap", overflowWrap: "anywhere", userSelect: "text", WebkitUserSelect: "text" }}>
