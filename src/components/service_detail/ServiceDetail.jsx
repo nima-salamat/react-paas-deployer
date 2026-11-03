@@ -193,9 +193,6 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
   const [actionState, setActionState] = useState({});
   const [rebuildLoading, setRebuildLoading] = useState(false);
   const [forceCancelLoading, setForceCancelLoading] = useState(false);
-  const [dbConfigSaving, setDbConfigSaving] = useState(false);
-  const [dbConfigFields, setDbConfigFields] = useState({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
-
   const [editingDeployId, setEditingDeployId] = useState(null);
   const [editData, setEditData] = useState({ name: "", version: "", config: "", platform: "docker" });
   const [editOriginalName, setEditOriginalName] = useState("");
@@ -1396,34 +1393,6 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
       if (mountedRef.current) setRebuildLoading(false);
     }
   };
-
-  const handleUpdateDbConfig = async () => {
-    const deployId = selectedDeployId || selectedDeploy?.id || selectedDeploy?.pk;
-    if (!deployId || !selectedIsDb) { setError("Select a DB deploy first."); return; }
-    setDbConfigSaving(true); setError(null);
-    try {
-      const body = {};
-      for (const key of MUTABLE_DB_CONFIG_KEYS) {
-        const v = dbConfigFields[key];
-        if (v === undefined || v === null || String(v).trim() === "") continue;
-        if (key === "port") { const n = Number(v); body.port = Number.isNaN(n) ? v : n; }
-        else if (key === "env") { try { body.env = JSON.parse(v); } catch { body.env = v; } }
-        else body[key] = v;
-      }
-      if (!Object.keys(body).length) { setError("Provide at least one credential field to update."); return; }
-
-      const resp = await apiRequest({ method: "PATCH", url: `${DEPLOY_BASE}${deployId}/update_db_config/`, data: body });
-      if (resp.status === 200 || resp.data?.result === "success") {
-        safeSetSnackbar("success", resp.data?.detail || "DB config updated. Use Rebuild to apply credentials.");
-        await fetchDeploys(pageInfo.page); await fetchService(true);
-      } else setError(resp.data?.detail || "Failed to update DB config.");
-    } catch (err) {
-      setError(err, "Could not update the database configuration.");
-    } finally {
-      if (mountedRef.current) setDbConfigSaving(false);
-    }
-  };
-
 
   const forceCancelDeploy = async () => {
     if (!id) return;
