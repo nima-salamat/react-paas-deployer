@@ -880,12 +880,13 @@ export default function SecureChatPanel({
             )}
             <Stack spacing={1.25} sx={{ maxWidth: 900, mx: "auto" }}>
               {filteredMessages.map((message) => (
+                <React.Fragment key={message.id}>
                 {message.id === unreadAnchorId && !searchQuery.trim() && (
                   <Box sx={{ width: "100%", py: 0.5 }}>
                     <Divider><Chip size="small" color="primary" label="Unread messages" /></Divider>
                   </Box>
                 )}
-                <Box key={message.id} data-secure-event-id={message.id} data-secure-own={message.isOwn ? "true" : "false"} sx={{ display: "flex", justifyContent: message.isOwn ? "flex-end" : "flex-start" }}>
+                <Box data-secure-event-id={message.id} data-secure-own={message.isOwn ? "true" : "false"} sx={{ display: "flex", justifyContent: message.isOwn ? "flex-end" : "flex-start" }}>
                   <Paper
                     elevation={0}
                     data-receipt-revision={receiptRevision}
@@ -989,6 +990,7 @@ export default function SecureChatPanel({
                     </Stack>
                   </Paper>
                 </Box>
+                </React.Fragment>
               ))}
             </Stack>
           </Box>
