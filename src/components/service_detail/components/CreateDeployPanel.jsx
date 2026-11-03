@@ -15,6 +15,7 @@ import {
 import DeployCard from "./DeployCard";
 import {
   isDbPlatform,
+  getDbCredentialRotationPolicy,
   generateDbCredentials,
   buildDjangoConfigSuggestion,
 } from "../utils";
@@ -101,6 +102,10 @@ export default function CreateDeployPanel({
   const isDb = editingDeployId
     ? isDbPlatform(editData.platform || planPlatform || createPlatform)
     : isDbPlatform(effectivePlatform);
+  const editDbPlatform = editData.platform || planPlatform || createPlatform || "";
+  const rotationPolicy = editingDeployId && isDb
+    ? getDbCredentialRotationPolicy(editDbPlatform)
+    : null;
 
   // --- Fill automatically (DB credentials) ---
   // Generates a random, DB-safe set of credentials client-side (no API
@@ -116,7 +121,13 @@ export default function CreateDeployPanel({
     // Tiny delay so the spinner is visible (otherwise it flickers too fast).
     setTimeout(() => {
       if (editingDeployId) {
-        setEditDbFields((f) => ({ ...f, ...creds }));
+        const editableCredentials = new Set(
+          getDbCredentialRotationPolicy(platform).editableFields,
+        );
+        const supportedCreds = Object.fromEntries(
+          Object.entries(creds).filter(([key]) => editableCredentials.has(key)),
+        );
+        setEditDbFields((f) => ({ ...f, ...supportedCreds }));
       } else {
         setCreateDbFields((f) => ({ ...f, ...creds }));
       }
@@ -369,21 +380,29 @@ export default function CreateDeployPanel({
                 color="text.secondary"
                 sx={{ display: "block", mb: 1.25 }}
               >
-                DB credentials (stored in deploy config). After changing a
-                running DB, call Rebuild to apply — volumes/data are preserved.
+                DB credentials are stored in the deployment configuration. After
+                changing supported values, a new immutable revision is saved;
+                rebuild the service to apply it. Existing data volumes are preserved.
               </Typography>
+              {rotationPolicy ? (
+                <Alert severity="info" sx={{ mb: 1.5, py: 0.25 }}>
+                  <Typography variant="caption">{rotationPolicy.description}</Typography>
+                </Alert>
+              ) : null}
 
               {/* Fill automatically — generates a random, DB-safe username +
                   password + database name.  Saves the user from having to
                   invent secure credentials manually. */}
               <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1 }}>
-                <Tooltip title="Generate a random username, password, and database name. You can still edit them after.">
+                <Tooltip title={editingDeployId && !rotationPolicy?.canGenerateCredentials
+                  ? "This database engine does not support in-place credential rotation."
+                  : "Generate supported database credentials."}>
                   <Button
                     size="small"
                     variant="outlined"
                     startIcon={filling ? <CircularProgress size={14} /> : <AutoFixHighIcon fontSize="small" />}
                     onClick={handleFillAutomatically}
-                    disabled={filling}
+                    disabled={filling || Boolean(editingDeployId && !rotationPolicy?.canGenerateCredentials)}
                     sx={{ borderRadius: 1.5, textTransform: "none", fontWeight: 600 }}
                   >
                     Fill automatically
@@ -402,12 +421,18 @@ export default function CreateDeployPanel({
                   (field) => {
                     const editing = Boolean(editingDeployId);
                     const isPasswordField = field === "password" || field === "root_password";
+                    const isCredentialField = ["username", "password", "root_password", "database"].includes(field);
+                    const credentialEditable = !editing || Boolean(rotationPolicy?.editableFields.includes(field));
                     return (
                       <TextField
                         key={field}
                         fullWidth
                         size="small"
                         type="text"
+                        disabled={editing && isCredentialField && !credentialEditable}
+                        helperText={editing && isCredentialField && !credentialEditable
+                          ? "In-place changes are not supported by this database engine."
+                          : undefined}
                         label={field.replace(/_/g, " ")}
                         placeholder={
                           (isPasswordField && editing)
@@ -438,6 +463,9 @@ export default function CreateDeployPanel({
                 multiline
                 rows={2}
                 label="Extra env (JSON object)"
+                helperText={editingDeployId
+                  ? "Only non-secret environment settings can be changed here. Database credentials must use the supported fields above."
+                  : undefined}
                 sx={{ mt: 1.5 }}
                 value={
                   editingDeployId
