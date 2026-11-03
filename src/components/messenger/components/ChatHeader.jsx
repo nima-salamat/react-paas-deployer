@@ -67,6 +67,8 @@ export default function ChatHeader(props) {
     onCreateTopic,
     onSwitchTopic,
     onStartSecureChat,
+    secureMode = false,
+    onOpenSecuritySettings,
   } = props;
 
   const [topicMenuAnchor, setTopicMenuAnchor] = React.useState(null);
@@ -111,7 +113,7 @@ export default function ChatHeader(props) {
         {drawerOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
       </IconButton>
     )}
-    {msgSearchOpen && !isMobile ? (
+    {msgSearchOpen && !secureMode && !isMobile ? (
       <>
         <TextField
           autoFocus
@@ -212,7 +214,7 @@ export default function ChatHeader(props) {
           <CloseIcon />
         </IconButton>
       </>
-    ) : !msgSearchOpen ? (
+    ) : (!msgSearchOpen || secureMode) ? (
       <>
     <Box sx={{ position: "relative" }}>
       <Avatar src={convAvatar(activeConv, meId)} sx={{ width: 40, height: 40, cursor: "pointer" }}
@@ -237,20 +239,29 @@ export default function ChatHeader(props) {
     </Box>
     <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }}
       onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
-      <Typography fontWeight={750} noWrap fontSize={{ xs: 14.5, sm: 15.5 }} sx={{ letterSpacing: -0.15 }}>{title}</Typography>
+      <Stack direction="row" spacing={0.65} alignItems="center" minWidth={0}>
+        <Typography fontWeight={750} noWrap fontSize={{ xs: 14.5, sm: 15.5 }} sx={{ letterSpacing: -0.15 }}>{title}</Typography>
+        {secureMode ? (
+          <Tooltip title={tr("Separate end-to-end encrypted conversation")}>
+            <LockOutlinedIcon color="success" sx={{ fontSize: 16, flexShrink: 0 }} />
+          </Tooltip>
+        ) : null}
+      </Stack>
       <Typography
         variant="caption"
-        color={Object.keys(typingUsers).length ? "primary.main" : "text.secondary"}
+        color={secureMode ? "success.main" : Object.keys(typingUsers).length ? "primary.main" : "text.secondary"}
         noWrap
-        sx={{ fontStyle: Object.keys(typingUsers).length ? "italic" : "normal", maxWidth: 280 }}
+        sx={{ fontStyle: !secureMode && Object.keys(typingUsers).length ? "italic" : "normal", maxWidth: 280 }}
       >
-        {Object.keys(typingUsers).length
-          ? formatTypingLabel(typingUsers, activeConv?.type === "group")
-          : activeConv?.type === "group"
-            ? `${(activeConv?.participants || []).length} ${tr("members")}`
-            : peer?.id && onlineUsers.has(Number(peer.id))
-              ? tr("online")
-              : tr("tap for info")}
+        {secureMode
+          ? tr("End-to-end encrypted")
+          : Object.keys(typingUsers).length
+            ? formatTypingLabel(typingUsers, activeConv?.type === "group")
+            : activeConv?.type === "group"
+              ? `${(activeConv?.participants || []).length} ${tr("members")}`
+              : peer?.id && onlineUsers.has(Number(peer.id))
+                ? tr("online")
+                : tr("tap for info")}
       </Typography>
     </Box>
     {isForumConversation && (
@@ -267,7 +278,13 @@ export default function ChatHeader(props) {
       </Tooltip>
     )}
     {/* Mobile: keep a single call icon → popup with voice/video; rest in ⋮ menu */}
-    {isMobile ? (
+    {secureMode ? (
+      <Tooltip title={tr("Security settings")}>
+        <IconButton onClick={() => onOpenSecuritySettings?.()} sx={{ color: "success.main" }}>
+          <LockOutlinedIcon />
+        </IconButton>
+      </Tooltip>
+    ) : isMobile ? (
       <Tooltip title={tr("Call")}>
         <IconButton
           onClick={() => setCallChoiceOpen(true)}
@@ -313,7 +330,13 @@ export default function ChatHeader(props) {
     )}
     <IconButton aria-label={tr("Chat actions")} onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
     <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
-      {isMobile && (
+      {secureMode && (
+        <MenuItem onClick={() => { onOpenSecuritySettings?.(); setHeaderMenu(null); }}>
+          <ListItemIcon><LockOutlinedIcon fontSize="small" color="success" /></ListItemIcon>
+          {tr("Security settings")}
+        </MenuItem>
+      )}
+      {isMobile && !secureMode && (
         <MenuItem onClick={() => { openMsgSearch(); setHeaderMenu(null); }}>
           <ListItemIcon><SearchIcon fontSize="small" /></ListItemIcon> Search messages
         </MenuItem>
@@ -338,6 +361,7 @@ export default function ChatHeader(props) {
         </MenuItem>
       )}
       {activeConv?.type === "private"
+        && !secureMode
         && activeConv?.security_mode !== "matrix_e2ee"
         && peer?.id
         && !peer?.is_blocked && (
@@ -356,6 +380,7 @@ export default function ChatHeader(props) {
           {tr(activeConv.is_forum ? "Create topic" : "Organize group into topics")}
         </MenuItem>
       )}
+      {!secureMode && (
       <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
         <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon> Clear messages
       </MenuItem>
@@ -389,6 +414,7 @@ export default function ChatHeader(props) {
         <MenuItem onClick={() => { setConfirmLeave({ conv: activeConv }); setHeaderMenu(null); }}>
           <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon> Leave
         </MenuItem>
+      )}
       )}
     </Menu>
     {isForumConversation && (
