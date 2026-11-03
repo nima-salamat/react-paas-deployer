@@ -12,7 +12,8 @@ test("encrypted conversations never render the plaintext Messenger timeline or c
 
   assert.match(app, /const isMatrixE2EE = activeConv\?\.security_mode === "matrix_e2ee" \|\| Boolean\(activeConv\?\.matrix_room_id\)/);
   assert.match(app, /\{isMatrixE2EE \? \(/);
-  assert.match(app, /<SecureChatPanel[\s\S]*?conversation=\{activeConv\}[\s\S]*?currentUserId=\{meId\}[\s\S]*?onOpenSecuritySettings=/);
+  assert.match(app, /<ChatHeader[\s\S]*?secureMode=\{isMatrixE2EE\}[\s\S]*?onOpenSecuritySettings=/);
+  assert.match(app, /<SecureChatPanel[\s\S]*?conversation=\{activeConv\}[\s\S]*?currentUserId=\{meId\}/);
   const securePanel = read("src/components/messenger/secure/SecureChatPanel.jsx");
   assert.match(securePanel, /Secure room unavailable/);
   assert.match(securePanel, /phase === "error"/);
@@ -90,13 +91,14 @@ test("secure chats preserve a distinct plaintext conversation and use explicit i
 test("first-time and offline peers do not turn recovery setup into a crypto-init requirement", () => {
   const client = read("src/components/messenger/secure/MatrixSecureClient.js");
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const app = read("src/components/messenger/MessengerApp.jsx");
 
   assert.ok(client.includes("The browser could not lock the local Matrix encryption store"));
   assert.ok(client.includes('const preparedSyncClients = new WeakSet()'));
   assert.ok(client.includes("export async function assertSecureMessagingReady"));
   assert.ok(!client.includes("Set up and verify an encrypted key backup before starting a secure chat."));
   assert.ok(panel.includes("They can do that when they come online."));
-  assert.ok(panel.includes("onOpenSecuritySettings"));
+  assert.ok(app.includes("onOpenSecuritySettings"));
   assert.ok(!panel.includes("Set up recovery"));
   assert.ok(!panel.includes("MatrixRecoveryDialog"));
   assert.ok(!panel.includes('phase === "recovery_required"'));
@@ -402,4 +404,50 @@ test("Matrix recovery and verification errors are translated at their display bo
   assert.match(verification, /\{t\(phaseLabel\)\}/);
   assert.match(app, /error=\{t\(error\)\}/);
   assert.match(app, /\{t\(matrixNotice\.body\)\}/);
+});
+
+test("Matrix Rust crypto uses a per-account-device IndexedDB and safely retries an old shared-store mismatch", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+
+  assert.match(client, /CRYPTO_STORE_MODE_KEY_PREFIX/);
+  assert.match(client, /function readCryptoStoreMode\(session\)/);
+  assert.match(client, /function rememberCryptoStoreMode\(session, mode\)/);
+  assert.match(client, /async function isolatedCryptoDatabasePrefix\(session\)/);
+  assert.match(client, /JSON\.stringify\(\[/);
+  assert.match(client, /String\(session\?\.homeserverUrl/);
+  assert.match(client, /String\(session\?\.userId/);
+  assert.match(client, /String\(session\?\.deviceId/);
+  assert.match(client, /cryptoDatabasePrefix/);
+  assert.match(client, /createdDeviceSession \? "isolated" : "legacy"/);
+  assert.match(client, /isMatrixCryptoAccountMismatch\(initializationError\)/);
+  assert.match(client, /nextClient = buildClientForSession\(\)[\s\S]*?initRustCrypto\(\{ cryptoDatabasePrefix \}\)/);
+  assert.match(client, /rememberCryptoStoreMode\(session, cryptoStoreMode\)/);
+  assert.match(client, /Never delete or overwrite the old global database/);
+  assert.doesNotMatch(client, /indexedDB\.deleteDatabase/);
+});
+
+test("secure private chats use a distinct #s username hash and cannot open the plaintext DM from that route", () => {
+  const utils = read("src/components/messenger/messengerUtils.js");
+  const app = read("src/components/messenger/MessengerApp.jsx");
+
+  assert.match(utils, /h\.startsWith\("s\/"\).*type: "s"/);
+  assert.match(utils, /type === "u" \|\| type === "s"/);
+  assert.match(app, /setHash\(securePrivateChat \? "s" : "u", hashUser\)/);
+  assert.match(app, /setHash\(securePrivateChat \? "s" : "u", c\.peer\.username\)/);
+  assert.match(app, /const isSecureLink = h\.type === "s"/);
+  assert.match(app, /return isSecureLink \? secureConversation : !secureConversation/);
+});
+
+test("secure conversations reuse the Messenger identity header and profile action without plaintext chat controls", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  const header = read("src/components/messenger/components/ChatHeader.jsx");
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(app, /<ChatHeader[\s\S]*?secureMode=\{isMatrixE2EE\}/);
+  assert.match(header, /onClick=\{\(\) => \(peer\?\.id \? loadUserProfile\(peer\.id\) : pushPanel\("info"\)\)\}/);
+  assert.match(header, /secureMode \? tr\("End-to-end encrypted"\)/);
+  assert.match(header, /secureMode && \(/);
+  assert.match(header, /!secureMode && \(/);
+  assert.match(panel, /role="region" aria-label=\{appConversationTitle\(conversation, currentUserId\)\}/);
+  assert.match(panel, /Unencrypted event rejected/);
 });
