@@ -776,7 +776,7 @@ async function initializeClient() {
       nextClient.off("sync", markInitialSyncPrepared);
     };
     nextClient.on("sync", markInitialSyncPrepared);
-    nextClient.startClient({ initialSyncLimit: 40 });
+    nextClient.startClient({ initialSyncLimit: 50 });
     client = nextClient;
     currentSession = session;
     return client;
