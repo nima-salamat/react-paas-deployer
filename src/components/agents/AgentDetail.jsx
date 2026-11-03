@@ -15,6 +15,7 @@ import { useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../service_detail/errorUtils";
 import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { getAgent, listScopes, listCredentials, issueCredential, rotateCredentials, revokeCredential, deleteCredential, setAgentStatus, listAudit, updateAgent, generateManifest, downloadManifest, deleteAgent } from "./agentApi";
+import AgentScopePicker from "./AgentScopePicker";
 
 function fmt(value) { return value ? new Date(value).toLocaleString() : "Never"; }
 function provisioningLabel(value) {
@@ -91,6 +92,15 @@ export default function AgentDetail() {
   };
 
   const toggleScope = (name) => setDraft((prev) => ({ ...prev, scopes: prev.scopes.includes(name) ? prev.scopes.filter((x) => x !== name) : [...prev.scopes, name] }));
+
+  const toggleScopeCategory = (_category, scopes) => {
+    const names = scopes.map((scope) => scope.name);
+    const current = new Set(draft.scopes);
+    const fullySelected = names.length > 0 && names.every((name) => current.has(name));
+    if (fullySelected) names.forEach((name) => current.delete(name));
+    else names.forEach((name) => current.add(name));
+    setDraft((prev) => ({ ...prev, scopes: Array.from(current) }));
+  };
 
   const saveProfile = async () => {
     const oldScopes = new Set(agent?.scopes || []);
@@ -292,20 +302,13 @@ export default function AgentDetail() {
           {tab === 1 ? (
             <Box sx={{ p: { xs: 2, md: 3 } }}>
               <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}>{tr("Grant only the permissions the automation client actually needs. Destructive and high-risk scopes are marked.")}</Alert>
-              <Stack spacing={2}>
-                {Object.entries(groupedScopes).map(([category, scopes]) => (
-                  <Paper key={category} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 850, textTransform: "capitalize" }}>{category.replace(/_/g, " ")}</Typography>
-                    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                      {scopes.map((scope) => {
-                        const selected = draft.scopes.includes(scope.name);
-                        const suffix = scope.destructive ? " · destructive" : scope.high_risk ? " · high risk" : "";
-                        return <Chip key={scope.name} label={tr(scope.label) + (scope.destructive ? " · " + tr("destructive") : scope.high_risk ? " · " + tr("high risk") : "")} icon={selected ? <CheckRoundedIcon /> : undefined} color={selected ? "primary" : "default"} variant={selected ? "filled" : "outlined"} onClick={() => toggleScope(scope.name)} sx={{ height: 31, fontWeight: 650 }} />;
-                      })}
-                    </Stack>
-                  </Paper>
-                ))}
-              </Stack>
+              <AgentScopePicker
+                groups={groupedScopes}
+                selectedScopes={draft.scopes}
+                onToggleScope={toggleScope}
+                onToggleCategory={toggleScopeCategory}
+                disabled={saving}
+              />
               <Button variant="contained" onClick={saveProfile} disabled={saving} sx={{ mt: 2, borderRadius: 1.5 }}>{tr("Save permissions")}</Button>
             </Box>
           ) : null}
