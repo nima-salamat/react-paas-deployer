@@ -1,7 +1,7 @@
 /**
  * Messenger — Telegram-like full-screen UI
  *
- * URL hash: #c/<conversationId> | #u/<username>  (survives reload)
+ * URL hash: #c/<conversationId> | #u/<username> | #s/<username> (secure private chat; survives reload)
  * Esc → leave chat to list (clears hash)
  *
  * Multi-module structure:
