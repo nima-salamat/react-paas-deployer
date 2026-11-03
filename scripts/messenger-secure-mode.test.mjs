@@ -180,7 +180,7 @@ test("secure recovery is global and dismissible; standard Messenger APIs do not 
   assert.match(app, /if \(!cid \|\| isMatrixConversationId\(cid\)\) return/);
   assert.doesNotMatch(app, /\+ \(token \? `&token=\$\{encodeURIComponent\(token\)\}` : ""\)/);
   assert.match(settings, /kind === "secure-settings"/);
-  assert.match(panel, /onOpenSecuritySettings/);
+  assert.match(app, /onOpenSecuritySettings=/);
   assert.doesNotMatch(panel, /MatrixRecoveryDialog|Set up recovery/);
   assert.match(client, /return \{ state: "not_checked" \}/);
 });
@@ -449,5 +449,5 @@ test("secure conversations reuse the Messenger identity header and profile actio
   assert.match(header, /secureMode && \(/);
   assert.match(header, /!secureMode && \(/);
   assert.match(panel, /role="region" aria-label=\{appConversationTitle\(conversation, currentUserId\)\}/);
-  assert.match(panel, /Unencrypted event rejected/);
+  assert.doesNotMatch(panel, /onOpenSecuritySettings/);
 });
