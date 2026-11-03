@@ -1831,7 +1831,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
               </Box>
             ) : null}
 
-            <Box ref={terminalRef} sx={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", position: "relative", bgcolor: "#0a0f14", color: "#dce6ef" }}>
+            <Box ref={terminalRef} onClick={handleTerminalSurfaceClick} sx={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", position: "relative", bgcolor: "#0a0f14", color: "#dce6ef" }}>
               <Box
                 sx={{
                   height: { xs: 40, sm: 38 },
@@ -1944,7 +1944,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 )}
               </Box>
 
-              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58, userSelect: "text", WebkitUserSelect: "text" }} onScroll={() => completionOpen && requestAnimationFrame(updateHelperPosition)} onClick={handleTerminalSurfaceClick}>
+              <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", px: { xs: 1.2, md: 1.6 }, py: 1.25, fontFamily: MONO, fontSize: 13, lineHeight: 1.58, userSelect: "text", WebkitUserSelect: "text" }} onScroll={() => completionOpen && requestAnimationFrame(updateHelperPosition)}>
                 {terminalLines.map((line) => (
                   line.type === "command" ? (
                     <Box key={line.key} sx={{ minHeight: 20, whiteSpace: "pre-wrap", overflowWrap: "anywhere", userSelect: "text", WebkitUserSelect: "text" }}>
