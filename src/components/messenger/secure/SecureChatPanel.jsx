@@ -1460,7 +1460,7 @@ export default function SecureChatPanel({
             <Chip label="Waiting for participants" color="warning" variant="outlined" size="small" />
             <Typography variant="h6" fontWeight={800}>Waiting for secure-room participants</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, lineHeight: 1.7 }}>
-              The encrypted invitation is ready, but one or more participants have not joined with a Matrix device yet. Sending stays paused so message keys are not shared only with this device. The other person does not need to create a secure chat manually; they can do that when they come online.
+              The encrypted invitation is ready, but one or more participants have not joined with a Matrix device yet. Sending stays paused so message keys are not shared only with this device. The other person does not need to create a secure chat manually. They can do that when they come online.
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Your standard Messenger history remains separate and unchanged.
