@@ -896,15 +896,34 @@ export default function SecureChatPanel({
                         {loadedMedia[message.id] && message.mediaType === "m.video" && (
                           <video controls preload="none" src={loadedMedia[message.id].url} style={{ maxWidth: "min(65vw, 420px)", maxHeight: 420, borderRadius: 8 }} />
                         )}
-                        {!loadedMedia[message.id] && (
+                        {loadedMedia[message.id] && message.mediaType === "m.file" && (
+                          <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={() => downloadLoadedMedia(message)}>
+                            Download decrypted file
+                          </Button>
+                        )}
+                        {!loadedMedia[message.id] && !loadingMedia[message.id] && (
                           <Button
                             variant="outlined"
                             size="small"
-                            disabled={Boolean(loadingMedia[message.id])}
-                            onClick={() => void openEncryptedMedia(message, { download: message.mediaType === "m.file" })}
+                            onClick={() => {
+                              autoDecryptStartedRef.current.add(String(message.id));
+                              void openEncryptedMedia(message);
+                            }}
                           >
-                            {loadingMedia[message.id] ? "Verifying and decrypting…" : message.mediaType === "m.image" ? "Load encrypted image" : message.mediaType === "m.audio" ? "Load encrypted voice message" : message.mediaType === "m.video" ? "Load encrypted video" : "Decrypt and download file"}
+                            Decrypt and show attachment
                           </Button>
+                        )}
+                        {loadingMedia[message.id] && (
+                          <Stack spacing={0.6}>
+                            <Stack direction="row" alignItems="center" spacing={0.75}>
+                              <CircularProgress size={15} />
+                              <Typography variant="caption" color="text.secondary">{mediaStatus[message.id] || "Processing encrypted attachment…"}</Typography>
+                            </Stack>
+                            <LinearProgress />
+                          </Stack>
+                        )}
+                        {!loadingMedia[message.id] && mediaStatus[message.id] && (
+                          <Typography variant="caption" color="text.secondary">{mediaStatus[message.id]}</Typography>
                         )}
                         <Typography variant="caption" color="text.secondary">
                           {message.filename || message.body} · E2EE
