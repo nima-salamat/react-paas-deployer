@@ -208,12 +208,28 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
     });
   const rowsById = new Map(rows.map((row) => [row.id, row]));
   for (const event of events) {
-    if (event.getType?.() !== "m.reaction") continue;
     const content = event.getContent?.() || {};
     const relation = content["m.relates_to"] || {};
+    if (event.getType?.() === "m.room.message" && relation.rel_type === "m.replace" && relation.event_id) {
+      const target = rowsById.get(relation.event_id);
+      const replacement = content["m.new_content"] || {};
+      if (
+        target
+        && !target.redacted
+        && !target.mediaType
+        && String(target.senderId || "") === String(event.getSender?.() || "")
+        && typeof replacement.body === "string"
+        && replacement.msgtype === "m.text"
+      ) {
+        target.body = replacement.body;
+        target.edited = true;
+      }
+      continue;
+    }
+    if (event.getType?.() !== "m.reaction") continue;
     if (relation.rel_type !== "m.annotation" || !relation.event_id || !relation.key) continue;
     const target = rowsById.get(relation.event_id);
-    if (!target || target.undecryptable) continue;
+    if (!target || target.undecryptable || target.redacted) continue;
     if (!Array.isArray(target.reactions)) target.reactions = [];
     target.reactions.push({
       id: event.getId?.() || String(event.getTs?.() || Date.now()),
@@ -221,7 +237,11 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
       senderId: event.getSender?.() || "",
     });
   }
-  return rows.sort((a, b) => a.timestamp - b.timestamp);
+  return rows.filter((row) => {
+    const event = events.find((candidate) => candidate.getId?.() === row.id);
+    const relation = event?.getContent?.()?.["m.relates_to"];
+    return relation?.rel_type !== "m.replace";
+  }).sort((a, b) => a.timestamp - b.timestamp);
 }
 
 function getReadReceiptStatus(room, messageId, ownUserId) {
