@@ -174,7 +174,7 @@ function waitForSync(client) {
   });
 }
 
-export default function SecureChatPanel({ conversation, currentUserId, onOpenSecuritySettings, onSecureClientReady }) {
+export default function SecureChatPanel({ conversation, currentUserId, onSecureClientReady }) {
   const roomId = conversation?.matrix_room_id;
   const [phase, setPhase] = useState("connecting");
   const [error, setError] = useState("");
@@ -593,7 +593,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
   );
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, bgcolor: "background.default" }}>
+    <Box role="region" aria-label={appConversationTitle(conversation, currentUserId)} sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, bgcolor: "background.default" }}>
       <Alert
         severity="info"
         icon={<LockOutlinedIcon />}
