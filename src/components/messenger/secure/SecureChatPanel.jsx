@@ -942,9 +942,35 @@ export default function SecureChatPanel({
                         {message.mediaType === "m.audio" ? (message.body === message.filename ? "Voice message" : message.body) : message.body}
                       </Typography>
                     )}
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", textAlign: "right", mt: 0.5 }}>
-                      {new Date(message.timestamp).toLocaleString()}
-                    </Typography>
+                    <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5} sx={{ mt: 0.5 }}>
+                      {message.isOwn && (
+                        <Tooltip title={getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId())}>
+                          <Stack direction="row" alignItems="center" spacing={0.25}>
+                            <DoneAllIcon sx={{ fontSize: 14, color: getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId()) === "Seen" ? "success.main" : "text.disabled" }} />
+                            <Typography variant="caption" color="text.secondary">
+                              {getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId())}
+                            </Typography>
+                          </Stack>
+                        </Tooltip>
+                      )}
+                      {!message.mediaType && (
+                        <Tooltip title="Copy message text">
+                          <IconButton
+                            size="small"
+                            aria-label="Copy secure message"
+                            onClick={() => {
+                              try { void navigator.clipboard?.writeText(message.body || ""); } catch { /* clipboard unavailable */ }
+                            }}
+                            sx={{ p: 0.25 }}
+                          >
+                            <ContentCopyIcon sx={{ fontSize: 13 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(message.timestamp).toLocaleString()}
+                      </Typography>
+                    </Stack>
                   </Paper>
                 </Box>
               ))}
