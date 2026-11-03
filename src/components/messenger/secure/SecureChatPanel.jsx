@@ -48,6 +48,16 @@ function findFirstUnreadEventId(room, ownUserId) {
   return firstIncoming?.getId?.() || null;
 }
 
+function findUnreadEventIdByCount(room, ownUserId, unreadCount) {
+  const events = room?.getLiveTimeline?.().getEvents?.() || [];
+  const incoming = events.filter((event) => (
+    event.getSender?.() !== ownUserId
+    && isSecureTimelineMessage(event)
+  ));
+  const startIndex = Math.max(0, incoming.length - Math.max(0, Number(unreadCount) || 0));
+  return incoming[startIndex]?.getId?.() || null;
+}
+
 const INITIAL_SECURE_MESSAGE_COUNT = 50;
 const SECURE_HISTORY_PAGE_SIZE = 40;
 const MAX_INITIAL_UNREAD_HISTORY_PAGES = 100;
@@ -92,7 +102,11 @@ async function prepareInitialSecureTimeline(client, room, ownUserId, unreadCount
     pagesLoaded += 1;
   }
 
-  const unreadAnchorId = unreadCount > 0 ? findFirstUnreadEventId(room, ownUserId) : null;
+  const unreadAnchorId = unreadCount <= 0
+    ? null
+    : receiptEventId
+      ? findFirstUnreadEventId(room, ownUserId)
+      : findUnreadEventIdByCount(room, ownUserId, unreadCount);
   return {
     unreadAnchorId,
     hasMoreHistory: !exhausted,
