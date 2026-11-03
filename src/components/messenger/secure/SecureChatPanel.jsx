@@ -1427,6 +1427,129 @@ export default function SecureChatPanel({
         </>
       )}
 
+      <Menu
+        anchorEl={messageMenuAnchor}
+        open={Boolean(messageMenuAnchor && messageMenuTarget)}
+        onClose={() => {
+          setMessageMenuAnchor(null);
+          setMessageMenuTarget(null);
+        }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        {messageMenuTarget && !messageMenuTarget.redacted && !messageMenuTarget.mediaType && (
+          <MenuItem onClick={() => {
+            try { void navigator.clipboard?.writeText(messageMenuTarget.body || ""); } catch { /* clipboard unavailable */ }
+            setMessageMenuAnchor(null);
+            setMessageMenuTarget(null);
+          }}>
+            <ContentCopyIcon fontSize="small" sx={{ mr: 1.2 }} />
+            Copy text
+          </MenuItem>
+        )}
+        {messageMenuTarget && !messageMenuTarget.redacted && (
+          <MenuItem onClick={() => {
+            setReactionPickerMessageId(messageMenuTarget.id);
+            setMessageMenuAnchor(null);
+            setMessageMenuTarget(null);
+          }}>
+            <EmojiEmotionsIcon fontSize="small" sx={{ mr: 1.2 }} />
+            React
+          </MenuItem>
+        )}
+        {messageMenuTarget?.isOwn && !messageMenuTarget.redacted && !messageMenuTarget.mediaType && (
+          <MenuItem onClick={() => startEditSecureMessage(messageMenuTarget)}>
+            <EditOutlinedIcon fontSize="small" sx={{ mr: 1.2 }} />
+            Edit message
+          </MenuItem>
+        )}
+        {messageMenuTarget?.isOwn && !messageMenuTarget.redacted && (
+          <MenuItem
+            onClick={() => {
+              setDeletingMessage(messageMenuTarget);
+              setMessageMenuAnchor(null);
+              setMessageMenuTarget(null);
+            }}
+            sx={{ color: "error.main" }}
+          >
+            <DeleteOutlineIcon fontSize="small" sx={{ mr: 1.2 }} />
+            Delete message
+          </MenuItem>
+        )}
+        {messageMenuTarget?.mediaType && loadedMedia[messageMenuTarget.id] && (
+          <MenuItem onClick={() => {
+            downloadLoadedMedia(messageMenuTarget);
+            setMessageMenuAnchor(null);
+            setMessageMenuTarget(null);
+          }}>
+            <DownloadIcon fontSize="small" sx={{ mr: 1.2 }} />
+            Download attachment
+          </MenuItem>
+        )}
+        {messageMenuTarget?.file && !loadedMedia[messageMenuTarget.id] && (
+          <MenuItem onClick={() => {
+            void openEncryptedMedia(messageMenuTarget);
+            setMessageMenuAnchor(null);
+            setMessageMenuTarget(null);
+          }}>
+            <DownloadIcon fontSize="small" sx={{ mr: 1.2 }} />
+            Decrypt attachment
+          </MenuItem>
+        )}
+      </Menu>
+
+      <Dialog
+        open={Boolean(editingMessage)}
+        onClose={() => { if (!savingEdit) { setEditingMessage(null); setEditDraft(""); } }}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Edit encrypted message</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={3}
+            maxRows={10}
+            value={editDraft}
+            onChange={(event) => setEditDraft(event.target.value)}
+            placeholder="Edit your message…"
+            sx={{ mt: 1 }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            The edit is sent as a new encrypted Matrix event. The original message event remains in room history.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={savingEdit} onClick={() => { setEditingMessage(null); setEditDraft(""); }}>
+            Cancel
+          </Button>
+          <Button variant="contained" disabled={!editDraft.trim() || savingEdit} onClick={() => void saveSecureMessageEdit()}>
+            {savingEdit ? <CircularProgress size={18} color="inherit" /> : "Save edit"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deletingMessage)}
+        onClose={() => { if (!deleting) setDeletingMessage(null); }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete encrypted message?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            This sends a Matrix redaction for the message. Other devices may retain a copy that was already received or decrypted.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={deleting} onClick={() => setDeletingMessage(null)}>Cancel</Button>
+          <Button color="error" variant="contained" disabled={deleting} onClick={() => void confirmSecureMessageDelete()}>
+            {deleting ? <CircularProgress size={18} color="inherit" /> : "Delete for everyone"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
