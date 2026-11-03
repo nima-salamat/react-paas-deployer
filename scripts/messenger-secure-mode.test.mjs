@@ -462,6 +462,8 @@ test("secure chat uses Matrix-native receipts, unread navigation, and reconnect 
   assert.match(header, /onReconnectSecureChat/);
   assert.match(header, /Reconnect secure room/);
   assert.match(app, /onReconnectSecureChat=\{\(\) => secureReconnectRef\.current\?\.\(\)\}/);
+  assert.match(app, /secureUnreadCountsRef\.current\.set/);
+  assert.match(app, /secureUnreadCountsRef\.current\.get/);
   assert.match(panel, /onRegisterReconnect/);
   assert.match(panel, /findFirstUnreadEventWithPagination/);
   assert.match(panel, /getReadReceiptForUserId/);
