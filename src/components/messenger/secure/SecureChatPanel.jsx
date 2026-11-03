@@ -67,9 +67,11 @@ async function prepareInitialSecureTimeline(client, room, ownUserId, unreadCount
   while (pagesLoaded < MAX_INITIAL_UNREAD_HISTORY_PAGES) {
     const events = room?.getLiveTimeline?.().getEvents?.() || [];
     const messageCount = events.filter(isSecureTimelineMessage).length;
-    const unreadBoundaryAvailable = receiptEventId
-      ? events.some((event) => event.getId?.() === receiptEventId)
-      : countIncomingSecureMessages(events, ownUserId) >= Math.max(0, unreadCount);
+    const unreadBoundaryAvailable = unreadCount <= 0
+      ? true
+      : receiptEventId
+        ? events.some((event) => event.getId?.() === receiptEventId)
+        : countIncomingSecureMessages(events, ownUserId) >= unreadCount;
 
     if (messageCount >= INITIAL_SECURE_MESSAGE_COUNT && unreadBoundaryAvailable) break;
 
