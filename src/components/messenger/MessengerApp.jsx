@@ -170,7 +170,24 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const onRoomTimeline = (_event, room) => updateRoomUnread(room);
     const onRoomReceipt = (_event, room) => updateRoomUnread(room);
     const onSync = () => {
-      for (const room of matrixClient?.getRooms?.() || []) updateRoomUnread(room);
+      const updates = new Map();
+      for (const room of matrixClient?.getRooms?.() || []) {
+        const conversationId = secureRoomToConversationIdRef.current.get(String(room?.roomId || ""));
+        if (!conversationId) continue;
+        updates.set(conversationId, Math.max(0, Number(room.getUnreadNotificationCount?.("total") || 0)));
+      }
+      if (!updates.size) return;
+      for (const [conversationId, unreadCount] of updates) {
+        secureUnreadCountsRef.current.set(conversationId, unreadCount);
+      }
+      setConversations((prev) => prev.map((row) => {
+        const unreadCount = updates.get(String(row.id));
+        return unreadCount === undefined ? row : { ...row, unread_count: unreadCount };
+      }));
+      setActiveDetail((prev) => {
+        if (!prev || !updates.has(String(prev.id))) return prev;
+        return { ...prev, unread_count: updates.get(String(prev.id)) };
+      });
     };
     const attach = async () => {
       try {
