@@ -5,7 +5,6 @@ import {
 } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
-import SettingsIcon from "@mui/icons-material/Settings";
 import SendIcon from "@mui/icons-material/Send";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -198,12 +197,10 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
   const timelineRef = useRef(null);
   const inviteJoinInProgressRef = useRef(false);
   const [revision, setRevision] = useState(0);
-  const [roomDisplayName, setRoomDisplayName] = useState(conversation?.title || "");
 
   const refreshTimeline = useCallback((client) => {
     const room = client.getRoom(roomId);
     if (!room) return;
-    setRoomDisplayName(appConversationTitle(conversation, currentUserId));
     setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
   }, [roomId, conversation?.title, conversation?.participants, currentUserId]);
 
@@ -287,8 +284,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
         }
 
         const membership = room.getMyMembership?.();
-        setRoomDisplayName(appConversationTitle(conversation, currentUserId));
-        setHasMoreHistory(true);
+            setHasMoreHistory(true);
 
         const participants = conversation?.participants || [];
         const localUserIds = [...new Set([
@@ -591,7 +587,6 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
     }
   };
 
-  const title = roomDisplayName || appConversationTitle(conversation, currentUserId);
   const secureFeatureNotice = useMemo(
     () => "Text, photos, voice notes, videos and files are end-to-end encrypted. Search, replies, edits/deletes, reactions, forwarding, read receipts, scheduled messages and live calls are not enabled in this secure room yet.",
     [],
@@ -599,23 +594,21 @@ export default function SecureChatPanel({ conversation, currentUserId, onOpenSec
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, bgcolor: "background.default" }}>
-      <Paper square elevation={0} sx={{ display: "flex", alignItems: "center", px: 2, py: 1.25, gap: 1, borderBottom: "1px solid", borderColor: "divider" }}>
-        <LockOutlinedIcon color="success" />
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography fontWeight={750} noWrap>{title}</Typography>
-          <Typography variant="caption" color="text.secondary">
-            End-to-end encrypted
-          </Typography>
-        </Box>
-        <IconButton aria-label="Reconnect secure chat" onClick={() => setRevision((value) => value + 1)} disabled={phase === "connecting"}>
-          <RefreshIcon />
-        </IconButton>
-        <Button size="small" startIcon={<SettingsIcon />} onClick={() => onOpenSecuritySettings?.()}>
-          Security settings
-        </Button>
-      </Paper>
-
-      <Alert severity="info" sx={{ mx: 1.5, mt: 1.25 }}>
+      <Alert
+        severity="info"
+        icon={<LockOutlinedIcon />}
+        sx={{ mx: 1.5, mt: 1.25, alignItems: "center" }}
+        action={(
+          <Button
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={() => setRevision((value) => value + 1)}
+            disabled={phase === "connecting"}
+          >
+            Reconnect
+          </Button>
+        )}
+      >
         {secureFeatureNotice}
       </Alert>
 
