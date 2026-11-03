@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, Avatar, Box, Button, CircularProgress, Divider, IconButton, LinearProgress, Paper,
+  Alert, Avatar, Box, Button, Chip, CircularProgress, Divider, IconButton, LinearProgress, Paper,
   Stack, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
 import SendIcon from "@mui/icons-material/Send";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import RefreshIcon from "@mui/icons-material/Refresh";
 import StopIcon from "@mui/icons-material/Stop";
 import SearchIcon from "@mui/icons-material/Search";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadIcon from "@mui/icons-material/Download";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
+import ClearIcon from "@mui/icons-material/Clear";
 import {
   assertSecureMessagingReady, getSecureMatrixClient, getSecureMatrixSession,
   hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
@@ -765,31 +765,8 @@ export default function SecureChatPanel({
     }
   };
 
-  const secureFeatureNotice = useMemo(
-    () => "Text, photos, voice notes, videos and files are end-to-end encrypted. Search, replies, edits/deletes, reactions, forwarding, read receipts, scheduled messages and live calls are not enabled in this secure room yet.",
-    [],
-  );
-
   return (
     <Box role="region" aria-label={appConversationTitle(conversation, currentUserId)} sx={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, bgcolor: "background.default" }}>
-      <Alert
-        severity="info"
-        icon={<LockOutlinedIcon />}
-        sx={{ mx: 1.5, mt: 1.25, alignItems: "center" }}
-        action={(
-          <Button
-            size="small"
-            startIcon={<RefreshIcon />}
-            onClick={() => setRevision((value) => value + 1)}
-            disabled={phase === "connecting"}
-          >
-            Reconnect
-          </Button>
-        )}
-      >
-        {secureFeatureNotice}
-      </Alert>
-
       {error && <Alert severity="error" sx={{ mx: 1.5, mt: 1 }}>{error}</Alert>}
 
       {phase === "connecting" && (
