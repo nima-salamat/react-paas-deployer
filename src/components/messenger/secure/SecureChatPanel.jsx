@@ -979,6 +979,81 @@ export default function SecureChatPanel({
     }
   }, [matrixClient, roomId, phase, refreshTimeline]);
 
+  const startEditSecureMessage = (message) => {
+    if (!message?.isOwn || message?.mediaType || message?.redacted || message?.undecryptable) return;
+    setMessageMenuAnchor(null);
+    setMessageMenuTarget(null);
+    setEditDraft(String(message.body || ""));
+    setEditingMessage(message);
+  };
+
+  const saveSecureMessageEdit = async () => {
+    const body = editDraft.trim();
+    if (!editingMessage?.id || !body || savingEdit || !matrixClient || phase !== "ready") return;
+    setSavingEdit(true);
+    setError("");
+    try {
+      const room = matrixClient.getRoom(roomId);
+      if (!room || room.getMyMembership?.() !== "join") {
+        throw new MatrixSecureError("You must remain a joined room member to edit this message.", "not_joined");
+      }
+      if (roomHasPendingInvites(room)) {
+        throw new MatrixSecureError("Secure message editing is paused until every participant has joined.", "participants_pending");
+      }
+      const originalEvent = room.findEventById?.(editingMessage.id);
+      if (!editingMessage.isOwn || (originalEvent && originalEvent.getSender?.() !== matrixClient.getUserId())) {
+        throw new MatrixSecureError("Only the original sender can edit this secure message.", "edit_not_allowed");
+      }
+      await assertSecureMessagingReady(matrixClient);
+      if (!(await matrixClient.getCrypto().isEncryptionEnabledInRoom(roomId))) {
+        throw new MatrixSecureError("Room encryption is not confirmed. The edit was not sent.", "encryption_lost");
+      }
+      await matrixClient.sendEvent(roomId, "m.room.message", {
+        msgtype: "m.text",
+        body: "* " + body,
+        "m.new_content": { msgtype: "m.text", body },
+        "m.relates_to": { rel_type: "m.replace", event_id: editingMessage.id },
+      });
+      setEditingMessage(null);
+      setEditDraft("");
+      refreshTimeline(matrixClient);
+    } catch (err) {
+      setError(err?.message || "Secure message edit could not be sent.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const confirmSecureMessageDelete = async () => {
+    if (!deletingMessage?.id || deleting || !matrixClient || phase !== "ready") return;
+    setDeleting(true);
+    setError("");
+    try {
+      const room = matrixClient.getRoom(roomId);
+      if (!room || room.getMyMembership?.() !== "join") {
+        throw new MatrixSecureError("You must remain a joined room member to delete this message.", "not_joined");
+      }
+      if (roomHasPendingInvites(room)) {
+        throw new MatrixSecureError("Secure message deletion is paused until every participant has joined.", "participants_pending");
+      }
+      const originalEvent = room.findEventById?.(deletingMessage.id);
+      if (!deletingMessage.isOwn || (originalEvent && originalEvent.getSender?.() !== matrixClient.getUserId())) {
+        throw new MatrixSecureError("Only the original sender can delete this secure message.", "delete_not_allowed");
+      }
+      await assertSecureMessagingReady(matrixClient);
+      if (!(await matrixClient.getCrypto().isEncryptionEnabledInRoom(roomId))) {
+        throw new MatrixSecureError("Room encryption is not confirmed. The deletion was not sent.", "encryption_lost");
+      }
+      await matrixClient.redactEvent(roomId, deletingMessage.id);
+      setDeletingMessage(null);
+      refreshTimeline(matrixClient);
+    } catch (err) {
+      setError(err?.message || "Secure message deletion could not be sent.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const send = async () => {
     const body = draft.trim();
     if (!body || !matrixClient || !roomId || sending || phase !== "ready") return;
