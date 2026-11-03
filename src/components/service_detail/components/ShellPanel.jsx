@@ -342,7 +342,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const terminalRef = useRef(null);
   const terminalInputRef = useRef(null);
   const xtermWriteRef = useRef(null);
-  const developerOutputRef = useRef("");
+  const ptyOutputRef = useRef("");
   const pendingXtermOutputRef = useRef("");
   const editorInputRef = useRef(null);
 
@@ -642,7 +642,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       }
       if (message.type === "process.started") {
         runningRef.current = true;
-        developerOutputRef.current = "";
+        ptyOutputRef.current = "";
         pendingXtermOutputRef.current = "";
         setInteractiveRunning(true);
         setCommandRunning(false);
@@ -653,18 +653,11 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       }
       if (message.type === "process.output") {
         const raw = String(message.data ?? "");
-        if (isDeveloperSession) {
-          // Keep the live PTY experience while buffering its transcript so the
-          // completed output remains in the same scrollback as the shell prompt.
-          developerOutputRef.current = (developerOutputRef.current + raw).slice(-500000);
-          if (xtermWriteRef.current) xtermWriteRef.current(raw);
-          else pendingXtermOutputRef.current += raw;
-        } else if (xtermWriteRef.current) {
-          xtermWriteRef.current(raw);
-        } else {
-          const cleaned = cleanOutput(raw);
-          if (cleaned) appendHistory({ type: "output", stdout: cleaned, stderr: "", exitCode: null });
-        }
+        // Buffer PTY output while xterm renders it live. After the process exits,
+        // replay the transcript into the same scrollback as the shell prompt.
+        ptyOutputRef.current = (ptyOutputRef.current + raw).slice(-500000);
+        if (xtermWriteRef.current) xtermWriteRef.current(raw);
+        else pendingXtermOutputRef.current += raw;
         if (/password\s*:/i.test(raw)) setInteractiveSecret(true);
         return;
       }
@@ -674,8 +667,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         setCommandRunning(false);
         setInteractiveInput("");
         setInteractiveSecret(false);
-        const transcript = isDeveloperSession ? cleanOutput(developerOutputRef.current) : "";
-        developerOutputRef.current = "";
+        const transcript = cleanOutput(ptyOutputRef.current);
+        ptyOutputRef.current = "";
         pendingXtermOutputRef.current = "";
         // Preserve completed PTY output in the shell scrollback after the live
         // interactive terminal surface is removed.
