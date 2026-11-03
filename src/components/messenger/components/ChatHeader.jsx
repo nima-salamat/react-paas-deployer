@@ -88,16 +88,21 @@ export default function ChatHeader(props) {
     alignItems="center"
     spacing={msgSearchOpen && !secureMode ? (isMobile ? 0 : 0.5) : 1}
     sx={{
-      px: msgSearchOpen && isMobile ? 0.35 : 1,
-      py: 0.85,
-      bgcolor: (t) => alpha(t.palette.background.paper, 0.94),
-      backdropFilter: "blur(16px)",
+      px: msgSearchOpen && isMobile ? 0.35 : { xs: 1, md: 1.5 },
+      py: secureMode ? 1 : 0.85,
+      bgcolor: (t) => alpha(t.palette.background.paper, 0.96),
+      backgroundImage: secureMode
+        ? (t) => t.palette.mode === "dark"
+          ? "linear-gradient(105deg, rgba(45,145,105,.13), transparent 48%)"
+          : "linear-gradient(105deg, rgba(35,145,105,.075), transparent 48%)"
+        : "none",
+      backdropFilter: "blur(18px)",
       borderBottom: "1px solid",
-      borderColor: "divider",
-      minHeight: 56,
+      borderColor: secureMode ? (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.28 : 0.18) : "divider",
+      minHeight: secureMode ? 66 : 56,
       position: "relative",
       zIndex: 11,
-      boxShadow: (t) => t.palette.mode === "dark" ? "0 4px 18px rgba(0,0,0,0.10)" : "0 4px 18px rgba(15,23,42,0.04)",
+      boxShadow: (t) => t.palette.mode === "dark" ? "0 4px 22px rgba(0,0,0,0.16)" : "0 5px 22px rgba(15,23,42,0.055)",
     }}
   >
     {isMobile && (!msgSearchOpen || secureMode) && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
@@ -219,8 +224,18 @@ export default function ChatHeader(props) {
     ) : (!msgSearchOpen || secureMode) ? (
       <>
     <Box sx={{ position: "relative" }}>
-      <Avatar src={convAvatar(activeConv, meId)} sx={{ width: 40, height: 40, cursor: "pointer" }}
-        onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}>
+      <Avatar
+        src={convAvatar(activeConv, meId)}
+        sx={{
+          width: secureMode ? 43 : 40,
+          height: secureMode ? 43 : 40,
+          cursor: "pointer",
+          border: secureMode ? "2px solid" : "none",
+          borderColor: secureMode ? (t) => alpha(t.palette.success.main, 0.5) : "transparent",
+          boxShadow: secureMode ? (t) => `0 0 0 3px ${alpha(t.palette.success.main, 0.08)}` : "none",
+        }}
+        onClick={() => (peer?.id ? loadUserProfile(peer.id) : pushPanel("info"))}
+      >
         {convTitle(activeConv, meId)[0]?.toUpperCase()}
       </Avatar>
       {peer?.id && onlineUsers.has(Number(peer.id)) && (
@@ -245,7 +260,20 @@ export default function ChatHeader(props) {
         <Typography fontWeight={750} noWrap fontSize={{ xs: 14.5, sm: 15.5 }} sx={{ letterSpacing: -0.15 }}>{title}</Typography>
         {secureMode ? (
           <Tooltip title={tr("Separate end-to-end encrypted conversation")}>
-            <LockOutlinedIcon color="success" sx={{ fontSize: 16, flexShrink: 0 }} />
+            <Box
+              sx={{
+                width: 23,
+                height: 23,
+                borderRadius: 1.75,
+                display: "grid",
+                placeItems: "center",
+                color: "success.main",
+                bgcolor: (t) => alpha(t.palette.success.main, 0.11),
+                flexShrink: 0,
+              }}
+            >
+              <LockOutlinedIcon sx={{ fontSize: 14 }} />
+            </Box>
           </Tooltip>
         ) : null}
       </Stack>
@@ -253,7 +281,12 @@ export default function ChatHeader(props) {
         variant="caption"
         color={secureMode ? "success.main" : Object.keys(typingUsers).length ? "primary.main" : "text.secondary"}
         noWrap
-        sx={{ fontStyle: !secureMode && Object.keys(typingUsers).length ? "italic" : "normal", maxWidth: 280 }}
+        sx={{
+          fontStyle: !secureMode && Object.keys(typingUsers).length ? "italic" : "normal",
+          maxWidth: 280,
+          fontWeight: secureMode ? 600 : 400,
+          letterSpacing: secureMode ? 0.08 : 0,
+        }}
       >
         {secureMode
           ? tr("End-to-end encrypted")
@@ -282,7 +315,19 @@ export default function ChatHeader(props) {
     {/* Mobile: keep a single call icon → popup with voice/video; rest in ⋮ menu */}
     {secureMode ? (
       <Tooltip title={tr("Security settings")}>
-        <IconButton onClick={() => onOpenSecuritySettings?.()} sx={{ color: "success.main" }}>
+        <IconButton
+          aria-label={tr("Security settings")}
+          onClick={() => onOpenSecuritySettings?.()}
+          sx={{
+            width: 38,
+            height: 38,
+            color: "success.main",
+            bgcolor: (t) => alpha(t.palette.success.main, 0.09),
+            border: "1px solid",
+            borderColor: (t) => alpha(t.palette.success.main, 0.16),
+            "&:hover": { bgcolor: (t) => alpha(t.palette.success.main, 0.16) },
+          }}
+        >
           <LockOutlinedIcon />
         </IconButton>
       </Tooltip>
