@@ -98,7 +98,7 @@ export const PASSWORD_ALPHABET_SAFE =
 
 // Sentinel value sent to the backend for password fields when the user
 // wants to KEEP the existing password (i.e. didn't type a new one).
-// The backend's update_db_config + update endpoints treat this the same
+// The backend update_db_config endpoint treats this the same
 // as null / empty string — they skip the field instead of overwriting.
 export const SENTINEL_KEEP_EXISTING = "__unchanged__";
 
