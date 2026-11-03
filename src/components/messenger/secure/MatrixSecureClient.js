@@ -193,7 +193,7 @@ async function isolatedCryptoDatabasePrefix(session) {
       "crypto_unavailable",
     );
   }
-  const identity = [
+  const identity = JSON.stringify([
     String(session?.homeserverUrl || "").replace(new RegExp("/+$"), "").toLowerCase(),
     String(session?.userId || ""),
     String(session?.deviceId || ""),
