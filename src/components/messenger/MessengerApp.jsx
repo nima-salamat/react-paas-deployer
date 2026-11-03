@@ -5416,10 +5416,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             <SecureChatPanel
               conversation={activeConv}
               currentUserId={meId}
-              onOpenSecuritySettings={() => {
-                pushPanel("secure-settings");
-                void refreshSecureRecoveryState();
-              }}
               onSecureClientReady={refreshSecureRecoveryState}
             />
           ) : (
