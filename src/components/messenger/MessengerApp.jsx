@@ -5358,7 +5358,6 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               </Box>
             </Box>
           )}
-          {isMatrixE2EE ? null : (
           <ChatHeader
             isMobile={isMobile}
             msgSearchOpen={msgSearchOpen}
@@ -5406,8 +5405,12 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               void openChat(listed || topic);
             }}
             onStartSecureChat={startSecureChat}
+            secureMode={isMatrixE2EE}
+            onOpenSecuritySettings={() => {
+              pushPanel("secure-settings");
+              void refreshSecureRecoveryState();
+            }}
           />
-          )}
 
           {isMatrixE2EE ? (
             <SecureChatPanel
