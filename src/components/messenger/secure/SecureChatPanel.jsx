@@ -560,8 +560,14 @@ export default function SecureChatPanel({
   }, [phase, matrixClient, messages, loadedMedia, openEncryptedMedia]);
 
   const sendMediaFile = async (file, options = {}) => {
-    if (!file || !matrixClient || !roomId || mediaBusy || phase !== "ready") return;
+    if (!file || !matrixClient || !roomId || mediaBusyRef.current || phase !== "ready") return;
+    mediaBusyRef.current = true;
     setMediaBusy(true);
+    setPendingUpload({
+      id: String(Date.now()) + "-" + String(file.name || "attachment"),
+      filename: file.name || "Encrypted attachment",
+      status: "Preparing attachment…",
+    });
     setError("");
     try {
       const room = matrixClient.getRoom(roomId);
@@ -572,12 +578,17 @@ export default function SecureChatPanel({
         setPhase("waiting_for_peer");
         throw new MatrixSecureError("Secure media sending is paused until every invited participant has joined.", "participants_pending");
       }
-      await sendEncryptedMedia(matrixClient, roomId, file, options);
+      await sendEncryptedMedia(matrixClient, roomId, file, {
+        ...options,
+        onStatus: (status) => setPendingUpload((prev) => prev ? { ...prev, status } : prev),
+      });
       refreshTimeline(matrixClient);
     } catch (err) {
       setError(err?.message || "Encrypted attachment could not be sent.");
     } finally {
+      mediaBusyRef.current = false;
       setMediaBusy(false);
+      setPendingUpload(null);
       if (mediaInputRef.current) mediaInputRef.current.value = "";
     }
   };
