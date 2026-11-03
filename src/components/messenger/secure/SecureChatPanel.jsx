@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, Avatar, Box, Button, Chip, CircularProgress, Divider, IconButton, LinearProgress, Paper,
-  Stack, TextField, Tooltip, Typography,
+  Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
+  DialogTitle, Divider, IconButton, LinearProgress, Menu, MenuItem, Paper, Stack, TextField,
+  Tooltip, Typography,
 } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
@@ -14,6 +15,10 @@ import DownloadIcon from "@mui/icons-material/Download";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import ClearIcon from "@mui/icons-material/Clear";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   assertSecureMessagingReady, getSecureMatrixClient, getSecureMatrixSession,
   hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
@@ -124,6 +129,8 @@ function appConversationTitle(conversation, currentUserId) {
 
 function describeEvent(event, ownUserId, profilesByMatrixId = {}) {
   const type = event.getType();
+  const unsigned = event.getUnsigned?.() || {};
+  const isRedacted = Boolean(event.isRedacted?.() || unsigned.redacted_because);
   const wireType = event.getWireType?.() || type;
   const content = event.getContent?.() || {};
   const senderId = event.getSender?.() || "";
@@ -131,6 +138,15 @@ function describeEvent(event, ownUserId, profilesByMatrixId = {}) {
   const sender = senderId === ownUserId ? "You" : (profile?.displayName || "Member");
   const timestamp = Number(event.getTs?.() || Date.now());
   const eventId = event.getId?.() || `${senderId}:${timestamp}`;
+
+  if (isRedacted) {
+    return {
+      id: eventId, sender, senderId, senderAvatar: profile?.avatar || null,
+      timestamp, isOwn: senderId === ownUserId,
+      body: "This message was deleted.",
+      redacted: true, msgtype: "m.text",
+    };
+  }
 
   if (type === "m.room.message" && wireType !== "m.room.encrypted") {
     // Fail closed: an encrypted-room label cannot make a plaintext event safe.
