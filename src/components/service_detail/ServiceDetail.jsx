@@ -853,22 +853,6 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
 
   const serviceBusy = useMemo(() => Boolean(service && ["queued", "deploying", "stopping"].includes(String(service.status || "").toLowerCase())), [service]);
 
-  useEffect(() => {
-    if (!selectedDeploy || !selectedIsDb) {
-      setDbConfigFields({ root_password: "", password: "", username: "", database: "", port: "", env: "" });
-      return;
-    }
-    const cfg = parseDeployConfig(selectedDeploy.config);
-    setDbConfigFields({
-      root_password: cfg.root_password != null ? String(cfg.root_password) : "",
-      password: cfg.password != null ? String(cfg.password) : "",
-      username: cfg.username != null ? String(cfg.username) : "",
-      database: cfg.database != null ? String(cfg.database) : "",
-      port: cfg.port != null ? String(cfg.port) : "",
-      env: cfg.env != null ? (typeof cfg.env === "string" ? cfg.env : JSON.stringify(cfg.env, null, 2)) : "",
-    });
-  }, [selectedDeploy, selectedIsDb]);
-
   const currentDeployForLogs = useMemo(() => {
     if (!deployLogDeployId) return null;
     return deploys.find((d) => String(d.id ?? d.pk ?? "") === String(deployLogDeployId)) || null;
