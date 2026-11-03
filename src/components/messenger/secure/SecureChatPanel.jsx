@@ -853,7 +853,7 @@ export default function SecureChatPanel({
               </Typography>
             )}
             <Stack spacing={1.25} sx={{ maxWidth: 900, mx: "auto" }}>
-              {messages.map((message) => (
+              {filteredMessages.map((message) => (
                 <Box key={message.id} sx={{ display: "flex", justifyContent: message.isOwn ? "flex-end" : "flex-start" }}>
                   <Paper
                     elevation={0}
