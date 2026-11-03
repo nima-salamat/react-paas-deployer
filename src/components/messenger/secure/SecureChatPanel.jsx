@@ -1585,7 +1585,7 @@ export default function SecureChatPanel({
         <DialogActions>
           <Button disabled={deleting} onClick={() => setDeletingMessage(null)}>Cancel</Button>
           <Button color="error" variant="contained" disabled={deleting} onClick={() => void confirmSecureMessageDelete()}>
-            {deleting ? <CircularProgress size={18} color="inherit" /> : "Delete for everyone"}
+            {deleting ? <CircularProgress size={18} color="inherit" /> : "Delete message"}
           </Button>
         </DialogActions>
       </Dialog>
