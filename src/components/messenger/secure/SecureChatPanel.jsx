@@ -202,7 +202,7 @@ export default function SecureChatPanel({ conversation, currentUserId, onSecureC
     const room = client.getRoom(roomId);
     if (!room) return;
     setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
-  }, [roomId, conversation?.title, conversation?.participants, currentUserId]);
+  }, [roomId]);
 
   useEffect(() => {
     let cancelled = false;
