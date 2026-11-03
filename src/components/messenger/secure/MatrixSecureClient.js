@@ -194,10 +194,10 @@ async function isolatedCryptoDatabasePrefix(session) {
     );
   }
   const identity = [
-    String(session?.homeserverUrl || "").replace(/\\/+$/, "").toLowerCase(),
+    String(session?.homeserverUrl || "").replace(new RegExp("/+$"), "").toLowerCase(),
     String(session?.userId || ""),
     String(session?.deviceId || ""),
-  ].join("\\u0000");
+  ]);
   const digest = await globalThis.crypto.subtle.digest(
     "SHA-256",
     new TextEncoder().encode(identity),
