@@ -601,7 +601,7 @@ test("database Deploy edits use immutable revisions and match backend rotation c
   assert.match(dbBranch, /data: \{ name: editData\.name, version: editData\.version \}/);
   assert.doesNotMatch(dbBranch, /data: \{ name: editData\.name, version: editData\.version, config:/);
   assert.match(dbBranch, /getDbCredentialRotationPolicy\(effectivePlatform\)/);
-  assert.match(dbBranch, /DATABASE/);
+  assert.match(dbBranch, /databaseRevisionSaved/);
 
   assert.match(detail, /setEditDbOriginalFields/);
   assert.match(detail, /normalizeValue\(key, editDbOriginalFields\[key\]\)/);
