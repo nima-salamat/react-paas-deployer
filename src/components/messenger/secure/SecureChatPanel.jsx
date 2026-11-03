@@ -314,6 +314,30 @@ export default function SecureChatPanel({
   const inviteJoinInProgressRef = useRef(false);
   const [revision, setRevision] = useState(0);
 
+  useEffect(() => {
+    for (const url of mediaObjectUrlsRef.current) URL.revokeObjectURL(url);
+    mediaObjectUrlsRef.current.clear();
+    mediaOperationsRef.current.clear();
+    autoDecryptStartedRef.current.clear();
+    readReceiptSentRef.current.clear();
+    reactionOperationsRef.current.clear();
+    profilesByMatrixIdRef.current = {};
+    setLoadedMedia({});
+    setLoadingMedia({});
+    setMediaStatus({});
+    setPendingUpload(null);
+    setMessages([]);
+    setDraft("");
+    setError("");
+    setSearchOpen(false);
+    setSearchQuery("");
+    setReactionPickerMessageId(null);
+    setUnreadAnchorId(null);
+    setTimelineInitialised(false);
+    initialScrollHandledRef.current = false;
+    setPhase("connecting");
+  }, [roomId]);
+
   const refreshTimeline = useCallback((client) => {
     const room = client.getRoom(roomId);
     if (!room) return;
