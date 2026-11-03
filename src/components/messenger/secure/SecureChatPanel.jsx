@@ -13,6 +13,7 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadIcon from "@mui/icons-material/Download";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import ClearIcon from "@mui/icons-material/Clear";
+import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import {
   assertSecureMessagingReady, getSecureMatrixClient, getSecureMatrixSession,
   hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
@@ -179,6 +180,19 @@ function getReadReceiptStatus(room, messageId, ownUserId) {
   return "Seen by " + summary.readCount + " of " + summary.total;
 }
 
+function getReactionGroups(reactions = [], ownUserId = "") {
+  const grouped = new Map();
+  for (const reaction of reactions) {
+    const key = String(reaction?.key || "");
+    if (!key) continue;
+    const current = grouped.get(key) || { key, count: 0, own: false };
+    current.count += 1;
+    current.own = current.own || String(reaction.senderId || "") === String(ownUserId || "");
+    grouped.set(key, current);
+  }
+  return [...grouped.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
 function roomHasPendingInvites(room) {
   try {
     const events = room?.currentState?.getStateEvents?.("m.room.member");
@@ -287,6 +301,8 @@ export default function SecureChatPanel({
   const initialScrollHandledRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
+  const reactionOperationsRef = useRef(new Set());
   const [sending, setSending] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
@@ -778,6 +794,47 @@ export default function SecureChatPanel({
     for (const url of mediaObjectUrlsRef.current) URL.revokeObjectURL(url);
     mediaObjectUrlsRef.current.clear();
   }, []);
+
+  const toggleSecureReaction = useCallback(async (message, emoji) => {
+    if (!matrixClient || !roomId || phase !== "ready" || !message?.id || !emoji) return;
+    const operationKey = String(message.id) + ":" + String(emoji);
+    if (reactionOperationsRef.current.has(operationKey)) return;
+    reactionOperationsRef.current.add(operationKey);
+    try {
+      const room = matrixClient.getRoom(roomId);
+      if (!room || room.getMyMembership?.() !== "join") {
+        throw new MatrixSecureError("Join the encrypted room before reacting.", "not_joined");
+      }
+      if (roomHasPendingInvites(room)) {
+        throw new MatrixSecureError("Reactions are paused until every invited participant has joined.", "participants_pending");
+      }
+      await assertSecureMessagingReady(matrixClient);
+      if (!(await matrixClient.getCrypto().isEncryptionEnabledInRoom(roomId))) {
+        throw new MatrixSecureError("Room encryption is not confirmed. The reaction was not sent.", "encryption_lost");
+      }
+      const ownReaction = (message.reactions || []).find((reaction) => (
+        reaction.key === emoji && String(reaction.senderId || "") === String(matrixClient.getUserId() || "")
+      ));
+      if (ownReaction?.id) {
+        await matrixClient.redactEvent(roomId, ownReaction.id);
+      } else {
+        // MatrixClient.sendEvent encrypts timeline events automatically in encrypted rooms.
+        await matrixClient.sendEvent(roomId, "m.reaction", {
+          "m.relates_to": {
+            rel_type: "m.annotation",
+            event_id: message.id,
+            key: emoji,
+          },
+        });
+      }
+      refreshTimeline(matrixClient);
+      setReactionPickerMessageId(null);
+    } catch (err) {
+      setError(err?.message || "Secure reaction could not be sent.");
+    } finally {
+      reactionOperationsRef.current.delete(operationKey);
+    }
+  }, [matrixClient, roomId, phase, refreshTimeline]);
 
   const send = async () => {
     const body = draft.trim();
