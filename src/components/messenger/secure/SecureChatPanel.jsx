@@ -42,22 +42,53 @@ function findFirstUnreadEventId(room, ownUserId) {
   return firstIncoming?.getId?.() || null;
 }
 
-async function findFirstUnreadEventWithPagination(client, room, ownUserId, maxPages = 12) {
-  let receiptEventId = getRoomReadReceiptEventId(room, ownUserId);
-  for (let page = 0; receiptEventId && page < maxPages; page += 1) {
+const INITIAL_SECURE_MESSAGE_COUNT = 50;
+const SECURE_HISTORY_PAGE_SIZE = 40;
+const MAX_INITIAL_UNREAD_HISTORY_PAGES = 100;
+
+function isSecureTimelineMessage(event) {
+  return event?.getType?.() === "m.room.message" || event?.getWireType?.() === "m.room.encrypted";
+}
+
+function countIncomingSecureMessages(events, ownUserId) {
+  return events.filter((event) => isSecureTimelineMessage(event) && event.getSender?.() !== ownUserId).length;
+}
+
+async function prepareInitialSecureTimeline(client, room, ownUserId, unreadCount) {
+  const receiptEventId = getRoomReadReceiptEventId(room, ownUserId);
+  let exhausted = false;
+  let pagesLoaded = 0;
+
+  while (pagesLoaded < MAX_INITIAL_UNREAD_HISTORY_PAGES) {
     const events = room?.getLiveTimeline?.().getEvents?.() || [];
-    if (events.some((event) => event.getId?.() === receiptEventId)) break;
+    const messageCount = events.filter(isSecureTimelineMessage).length;
+    const unreadBoundaryAvailable = receiptEventId
+      ? events.some((event) => event.getId?.() === receiptEventId)
+      : countIncomingSecureMessages(events, ownUserId) >= Math.max(0, unreadCount);
+
+    if (messageCount >= INITIAL_SECURE_MESSAGE_COUNT && unreadBoundaryAvailable) break;
+
     const beforeCount = events.length;
     try {
-      await client.scrollback(room, 40);
+      await client.scrollback(room, SECURE_HISTORY_PAGE_SIZE);
     } catch {
+      exhausted = true;
       break;
     }
-    const afterEvents = room?.getLiveTimeline?.().getEvents?.() || [];
-    if (afterEvents.length <= beforeCount) break;
-    receiptEventId = getRoomReadReceiptEventId(room, ownUserId) || receiptEventId;
+    const afterCount = room?.getLiveTimeline?.().getEvents?.().length || 0;
+    if (afterCount <= beforeCount) {
+      exhausted = true;
+      break;
+    }
+    pagesLoaded += 1;
   }
-  return findFirstUnreadEventId(room, ownUserId);
+
+  const unreadAnchorId = unreadCount > 0 ? findFirstUnreadEventId(room, ownUserId) : null;
+  return {
+    unreadAnchorId,
+    hasMoreHistory: !exhausted,
+    pagesLoaded,
+  };
 }
 
 function getReadReceiptSummary(room, messageId, ownUserId) {
@@ -502,14 +533,14 @@ export default function SecureChatPanel({
 
         if (cancelled) return;
         roomReadyForTimeline = true;
-        const unreadAnchor = Number(room.getUnreadNotificationCount?.("total") || 0) > 0
-          ? await findFirstUnreadEventWithPagination(client, room, client.getUserId())
-          : null;
+        const unreadCount = Number(room.getUnreadNotificationCount?.("total") || 0);
+        const initialHistory = await prepareInitialSecureTimeline(client, room, client.getUserId(), unreadCount);
         if (cancelled) return;
         setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
-        setUnreadAnchorId(unreadAnchor);
+        setUnreadAnchorId(initialHistory.unreadAnchorId);
+        setHasMoreHistory(initialHistory.hasMoreHistory);
         setTimelineInitialised(true);
-        onSecureUnreadCountChange?.(Number(room.getUnreadNotificationCount?.("total") || 0));
+        onSecureUnreadCountChange?.(unreadCount);
         attachRoomListeners();
         client.on("sync", onSync);
         client.on("RoomMember.membership", onMembership);
