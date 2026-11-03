@@ -845,6 +845,27 @@ export default function SecureChatPanel({
     }
   };
 
+  const cancelVoiceRecording = () => {
+    if (!recordingVoice && !mediaRecorderRef.current) return;
+    voiceRecordingCancelledRef.current = true;
+    setRecordingVoice(false);
+    setError("");
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+        return;
+      } catch {
+        // Fall through to release the microphone if the recorder cannot stop.
+      }
+    }
+    mediaChunksRef.current = [];
+    mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    voiceRecordingCancelledRef.current = false;
+  };
+
   const toggleVoiceRecording = async () => {
     if (recordingVoice) {
       try { mediaRecorderRef.current?.stop(); } catch { /* no-op */ }
@@ -858,6 +879,7 @@ export default function SecureChatPanel({
     }
     try {
       setError("");
+      voiceRecordingCancelledRef.current = false;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
       mediaChunksRef.current = [];
@@ -869,17 +891,23 @@ export default function SecureChatPanel({
         if (event.data?.size) mediaChunksRef.current.push(event.data);
       };
       recorder.onerror = () => {
+        voiceRecordingCancelledRef.current = true;
         setError("Voice recording failed. Check microphone permissions and try again.");
         setRecordingVoice(false);
+        try { recorder.stop(); } catch { /* no-op */ }
       };
       recorder.onstop = () => {
-        const mimeType = recorder.mimeType || "audio/webm";
-        setRecordingVoice(false);
-        const blob = new Blob(mediaChunksRef.current, { type: mimeType });
+        const cancelled = voiceRecordingCancelledRef.current;
+        voiceRecordingCancelledRef.current = false;
+        const chunks = mediaChunksRef.current;
         mediaChunksRef.current = [];
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunks, { type: mimeType });
         mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
         mediaStreamRef.current = null;
         mediaRecorderRef.current = null;
+        setRecordingVoice(false);
+        if (cancelled) return;
         if (blob.size > 0) {
           const extension = mimeType.includes("mp4") ? "m4a" : "webm";
           const file = new File([blob], `voice-message-${Date.now()}.${extension}`, { type: mimeType });
@@ -893,6 +921,7 @@ export default function SecureChatPanel({
     } catch (err) {
       mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
       mediaStreamRef.current = null;
+      mediaRecorderRef.current = null;
       setError(err?.message || "Microphone access was denied.");
     }
   };
