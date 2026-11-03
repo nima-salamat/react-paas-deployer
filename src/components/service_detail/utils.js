@@ -35,6 +35,42 @@ export function isDbPlatform(platformOrDeploy) {
   return DB_PLATFORMS.has(getDeployPlatform(platformOrDeploy));
 }
 
+
+/**
+ * Database credential-rotation capabilities exposed by the backend
+ * update_db_config endpoint. Keep the edit UI aligned with the engine-specific
+ * in-place mutation contract; port and non-secret env fields are separate.
+ */
+export function getDbCredentialRotationPolicy(platform) {
+  const normalized = String(platform || "").toLowerCase().trim();
+  if (normalized === "mysql" || normalized === "mariadb") {
+    return {
+      editableFields: ["username", "password", "root_password", "database"],
+      canGenerateCredentials: true,
+      description: "MySQL and MariaDB support in-place credential and database updates. A new immutable revision is created; rebuild the service to apply it.",
+    };
+  }
+  if (normalized === "redis") {
+    return {
+      editableFields: ["password"],
+      canGenerateCredentials: true,
+      description: "Redis supports in-place password rotation only. Username and database changes are not supported.",
+    };
+  }
+  if (["postgres", "postgresql", "mongodb", "mongo", "oracle"].includes(normalized)) {
+    return {
+      editableFields: [],
+      canGenerateCredentials: false,
+      description: "This database engine does not support in-place credential or database rotation. Create a new database and migrate its data. Port and non-secret environment settings can still be changed.",
+    };
+  }
+  return {
+    editableFields: [],
+    canGenerateCredentials: false,
+    description: "The backend has no in-place credential-rotation contract for this database engine.",
+  };
+}
+
 export function buildConfigPayload(platform, { configText, dbFields, isDb }) {
   if (isDb) {
     const out = { platform };
