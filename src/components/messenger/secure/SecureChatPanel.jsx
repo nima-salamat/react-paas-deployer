@@ -819,6 +819,22 @@ export default function SecureChatPanel({
       {phase === "ready" && (
         <>
           <Box
+            sx={{ minHeight: 40, px: { xs: 1.25, md: 2 }, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid", borderColor: "divider" }}
+          >
+            <Tooltip title="Search decrypted messages already loaded on this device">
+              <IconButton size="small" aria-label={searchOpen ? "Close secure history search" : "Search secure history"} onClick={() => { setSearchOpen((value) => !value); setSearchQuery(""); }}>
+                {searchOpen ? <ClearIcon fontSize="small" /> : <SearchIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+            {searchOpen ? (
+              <TextField autoFocus fullWidth size="small" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search loaded encrypted history on this device…" inputProps={{ "aria-label": "Search loaded encrypted history" }} sx={{ "& .MuiOutlinedInput-root": { minHeight: 34, fontSize: 13 } }} />
+            ) : (
+              <Typography variant="caption" color="text.secondary">{messages.length} encrypted messages loaded on this device</Typography>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Chip size="small" icon={<LockOutlinedIcon sx={{ fontSize: "14px !important" }} />} label="E2EE" color="success" variant="outlined" sx={{ height: 23, fontSize: 10.5 }} />
+          </Box>
+          <Box
             ref={timelineRef}
             onScroll={onTimelineScroll}
             sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: { xs: 1.5, md: 3 }, py: 2 }}
