@@ -561,6 +561,8 @@ test("developer shell commands always use the PTY transport and preserve termina
   const xterm = read("src/components/service_detail/components/ShellXterm.jsx");
 
   assert.match(shell, /const isDeveloperSession = session\?\.mode === "developer"/);
+  assert.match(shell, /data: \{ mode: shellMode \}/);
+  assert.match(shell, /setShellMode\(data\.mode \|\| shellMode\)/);
   const runStart = shell.indexOf("const runCommand = useCallback");
   const runEnd = shell.indexOf("const runningRef = useRef(false)", runStart);
   assert.ok(runStart >= 0 && runEnd > runStart, "shell command handler should exist");
