@@ -151,7 +151,7 @@ test("Agent scope categories can be selected as a tri-state group in create and 
 
   assert.match(picker, /checked=\{allSelected\}/);
   assert.match(picker, /indeterminate=\{partiallySelected\}/);
-  assert.match(picker, /selectedCount \} \/ \{categoryScopes\.length/);
+  assert.match(picker, /\\{selectedCount\\} \/ \\{categoryScopes\\.length\\}/);
   assert.match(picker, /onToggleCategory\?\.\(category, categoryScopes\)/);
   assert.match(picker, /onToggleScope\?\.\(scope\.name\)/);
 
