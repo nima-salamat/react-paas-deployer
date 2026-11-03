@@ -451,3 +451,49 @@ test("secure conversations reuse the Messenger identity header and profile actio
   assert.match(panel, /role="region" aria-label=\{appConversationTitle\(conversation, currentUserId\)\}/);
   assert.doesNotMatch(panel, /onOpenSecuritySettings/);
 });
+
+
+test("secure chat uses Matrix-native receipts, unread navigation, and reconnect controls", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  const header = read("src/components/messenger/components/ChatHeader.jsx");
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.doesNotMatch(panel, /Text, photos, voice notes, videos and files are end-to-end encrypted/);
+  assert.match(header, /onReconnectSecureChat/);
+  assert.match(header, /Reconnect secure room/);
+  assert.match(app, /onReconnectSecureChat=\{\(\) => secureReconnectRef\.current\?\.\(\)\}/);
+  assert.match(panel, /onRegisterReconnect/);
+  assert.match(panel, /findFirstUnreadEventWithPagination/);
+  assert.match(panel, /getReadReceiptForUserId/);
+  assert.match(panel, /matrixClient\.sendReadReceipt\(event\)/);
+  assert.match(panel, /new IntersectionObserver/);
+  assert.match(panel, /onSecureUnreadCountChange/);
+});
+
+test("secure media auto-decrypt is size bounded and reports each encryption stage", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+
+  assert.match(panel, /AUTO_DECRYPT_MEDIA_MAX_BYTES = 12 \* 1024 \* 1024/);
+  assert.match(panel, /size > AUTO_DECRYPT_MEDIA_MAX_BYTES/);
+  assert.match(panel, /decryptSmallMedia/);
+  assert.match(panel, /mediaStatus\[message\.id\]/);
+  assert.match(panel, /Download decrypted file/);
+  assert.match(client, /Downloading encrypted attachment/);
+  assert.match(client, /Verifying encrypted attachment integrity/);
+  assert.match(client, /Decrypting securely on this device/);
+  assert.match(client, /Uploading encrypted attachment/);
+});
+
+test("secure composer restores focus and additional local search, copy, and Matrix reactions stay in E2EE", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(panel, /inputRef=\{draftInputRef\}/);
+  assert.match(panel, /requestAnimationFrame\(\(\) => draftInputRef\.current\?\.focus\(\)\)/);
+  assert.match(panel, /filteredMessages/);
+  assert.match(panel, /navigator\.clipboard\?\.writeText/);
+  assert.match(panel, /matrixClient\.sendEvent\(roomId, "m\.reaction"/);
+  assert.match(panel, /matrixClient\.redactEvent\(roomId, ownReaction\.id\)/);
+  assert.match(panel, /rel_type: "m\.annotation"/);
+  assert.match(panel, /getReactionGroups/);
+});
