@@ -555,3 +555,26 @@ test("service owners can manage shares and granular rules from Service Detail", 
   assert.match(opsPreset[1], /can_deploy_remove_others: false/);
   assert.match(opsPreset[1], /can_deploy_download: false/);
 });
+
+test("developer shell commands always use the PTY transport and preserve terminal output", () => {
+  const shell = read("src/components/service_detail/components/ShellPanel.jsx");
+  const xterm = read("src/components/service_detail/components/ShellXterm.jsx");
+
+  assert.match(shell, /const isDeveloperSession = session\?\.mode === "developer"/);
+  const runStart = shell.indexOf("const runCommand = useCallback");
+  const runEnd = shell.indexOf("const runningRef = useRef(false)", runStart);
+  assert.ok(runStart >= 0 && runEnd > runStart, "shell command handler should exist");
+  const runCommand = shell.slice(runStart, runEnd);
+  const ptyRoute = runCommand.indexOf("if (isDeveloperSession || isInteractiveCommand(cmd))");
+  const oneShotRoute = runCommand.indexOf("${apiRoot}/command/");
+  assert.ok(ptyRoute >= 0, "Developer mode must route commands to the PTY");
+  assert.ok(oneShotRoute > ptyRoute, "the one-shot HTTP command endpoint must remain after the PTY branch");
+
+  assert.match(shell, /message\.type === "command\.output"/);
+  assert.match(shell, /message\.type === "process\.exit"[\s\S]*?runningRef\.current = false/);
+  assert.match(shell, /keepMounted=\{isDeveloperSession\}/);
+  assert.match(shell, /disabled=\{isDeveloperSession\}/);
+  assert.match(xterm, /keepMounted = false/);
+  assert.match(xterm, /disableStdin: !activeRef\.current/);
+  assert.match(xterm, /if \(activeRef\.current\) callbacksRef\.current\.onData/);
+});
