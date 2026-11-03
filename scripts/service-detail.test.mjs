@@ -578,3 +578,37 @@ test("developer shell commands always use the PTY transport and preserve termina
   assert.match(xterm, /disableStdin: !activeRef\.current/);
   assert.match(xterm, /if \(activeRef\.current\) callbacksRef\.current\.onData/);
 });
+
+test("database Deploy edits use immutable revisions and match backend rotation capabilities", () => {
+  const utils = read("src/components/service_detail/utils.js");
+  const detail = read("src/components/service_detail/ServiceDetail.jsx");
+  const panel = read("src/components/service_detail/components/CreateDeployPanel.jsx");
+  const constants = read("src/components/service_detail/constants.js");
+
+  assert.match(utils, /export function getDbCredentialRotationPolicy/);
+  assert.match(utils, /normalized === "mysql" \|\| normalized === "mariadb"[\s\S]*?editableFields: \["username", "password", "root_password", "database"\]/);
+  assert.match(utils, /normalized === "redis"[\s\S]*?editableFields: \["password"\]/);
+  assert.match(utils, /"postgres", "postgresql", "mongodb", "mongo", "oracle"/);
+
+  const start = detail.indexOf("const handleUpdateDeploy = async (deployId) => {");
+  const end = detail.indexOf("const handleDeleteDeploy = async (deployId) => {", start);
+  assert.ok(start >= 0 && end > start, "Deploy update handler should exist");
+  const handler = detail.slice(start, end);
+  const dbBranchEnd = handler.indexOf("let configPayload;");
+  const dbBranch = handler.slice(0, dbBranchEnd);
+  assert.match(dbBranch, /url: `\$\{DEPLOY_BASE\}\$\{deployId\}\/update_db_config\//);
+  assert.match(dbBranch, /method: "PATCH"/);
+  assert.match(dbBranch, /data: \{ name: editData\.name, version: editData\.version \}/);
+  assert.doesNotMatch(dbBranch, /data: \{ name: editData\.name, version: editData\.version, config:/);
+  assert.match(dbBranch, /getDbCredentialRotationPolicy\(effectivePlatform\)/);
+  assert.match(dbBranch, /DATABASE/);
+
+  assert.match(detail, /setEditDbOriginalFields/);
+  assert.match(detail, /normalizeValue\(key, editDbOriginalFields\[key\]\)/);
+  assert.match(panel, /getDbCredentialRotationPolicy/);
+  assert.match(panel, /disabled=\{editing && isCredentialField && !credentialEditable\}/);
+  assert.match(panel, /rotationPolicy\?\.canGenerateCredentials/);
+  assert.match(panel, /Only non-secret environment settings can be changed here/);
+  assert.match(constants, /backend update_db_config endpoint/);
+  assert.doesNotMatch(constants, /update_db_config \+ update endpoints/);
+});
