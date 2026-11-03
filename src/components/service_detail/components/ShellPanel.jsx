@@ -348,6 +348,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const platform = normalizePlatform(session?.platform || service?.platform || service?.framework || service?.selected_platform);
   const apiRoot = `${SERVICE_ACTION_ROOT}services/${serviceId}/shell`;
   const currentCwd = session?.cwd || "/";
+  const isDeveloperSession = session?.mode === "developer";
   useEffect(() => {
     if (isMobileLayout) setSidebarOpen(false);
   }, [isMobileLayout]);
@@ -593,7 +594,33 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         setSession((prev) => prev ? { ...prev, cwd: message.cwd || prev.cwd, platform: message.platform || prev.platform } : prev);
         return;
       }
+      if (message.type === "command.output") {
+        const nextCwd = message.cwd || session?.cwd || "/";
+        setSession((prev) => (prev ? { ...prev, cwd: nextCwd } : prev));
+        const stdout = cleanOutput(message.stdout);
+        const stderr = cleanOutput(message.stderr);
+        if (isDeveloperSession && xtermWriteRef.current) {
+          if (stdout) xtermWriteRef.current(stdout.endsWith("\n") ? stdout : `${stdout}\r\n`);
+          if (stderr) xtermWriteRef.current(stderr.endsWith("\n") ? stderr : `${stderr}\r\n`);
+        } else {
+          appendHistory({
+            type: "output",
+            stdout,
+            stderr,
+            exitCode: message.exit_code ?? 0,
+          });
+        }
+        runningRef.current = false;
+        setCommandRunning(false);
+        setInteractiveRunning(false);
+        setInteractiveInput("");
+        setInteractiveSecret(false);
+        refreshDirectory();
+        focusTerminal();
+        return;
+      }
       if (message.type === "process.started") {
+        runningRef.current = true;
         setInteractiveRunning(true);
         setCommandRunning(false);
         setInteractiveInput("");
@@ -614,12 +641,14 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         return;
       }
       if (message.type === "process.exit") {
+        runningRef.current = false;
         setInteractiveRunning(false);
         setCommandRunning(false);
         setInteractiveInput("");
         setInteractiveSecret(false);
         // Keep exitCode only — terminalLines renders the message once from exitCode.
         appendHistory({ type: "output", stdout: "", stderr: "", exitCode: message.exit_code ?? 0 });
+        if (isDeveloperSession) refreshDirectory();
         focusTerminal();
         return;
       }
@@ -638,17 +667,22 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         };
         const prefix = code && labels[code] ? `${labels[code]}: ` : code ? `[${code}] ` : "";
         appendHistory({ type: "error", text: `${prefix}${message.message || "Interactive shell error."}` });
+        runningRef.current = false;
         setCommandRunning(false);
         setInteractiveRunning(false);
       }
     };
-    socket.onerror = () => { /* Basic command API remains available when PTY is unavailable. */ };
+    socket.onerror = () => {
+      // Developer commands have no HTTP fallback: the backend requires this PTY transport.
+    };
     socket.onclose = (event) => {
       clearInterval(pingTimer);
       if (event.code === 4401) {
         refreshAccessToken().catch(() => {});
       }
       shellSocketRef.current = null;
+      runningRef.current = false;
+      setCommandRunning(false);
       setInteractiveRunning(false);
       setInteractiveInput("");
       setInteractiveSecret(false);
@@ -658,7 +692,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       try { socket.close(); } catch { /* noop */ }
       if (shellSocketRef.current === socket) shellSocketRef.current = null;
     };
-  }, [appendHistory, focusTerminal, serviceId, session?.token, authGeneration]);
+  }, [appendHistory, focusTerminal, isDeveloperSession, refreshDirectory, serviceId, session?.token, authGeneration]);
 
   const createSession = useCallback(async () => {
     if (!serviceId || !enabled || sessionLoading || session) return;
@@ -916,7 +950,10 @@ export default function ShellPanel({ service, enabled = true, onError }) {
 
   const isInteractiveCommand = useCallback((cmd) => {
     const normalized = String(cmd || "").trim().toLowerCase();
-    return commandCatalog.some((item) => item.interactive && String(item.command || "").trim().toLowerCase() === normalized);
+    return commandCatalog.some(
+      (item) => (item.interactive || item.transport === "pty_websocket")
+        && String(item.command || "").trim().toLowerCase() === normalized,
+    );
   }, [commandCatalog]);
 
   const sendInteractiveInput = useCallback((data) => {
@@ -962,6 +999,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     if (!session?.token || runningRef.current || !cmd) return;
     if (cmd === "clear") {
       setHistory([]);
+      if (isDeveloperSession) xtermWriteRef.current?.("\x1b[2J\x1b[H");
       setCommand("");
       setCommandHistoryIndex(null);
       setCompletionOpen(false);
@@ -971,7 +1009,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
     }
 
     const editorCommand = cmd.match(/^(?:nano|vi|vim)\s+(.+)$/i);
-    if (editorCommand) {
+    if (!isDeveloperSession && editorCommand) {
       appendHistory({ type: "command", text: cmd, cwd: currentCwd });
       let editorPath = null;
       try {
@@ -1002,7 +1040,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       return true;
     }
 
-    if (isInteractiveCommand(cmd)) {
+    if (isDeveloperSession || isInteractiveCommand(cmd)) {
       const socket = shellSocketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         handleError("Interactive shell connection is not ready. Reconnect the shell session and try again.");
@@ -1014,9 +1052,18 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       setCommand("");
       setCompletionOpen(false);
       if (terminalInputRef.current) terminalInputRef.current.textContent = "";
-      // Hide outer prompt immediately; process.started will take over with interactiveRunning.
+      // Developer commands and catalogued interactive commands must use the PTY.
+      // Developer mode intentionally has no one-shot /command/ fallback.
+      runningRef.current = true;
       setCommandRunning(true);
-      socket.send(JSON.stringify({ type: "command", command: cmd }));
+      try {
+        socket.send(JSON.stringify({ type: "command", command: cmd }));
+      } catch (error) {
+        runningRef.current = false;
+        setCommandRunning(false);
+        appendHistory({ type: "error", text: error?.message || "Unable to send command to the interactive shell." });
+        return false;
+      }
       focusTerminal();
       return true;
     }
@@ -1072,7 +1119,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       setCommandRunning(false);
       focusTerminal();
     }
-  }, [apiRoot, command, currentCwd, dryRun, focusTerminal, formatShellError, handleError, isInteractiveCommand, parseSingleEditorArgument, refreshDirectory, session?.token]);
+  }, [apiRoot, appendHistory, command, currentCwd, dryRun, focusTerminal, formatShellError, handleError, isDeveloperSession, isInteractiveCommand, parseSingleEditorArgument, refreshDirectory, session?.token]);
 
   const runningRef = useRef(false);
 
@@ -1792,8 +1839,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                 {session ? (
                   <>
                     <Box sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center", gap: .2, minWidth: 0 }}>
-                      <Tooltip title={tr(dryRun ? "Dry-run ON (commands are planned only)" : "Dry-run OFF")}>
-                        <Chip size="small" onClick={(e) => { e.stopPropagation(); setDryRun((v) => !v); }} label={dryRun ? "dry-run" : "live"} sx={{ height: 22, cursor: "pointer", color: dryRun ? "#e9bd69" : "#8fa0b0", bgcolor: dryRun ? "rgba(246,199,108,.1)" : "rgba(148,163,184,.06)" }} />
+                      <Tooltip title={tr(isDeveloperSession ? "Dry-run is unavailable in Developer mode" : (dryRun ? "Dry-run ON (commands are planned only)" : "Dry-run OFF"))}>
+                        <Chip size="small" disabled={isDeveloperSession} onClick={(e) => { e.stopPropagation(); setDryRun((v) => !v); }} label={dryRun ? "dry-run" : "live"} sx={{ height: 22, cursor: isDeveloperSession ? "not-allowed" : "pointer", color: dryRun ? "#e9bd69" : "#8fa0b0", bgcolor: dryRun ? "rgba(246,199,108,.1)" : "rgba(148,163,184,.06)" }} />
                       </Tooltip>
                       <Tooltip title={tr("Snippets")}><Button size="small" onClick={(e) => { e.stopPropagation(); setSnippetsOpen(true); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Snippets")}</Button></Tooltip>
                       <Tooltip title={tr("Environment (masked)")}><Button size="small" onClick={(e) => { e.stopPropagation(); loadEnv(); }} sx={{ minWidth: 0, px: .7, color: "#9ab0c4", textTransform: "none", fontSize: 11 }}>{tr("Env")}</Button></Tooltip>
@@ -1833,7 +1880,7 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                       <MenuItem onClick={() => { setShellMode("restricted"); setShellModeAnchorEl(null); }}>
                         <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>{tr("Restricted")}</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>{tr("Policy-enforced workspace shell")}</Typography></Stack>
                       </MenuItem>
-                      <MenuItem disabled={!shellAdvanced} onClick={() => { setShellMode("developer"); setShellModeAnchorEl(null); }}>
+                      <MenuItem disabled={!shellAdvanced} onClick={() => { setShellMode("developer"); setDryRun(false); setShellModeAnchorEl(null); }}>
                         <Stack spacing={0.1}><Typography sx={{ fontSize: 12.5 }}>{tr("Developer")}</Typography><Typography sx={{ fontSize: 10.5, color: "text.secondary" }}>{tr(shellAdvanced ? "Real /bin/sh inside the hardened container" : "Requires advanced shell permission")}</Typography></Stack>
                       </MenuItem>
                     </Menu>
@@ -1862,18 +1909,22 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     <Box key={line.key} sx={{ color: line.type === "stderr" || line.type === "error" ? "#ff9b8f" : line.type === "system" ? "#87b4d9" : "#dce6ef", whiteSpace: "pre-wrap", overflowWrap: "anywhere", minHeight: line.text ? 20 : 6, userSelect: "text", WebkitUserSelect: "text" }}>{line.text || " "}</Box>
                   )
                 ))}
-                                {interactiveRunning ? (
+                                {(interactiveRunning || isDeveloperSession) ? (
                   <Box sx={{ my: 1 }}>
                     <ShellXterm
+                      key={session?.token || "shell-terminal"}
                       active={interactiveRunning}
+                      keepMounted={isDeveloperSession}
                       onData={handleXtermData}
                       onResize={handleXtermResize}
                       writeRef={xtermWriteRef}
                       height={Math.max(280, (typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.35) : 320))}
                     />
-                    <Typography sx={{ mt: 0.5, fontSize: 11, color: "#5e6d7c" }}>
-                      Interactive session · Ctrl+C interrupt · Ctrl+D exit · typed keys go to the process
-                    </Typography>
+                    {interactiveRunning ? (
+                      <Typography sx={{ mt: 0.5, fontSize: 11, color: "#5e6d7c" }}>
+                        Interactive session · Ctrl+C interrupt · Ctrl+D exit · typed keys go to the process
+                      </Typography>
+                    ) : null}
                   </Box>
                 ) : null}
                 {session && !interactiveRunning ? (
@@ -2116,8 +2167,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
           {fullscreen ? <FullscreenExitRoundedIcon sx={{ mr: 1, fontSize: 19 }} /> : <FullscreenRoundedIcon sx={{ mr: 1, fontSize: 19 }} />}
           {tr(fullscreen ? "Exit fullscreen" : "Fullscreen")}
         </MenuItem>
-        <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setDryRun((value) => !value); }}>
-          {tr(dryRun ? "Disable dry-run" : "Enable dry-run")}
+        <MenuItem disabled={isDeveloperSession} onClick={() => { setMobileOptionsAnchorEl(null); setDryRun((value) => !value); }}>
+          {tr(isDeveloperSession ? "Dry-run unavailable in Developer mode" : (dryRun ? "Disable dry-run" : "Enable dry-run"))}
         </MenuItem>
         <MenuItem onClick={() => { setMobileOptionsAnchorEl(null); setSnippetsOpen(true); }}>
           {tr("Snippets")}
