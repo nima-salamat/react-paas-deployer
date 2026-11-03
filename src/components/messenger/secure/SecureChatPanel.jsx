@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, Avatar, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
-  DialogTitle, Divider, IconButton, LinearProgress, Menu, MenuItem, Paper, Stack, TextField,
+  Alert, Avatar, Badge, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent,
+  DialogTitle, Divider, IconButton, LinearProgress, Menu, MenuItem, Paper, Popover, Slider, Stack, TextField,
   Tooltip, Typography,
 } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
@@ -19,12 +19,18 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CloseIcon from "@mui/icons-material/Close";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import OpenInFullRoundedIcon from "@mui/icons-material/OpenInFullRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
 import {
   assertSecureMessagingReady, getSecureMatrixClient, getSecureMatrixSession,
   hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
   sendEncryptedMedia, decryptEncryptedMedia,
 } from "./MatrixSecureClient";
-import { withTokenQuery } from "../messengerUtils";
+import { formatDuration, withTokenQuery } from "../messengerUtils";
+import MediaGalleryDialog from "../components/MediaGalleryDialog";
+import VideoPlayer from "../components/VideoPlayer";
 
 const AUTO_DECRYPT_MEDIA_MAX_BYTES = 12 * 1024 * 1024;
 
@@ -363,6 +369,138 @@ function waitForSync(client) {
   });
 }
 
+
+function SecureAudioPlayer({ src, filename, onDownload }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [audioError, setAudioError] = useState(false);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return undefined;
+    const updateTime = () => setCurrentTime(audio.currentTime || 0);
+    const updateDuration = () => {
+      const value = Number(audio.duration);
+      setDuration(Number.isFinite(value) && value > 0 ? value : 0);
+    };
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onEnded = () => { setPlaying(false); setCurrentTime(0); };
+    const onError = () => { setPlaying(false); setAudioError(true); };
+    audio.addEventListener("timeupdate", updateTime);
+    audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("durationchange", updateDuration);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+    audio.load();
+    return () => {
+      audio.pause();
+      audio.removeEventListener("timeupdate", updateTime);
+      audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("durationchange", updateDuration);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+    };
+  }, [src]);
+
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (!audio || audioError) return;
+    if (audio.paused) {
+      try {
+        await audio.play();
+      } catch {
+        setAudioError(true);
+        setPlaying(false);
+      }
+    } else {
+      audio.pause();
+    }
+  };
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        width: "min(100%, 380px)",
+        p: 1,
+        borderRadius: 2.5,
+        bgcolor: "rgba(0,0,0,0.035)",
+        borderColor: "divider",
+      }}
+    >
+      <audio ref={audioRef} src={src} preload="metadata" />
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <IconButton
+          aria-label={playing ? "Pause encrypted audio" : "Play encrypted audio"}
+          onClick={() => void togglePlayback()}
+          disabled={audioError}
+          sx={{
+            width: 42,
+            height: 42,
+            flex: "0 0 42px",
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
+            "&:hover": { bgcolor: "primary.dark" },
+            "&.Mui-disabled": { bgcolor: "action.disabledBackground" },
+          }}
+        >
+          {playing ? <PauseRoundedIcon /> : <PlayArrowRoundedIcon />}
+        </IconButton>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" fontWeight={650} noWrap title={filename || "Audio message"}>
+            {filename || "Audio message"}
+          </Typography>
+          {audioError ? (
+            <Typography variant="caption" color="error.main">Audio could not be played</Typography>
+          ) : (
+            <Slider
+              size="small"
+              value={Math.min(currentTime, duration || 0)}
+              min={0}
+              max={duration || 1}
+              onChange={(_, value) => {
+                const next = Array.isArray(value) ? value[0] : value;
+                setCurrentTime(next);
+                if (audioRef.current && duration > 0) audioRef.current.currentTime = next;
+              }}
+              sx={{
+                py: 0.15,
+                my: -0.15,
+                color: "primary.main",
+                "& .MuiSlider-thumb": { width: 10, height: 10 },
+                "& .MuiSlider-rail": { opacity: 0.22 },
+              }}
+              aria-label="Audio progress"
+            />
+          )}
+          <Stack direction="row" justifyContent="space-between">
+            <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: "tabular-nums" }}>
+              {formatDuration(currentTime)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: "tabular-nums" }}>
+              {formatDuration(duration)}
+            </Typography>
+          </Stack>
+        </Box>
+        {onDownload && (
+          <Tooltip title="Download decrypted audio">
+            <IconButton size="small" aria-label="Download encrypted audio" onClick={onDownload}>
+              <DownloadIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Stack>
+    </Paper>
+  );
+}
+
 export default function SecureChatPanel({
   conversation,
   currentUserId,
@@ -395,12 +533,23 @@ export default function SecureChatPanel({
   const readReceiptSentRef = useRef(new Set());
   const [receiptRevision, setReceiptRevision] = useState(0);
   const [unreadAnchorId, setUnreadAnchorId] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCountRef = useRef(0);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const isNearBottomRef = useRef(true);
   const [timelineInitialised, setTimelineInitialised] = useState(false);
   const initialScrollHandledRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roomMenuAnchor, setRoomMenuAnchor] = useState(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
+  const [reactionPickerAnchor, setReactionPickerAnchor] = useState(null);
   const reactionOperationsRef = useRef(new Set());
+  const [secureViewerAttachment, setSecureViewerAttachment] = useState(null);
+  const secureViewerItems = useMemo(
+    () => (secureViewerAttachment ? [secureViewerAttachment] : null),
+    [secureViewerAttachment],
+  );
   const [messageMenuAnchor, setMessageMenuAnchor] = useState(null);
   const [messageMenuTarget, setMessageMenuTarget] = useState(null);
   const [editingMessage, setEditingMessage] = useState(null);
@@ -433,7 +582,14 @@ export default function SecureChatPanel({
     setError("");
     setSearchOpen(false);
     setSearchQuery("");
+    setRoomMenuAnchor(null);
     setReactionPickerMessageId(null);
+    setReactionPickerAnchor(null);
+    setSecureViewerAttachment(null);
+    unreadCountRef.current = 0;
+    setUnreadCount(0);
+    setShowJumpToBottom(false);
+    isNearBottomRef.current = true;
     setMessageMenuAnchor(null);
     setMessageMenuTarget(null);
     setEditingMessage(null);
@@ -449,8 +605,10 @@ export default function SecureChatPanel({
     const room = client.getRoom(roomId);
     if (!room) return;
     setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
-    const unreadCount = Number(room.getUnreadNotificationCount?.("total") || 0);
-    onSecureUnreadCountChange?.(unreadCount);
+    const nextUnreadCount = Math.max(0, Number(room.getUnreadNotificationCount?.("total") || 0));
+    unreadCountRef.current = nextUnreadCount;
+    setUnreadCount(nextUnreadCount);
+    onSecureUnreadCountChange?.(nextUnreadCount);
   }, [roomId, onSecureUnreadCountChange]);
 
   useEffect(() => {
@@ -467,8 +625,10 @@ export default function SecureChatPanel({
     const onReceipt = (_event, room) => {
       if (room?.roomId !== roomId) return;
       setReceiptRevision((value) => value + 1);
-      const unreadCount = Number(room.getUnreadNotificationCount?.("total") || 0);
-      onSecureUnreadCountChange?.(unreadCount);
+      const nextUnreadCount = Math.max(0, Number(room.getUnreadNotificationCount?.("total") || 0));
+      unreadCountRef.current = nextUnreadCount;
+      setUnreadCount(nextUnreadCount);
+      onSecureUnreadCountChange?.(nextUnreadCount);
     };
     const attachRoomListeners = () => {
       if (roomListenersAttached || !activeClient) return;
@@ -615,6 +775,8 @@ export default function SecureChatPanel({
         setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
         setUnreadAnchorId(initialHistory.unreadAnchorId);
         setHasMoreHistory(initialHistory.hasMoreHistory);
+        unreadCountRef.current = unreadCount;
+        setUnreadCount(unreadCount);
         setTimelineInitialised(true);
         onSecureUnreadCountChange?.(unreadCount);
         attachRoomListeners();
@@ -665,8 +827,14 @@ export default function SecureChatPanel({
         const anchorIndex = timelineEvents.findIndex((candidate) => candidate.getId?.() === current);
         return anchorIndex >= 0 && readIndex >= anchorIndex ? null : current;
       });
-      const unreadCount = Number(matrixClient.getRoom(roomId)?.getUnreadNotificationCount?.("total") || 0);
-      onSecureUnreadCountChange?.(unreadCount);
+      const room = matrixClient.getRoom(roomId);
+      const roomUnreadCount = Math.max(0, Number(room?.getUnreadNotificationCount?.("total") || 0));
+      const nextUnreadCount = unreadCountRef.current > 0
+        ? Math.min(roomUnreadCount, unreadCountRef.current - 1)
+        : roomUnreadCount;
+      unreadCountRef.current = nextUnreadCount;
+      setUnreadCount(nextUnreadCount);
+      onSecureUnreadCountChange?.(nextUnreadCount);
     } catch {
       // Keep the receipt retryable when the homeserver is temporarily unavailable.
       readReceiptSentRef.current.delete(eventId);
@@ -707,9 +875,25 @@ export default function SecureChatPanel({
       } else {
         timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
       }
+      const distanceFromBottom = Math.max(
+        0,
+        timelineRef.current.scrollHeight - timelineRef.current.scrollTop - timelineRef.current.clientHeight,
+      );
+      isNearBottomRef.current = distanceFromBottom < 120;
+      setShowJumpToBottom(distanceFromBottom >= 120);
       initialScrollHandledRef.current = true;
     });
   }, [phase, timelineInitialised, messages, unreadAnchorId]);
+
+  useEffect(() => {
+    if (!timelineInitialised || !initialScrollHandledRef.current || !isNearBottomRef.current) return;
+    requestAnimationFrame(() => {
+      const scroller = timelineRef.current;
+      if (!scroller || !isNearBottomRef.current) return;
+      scroller.scrollTop = scroller.scrollHeight;
+      setShowJumpToBottom(false);
+    });
+  }, [messages, timelineInitialised]);
 
   const filteredMessages = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase();
@@ -750,9 +934,21 @@ export default function SecureChatPanel({
   }, [matrixClient, roomId, loadingOlder, hasMoreHistory, refreshTimeline]);
 
   const onTimelineScroll = (event) => {
-    if (event.currentTarget.scrollTop < 48 && hasMoreHistory && !loadingOlder) {
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+    const distanceFromBottom = Math.max(0, scrollHeight - scrollTop - clientHeight);
+    const nearBottom = distanceFromBottom < 120;
+    isNearBottomRef.current = nearBottom;
+    setShowJumpToBottom(!nearBottom);
+    if (scrollTop < 48 && hasMoreHistory && !loadingOlder) {
       void loadOlderHistory();
     }
+  };
+
+  const jumpToLatestMessage = () => {
+    const scroller = timelineRef.current;
+    if (!scroller) return;
+    isNearBottomRef.current = true;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
   };
 
   const acceptInvitation = async () => {
@@ -1198,21 +1394,45 @@ export default function SecureChatPanel({
       {phase === "ready" && (
         <>
           <Box
-            sx={{ minHeight: 40, px: { xs: 1.25, md: 2 }, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid", borderColor: "divider" }}
+            sx={{ minHeight: 44, px: { xs: 1.25, md: 2 }, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid", borderColor: "divider" }}
           >
-            <Tooltip title="Search decrypted messages already loaded on this device">
-              <IconButton size="small" aria-label={searchOpen ? "Close secure history search" : "Search secure history"} onClick={() => { setSearchOpen((value) => !value); setSearchQuery(""); }}>
-                {searchOpen ? <ClearIcon fontSize="small" /> : <SearchIcon fontSize="small" />}
-              </IconButton>
-            </Tooltip>
             {searchOpen ? (
-              <TextField autoFocus fullWidth size="small" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search loaded encrypted history on this device…" inputProps={{ "aria-label": "Search loaded encrypted history" }} sx={{ "& .MuiOutlinedInput-root": { minHeight: 34, fontSize: 13 } }} />
+              <>
+                <TextField autoFocus fullWidth size="small" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search loaded encrypted history on this device…" inputProps={{ "aria-label": "Search loaded encrypted history" }} sx={{ "& .MuiOutlinedInput-root": { minHeight: 36, fontSize: 13, borderRadius: 3 } }} />
+                <Tooltip title="Close search">
+                  <IconButton size="small" aria-label="Close secure history search" onClick={() => { setSearchOpen(false); setSearchQuery(""); }}>
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </>
             ) : (
               <Typography variant="caption" color="text.secondary">{messages.length} encrypted messages loaded on this device</Typography>
             )}
             <Box sx={{ flex: 1 }} />
             <Chip size="small" icon={<LockOutlinedIcon sx={{ fontSize: "14px !important" }} />} label="E2EE" color="success" variant="outlined" sx={{ height: 23, fontSize: 10.5 }} />
+            <Tooltip title="Secure chat options">
+              <IconButton size="small" aria-label="Secure chat options" onClick={(event) => setRoomMenuAnchor(event.currentTarget)}>
+                <MoreVertIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
+          <Menu
+            anchorEl={roomMenuAnchor}
+            open={Boolean(roomMenuAnchor)}
+            onClose={() => setRoomMenuAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <MenuItem onClick={() => {
+              setSearchOpen(true);
+              setSearchQuery("");
+              setRoomMenuAnchor(null);
+            }}>
+              <SearchIcon fontSize="small" sx={{ mr: 1.2 }} />
+              Search loaded messages
+            </MenuItem>
+          </Menu>
+          <Box sx={{ flex: 1, minHeight: 0, position: "relative", display: "flex" }}>
           <Box
             ref={timelineRef}
             onScroll={onTimelineScroll}
@@ -1251,8 +1471,10 @@ export default function SecureChatPanel({
                       maxWidth: "min(78%, 720px)",
                       border: "1px solid",
                       borderColor: message.undecryptable ? "warning.main" : "divider",
-                      bgcolor: message.isOwn ? "action.selected" : "background.paper",
-                      px: 1.5, py: 1, borderRadius: 1.5,
+                      bgcolor: message.isOwn ? "primary.main" : "background.paper",
+                      color: message.isOwn ? "primary.contrastText" : "text.primary",
+                      boxShadow: message.isOwn ? "0 2px 10px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.045)",
+                      px: 1.5, py: 1, borderRadius: message.isOwn ? "18px 18px 5px 18px" : "18px 18px 18px 5px",
                     }}
                   >
                     {!message.isOwn && (
@@ -1268,13 +1490,67 @@ export default function SecureChatPanel({
                     {message.mediaType && (
                       <Box sx={{ display: "grid", gap: 1, my: 0.5, minWidth: 150 }}>
                         {loadedMedia[message.id] && message.mediaType === "m.image" && (
-                          <img src={loadedMedia[message.id].url} alt={message.filename || "Encrypted image"} style={{ display: "block", maxWidth: "min(65vw, 420px)", maxHeight: 420, objectFit: "contain", borderRadius: 8 }} />
+                          <Tooltip title="Open image viewer">
+                            <Box
+                              component="button"
+                              type="button"
+                              onClick={() => setSecureViewerAttachment({
+                                id: String(message.id),
+                                message_id: message.id,
+                                url: loadedMedia[message.id].url,
+                                kind: "image",
+                                content_type: loadedMedia[message.id].mimeType || message.info?.mimetype || "image/jpeg",
+                                original_filename: message.filename || "Encrypted image",
+                              })}
+                              sx={{
+                                display: "block",
+                                position: "relative",
+                                maxWidth: "min(65vw, 420px)",
+                                p: 0,
+                                border: 0,
+                                borderRadius: 2,
+                                overflow: "hidden",
+                                bgcolor: "transparent",
+                                cursor: "zoom-in",
+                                lineHeight: 0,
+                                "& img": { display: "block", maxWidth: "100%", maxHeight: 360, objectFit: "contain", borderRadius: 2 },
+                                "& .secure-image-open": {
+                                  position: "absolute",
+                                  right: 8,
+                                  bottom: 8,
+                                  display: "grid",
+                                  placeItems: "center",
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  color: "#fff",
+                                  bgcolor: "rgba(0,0,0,0.58)",
+                                  opacity: 0,
+                                  transition: "opacity .18s ease",
+                                },
+                                "&:hover .secure-image-open, &:focus-visible .secure-image-open": { opacity: 1 },
+                              }}
+                            >
+                              <img src={loadedMedia[message.id].url} alt={message.filename || "Encrypted image"} />
+                              <Box className="secure-image-open"><OpenInFullRoundedIcon fontSize="small" /></Box>
+                            </Box>
+                          </Tooltip>
                         )}
                         {loadedMedia[message.id] && message.mediaType === "m.audio" && (
-                          <audio controls preload="none" src={loadedMedia[message.id].url} style={{ maxWidth: "min(65vw, 360px)" }} />
+                          <SecureAudioPlayer
+                            src={loadedMedia[message.id].url}
+                            filename={message.filename || "Audio message"}
+                            onDownload={() => downloadLoadedMedia(message)}
+                          />
                         )}
                         {loadedMedia[message.id] && message.mediaType === "m.video" && (
-                          <video controls preload="none" src={loadedMedia[message.id].url} style={{ maxWidth: "min(65vw, 420px)", maxHeight: 420, borderRadius: 8 }} />
+                          <VideoPlayer
+                            src={loadedMedia[message.id].url}
+                            filename={message.filename || "Encrypted video"}
+                            contentType={loadedMedia[message.id].mimeType || message.info?.mimetype || "video/mp4"}
+                            maxWidth={420}
+                            maxHeight={300}
+                          />
                         )}
                         {loadedMedia[message.id] && message.mediaType === "m.file" && (
                           <Button variant="outlined" size="small" startIcon={<DownloadIcon />} onClick={() => downloadLoadedMedia(message)}>
@@ -1311,9 +1587,9 @@ export default function SecureChatPanel({
                         </Typography>
                       </Box>
                     )}
-                    {(!message.mediaType || !["m.image", "m.video", "m.file"].includes(message.mediaType)) && (
+                    {!message.mediaType && (
                       <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
-                        {message.mediaType === "m.audio" ? (message.body === message.filename ? "Voice message" : message.body) : message.body}
+                        {message.body}
                       </Typography>
                     )}
                     <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5} sx={{ mt: 0.5 }}>
@@ -1342,9 +1618,9 @@ export default function SecureChatPanel({
                         </Tooltip>
                       )}
                       {message.edited && (
-                        <Typography variant="caption" color="text.secondary">edited</Typography>
+                        <Typography variant="caption" sx={{ color: message.isOwn ? "rgba(255,255,255,0.72)" : "text.secondary" }}>edited</Typography>
                       )}
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{ color: message.isOwn ? "rgba(255,255,255,0.72)" : "text.secondary" }}>
                         {new Date(message.timestamp).toLocaleString()}
                       </Typography>
                       <Tooltip title="Message options">
@@ -1361,7 +1637,7 @@ export default function SecureChatPanel({
                         </IconButton>
                       </Tooltip>
                     </Stack>
-                    {(message.reactions?.length || reactionPickerMessageId === message.id) ? (
+                    {message.reactions?.length > 0 && (
                       <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.4} sx={{ mt: 0.65 }}>
                         {getReactionGroups(message.reactions, matrixClient?.getUserId()).map((reaction) => (
                           <Chip
@@ -1375,20 +1651,25 @@ export default function SecureChatPanel({
                             sx={{ height: 25 }}
                           />
                         ))}
-                        {reactionPickerMessageId === message.id && ["👍", "❤️", "😂", "😮", "🙏"].map((emoji) => (
-                          <Chip key={emoji} size="small" clickable label={emoji} onClick={() => void toggleSecureReaction(message, emoji)} sx={{ height: 25 }} />
-                        ))}
                       </Stack>
-                    ) : null}
+                    )}
                     <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.35 }}>
                       <Tooltip title={reactionPickerMessageId === message.id ? "Close reactions" : "Add reaction"}>
                         <IconButton
                           size="small"
                           aria-label="Add secure reaction"
-                          onClick={() => setReactionPickerMessageId((current) => current === message.id ? null : message.id)}
-                          sx={{ p: 0.2, opacity: 0.72 }}
+                          onClick={(event) => {
+                            setReactionPickerMessageId((current) => current === message.id ? null : message.id);
+                            setReactionPickerAnchor((current) => current && reactionPickerMessageId === message.id ? null : event.currentTarget);
+                          }}
+                          sx={{
+                            p: 0.25,
+                            opacity: 0.82,
+                            color: message.isOwn ? "rgba(255,255,255,0.82)" : "text.secondary",
+                            "&:hover": { bgcolor: message.isOwn ? "rgba(255,255,255,0.14)" : "action.hover" },
+                          }}
                         >
-                          <EmojiEmotionsIcon sx={{ fontSize: 15 }} />
+                          <EmojiEmotionsIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Tooltip>
                     </Box>
@@ -1412,6 +1693,48 @@ export default function SecureChatPanel({
                 </Box>
               )}
             </Stack>
+          </Box>
+          {showJumpToBottom && (
+            <Box sx={{ position: "absolute", right: { xs: 14, md: 24 }, bottom: 18, zIndex: 4 }}>
+              <Badge
+                badgeContent={unreadCount > 99 ? "99+" : unreadCount}
+                color="primary"
+                invisible={unreadCount <= 0}
+                overlap="circular"
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                sx={{
+                  "& .MuiBadge-badge": {
+                    minWidth: 21,
+                    height: 21,
+                    px: 0.6,
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    boxShadow: 2,
+                    border: "2px solid",
+                    borderColor: "background.paper",
+                  },
+                }}
+              >
+                <IconButton
+                  aria-label={unreadCount > 0 ? `Jump to latest message, ${unreadCount} unread` : "Jump to latest message"}
+                  onClick={jumpToLatestMessage}
+                  sx={{
+                    width: 46,
+                    height: 46,
+                    bgcolor: "background.paper",
+                    color: "primary.main",
+                    border: "1px solid",
+                    borderColor: "divider",
+                    boxShadow: "0 5px 18px rgba(0,0,0,0.18)",
+                    "&:hover": { bgcolor: "action.hover", transform: "translateY(-2px)" },
+                    transition: "transform .18s ease, background-color .18s ease",
+                  }}
+                >
+                  <KeyboardArrowDownRoundedIcon sx={{ fontSize: 28 }} />
+                </IconButton>
+              </Badge>
+            </Box>
+          )}
           </Box>
           <Divider />
           <Box
@@ -1484,6 +1807,55 @@ export default function SecureChatPanel({
         </>
       )}
 
+      <Popover
+        open={Boolean(reactionPickerAnchor && reactionPickerMessageId)}
+        anchorEl={reactionPickerAnchor}
+        onClose={() => {
+          setReactionPickerAnchor(null);
+          setReactionPickerMessageId(null);
+        }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+        slotProps={{
+          paper: {
+            sx: {
+              p: 0.75,
+              borderRadius: 3,
+              boxShadow: "0 8px 28px rgba(0,0,0,0.2)",
+              border: "1px solid",
+              borderColor: "divider",
+            },
+          },
+        }}
+      >
+        <Stack direction="row" spacing={0.25} alignItems="center">
+          {["👍", "❤️", "😂", "😮", "🙏", "🎉", "🔥"].map((emoji) => (
+            <IconButton
+              key={emoji}
+              aria-label={`React with ${emoji}`}
+              onClick={() => {
+                const target = messages.find((message) => message.id === reactionPickerMessageId);
+                if (target) void toggleSecureReaction(target, emoji);
+                setReactionPickerAnchor(null);
+                setReactionPickerMessageId(null);
+              }}
+              sx={{ width: 38, height: 38, fontSize: 20 }}
+            >
+              {emoji}
+            </IconButton>
+          ))}
+        </Stack>
+      </Popover>
+
+      <MediaGalleryDialog
+        open={Boolean(secureViewerAttachment)}
+        conversationId={null}
+        startAttachment={secureViewerAttachment}
+        initialItems={secureViewerItems}
+        kinds="image,video"
+        onClose={() => setSecureViewerAttachment(null)}
+      />
+
       <Menu
         anchorEl={messageMenuAnchor}
         open={Boolean(messageMenuAnchor && messageMenuTarget)}
@@ -1507,6 +1879,7 @@ export default function SecureChatPanel({
         {messageMenuTarget && !messageMenuTarget.redacted && (
           <MenuItem onClick={() => {
             setReactionPickerMessageId(messageMenuTarget.id);
+            setReactionPickerAnchor(messageMenuAnchor);
             setMessageMenuAnchor(null);
             setMessageMenuTarget(null);
           }}>
