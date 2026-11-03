@@ -587,7 +587,7 @@ test("secure media viewers, floating reactions, search menu and unread jump cont
 
   assert.match(panel, /<Popover[\s\S]*?anchorEl=\{reactionPickerAnchor\}/);
   assert.doesNotMatch(panel, /reactionPickerMessageId === message\.id && \["👍", "❤️"/);
-  assert.match(panel, /setReactionPickerAnchor\(event\.currentTarget\)/);
+  assert.match(panel, /setReactionPickerAnchor\(\(current\) => current && reactionPickerMessageId === message\.id \? null : event\.currentTarget\)/);
 
   assert.match(panel, /aria-label="Secure chat options"/);
   assert.match(panel, /Search loaded messages/);
