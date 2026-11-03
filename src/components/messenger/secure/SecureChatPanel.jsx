@@ -1284,9 +1284,25 @@ export default function SecureChatPanel({
                           </IconButton>
                         </Tooltip>
                       )}
+                      {message.edited && (
+                        <Typography variant="caption" color="text.secondary">edited</Typography>
+                      )}
                       <Typography variant="caption" color="text.secondary">
                         {new Date(message.timestamp).toLocaleString()}
                       </Typography>
+                      <Tooltip title="Message options">
+                        <IconButton
+                          size="small"
+                          aria-label="Message options"
+                          onClick={(event) => {
+                            setMessageMenuTarget(message);
+                            setMessageMenuAnchor(event.currentTarget);
+                          }}
+                          sx={{ p: 0.25, ml: 0.15 }}
+                        >
+                          <MoreVertIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </Tooltip>
                     </Stack>
                     {(message.reactions?.length || reactionPickerMessageId === message.id) ? (
                       <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.4} sx={{ mt: 0.65 }}>
