@@ -851,6 +851,7 @@ export default function SecureChatPanel({
     if (!recordingVoice && !mediaRecorderRef.current) return;
     voiceRecordingCancelledRef.current = true;
     setRecordingVoice(false);
+    setMediaBusy(true);
     setError("");
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
@@ -866,11 +867,19 @@ export default function SecureChatPanel({
     mediaStreamRef.current = null;
     mediaRecorderRef.current = null;
     voiceRecordingCancelledRef.current = false;
+    setMediaBusy(false);
   };
 
   const toggleVoiceRecording = async () => {
     if (recordingVoice) {
-      try { mediaRecorderRef.current?.stop(); } catch { /* no-op */ }
+      setMediaBusy(true);
+      try { mediaRecorderRef.current?.stop(); } catch {
+        mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        mediaChunksRef.current = [];
+        setMediaBusy(false);
+      }
       setRecordingVoice(false);
       return;
     }
@@ -896,7 +905,25 @@ export default function SecureChatPanel({
         voiceRecordingCancelledRef.current = true;
         setError("Voice recording failed. Check microphone permissions and try again.");
         setRecordingVoice(false);
-        try { recorder.stop(); } catch { /* no-op */ }
+        setMediaBusy(true);
+        try {
+          if (recorder.state !== "inactive") recorder.stop();
+          else {
+            mediaChunksRef.current = [];
+            mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+            mediaStreamRef.current = null;
+            mediaRecorderRef.current = null;
+            voiceRecordingCancelledRef.current = false;
+            setMediaBusy(false);
+          }
+        } catch {
+          mediaChunksRef.current = [];
+          mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+          mediaStreamRef.current = null;
+          mediaRecorderRef.current = null;
+          voiceRecordingCancelledRef.current = false;
+          setMediaBusy(false);
+        }
       };
       recorder.onstop = () => {
         const cancelled = voiceRecordingCancelledRef.current;
@@ -909,6 +936,7 @@ export default function SecureChatPanel({
         mediaStreamRef.current = null;
         mediaRecorderRef.current = null;
         setRecordingVoice(false);
+        setMediaBusy(false);
         if (cancelled) return;
         if (blob.size > 0) {
           const extension = mimeType.includes("mp4") ? "m4a" : "webm";
@@ -924,6 +952,8 @@ export default function SecureChatPanel({
       mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
       mediaStreamRef.current = null;
       mediaRecorderRef.current = null;
+      voiceRecordingCancelledRef.current = false;
+      setMediaBusy(false);
       setError(err?.message || "Microphone access was denied.");
     }
   };
