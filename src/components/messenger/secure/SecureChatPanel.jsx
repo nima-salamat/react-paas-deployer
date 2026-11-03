@@ -22,10 +22,15 @@ import { withTokenQuery } from "../messengerUtils";
 
 const AUTO_DECRYPT_MEDIA_MAX_BYTES = 12 * 1024 * 1024;
 
+function getRoomReadReceiptEventId(room, userId) {
+  const receipt = room?.getReadReceiptForUserId?.(userId);
+  return receipt?.eventId || room?.getEventReadUpTo?.(userId) || null;
+}
+
 function findFirstUnreadEventId(room, ownUserId) {
   const events = room?.getLiveTimeline?.().getEvents?.() || [];
   if (!events.length) return null;
-  const readUpToId = room.getEventReadUpTo?.(ownUserId);
+  const readUpToId = getRoomReadReceiptEventId(room, ownUserId);
   const readIndex = readUpToId ? events.findIndex((event) => event.getId?.() === readUpToId) : -1;
   const unreadEvents = events.slice(Math.max(0, readIndex + 1));
   const firstIncoming = unreadEvents.find((event) => (
@@ -34,6 +39,20 @@ function findFirstUnreadEventId(room, ownUserId) {
     && Boolean(event.getId?.())
   ));
   return firstIncoming?.getId?.() || null;
+}
+
+async function findFirstUnreadEventWithPagination(client, room, ownUserId, maxPages = 8) {
+  let receiptEventId = getRoomReadReceiptEventId(room, ownUserId);
+  for (let page = 0; receiptEventId && page < maxPages; page += 1) {
+    const events = room?.getLiveTimeline?.().getEvents?.() || [];
+    if (events.some((event) => event.getId?.() === receiptEventId)) break;
+    const beforeCount = events.length;
+    await client.scrollback(room, 40);
+    const afterEvents = room?.getLiveTimeline?.().getEvents?.() || [];
+    if (afterEvents.length <= beforeCount) break;
+    receiptEventId = getRoomReadReceiptEventId(room, ownUserId) || receiptEventId;
+  }
+  return findFirstUnreadEventId(room, ownUserId);
 }
 
 function getReadReceiptSummary(room, messageId, ownUserId) {
@@ -424,8 +443,12 @@ export default function SecureChatPanel({
 
         if (cancelled) return;
         roomReadyForTimeline = true;
+        const unreadAnchor = Number(room.getUnreadNotificationCount?.("total") || 0) > 0
+          ? await findFirstUnreadEventWithPagination(client, room, client.getUserId())
+          : null;
+        if (cancelled) return;
         setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
-        setUnreadAnchorId(findFirstUnreadEventId(room, client.getUserId()));
+        setUnreadAnchorId(unreadAnchor);
         setTimelineInitialised(true);
         onSecureUnreadCountChange?.(Number(room.getUnreadNotificationCount?.("total") || 0));
         attachRoomListeners();
