@@ -202,7 +202,8 @@ test("secure attachments accept arbitrary file types and voice recording has an 
   assert.match(panel, /sendEncryptedMedia/);
   assert.match(panel, /recordingVoice \? <StopIcon \/> : <MicIcon \/>/);
   assert.doesNotMatch(panel, /accept="image\/\*,audio\/\*,video\/\*/);
-  assert.match(panel, /setRecordingVoice\(false\);\s*const blob = new Blob/);
+  assert.match(panel, /if \(recordingVoice\) \{\s*setMediaBusy\(true\);\s*try \{ mediaRecorderRef\.current\?\.stop\(\); \} catch \{/);
+  assert.match(panel, /recorder\.onstop = \(\) => \{[\s\S]*?const blob = new Blob\(chunks, \{ type: mimeType \}\);/);
 });
 
 
@@ -464,9 +465,9 @@ test("secure chat uses Matrix-native receipts, unread navigation, and reconnect 
   assert.match(app, /onReconnectSecureChat=\{\(\) => secureReconnectRef\.current\?\.\(\)\}/);
   assert.match(app, /secureUnreadCountsRef\.current\.set/);
   assert.match(app, /secureUnreadCountsRef\.current\.get/);
-  assert.match(app, /client\.on\("Room\.timeline", onRoomTimeline\)/);
-  assert.match(app, /client\.on\("Room\.receipt", onRoomReceipt\)/);
-  assert.match(app, /client\.on\("sync", onSync\)/);
+  assert.match(app, /matrixClient\.on\("Room\.timeline", onRoomTimeline\)/);
+  assert.match(app, /matrixClient\.on\("Room\.receipt", onRoomReceipt\)/);
+  assert.match(app, /matrixClient\.on("sync", onSync)/);
   assert.match(app, /secureRoomToConversationIdRef\.current\.get/);
   assert.match(panel, /onRegisterReconnect/);
   assert.match(panel, /prepareInitialSecureTimeline/);
