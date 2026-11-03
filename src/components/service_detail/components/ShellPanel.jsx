@@ -342,6 +342,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const terminalRef = useRef(null);
   const terminalInputRef = useRef(null);
   const xtermWriteRef = useRef(null);
+  const developerOutputRef = useRef("");
+  const pendingXtermOutputRef = useRef("");
   const editorInputRef = useRef(null);
 
   const serviceId = service?.id ?? service?.pk;
@@ -640,6 +642,8 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       }
       if (message.type === "process.started") {
         runningRef.current = true;
+        developerOutputRef.current = "";
+        pendingXtermOutputRef.current = "";
         setInteractiveRunning(true);
         setCommandRunning(false);
         setInteractiveInput("");
@@ -649,8 +653,13 @@ export default function ShellPanel({ service, enabled = true, onError }) {
       }
       if (message.type === "process.output") {
         const raw = String(message.data ?? "");
-        // Prefer real terminal when interactive PTY is active (colors, cursor, tables).
-        if (xtermWriteRef.current) {
+        if (isDeveloperSession) {
+          // Keep the live PTY experience while buffering its transcript so the
+          // completed output remains in the same scrollback as the shell prompt.
+          developerOutputRef.current = (developerOutputRef.current + raw).slice(-500000);
+          if (xtermWriteRef.current) xtermWriteRef.current(raw);
+          else pendingXtermOutputRef.current += raw;
+        } else if (xtermWriteRef.current) {
           xtermWriteRef.current(raw);
         } else {
           const cleaned = cleanOutput(raw);
@@ -665,8 +674,17 @@ export default function ShellPanel({ service, enabled = true, onError }) {
         setCommandRunning(false);
         setInteractiveInput("");
         setInteractiveSecret(false);
-        // Keep exitCode only — terminalLines renders the message once from exitCode.
-        appendHistory({ type: "output", stdout: "", stderr: "", exitCode: message.exit_code ?? 0 });
+        const transcript = isDeveloperSession ? cleanOutput(developerOutputRef.current) : "";
+        developerOutputRef.current = "";
+        pendingXtermOutputRef.current = "";
+        // Preserve completed PTY output in the shell scrollback after the live
+        // interactive terminal surface is removed.
+        appendHistory({
+          type: "output",
+          stdout: transcript,
+          stderr: "",
+          exitCode: message.exit_code ?? 0,
+        });
         if (isDeveloperSession) refreshDirectory();
         focusTerminal();
         return;
@@ -990,6 +1008,13 @@ export default function ShellPanel({ service, enabled = true, onError }) {
   const handleXtermData = useCallback((data) => {
     sendInteractiveInput(data);
   }, [sendInteractiveInput]);
+
+  const handleXtermReady = useCallback(() => {
+    const pending = pendingXtermOutputRef.current;
+    if (!pending) return;
+    pendingXtermOutputRef.current = "";
+    xtermWriteRef.current?.(pending);
+  }, []);
 
   const handleXtermResize = useCallback((cols, rows) => {
     const socket = shellSocketRef.current;
@@ -1928,22 +1953,20 @@ export default function ShellPanel({ service, enabled = true, onError }) {
                     <Box key={line.key} sx={{ color: line.type === "stderr" || line.type === "error" ? "#ff9b8f" : line.type === "system" ? "#87b4d9" : "#dce6ef", whiteSpace: "pre-wrap", overflowWrap: "anywhere", minHeight: line.text ? 20 : 6, userSelect: "text", WebkitUserSelect: "text" }}>{line.text || " "}</Box>
                   )
                 ))}
-                                {(interactiveRunning || isDeveloperSession) ? (
+                                {interactiveRunning ? (
                   <Box sx={{ my: 1 }}>
                     <ShellXterm
                       key={session?.token || "shell-terminal"}
-                      active={interactiveRunning}
-                      keepMounted={isDeveloperSession}
+                      active
                       onData={handleXtermData}
+                      onReady={handleXtermReady}
                       onResize={handleXtermResize}
                       writeRef={xtermWriteRef}
                       height={Math.max(280, (typeof window !== "undefined" ? Math.floor(window.innerHeight * 0.35) : 320))}
                     />
-                    {interactiveRunning ? (
-                      <Typography sx={{ mt: 0.5, fontSize: 11, color: "#5e6d7c" }}>
-                        Interactive session · Ctrl+C interrupt · Ctrl+D exit · typed keys go to the process
-                      </Typography>
-                    ) : null}
+                    <Typography sx={{ mt: 0.5, fontSize: 11, color: "#5e6d7c" }}>
+                      Interactive process · Ctrl+C interrupt · Ctrl+D exit · input is sent to the running process
+                    </Typography>
                   </Box>
                 ) : null}
                 {session && !interactiveRunning ? (
