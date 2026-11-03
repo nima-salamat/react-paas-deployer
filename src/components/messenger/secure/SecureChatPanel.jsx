@@ -470,7 +470,8 @@ export default function SecureChatPanel({
       await matrixClient.sendReadReceipt(event);
       setReceiptRevision((value) => value + 1);
       setUnreadAnchorId((current) => current === eventId ? null : current);
-      onSecureUnreadCountChange?.(0);
+      const unreadCount = Number(matrixClient.getRoom(roomId)?.getUnreadNotificationCount?.("total") || 0);
+      onSecureUnreadCountChange?.(unreadCount);
     } catch {
       // Keep the receipt retryable when the homeserver is temporarily unavailable.
       readReceiptSentRef.current.delete(eventId);
