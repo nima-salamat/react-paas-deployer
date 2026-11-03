@@ -1269,7 +1269,7 @@ export default function SecureChatPanel({
           <Box
             component="form"
             onSubmit={(event) => { event.preventDefault(); void send(); }}
-            sx={{ p: 1.25, display: "flex", gap: 1, maxWidth: 960, mx: "auto", width: "100%" }}
+            sx={{ p: 1.25, display: "flex", alignItems: "center", gap: 1, maxWidth: 960, mx: "auto", width: "100%" }}
           >
             <input
               ref={mediaInputRef}
@@ -1280,12 +1280,36 @@ export default function SecureChatPanel({
                 if (file) void sendMediaFile(file);
               }}
             />
-            <IconButton aria-label="Attach encrypted file" title="Attach an encrypted image, voice, video, or file" disabled={mediaBusy || sending || phase !== "ready"} onClick={() => mediaInputRef.current?.click()}>
+            <IconButton
+              aria-label="Attach encrypted file"
+              title="Attach an encrypted image, voice, video, or file"
+              disabled={mediaBusy || sending || phase !== "ready"}
+              onClick={() => mediaInputRef.current?.click()}
+              sx={{ flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42, aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0 }}
+            >
               <AttachFileIcon />
             </IconButton>
-            <IconButton aria-label={recordingVoice ? "Stop and send voice message" : "Record voice message"} title={recordingVoice ? "Stop and send voice message" : "Record voice message"} color={recordingVoice ? "error" : "default"} disabled={mediaBusy || sending || phase !== "ready"} onClick={() => void toggleVoiceRecording()}>
+            <IconButton
+              aria-label={recordingVoice ? "Stop and send voice message" : "Record voice message"}
+              title={recordingVoice ? "Stop and send voice message" : "Record voice message"}
+              color={recordingVoice ? "error" : "default"}
+              disabled={mediaBusy || sending || phase !== "ready"}
+              onClick={() => void toggleVoiceRecording()}
+              sx={{ flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42, aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0 }}
+            >
               {recordingVoice ? <StopIcon /> : <MicIcon />}
             </IconButton>
+            {recordingVoice && (
+              <Button
+                color="error"
+                size="small"
+                onClick={cancelVoiceRecording}
+                startIcon={<CloseIcon />}
+                sx={{ flexShrink: 0, minWidth: 0, px: 1 }}
+              >
+                Cancel
+              </Button>
+            )}
             <TextField
               inputRef={draftInputRef}
               fullWidth multiline minRows={1} maxRows={5}
@@ -1304,7 +1328,7 @@ export default function SecureChatPanel({
             <Button
               type="submit" variant="contained" aria-label="Send encrypted message"
               disabled={!draft.trim() || sending || mediaBusy || recordingVoice || phase !== "ready"}
-              sx={{ minWidth: 52, alignSelf: "stretch" }}
+              sx={{ flex: "0 0 44px", width: 44, height: 44, minWidth: 44, minHeight: 44, aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0 }}
             >
               {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
             </Button>
