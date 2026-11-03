@@ -859,7 +859,7 @@ export default function SecureChatPanel({
             )}
             <Stack spacing={1.25} sx={{ maxWidth: 900, mx: "auto" }}>
               {filteredMessages.map((message) => (
-                <Box key={message.id} sx={{ display: "flex", justifyContent: message.isOwn ? "flex-end" : "flex-start" }}>
+                <Box key={message.id} data-secure-event-id={message.id} data-secure-own={message.isOwn ? "true" : "false"} sx={{ display: "flex", justifyContent: message.isOwn ? "flex-end" : "flex-start" }}>
                   <Paper
                     elevation={0}
                     sx={{
