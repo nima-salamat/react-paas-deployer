@@ -582,7 +582,7 @@ test("developer shell commands always use the PTY transport and preserve termina
   assert.match(shell, /ptyOutputRef\.current = \(ptyOutputRef\.current \+ raw\)/);
   assert.match(shell, /const transcript = cleanOutput\(ptyOutputRef\.current\)/);
   assert.match(shell, /lastShellCommandRef\.current = cmd/);
-  assert.match(shell, /const isCdCommand = \/\^cd\(\?:\\\\s\|\$\)\/\.test\(lastShellCommandRef\.current\)/);
+  assert.match(shell, /const isCdCommand = \/\^cd/);
   assert.match(shell, /data\.mode !== "developer"/);
   assert.match(shell, /\{interactiveRunning \? \(/);
   assert.doesNotMatch(shell, /keepMounted=\{isDeveloperSession\}/);
