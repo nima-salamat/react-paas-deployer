@@ -84,7 +84,7 @@ export default function ChatHeader(props) {
   <Stack
     direction="row"
     alignItems="center"
-    spacing={msgSearchOpen ? (isMobile ? 0 : 0.5) : 1}
+    spacing={msgSearchOpen && !secureMode ? (isMobile ? 0 : 0.5) : 1}
     sx={{
       px: msgSearchOpen && isMobile ? 0.35 : 1,
       py: 0.85,
@@ -98,8 +98,8 @@ export default function ChatHeader(props) {
       boxShadow: (t) => t.palette.mode === "dark" ? "0 4px 18px rgba(0,0,0,0.10)" : "0 4px 18px rgba(15,23,42,0.04)",
     }}
   >
-    {isMobile && !msgSearchOpen && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
-    {isMobile && msgSearchOpen && (
+    {isMobile && (!msgSearchOpen || secureMode) && <IconButton onClick={closeChat}><ArrowBackIcon /></IconButton>}
+    {isMobile && msgSearchOpen && !secureMode && (
       <IconButton onClick={closeMsgSearch} size="small" sx={{ p: 0.4, flexShrink: 0 }} title={tr("Close search")}>
         <ArrowBackIcon fontSize="small" />
       </IconButton>
@@ -380,10 +380,6 @@ export default function ChatHeader(props) {
           {tr(activeConv.is_forum ? "Create topic" : "Organize group into topics")}
         </MenuItem>
       )}
-      {!secureMode && (
-      <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
-        <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon> Clear messages
-      </MenuItem>
       {peer && !peer.is_blocked && (
         <MenuItem onClick={() => { setConfirmBlock({ user: peer }); setHeaderMenu(null); }}>
           <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon> Block
@@ -394,27 +390,33 @@ export default function ChatHeader(props) {
           <ListItemIcon><BlockIcon fontSize="small" /></ListItemIcon> Unblock
         </MenuItem>
       )}
-      {activeConv?.type === "private" && (
-        <MenuItem
-          onClick={() => { setConfirmDelete({ type: "chat", conv: activeConv }); setHeaderMenu(null); }}
-          sx={{ color: "error.main" }}
-        >
-          <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete chat
-        </MenuItem>
-      )}
-      {activeConv?.type === "group" && (role === "owner" || role === "admin") && (
-        <MenuItem
-          onClick={() => { setConfirmDelete({ type: "group", conv: activeConv }); setHeaderMenu(null); }}
-          sx={{ color: "error.main" }}
-        >
-          <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete group
-        </MenuItem>
-      )}
-      {activeConv?.type === "group" && (
-        <MenuItem onClick={() => { setConfirmLeave({ conv: activeConv }); setHeaderMenu(null); }}>
-          <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon> Leave
-        </MenuItem>
-      )}
+      {!secureMode && (
+        <>
+          <MenuItem onClick={() => { setConfirmCleanup({ conv: activeConv }); setHeaderMenu(null); }}>
+            <ListItemIcon><CleaningServicesIcon fontSize="small" /></ListItemIcon> Clear messages
+          </MenuItem>
+          {activeConv?.type === "private" && (
+            <MenuItem
+              onClick={() => { setConfirmDelete({ type: "chat", conv: activeConv }); setHeaderMenu(null); }}
+              sx={{ color: "error.main" }}
+            >
+              <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete chat
+            </MenuItem>
+          )}
+          {activeConv?.type === "group" && (role === "owner" || role === "admin") && (
+            <MenuItem
+              onClick={() => { setConfirmDelete({ type: "group", conv: activeConv }); setHeaderMenu(null); }}
+              sx={{ color: "error.main" }}
+            >
+              <ListItemIcon><DeleteOutlineIcon fontSize="small" color="error" /></ListItemIcon> Delete group
+            </MenuItem>
+          )}
+          {activeConv?.type === "group" && (
+            <MenuItem onClick={() => { setConfirmLeave({ conv: activeConv }); setHeaderMenu(null); }}>
+              <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon> Leave
+            </MenuItem>
+          )}
+        </>
       )}
     </Menu>
     {isForumConversation && (
