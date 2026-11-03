@@ -4,6 +4,7 @@ import {
   DialogTitle, Divider, IconButton, LinearProgress, Menu, MenuItem, Paper, Popover, Slider, Stack, TextField,
   Tooltip, Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
 import SendIcon from "@mui/icons-material/Send";
@@ -153,6 +154,16 @@ function appConversationTitle(conversation, currentUserId) {
     return String(user?.id ?? participant?.user_id ?? "") !== String(currentUserId ?? "");
   });
   return appNameForParticipant(peer) || "Secure conversation";
+}
+
+function secureDateLabel(timestamp) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
 }
 
 function relationForMatrixEvent(event) {
@@ -1345,56 +1356,138 @@ export default function SecureChatPanel({
       {error && <Alert severity="error" sx={{ mx: 1.5, mt: 1 }}>{error}</Alert>}
 
       {phase === "connecting" && (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, minHeight: 200, gap: 1 }}>
-          <CircularProgress size={22} />
-          <Typography color="text.secondary">Verifying Matrix room and encrypted device…</Typography>
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, minHeight: 260, p: 3 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              width: "min(100%, 380px)",
+              p: 3,
+              textAlign: "center",
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 4,
+              bgcolor: "background.paper",
+              boxShadow: (theme) => theme.palette.mode === "dark"
+                ? "0 16px 50px rgba(0,0,0,.22)"
+                : "0 16px 50px rgba(15,23,42,.07)",
+            }}
+          >
+            <Box sx={{
+              mx: "auto", mb: 2, width: 58, height: 58, borderRadius: 3,
+              display: "grid", placeItems: "center",
+              color: "success.main",
+              bgcolor: (theme) => alpha(theme.palette.success.main, theme.palette.mode === "dark" ? 0.18 : 0.10),
+            }}>
+              <LockOutlinedIcon sx={{ fontSize: 28 }} />
+            </Box>
+            <CircularProgress size={22} thickness={4} sx={{ mb: 1.5 }} />
+            <Typography fontWeight={750}>Opening secure conversation</Typography>
+            <Typography color="text.secondary" variant="body2" sx={{ mt: 0.6 }}>
+              Verifying this device and preparing encrypted messages…
+            </Typography>
+          </Paper>
         </Box>
       )}
 
       {phase === "error" && (
-        <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, p: 4, flex: 1 }}>
-          <LockOutlinedIcon color="error" sx={{ fontSize: 42 }} />
-          <Typography fontWeight={700}>Secure room unavailable</Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={480}>
-            The normal Messenger timeline is intentionally not shown. Check Matrix configuration, device authentication, room membership and key recovery, then try again.
-          </Typography>
-          <Button variant="outlined" onClick={() => setRevision((value) => value + 1)}>Try again</Button>
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 3, flex: 1 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              width: "min(100%, 480px)", p: { xs: 2.5, sm: 3.5 },
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5,
+              textAlign: "center", border: "1px solid", borderColor: "divider",
+              borderRadius: 4, bgcolor: "background.paper",
+            }}
+          >
+            <Box sx={{
+              width: 60, height: 60, borderRadius: 3, display: "grid", placeItems: "center",
+              color: "error.main", bgcolor: (theme) => alpha(theme.palette.error.main, 0.10),
+            }}>
+              <LockOutlinedIcon sx={{ fontSize: 30 }} />
+            </Box>
+            <Typography variant="h6" fontWeight={800}>Secure room unavailable</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 390, lineHeight: 1.7 }}>
+              The normal Messenger timeline is intentionally hidden. Check Matrix configuration, device authentication, room membership and key recovery, then retry.
+            </Typography>
+            <Button variant="contained" onClick={() => setRevision((value) => value + 1)} sx={{ mt: 0.5, px: 3, borderRadius: 2.5 }}>
+              Try again
+            </Button>
+          </Paper>
         </Box>
       )}
 
       {phase === "invited" && (
-        <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, p: 4, flex: 1 }}>
-          <LockOutlinedIcon color="success" sx={{ fontSize: 42 }} />
-          <Typography fontWeight={700}>Encrypted conversation invitation</Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={520}>
-            This is a separate end-to-end encrypted room. Accept the invitation to join it and start secure messaging. Your existing standard conversation and its history will remain unchanged.
-          </Typography>
-          <Button variant="contained" onClick={() => void acceptInvitation()}>
-            Accept secure invitation
-          </Button>
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 3, flex: 1 }}>
+          <Paper elevation={0} sx={{
+            width: "min(100%, 500px)", p: { xs: 2.5, sm: 3.5 },
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5,
+            textAlign: "center", border: "1px solid", borderColor: "divider",
+            borderRadius: 4, bgcolor: "background.paper",
+          }}>
+            <Box sx={{
+              width: 66, height: 66, borderRadius: 3, display: "grid", placeItems: "center",
+              color: "success.main", bgcolor: (theme) => alpha(theme.palette.success.main, 0.11),
+            }}>
+              <LockOutlinedIcon sx={{ fontSize: 32 }} />
+            </Box>
+            <Chip label="Private invitation" color="success" variant="outlined" size="small" />
+            <Typography variant="h6" fontWeight={800}>Encrypted conversation invitation</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 410, lineHeight: 1.7 }}>
+              This is a separate end-to-end encrypted room. Accept the invitation to join it and start secure messaging. Your existing standard conversation and its history will remain unchanged.
+            </Typography>
+            <Button variant="contained" onClick={() => void acceptInvitation()} sx={{ mt: 0.5, px: 3, borderRadius: 2.5 }}>
+              Accept secure invitation
+            </Button>
+          </Paper>
         </Box>
       )}
 
       {phase === "waiting_for_peer" && (
-        <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 2, p: 4, flex: 1 }}>
-          <LockOutlinedIcon color="warning" sx={{ fontSize: 42 }} />
-          <Typography fontWeight={700}>Waiting for secure-room participants</Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={540}>
-            The encrypted invitation has been created, but one or more participants have not joined with a Matrix device yet. Sending is paused so message keys are not shared only with the sender's device. The other person does not need to create a secure chat manually; they just need to open this invitation and accept it. They can do that when they come online.
-          </Typography>
-          <Typography variant="body2" color="text.secondary" textAlign="center" maxWidth={540}>
-            Your normal Messenger conversation and its history are separate and have not been deleted or moved.
-          </Typography>
-          <Button variant="outlined" onClick={() => setRevision((value) => value + 1)}>
-            Check invitation status
-          </Button>
+        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", p: 3, flex: 1 }}>
+          <Paper elevation={0} sx={{
+            width: "min(100%, 540px)", p: { xs: 2.5, sm: 3.5 },
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 1.5,
+            textAlign: "center", border: "1px solid", borderColor: "divider",
+            borderRadius: 4, bgcolor: "background.paper",
+          }}>
+            <Box sx={{
+              width: 66, height: 66, borderRadius: 3, display: "grid", placeItems: "center",
+              color: "warning.main", bgcolor: (theme) => alpha(theme.palette.warning.main, 0.12),
+            }}>
+              <LockOutlinedIcon sx={{ fontSize: 32 }} />
+            </Box>
+            <Chip label="Waiting for participants" color="warning" variant="outlined" size="small" />
+            <Typography variant="h6" fontWeight={800}>Waiting for secure-room participants</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, lineHeight: 1.7 }}>
+              The encrypted invitation is ready, but one or more participants have not joined with a Matrix device yet. Sending stays paused so message keys are not shared only with this device. They can accept the invitation when they come online.
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Your standard Messenger history remains separate and unchanged.
+            </Typography>
+            <Button variant="outlined" onClick={() => setRevision((value) => value + 1)} sx={{ mt: 0.5, borderRadius: 2.5 }}>
+              Check invitation status
+            </Button>
+          </Paper>
         </Box>
       )}
 
       {phase === "ready" && (
         <>
           <Box
-            sx={{ minHeight: 44, px: { xs: 1.25, md: 2 }, display: "flex", alignItems: "center", gap: 1, borderBottom: "1px solid", borderColor: "divider" }}
+            sx={{
+              minHeight: 54,
+              px: { xs: 1.25, md: 2.5 },
+              display: "flex",
+              alignItems: "center",
+              gap: 1.1,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.paper",
+              backgroundImage: (theme) => theme.palette.mode === "dark"
+                ? "linear-gradient(110deg, rgba(45,125,95,.10), transparent 42%)"
+                : "linear-gradient(110deg, rgba(30,140,100,.055), transparent 42%)",
+            }}
           >
             {searchOpen ? (
               <>
@@ -1406,10 +1499,33 @@ export default function SecureChatPanel({
                 </Tooltip>
               </>
             ) : (
-              <Typography variant="caption" color="text.secondary">{messages.length} encrypted messages loaded on this device</Typography>
+              <Stack direction="row" spacing={0.75} alignItems="center">
+                <Box sx={{
+                  width: 7, height: 7, borderRadius: "50%", bgcolor: "success.main",
+                  boxShadow: (theme) => `0 0 0 3px ${alpha(theme.palette.success.main, 0.13)}`,
+                }} />
+                <Typography variant="caption" color="text.secondary" fontWeight={550}>
+                  {messages.length} messages on this device
+                </Typography>
+              </Stack>
             )}
             <Box sx={{ flex: 1 }} />
-            <Chip size="small" icon={<LockOutlinedIcon sx={{ fontSize: "14px !important" }} />} label="E2EE" color="success" variant="outlined" sx={{ height: 23, fontSize: 10.5 }} />
+            <Chip
+              size="small"
+              icon={<LockOutlinedIcon sx={{ fontSize: "14px !important" }} />}
+              label="End-to-end encrypted"
+              color="success"
+              variant="outlined"
+              sx={{
+                height: 27,
+                px: 0.35,
+                borderRadius: 2,
+                fontSize: 10.5,
+                fontWeight: 700,
+                bgcolor: (theme) => alpha(theme.palette.success.main, 0.045),
+                "& .MuiChip-icon": { ml: 0.65 },
+              }}
+            />
             <Tooltip title="Secure chat options">
               <IconButton size="small" aria-label="Secure chat options" onClick={(event) => setRoomMenuAnchor(event.currentTarget)}>
                 <MoreVertIcon />
@@ -1436,7 +1552,28 @@ export default function SecureChatPanel({
           <Box
             ref={timelineRef}
             onScroll={onTimelineScroll}
-            sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: { xs: 1.5, md: 3 }, py: 2 }}
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              px: { xs: 1.25, sm: 2, md: 3.25 },
+              py: { xs: 1.75, md: 2.5 },
+              scrollBehavior: "smooth",
+              overscrollBehavior: "contain",
+              backgroundImage: (theme) => theme.palette.mode === "dark"
+                ? "radial-gradient(circle at 14% 16%, rgba(60,145,110,.075), transparent 28%), radial-gradient(circle at 92% 84%, rgba(80,110,180,.065), transparent 30%)"
+                : "radial-gradient(circle at 14% 16%, rgba(50,150,110,.055), transparent 28%), radial-gradient(circle at 92% 84%, rgba(100,130,190,.045), transparent 30%)",
+              "&::-webkit-scrollbar": { width: 8 },
+              "&::-webkit-scrollbar-thumb": {
+                borderRadius: 8,
+                backgroundColor: (theme) => alpha(theme.palette.text.primary, 0.16),
+                border: "2px solid transparent",
+                backgroundClip: "padding-box",
+              },
+              "&::-webkit-scrollbar-thumb:hover": {
+                backgroundColor: (theme) => alpha(theme.palette.text.primary, 0.28),
+              },
+            }}
           >
             {hasMoreHistory && (
               <Box sx={{ display: "flex", justifyContent: "center", mb: 1.5 }}>
@@ -1455,34 +1592,102 @@ export default function SecureChatPanel({
                 No readable messages are available on this device yet.
               </Typography>
             )}
-            <Stack spacing={1.25} sx={{ maxWidth: 900, mx: "auto" }}>
-              {filteredMessages.map((message) => (
+            <Stack spacing={0.9} sx={{ maxWidth: 860, mx: "auto", pb: 1 }}>
+              {filteredMessages.map((message, messageIndex) => {
+                const previousMessage = filteredMessages[messageIndex - 1];
+                const showDate = !previousMessage
+                  || new Date(previousMessage.timestamp).toDateString() !== new Date(message.timestamp).toDateString();
+                const showSender = !message.isOwn && (
+                  !previousMessage
+                  || previousMessage.isOwn
+                  || previousMessage.senderId !== message.senderId
+                  || Number(message.timestamp) - Number(previousMessage.timestamp) > 5 * 60 * 1000
+                );
+                return (
                 <React.Fragment key={message.id}>
+                  {showDate && (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 0.9 }}>
+                      <Chip
+                        size="small"
+                        label={secureDateLabel(message.timestamp)}
+                        sx={{
+                          height: 25,
+                          px: 0.5,
+                          borderRadius: 2,
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          color: "text.secondary",
+                          bgcolor: (theme) => alpha(theme.palette.background.paper, theme.palette.mode === "dark" ? 0.78 : 0.88),
+                          border: "1px solid",
+                          borderColor: "divider",
+                          backdropFilter: "blur(8px)",
+                        }}
+                      />
+                    </Box>
+                  )}
                 {message.id === unreadAnchorId && !searchQuery.trim() && (
                   <Box sx={{ width: "100%", py: 0.5 }}>
                     <Divider><Chip size="small" color="primary" label="Unread messages" /></Divider>
                   </Box>
                 )}
-                <Box data-secure-event-id={message.id} data-secure-own={message.isOwn ? "true" : "false"} sx={{ display: "flex", justifyContent: message.isOwn ? "flex-end" : "flex-start" }}>
+                <Box
+                  data-secure-event-id={message.id}
+                  data-secure-own={message.isOwn ? "true" : "false"}
+                  className="secure-message-row"
+                  sx={{
+                    display: "flex",
+                    justifyContent: message.isOwn ? "flex-end" : "flex-start",
+                    alignItems: "flex-end",
+                    px: { xs: 0, sm: 0.5 },
+                    "&:hover .secure-message-reaction": { opacity: 1, transform: "translateY(0)" },
+                    "&:focus-within .secure-message-reaction": { opacity: 1, transform: "translateY(0)" },
+                  }}
+                >
                   <Paper
                     elevation={0}
                     data-receipt-revision={receiptRevision}
                     sx={{
-                      maxWidth: "min(78%, 720px)",
+                      position: "relative",
+                      maxWidth: { xs: "88%", sm: "min(78%, 700px)" },
+                      minWidth: 0,
                       border: "1px solid",
-                      borderColor: message.undecryptable ? "warning.main" : "divider",
+                      borderColor: message.undecryptable ? "warning.main" : message.isOwn ? "transparent" : "divider",
                       bgcolor: message.isOwn ? "primary.main" : "background.paper",
+                      background: message.isOwn
+                        ? (theme) => `linear-gradient(145deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`
+                        : (theme) => theme.palette.background.paper,
                       color: message.isOwn ? "primary.contrastText" : "text.primary",
-                      boxShadow: message.isOwn ? "0 2px 10px rgba(0,0,0,0.10)" : "0 1px 4px rgba(0,0,0,0.045)",
-                      px: 1.5, py: 1, borderRadius: message.isOwn ? "18px 18px 5px 18px" : "18px 18px 18px 5px",
+                      boxShadow: message.isOwn
+                        ? "0 5px 16px rgba(20,70,110,0.16)"
+                        : (theme) => theme.palette.mode === "dark"
+                          ? "0 3px 12px rgba(0,0,0,.15)"
+                          : "0 3px 14px rgba(15,23,42,.055)",
+                      px: { xs: 1.35, sm: 1.65 },
+                      py: { xs: 1.05, sm: 1.2 },
+                      borderRadius: message.isOwn ? "20px 20px 6px 20px" : "20px 20px 20px 6px",
+                      transition: "box-shadow .18s ease, transform .18s ease",
+                      "&:hover": {
+                        boxShadow: message.isOwn
+                          ? "0 7px 20px rgba(20,70,110,0.20)"
+                          : (theme) => theme.palette.mode === "dark" ? "0 5px 16px rgba(0,0,0,.24)" : "0 5px 18px rgba(15,23,42,.09)",
+                      },
                     }}
                   >
-                    {!message.isOwn && (
-                      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.35 }}>
-                        <Avatar src={message.senderAvatar || undefined} sx={{ width: 22, height: 22, fontSize: 11 }}>
+                    {showSender && (
+                      <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.8 }}>
+                        <Avatar
+                          src={message.senderAvatar || undefined}
+                          sx={{
+                            width: 25, height: 25, fontSize: 11, fontWeight: 800,
+                            bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                            color: "primary.main",
+                            border: "1px solid",
+                            borderColor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                          }}
+                        >
                           {(message.sender || "M").slice(0, 1).toUpperCase()}
                         </Avatar>
-                        <Typography variant="caption" fontWeight={700} color="primary.main">
+                        <Typography variant="caption" fontWeight={750} color="primary.main" sx={{ letterSpacing: 0.05 }}>
                           {message.sender}
                         </Typography>
                       </Stack>
@@ -1592,37 +1797,33 @@ export default function SecureChatPanel({
                         {message.body}
                       </Typography>
                     )}
-                    <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.5} sx={{ mt: 0.5 }}>
+                    <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={0.55} sx={{ mt: 0.8 }}>
+                      {message.edited && (
+                        <Typography variant="caption" sx={{ color: message.isOwn ? "rgba(255,255,255,0.70)" : "text.secondary", fontSize: 10 }}>
+                          edited
+                        </Typography>
+                      )}
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: message.isOwn ? "rgba(255,255,255,0.72)" : "text.secondary",
+                          fontSize: 10.5,
+                          lineHeight: 1.2,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </Typography>
                       {message.isOwn && (
                         <Tooltip title={getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId())}>
-                          <Stack direction="row" alignItems="center" spacing={0.25}>
-                            <DoneAllIcon sx={{ fontSize: 14, color: getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId()) === "Seen" ? "success.main" : "text.disabled" }} />
-                            <Typography variant="caption" color="text.secondary">
-                              {getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId())}
-                            </Typography>
-                          </Stack>
+                          <DoneAllIcon sx={{
+                            fontSize: 15,
+                            color: getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId()) === "Seen"
+                              ? "#9de4ca"
+                              : "rgba(255,255,255,0.65)",
+                          }} />
                         </Tooltip>
                       )}
-                      {!message.mediaType && (
-                        <Tooltip title="Copy message text">
-                          <IconButton
-                            size="small"
-                            aria-label="Copy secure message"
-                            onClick={() => {
-                              try { void navigator.clipboard?.writeText(message.body || ""); } catch { /* clipboard unavailable */ }
-                            }}
-                            sx={{ p: 0.25 }}
-                          >
-                            <ContentCopyIcon sx={{ fontSize: 13 }} />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {message.edited && (
-                        <Typography variant="caption" sx={{ color: message.isOwn ? "rgba(255,255,255,0.72)" : "text.secondary" }}>edited</Typography>
-                      )}
-                      <Typography variant="caption" sx={{ color: message.isOwn ? "rgba(255,255,255,0.72)" : "text.secondary" }}>
-                        {new Date(message.timestamp).toLocaleString()}
-                      </Typography>
                       <Tooltip title="Message options">
                         <IconButton
                           size="small"
@@ -1631,14 +1832,21 @@ export default function SecureChatPanel({
                             setMessageMenuTarget(message);
                             setMessageMenuAnchor(event.currentTarget);
                           }}
-                          sx={{ p: 0.25, ml: 0.15 }}
+                          sx={{
+                            width: 23,
+                            height: 23,
+                            ml: 0.1,
+                            p: 0,
+                            color: message.isOwn ? "rgba(255,255,255,0.74)" : "text.secondary",
+                            "&:hover": { bgcolor: message.isOwn ? "rgba(255,255,255,.14)" : "action.hover" },
+                          }}
                         >
                           <MoreVertIcon sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Tooltip>
                     </Stack>
                     {message.reactions?.length > 0 && (
-                      <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.4} sx={{ mt: 0.65 }}>
+                      <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.45} sx={{ mt: 0.8 }}>
                         {getReactionGroups(message.reactions, matrixClient?.getUserId()).map((reaction) => (
                           <Chip
                             key={reaction.key}
@@ -1648,38 +1856,56 @@ export default function SecureChatPanel({
                             variant={reaction.own ? "filled" : "outlined"}
                             label={reaction.key + " " + reaction.count}
                             onClick={() => void toggleSecureReaction(message, reaction.key)}
-                            sx={{ height: 25 }}
+                            sx={{
+                              height: 25,
+                              borderRadius: 2,
+                              fontWeight: 650,
+                              bgcolor: reaction.own
+                                ? undefined
+                                : (theme) => alpha(theme.palette.background.default, 0.72),
+                            }}
                           />
                         ))}
                       </Stack>
                     )}
-                    <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.35 }}>
-                      <Tooltip title={reactionPickerMessageId === message.id ? "Close reactions" : "Add reaction"}>
-                        <IconButton
-                          size="small"
-                          aria-label="Add secure reaction"
-                          onClick={(event) => {
-                            setReactionPickerMessageId((current) => current === message.id ? null : message.id);
-                            setReactionPickerAnchor((current) => current && reactionPickerMessageId === message.id ? null : event.currentTarget);
-                          }}
-                          sx={{
-                            p: 0.25,
-                            opacity: 0.82,
-                            color: message.isOwn ? "rgba(255,255,255,0.82)" : "text.secondary",
-                            "&:hover": { bgcolor: message.isOwn ? "rgba(255,255,255,0.14)" : "action.hover" },
-                          }}
-                        >
-                          <EmojiEmotionsIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
+                    <Tooltip title={reactionPickerMessageId === message.id ? "Close reactions" : "Add reaction"}>
+                      <IconButton
+                        className="secure-message-reaction"
+                        size="small"
+                        aria-label="Add secure reaction"
+                        onClick={(event) => {
+                          setReactionPickerMessageId((current) => current === message.id ? null : message.id);
+                          setReactionPickerAnchor((current) => current && reactionPickerMessageId === message.id ? null : event.currentTarget);
+                        }}
+                        sx={{
+                          position: "absolute",
+                          top: 6,
+                          [message.isOwn ? "left" : "right"]: -34,
+                          width: 29,
+                          height: 29,
+                          p: 0,
+                          opacity: { xs: 0.85, md: 0 },
+                          transform: "translateY(3px)",
+                          color: "text.secondary",
+                          bgcolor: "background.paper",
+                          border: "1px solid",
+                          borderColor: "divider",
+                          boxShadow: 1,
+                          transition: "opacity .16s ease, transform .16s ease",
+                          "&:hover": { bgcolor: "action.hover", color: "primary.main" },
+                        }}
+                      >
+                        <EmojiEmotionsIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
                   </Paper>
                 </Box>
                 </React.Fragment>
-              ))}
+                );
+              })}
               {pendingUpload && (
                 <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                  <Paper elevation={0} sx={{ width: "min(78%, 420px)", p: 1.25, border: "1px solid", borderColor: "primary.main", bgcolor: "action.selected", borderRadius: 1.5 }}>
+                  <Paper elevation={0} sx={{ width: "min(78%, 420px)", p: 1.5, border: "1px solid", borderColor: "primary.main", bgcolor: "background.paper", borderRadius: 3, boxShadow: 2 }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                       <LockOutlinedIcon color="success" fontSize="small" />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -1736,11 +1962,23 @@ export default function SecureChatPanel({
             </Box>
           )}
           </Box>
-          <Divider />
+          <Divider sx={{ borderColor: "divider" }} />
           <Box
             component="form"
             onSubmit={(event) => { event.preventDefault(); void send(); }}
-            sx={{ p: 1.25, display: "flex", alignItems: "center", gap: 1, maxWidth: 960, mx: "auto", width: "100%" }}
+            sx={{
+              p: { xs: 1, sm: 1.5 },
+              display: "flex",
+              alignItems: "center",
+              gap: { xs: 0.65, sm: 0.9 },
+              maxWidth: 960,
+              mx: "auto",
+              width: "100%",
+              bgcolor: "background.paper",
+              backgroundImage: (theme) => theme.palette.mode === "dark"
+                ? "linear-gradient(0deg, rgba(255,255,255,.015), transparent)"
+                : "linear-gradient(0deg, rgba(15,23,42,.018), transparent)",
+            }}
           >
             <input
               ref={mediaInputRef}
@@ -1756,7 +1994,12 @@ export default function SecureChatPanel({
               title="Attach an encrypted image, voice, video, or file"
               disabled={mediaBusy || sending || phase !== "ready"}
               onClick={() => mediaInputRef.current?.click()}
-              sx={{ flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42, aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0 }}
+              sx={{
+                flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42,
+                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.5, p: 0,
+                color: "text.secondary", bgcolor: "action.hover",
+                "&:hover": { bgcolor: "action.selected", color: "primary.main" },
+              }}
             >
               <AttachFileIcon />
             </IconButton>
@@ -1766,7 +2009,13 @@ export default function SecureChatPanel({
               color={recordingVoice ? "error" : "default"}
               disabled={mediaBusy || sending || phase !== "ready"}
               onClick={() => void toggleVoiceRecording()}
-              sx={{ flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42, aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0 }}
+              sx={{
+                flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42,
+                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.5, p: 0,
+                bgcolor: recordingVoice ? "error.main" : "action.hover",
+                color: recordingVoice ? "error.contrastText" : "text.secondary",
+                "&:hover": { bgcolor: recordingVoice ? "error.dark" : "action.selected", color: recordingVoice ? "error.contrastText" : "primary.main" },
+              }}
             >
               {recordingVoice ? <StopIcon /> : <MicIcon />}
             </IconButton>
@@ -1776,7 +2025,7 @@ export default function SecureChatPanel({
                 size="small"
                 onClick={cancelVoiceRecording}
                 startIcon={<CloseIcon />}
-                sx={{ flexShrink: 0, minWidth: 0, px: 1 }}
+                sx={{ flexShrink: 0, minWidth: 0, px: 1, borderRadius: 2, fontWeight: 700 }}
               >
                 Cancel
               </Button>
@@ -1784,7 +2033,8 @@ export default function SecureChatPanel({
             <TextField
               inputRef={draftInputRef}
               fullWidth multiline minRows={1} maxRows={5}
-              placeholder={recordingVoice ? "Recording voice message…" : "Write an end-to-end encrypted message…"}
+              variant="outlined"
+              placeholder={recordingVoice ? "Recording voice message…" : "Message securely…"}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
@@ -1795,11 +2045,35 @@ export default function SecureChatPanel({
               }}
               disabled={sending || mediaBusy || recordingVoice || phase !== "ready"}
               inputProps={{ "aria-label": "Encrypted message" }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  minHeight: 46,
+                  alignItems: "center",
+                  borderRadius: 3.25,
+                  bgcolor: "action.hover",
+                  transition: "background-color .18s ease, box-shadow .18s ease",
+                  "& fieldset": { borderColor: "transparent" },
+                  "&:hover fieldset": { borderColor: "divider" },
+                  "&.Mui-focused": {
+                    bgcolor: "background.paper",
+                    boxShadow: (theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.10)}`,
+                  },
+                  "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
+                },
+                "& .MuiInputBase-input": { py: 1.15, px: 1.5, fontSize: 14 },
+              }}
             />
             <Button
               type="submit" variant="contained" aria-label="Send encrypted message"
               disabled={!draft.trim() || sending || mediaBusy || recordingVoice || phase !== "ready"}
-              sx={{ flex: "0 0 44px", width: 44, height: 44, minWidth: 44, minHeight: 44, aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0 }}
+              sx={{
+                flex: "0 0 44px", width: 44, height: 44, minWidth: 44, minHeight: 44,
+                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.75, p: 0,
+                boxShadow: "0 4px 12px rgba(25,118,210,.20)",
+                transition: "transform .16s ease, box-shadow .16s ease",
+                "&:hover": { transform: "translateY(-1px)", boxShadow: "0 7px 16px rgba(25,118,210,.26)" },
+                "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "text.disabled", boxShadow: "none" },
+              }}
             >
               {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
             </Button>
