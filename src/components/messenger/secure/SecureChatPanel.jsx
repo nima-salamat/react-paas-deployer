@@ -1083,6 +1083,37 @@ export default function SecureChatPanel({
                         {new Date(message.timestamp).toLocaleString()}
                       </Typography>
                     </Stack>
+                    {(message.reactions?.length || reactionPickerMessageId === message.id) ? (
+                      <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.4} sx={{ mt: 0.65 }}>
+                        {getReactionGroups(message.reactions, matrixClient?.getUserId()).map((reaction) => (
+                          <Chip
+                            key={reaction.key}
+                            size="small"
+                            clickable
+                            color={reaction.own ? "success" : "default"}
+                            variant={reaction.own ? "filled" : "outlined"}
+                            label={reaction.key + " " + reaction.count}
+                            onClick={() => void toggleSecureReaction(message, reaction.key)}
+                            sx={{ height: 25 }}
+                          />
+                        ))}
+                        {reactionPickerMessageId === message.id && ["👍", "❤️", "😂", "😮", "🙏"].map((emoji) => (
+                          <Chip key={emoji} size="small" clickable label={emoji} onClick={() => void toggleSecureReaction(message, emoji)} sx={{ height: 25 }} />
+                        ))}
+                      </Stack>
+                    ) : null}
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 0.35 }}>
+                      <Tooltip title={reactionPickerMessageId === message.id ? "Close reactions" : "Add reaction"}>
+                        <IconButton
+                          size="small"
+                          aria-label="Add secure reaction"
+                          onClick={() => setReactionPickerMessageId((current) => current === message.id ? null : message.id)}
+                          sx={{ p: 0.2, opacity: 0.72 }}
+                        >
+                          <EmojiEmotionsIcon sx={{ fontSize: 15 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </Paper>
                 </Box>
                 </React.Fragment>
