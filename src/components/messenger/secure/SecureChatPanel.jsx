@@ -138,6 +138,13 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function getReadReceiptStatus(room, messageId, ownUserId) {
+  const summary = getReadReceiptSummary(room, messageId, ownUserId);
+  if (!summary.total || !summary.readCount) return "Sent";
+  if (summary.readCount >= summary.total) return "Seen";
+  return "Seen by " + summary.readCount + " of " + summary.total;
+}
+
 function roomHasPendingInvites(room) {
   try {
     const events = room?.currentState?.getStateEvents?.("m.room.member");
