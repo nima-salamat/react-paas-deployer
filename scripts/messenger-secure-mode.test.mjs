@@ -513,6 +513,7 @@ test("secure chat loads a bounded recent window and extends it to include unread
   assert.match(panel, /MAX_INITIAL_UNREAD_HISTORY_PAGES = 100/);
   assert.match(panel, /async function prepareInitialSecureTimeline/);
   assert.match(panel, /messageCount >= INITIAL_SECURE_MESSAGE_COUNT && unreadBoundaryAvailable/);
+  assert.match(panel, /unreadCount <= 0\s*\?/);
   assert.match(panel, /setUnreadAnchorId\(initialHistory\.unreadAnchorId\)/);
   assert.match(panel, /setHasMoreHistory\(initialHistory\.hasMoreHistory\)/);
   assert.match(panel, /timelineRef\.current\.scrollTop = timelineRef\.current\.scrollHeight/);
@@ -545,6 +546,9 @@ test("secure message actions edit with Matrix replacements and delete with Matri
   assert.match(panel, /Delete message/);
   assert.match(panel, /rel_type: "m\.replace", event_id: editingMessage\.id/);
   assert.match(panel, /"m\.new_content": \{ msgtype: "m\.text", body \}/);
+  assert.match(panel, /event\?\.getRelation\?\.\(\)/);
+  assert.match(panel, /event\.replacingEvent\?\.\(\)/);
+  assert.match(panel, /relationForMatrixEvent\(event\)/);
   assert.match(panel, /matrixClient\.redactEvent\(roomId, deletingMessage\.id\)/);
   assert.match(panel, /This message was deleted/);
   assert.match(panel, /Only the original sender can edit this secure message/);
