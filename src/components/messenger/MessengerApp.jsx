@@ -461,6 +461,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [headerMenu, setHeaderMenu] = useState(null);
   const [callChoiceOpen, setCallChoiceOpen] = useState(false);
   const secureReconnectRef = useRef(null);
+  const secureUnreadCountsRef = useRef(new Map());
   const registerSecureReconnect = useCallback((handler) => {
     secureReconnectRef.current = typeof handler === "function" ? handler : null;
   }, []);
@@ -1088,15 +1089,20 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       });
       const data = unwrapData(res);
       const next = data?.results || [];
-      if (silent && refreshSeq !== conversationRefreshSeqRef.current) return next;
+      const withSecureUnread = next.map((row) => {
+        const secureUnread = secureUnreadCountsRef.current.get(String(row.id));
+        return secureUnread === undefined ? row : { ...row, unread_count: secureUnread };
+      });
+      if (silent && refreshSeq !== conversationRefreshSeqRef.current) return withSecureUnread;
       setConversationLoadError(false);
-      // Merge by id: keep previous object reference when payload is unchanged so
-      // Sidebar Avatars do not remount / re-download on every silent refresh.
-      setConversations((prev) => mergeConversations(prev, next));
+      // Keep Matrix room unread counts across ordinary Django list refreshes:
+      // secure rooms deliberately have no plaintext Django Message rows.
+      // Merge by id so unchanged sidebar rows keep their object references.
+      setConversations((prev) => mergeConversations(prev, withSecureUnread));
       // Sync presence from API: add online peers AND drop offline ones
       setOnlineUsers((prev) => {
         const nextSet = new Set(prev);
-        for (const c of next) {
+        for (const c of withSecureUnread) {
           if (c?.type === "private" && c.peer?.id != null) {
             const id = Number(c.peer.id);
             const online = Boolean(c.peer.is_online ?? c.peer.online);
@@ -1106,7 +1112,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         }
         return nextSet;
       });
-      return next;
+      return withSecureUnread;
     } catch (e) {
       if (silent && refreshSeq !== conversationRefreshSeqRef.current) return [];
       if (!silent) setConversationLoadError(true);
@@ -4088,6 +4094,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
     const conversationId = activeConv?.id;
     if (!conversationId) return;
     const unreadCount = Math.max(0, Number(count) || 0);
+    secureUnreadCountsRef.current.set(String(conversationId), unreadCount);
     setConversations((prev) => prev.map((row) => (
       String(row.id) === String(conversationId) ? { ...row, unread_count: unreadCount } : row
     )));
