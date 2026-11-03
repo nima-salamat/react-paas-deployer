@@ -147,14 +147,29 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
   if (!room) return [];
   const events = room.getLiveTimeline?.().getEvents?.() || [];
   const seen = new Set();
-  return events
+  const rows = events
     .map((event) => describeEvent(event, ownUserId, profilesByMatrixId))
     .filter((row) => {
       if (!row || seen.has(row.id)) return false;
       seen.add(row.id);
       return true;
-    })
-    .sort((a, b) => a.timestamp - b.timestamp);
+    });
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  for (const event of events) {
+    if (event.getType?.() !== "m.reaction") continue;
+    const content = event.getContent?.() || {};
+    const relation = content["m.relates_to"] || {};
+    if (relation.rel_type !== "m.annotation" || !relation.event_id || !relation.key) continue;
+    const target = rowsById.get(relation.event_id);
+    if (!target || target.undecryptable) continue;
+    if (!Array.isArray(target.reactions)) target.reactions = [];
+    target.reactions.push({
+      id: event.getId?.() || String(event.getTs?.() || Date.now()),
+      key: String(relation.key),
+      senderId: event.getSender?.() || "",
+    });
+  }
+  return rows.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 function getReadReceiptStatus(room, messageId, ownUserId) {
