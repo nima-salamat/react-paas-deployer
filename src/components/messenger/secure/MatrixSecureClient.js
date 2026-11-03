@@ -212,6 +212,7 @@ function isMatrixCryptoAccountMismatch(error) {
   let current = error;
   while (current && !seen.has(current)) {
     seen.add(current);
+    if (typeof current?.name === "string") messages.push(current.name);
     if (typeof current?.message === "string") messages.push(current.message);
     current = current?.cause;
   }
