@@ -1792,9 +1792,15 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
         }
       }
     } catch { /* */ }
-    if (hashUser) setHash("u", hashUser);
-    else if (c.type === "private" && c.peer?.username) setHash("u", c.peer.username);
-    else setHash("c", c.id);
+    const securePrivateChat = c.type === "private" && (
+      c.security_mode === "matrix_e2ee"
+      || Boolean(c.matrix_room_id)
+      || isMatrixConversationId(c.id)
+    );
+    if (hashUser) setHash(securePrivateChat ? "s" : "u", hashUser);
+    else if (c.type === "private" && c.peer?.username) {
+      setHash(securePrivateChat ? "s" : "u", c.peer.username);
+    } else setHash("c", c.id);
 
     // Cached: paint already done — refresh in background, never block UI.
     // Cold: load messages first so the thread appears ASAP, then detail/pins.
@@ -1948,7 +1954,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
       if (String(activeIdRef.current) !== String(c.id)) return;
       try { markVisibleMessagesRead(); } catch { /* */ }
     }, 900);
-  }, [isMobile, loadMessages, loadConversationDetail, loadOlder, flushDraftToServer]);
+  }, [isMobile, isMatrixConversationId, loadMessages, loadConversationDetail, loadOlder, flushDraftToServer]);
 
 
   /* bootstrap + hash restore */
@@ -1973,15 +1979,21 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
             }
           } catch { /* */ }
         }
-      } else if (h.type === "u" && h.value) {
-        const byPeer = list.find(
-          (x) => x.type === "private" && (x.peer?.username || "").toLowerCase() === h.value.toLowerCase()
-        );
+      } else if ((h.type === "u" || h.type === "s") && h.value) {
+        const isSecureLink = h.type === "s";
+        const byPeer = list.find((x) => {
+          if (x.type !== "private" || (x.peer?.username || "").toLowerCase() !== h.value.toLowerCase()) {
+            return false;
+          }
+          const secureConversation = x.security_mode === "matrix_e2ee" || Boolean(x.matrix_room_id);
+          return isSecureLink ? secureConversation : !secureConversation;
+        });
         if (byPeer) {
           await openChat(byPeer, { hashUser: h.value });
         } else {
-          // For #u/<username> with no existing chat, OPEN THE PROFILE (no DM creation)
-          // — matches "clicking search result opens profile, not DM"
+          // A person link opens the shared Messenger profile, never creates a
+          // plaintext or encrypted conversation implicitly. To open #s/<name>,
+          // an encrypted conversation for that peer must already be available.
           try {
             const res = await apiRequest({
               method: "GET",
