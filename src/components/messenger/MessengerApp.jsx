@@ -130,8 +130,72 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   }, [conversations, activeDetail]);
   const secureConversationIdsRef = useRef(secureConversationIds);
   secureConversationIdsRef.current = secureConversationIds;
+  const secureRoomToConversationId = useMemo(() => {
+    const all = [
+      ...(conversations || []),
+      ...(activeDetail ? [activeDetail] : []),
+      ...((conversations || []).flatMap((conversation) => conversation?.topics || [])),
+      ...(activeDetail?.topics || []),
+    ];
+    return new Map(all
+      .filter((conversation) => (
+        (conversation?.security_mode === "matrix_e2ee" || Boolean(conversation?.matrix_room_id))
+        && conversation?.matrix_room_id
+      ))
+      .map((conversation) => [String(conversation.matrix_room_id), String(conversation.id)]));
+  }, [conversations, activeDetail]);
+  const secureRoomToConversationIdRef = useRef(secureRoomToConversationId);
+  secureRoomToConversationIdRef.current = secureRoomToConversationId;
   const isMatrixConversationId = useCallback((conversationId) =>
     secureConversationIdsRef.current.has(String(conversationId ?? "")), []);
+
+  useEffect(() => {
+    if (!meId) return undefined;
+    let cancelled = false;
+    let matrixClient = null;
+    const updateRoomUnread = (room) => {
+      const conversationId = secureRoomToConversationIdRef.current.get(String(room?.roomId || ""));
+      if (!conversationId) return;
+      const unreadCount = Math.max(0, Number(room.getUnreadNotificationCount?.("total") || 0));
+      secureUnreadCountsRef.current.set(conversationId, unreadCount);
+      setConversations((prev) => prev.map((row) => (
+        String(row.id) === conversationId ? { ...row, unread_count: unreadCount } : row
+      )));
+      setActiveDetail((prev) => (
+        prev && String(prev.id) === conversationId
+          ? { ...prev, unread_count: unreadCount }
+          : prev
+      ));
+    };
+    const onRoomTimeline = (_event, room) => updateRoomUnread(room);
+    const onRoomReceipt = (_event, room) => updateRoomUnread(room);
+    const onSync = () => {
+      for (const room of matrixClient?.getRooms?.() || []) updateRoomUnread(room);
+    };
+    const attach = async () => {
+      try {
+        if (!(await hasRecoverableLocalMatrixDevice())) return;
+        const client = await getSecureMatrixClient();
+        if (cancelled || !client) return;
+        matrixClient = client;
+        matrixClient.on("Room.timeline", onRoomTimeline);
+        matrixClient.on("Room.receipt", onRoomReceipt);
+        matrixClient.on("sync", onSync);
+        onSync();
+      } catch {
+        // The secure timeline panel reports authentication and recovery failures.
+      }
+    };
+    void attach();
+    return () => {
+      cancelled = true;
+      if (matrixClient) {
+        matrixClient.off("Room.timeline", onRoomTimeline);
+        matrixClient.off("Room.receipt", onRoomReceipt);
+        matrixClient.off("sync", onSync);
+      }
+    };
+  }, [meId, matrixRecoveryState?.state, secureRoomToConversationId.size]);
   const [messages, setMessages] = useState([]);
   const messagesRef = useRef([]);
   const [hasMoreMsgs, setHasMoreMsgs] = useState(false);
