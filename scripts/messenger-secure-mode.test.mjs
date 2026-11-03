@@ -507,7 +507,9 @@ test("secure composer restores focus and additional local search, copy, and Matr
 
 test("secure chat loads a bounded recent window and extends it to include unread history", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
 
+  assert.match(client, /startClient\(\{ initialSyncLimit: 50 \}\)/);
   assert.match(panel, /INITIAL_SECURE_MESSAGE_COUNT = 50/);
   assert.match(panel, /SECURE_HISTORY_PAGE_SIZE = 40/);
   assert.match(panel, /MAX_INITIAL_UNREAD_HISTORY_PAGES = 100/);
