@@ -575,7 +575,7 @@ test("developer shell commands always use the PTY transport and preserve termina
   assert.match(shell, /message\.type === "command\.output"/);
   assert.match(shell, /message\.type === "process\.exit"[\s\S]*?runningRef\.current = false/);
   assert.match(shell, /const handleTerminalSurfaceClick = useCallback/);
-  assert.match(shell, /onClick=\{handleTerminalSurfaceClick\}/);
+  assert.ok(shell.includes("<Box ref={terminalRef} onClick={handleTerminalSurfaceClick}"));
   assert.match(shell, /range\.collapse\(false\)/);
   assert.match(shell, /if \(selection && !selection\.isCollapsed\) return/);
   assert.match(shell, /onReady=\{handleXtermReady\}/);
