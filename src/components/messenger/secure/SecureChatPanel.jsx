@@ -854,7 +854,19 @@ export default function SecureChatPanel({
                 </Button>
               </Box>
             )}
-            {pendingUpload && <Typography variant="caption" color="text.secondary">{pendingUpload.status}</Typography>}
+            {pendingUpload && (
+              <Paper elevation={0} sx={{ maxWidth: 900, mx: "auto", mb: 1.25, p: 1.25, border: "1px solid", borderColor: "primary.main", borderRadius: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <LockOutlinedIcon color="success" fontSize="small" />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight={650} noWrap>{pendingUpload.filename}</Typography>
+                    <Typography variant="caption" color="text.secondary">{pendingUpload.status}</Typography>
+                  </Box>
+                  <CircularProgress size={18} />
+                </Stack>
+                <LinearProgress sx={{ mt: 1 }} />
+              </Paper>
+            )}
             {messages.length > 0 && filteredMessages.length === 0 && (
               <Typography color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
                 No matches in the decrypted messages currently loaded on this device.
@@ -875,6 +887,7 @@ export default function SecureChatPanel({
                 <Box key={message.id} data-secure-event-id={message.id} data-secure-own={message.isOwn ? "true" : "false"} sx={{ display: "flex", justifyContent: message.isOwn ? "flex-end" : "flex-start" }}>
                   <Paper
                     elevation={0}
+                    data-receipt-revision={receiptRevision}
                     sx={{
                       maxWidth: "min(78%, 720px)",
                       border: "1px solid",
@@ -918,7 +931,7 @@ export default function SecureChatPanel({
                               void openEncryptedMedia(message);
                             }}
                           >
-                            Decrypt and show attachment
+                            {Number(message.info?.size || 0) > AUTO_DECRYPT_MEDIA_MAX_BYTES ? "Decrypt large attachment" : "Decrypt attachment"}
                           </Button>
                         )}
                         {loadingMedia[message.id] && (
@@ -935,6 +948,7 @@ export default function SecureChatPanel({
                         )}
                         <Typography variant="caption" color="text.secondary">
                           {message.filename || message.body} · E2EE
+                          {Number(message.info?.size || 0) > 0 ? " · " + (Number(message.info.size) / (1024 * 1024)).toFixed(1) + " MB" : ""}
                         </Typography>
                       </Box>
                     )}
