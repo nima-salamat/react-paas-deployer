@@ -7,6 +7,7 @@ import { getSessionBoundAccessToken } from "../../customHooks/authSession.js";
 const LEGACY_SESSION_KEY = "pd.matrix.secure-session.v1";
 const SESSION_KEY_PREFIX = "pd.matrix.secure-session.v2:";
 const PERSISTENT_DEVICE_KEY_PREFIX = "pd.matrix.device-id.v1:";
+const CRYPTO_STORE_MODE_KEY_PREFIX = "pd.matrix.crypto-store-mode.v1:";
 const DEVICE_MARKER_DB = "pd-messenger-matrix-device-marker";
 const DEVICE_MARKER_STORE = "devices";
 
@@ -144,6 +145,80 @@ function currentDjangoUserNamespace() {
   } catch {
     return "";
   }
+}
+
+
+function readCryptoStoreMode(session) {
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace || !session?.deviceId) return null;
+  try {
+    const saved = JSON.parse(
+      localStorage.getItem(`${CRYPTO_STORE_MODE_KEY_PREFIX}${namespace}`) || "null",
+    );
+    if (saved?.deviceId !== session.deviceId) return null;
+    return saved.mode === "isolated" || saved.mode === "legacy" ? saved.mode : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberCryptoStoreMode(session, mode) {
+  const namespace = currentDjangoUserNamespace();
+  if (!namespace || !session?.deviceId || !["isolated", "legacy"].includes(mode)) {
+    throw new MatrixSecureError(
+      "Could not bind the local Matrix encryption store to this account and device.",
+      "crypto_store_binding_unavailable",
+    );
+  }
+  const key = `${CRYPTO_STORE_MODE_KEY_PREFIX}${namespace}`;
+  const record = { deviceId: session.deviceId, mode };
+  try {
+    localStorage.setItem(key, JSON.stringify(record));
+    const saved = JSON.parse(localStorage.getItem(key) || "null");
+    if (saved?.deviceId !== record.deviceId || saved?.mode !== record.mode) {
+      throw new Error("Matrix crypto store preference read-back did not match.");
+    }
+  } catch {
+    throw new MatrixSecureError(
+      "The browser could not remember which Matrix encryption store belongs to this device. Enable site storage and retry.",
+      "crypto_store_binding_unavailable",
+    );
+  }
+}
+
+async function isolatedCryptoDatabasePrefix(session) {
+  if (!globalThis.crypto?.subtle?.digest || typeof TextEncoder === "undefined") {
+    throw new MatrixSecureError(
+      "This browser cannot create an account-isolated Matrix encryption store. Use a current browser with Web Crypto enabled.",
+      "crypto_unavailable",
+    );
+  }
+  const identity = [
+    String(session?.homeserverUrl || "").replace(/\\/+$/, "").toLowerCase(),
+    String(session?.userId || ""),
+    String(session?.deviceId || ""),
+  ].join("\\u0000");
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(identity),
+  );
+  const suffix = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `pd-matrix-crypto-v1-${suffix}`;
+}
+
+function isMatrixCryptoAccountMismatch(error) {
+  const messages = [];
+  const seen = new Set();
+  let current = error;
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    if (typeof current?.message === "string") messages.push(current.message);
+    current = current?.cause;
+  }
+  const message = messages.join(" ").toLowerCase();
+  return message.includes("account in the store doesn't match the account in the constructor")
+    || message.includes("account in the store does not match the account in the constructor")
+    || message.includes("mismatchedaccount");
 }
 
 function getOrCreatePersistentDeviceId() {
@@ -642,8 +717,7 @@ async function initializeClient() {
       createdDeviceSession = session.createdNewDeviceId !== false;
     }
 
-    stage = "creating the Matrix client";
-    nextClient = createClient({
+    const buildClientForSession = () => createClient({
       baseUrl: session.homeserverUrl,
       accessToken: session.accessToken,
       userId: session.userId,
@@ -651,8 +725,44 @@ async function initializeClient() {
       cryptoCallbacks: cryptoCallbacks(),
     });
 
+    stage = "creating the Matrix client";
+    nextClient = buildClientForSession();
+
+    // matrix-js-sdk defaults to one global IndexedDB name ("matrix-js-sdk").
+    // A stale store from another Matrix account/device can therefore reject
+    // this constructor with MismatchedAccount. Preserve existing devices by
+    // trying the legacy store once for an already-established session, then
+    // retry only that exact ownership error with a deterministic, private
+    // database name derived from this homeserver + Matrix user + device.
     stage = "initializing Matrix Rust/WASM encryption and IndexedDB";
-    await nextClient.initRustCrypto();
+    let cryptoStoreMode = readCryptoStoreMode(session)
+      || (createdDeviceSession ? "isolated" : "legacy");
+    let cryptoDatabasePrefix = cryptoStoreMode === "isolated"
+      ? await isolatedCryptoDatabasePrefix(session)
+      : null;
+
+    try {
+      if (cryptoStoreMode === "isolated") {
+        await nextClient.initRustCrypto({ cryptoDatabasePrefix });
+      } else {
+        await nextClient.initRustCrypto();
+      }
+    } catch (initializationError) {
+      if (cryptoStoreMode !== "legacy" || !isMatrixCryptoAccountMismatch(initializationError)) {
+        throw initializationError;
+      }
+
+      try { nextClient.stopClient(); } catch { /* discard the failed SDK instance */ }
+      nextClient = buildClientForSession();
+      cryptoStoreMode = "isolated";
+      cryptoDatabasePrefix = await isolatedCryptoDatabasePrefix(session);
+      await nextClient.initRustCrypto({ cryptoDatabasePrefix });
+    }
+
+    // Record the store choice only after Rust crypto successfully opens it.
+    // Never delete or overwrite the old global database: it may contain the
+    // only recoverable keys for a different account or an older device.
+    rememberCryptoStoreMode(session, cryptoStoreMode);
 
     stage = "recording local device state";
     await writeDeviceMarker(session.deviceId);
