@@ -847,6 +847,11 @@ export default function SecureChatPanel({
               </Box>
             )}
             {pendingUpload && <Typography variant="caption" color="text.secondary">{pendingUpload.status}</Typography>}
+            {messages.length > 0 && filteredMessages.length === 0 && (
+              <Typography color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
+                No matches in the decrypted messages currently loaded on this device.
+              </Typography>
+            )}
             {messages.length === 0 && (
               <Typography color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
                 No readable messages are available on this device yet.
