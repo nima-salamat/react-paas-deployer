@@ -242,6 +242,7 @@ export default function SecureChatPanel({
   const readReceiptSentRef = useRef(new Set());
   const [receiptRevision, setReceiptRevision] = useState(0);
   const [unreadAnchorId, setUnreadAnchorId] = useState(null);
+  const [timelineInitialised, setTimelineInitialised] = useState(false);
   const initialScrollHandledRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -324,6 +325,8 @@ export default function SecureChatPanel({
 
     async function connect() {
       setPhase("connecting");
+      setTimelineInitialised(false);
+      initialScrollHandledRef.current = false;
       setError("");
       if (!roomId) {
         setError("This encrypted conversation is missing its Matrix room binding.");
@@ -416,6 +419,7 @@ export default function SecureChatPanel({
         roomReadyForTimeline = true;
         setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
         setUnreadAnchorId(findFirstUnreadEventId(room, client.getUserId()));
+        setTimelineInitialised(true);
         onSecureUnreadCountChange?.(Number(room.getUnreadNotificationCount?.("total") || 0));
         attachRoomListeners();
         client.on("sync", onSync);
@@ -439,6 +443,78 @@ export default function SecureChatPanel({
       }
     };
   }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title, conversation?.participants, onSecureClientReady, onSecureUnreadCountChange]);
+
+  const reconnectSecureChat = useCallback(() => {
+    setRevision((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    onRegisterReconnect?.(reconnectSecureChat);
+    return () => onRegisterReconnect?.(null);
+  }, [onRegisterReconnect, reconnectSecureChat]);
+
+  const markEventRead = useCallback(async (event) => {
+    if (!matrixClient || !event || event.getSender?.() === matrixClient.getUserId()) return;
+    const eventId = String(event.getId?.() || "");
+    if (!eventId || readReceiptSentRef.current.has(eventId)) return;
+    readReceiptSentRef.current.add(eventId);
+    try {
+      // Receipts are Matrix room metadata, not plaintext Messenger messages.
+      await matrixClient.sendReadReceipt(event);
+      setReceiptRevision((value) => value + 1);
+      setUnreadAnchorId((current) => current === eventId ? null : current);
+      onSecureUnreadCountChange?.(0);
+    } catch {
+      // Keep the receipt retryable when the homeserver is temporarily unavailable.
+      readReceiptSentRef.current.delete(eventId);
+    }
+  }, [matrixClient, onSecureUnreadCountChange]);
+
+  useEffect(() => {
+    const root = timelineRef.current;
+    if (phase !== "ready" || !matrixClient || !root || typeof IntersectionObserver === "undefined") return undefined;
+    const room = matrixClient.getRoom(roomId);
+    if (!room) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (document.visibilityState !== "visible") return;
+      const events = room.getLiveTimeline?.().getEvents?.() || [];
+      for (const entry of entries) {
+        if (!entry.isIntersecting || entry.intersectionRatio < 0.6) continue;
+        const eventId = entry.target.getAttribute("data-secure-event-id");
+        const isOwn = entry.target.getAttribute("data-secure-own") === "true";
+        if (!eventId || isOwn) continue;
+        const event = events.find((candidate) => candidate.getId?.() === eventId);
+        if (event) void markEventRead(event);
+      }
+    }, { root, threshold: [0.6] });
+    root.querySelectorAll("[data-secure-event-id]").forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [phase, matrixClient, roomId, messages, markEventRead]);
+
+  useEffect(() => {
+    const root = timelineRef.current;
+    if (phase !== "ready" || !timelineInitialised || !messages.length || !root || initialScrollHandledRef.current) return;
+    requestAnimationFrame(() => {
+      if (initialScrollHandledRef.current || !timelineRef.current) return;
+      if (unreadAnchorId) {
+        const target = Array.from(timelineRef.current.querySelectorAll("[data-secure-event-id]"))
+          .find((node) => node.getAttribute("data-secure-event-id") === unreadAnchorId);
+        if (target) target.scrollIntoView({ block: "start", behavior: "auto" });
+        else timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
+      } else {
+        timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
+      }
+      initialScrollHandledRef.current = true;
+    });
+  }, [phase, timelineInitialised, messages, unreadAnchorId]);
+
+  const filteredMessages = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase();
+    if (!query) return messages;
+    return messages.filter((message) => [
+      message.body, message.sender, message.filename,
+    ].some((value) => String(value || "").toLocaleLowerCase().includes(query)));
+  }, [messages, searchQuery]);
 
   const loadOlderHistory = useCallback(async () => {
     if (!matrixClient || !roomId || loadingOlder || !hasMoreHistory) return;
