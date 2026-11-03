@@ -146,6 +146,9 @@ export function parseHash() {
   const h = (window.location.hash || "").replace(/^#/, "");
   if (h.startsWith("c/")) return { type: "c", value: h.slice(2) };
   if (h.startsWith("u/")) return { type: "u", value: decodeURIComponent(h.slice(2)) };
+  // Secure private chats intentionally use a distinct, reload-safe hash:
+  // #s/<username> is never interpreted as an ordinary plaintext #u/<username>.
+  if (h.startsWith("s/")) return { type: "s", value: decodeURIComponent(h.slice(2)) };
   return null;
 }
 
@@ -155,7 +158,9 @@ export function setHash(type, value) {
     window.history.replaceState(null, "", pathname + search);
     return;
   }
-  const hash = type === "u" ? `#u/${encodeURIComponent(value)}` : `#c/${value}`;
+  const hash = type === "u" || type === "s"
+    ? `#${type}/${encodeURIComponent(value)}`
+    : `#c/${value}`;
   const { pathname, search } = window.location;
   window.history.replaceState(null, "", pathname + search + hash);
 }
