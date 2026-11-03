@@ -512,6 +512,7 @@ test("secure chat loads a bounded recent window and extends it to include unread
   assert.match(panel, /SECURE_HISTORY_PAGE_SIZE = 40/);
   assert.match(panel, /MAX_INITIAL_UNREAD_HISTORY_PAGES = 100/);
   assert.match(panel, /async function prepareInitialSecureTimeline/);
+  assert.match(panel, /findUnreadEventIdByCount/);
   assert.match(panel, /messageCount >= INITIAL_SECURE_MESSAGE_COUNT && unreadBoundaryAvailable/);
   assert.match(panel, /unreadCount <= 0\s*\?/);
   assert.match(panel, /setUnreadAnchorId\(initialHistory\.unreadAnchorId\)/);
