@@ -540,7 +540,9 @@ test("secure composer icon actions remain circular and fixed-size", () => {
 
   assert.match(panel, /flex: "0 0 42px", width: 42, height: 42/);
   assert.match(panel, /borderRadius: "50%"/);
-  assert.match(panel, /alignItems: "center", gap: 1, maxWidth: 960/);
+  assert.match(panel, /alignItems: "center",[\s\S]*?gap: \{ xs: 0\.65, sm: 0\.9 \},[\s\S]*?maxWidth: 960/);
+  assert.match(panel, /Message securely…/);
+  assert.match(panel, /backgroundImage: \(theme\) => theme\.palette\.mode === "dark"/);
 });
 
 test("secure message actions edit with Matrix replacements and delete with Matrix redactions", () => {
@@ -597,4 +599,24 @@ test("secure media viewers, floating reactions, search menu and unread jump cont
   assert.match(panel, /<KeyboardArrowDownRoundedIcon/);
   assert.match(panel, /unreadCountRef\.current - 1/);
   assert.match(panel, /scroller\.scrollTo\(\{ top: scroller\.scrollHeight, behavior: "smooth" \}\)/);
+});
+
+
+test("secure Messenger visual refresh keeps timeline date groups, compact bubbles, status surface and cohesive composer", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const header = read("src/components/messenger/components/ChatHeader.jsx");
+
+  assert.match(panel, /function secureDateLabel\(timestamp\)/);
+  assert.match(panel, /filteredMessages\.map\(\(message, messageIndex\) => \{/);
+  assert.match(panel, /showSender && \(/);
+  assert.match(panel, /linear-gradient\(145deg/);
+  assert.match(panel, /className="secure-message-reaction"/);
+  assert.match(panel, /&:hover \.secure-message-reaction/);
+  assert.match(panel, /minHeight: 54/);
+  assert.match(panel, /End-to-end encrypted/);
+  assert.match(panel, /scrollBehavior: "smooth"/);
+  assert.match(panel, /Message securely…/);
+  assert.match(panel, /& .MuiOutlinedInput-root/);
+  assert.match(header, /secureMode \? 66 : 56/);
+  assert.match(header, /alpha\(t\.palette\.success\.main, 0\.5\)/);
 });
