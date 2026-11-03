@@ -469,7 +469,7 @@ test("secure chat uses Matrix-native receipts, unread navigation, and reconnect 
   assert.match(app, /client\.on\("sync", onSync\)/);
   assert.match(app, /secureRoomToConversationIdRef\.current\.get/);
   assert.match(panel, /onRegisterReconnect/);
-  assert.match(panel, /findFirstUnreadEventWithPagination/);
+  assert.match(panel, /prepareInitialSecureTimeline/);
   assert.match(panel, /getReadReceiptForUserId/);
   assert.match(panel, /matrixClient\.sendReadReceipt\(event\)/);
   assert.match(panel, /new IntersectionObserver/);
@@ -502,4 +502,50 @@ test("secure composer restores focus and additional local search, copy, and Matr
   assert.match(panel, /matrixClient\.redactEvent\(roomId, ownReaction\.id\)/);
   assert.match(panel, /rel_type: "m\.annotation"/);
   assert.match(panel, /getReactionGroups/);
+});
+
+
+test("secure chat loads a bounded recent window and extends it to include unread history", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(panel, /INITIAL_SECURE_MESSAGE_COUNT = 50/);
+  assert.match(panel, /SECURE_HISTORY_PAGE_SIZE = 40/);
+  assert.match(panel, /MAX_INITIAL_UNREAD_HISTORY_PAGES = 100/);
+  assert.match(panel, /async function prepareInitialSecureTimeline/);
+  assert.match(panel, /messageCount >= INITIAL_SECURE_MESSAGE_COUNT && unreadBoundaryAvailable/);
+  assert.match(panel, /setUnreadAnchorId\(initialHistory\.unreadAnchorId\)/);
+  assert.match(panel, /setHasMoreHistory\(initialHistory\.hasMoreHistory\)/);
+  assert.match(panel, /timelineRef\.current\.scrollTop = timelineRef\.current\.scrollHeight/);
+});
+
+test("secure voice recording can be cancelled without sending the captured audio", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(panel, /const cancelVoiceRecording = \(\) =>/);
+  assert.match(panel, /voiceRecordingCancelledRef\.current = true/);
+  assert.match(panel, /if \(cancelled\) return/);
+  assert.match(panel, /onClick=\{cancelVoiceRecording\}/);
+  assert.match(panel, />\s*Cancel\s*</);
+});
+
+test("secure composer icon actions remain circular and fixed-size", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(panel, /flex: "0 0 42px", width: 42, height: 42/);
+  assert.match(panel, /borderRadius: "50%"/);
+  assert.match(panel, /alignItems: "center", gap: 1, maxWidth: 960/);
+});
+
+test("secure message actions edit with Matrix replacements and delete with Matrix redactions", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(panel, /MoreVertIcon/);
+  assert.match(panel, /Message options/);
+  assert.match(panel, /Edit message/);
+  assert.match(panel, /Delete message/);
+  assert.match(panel, /rel_type: "m\.replace", event_id: editingMessage\.id/);
+  assert.match(panel, /"m\.new_content": \{ msgtype: "m\.text", body \}/);
+  assert.match(panel, /matrixClient\.redactEvent\(roomId, deletingMessage\.id\)/);
+  assert.match(panel, /This message was deleted/);
+  assert.match(panel, /Only the original sender can edit this secure message/);
 });
