@@ -785,7 +785,7 @@ export function buildDjangoConfigSuggestion(inspection) {
 
 /**
  * Sentinel value to send for password fields the user wants to KEEP.
- * The backend's update_db_config + update endpoints treat this the same
+ * The backend update_db_config endpoint treats this the same
  * as null / empty string — they skip the field instead of overwriting.
  */
 export { SENTINEL_KEEP_EXISTING };
