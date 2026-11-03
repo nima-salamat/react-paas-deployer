@@ -19,6 +19,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import CloseIcon from "@mui/icons-material/Close";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import CallIcon from "@mui/icons-material/Call";
 import VideocamIcon from "@mui/icons-material/Videocam";
 import ForumOutlinedIcon from "@mui/icons-material/ForumOutlined";
@@ -69,6 +70,7 @@ export default function ChatHeader(props) {
     onStartSecureChat,
     secureMode = false,
     onOpenSecuritySettings,
+    onReconnectSecureChat,
   } = props;
 
   const [topicMenuAnchor, setTopicMenuAnchor] = React.useState(null);
@@ -330,6 +332,12 @@ export default function ChatHeader(props) {
     )}
     <IconButton aria-label={tr("Chat actions")} onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
     <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
+      {secureMode && (
+        <MenuItem onClick={() => { onReconnectSecureChat?.(); setHeaderMenu(null); }}>
+          <ListItemIcon><RefreshIcon fontSize="small" /></ListItemIcon>
+          {tr("Reconnect secure room")}
+        </MenuItem>
+      )}
       {secureMode && (
         <MenuItem onClick={() => { onOpenSecuritySettings?.(); setHeaderMenu(null); }}>
           <ListItemIcon><LockOutlinedIcon fontSize="small" color="success" /></ListItemIcon>
