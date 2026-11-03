@@ -559,3 +559,18 @@ test("secure message actions edit with Matrix replacements and delete with Matri
   assert.match(panel, /This message was deleted/);
   assert.match(panel, /Only the original sender can edit this secure message/);
 });
+
+test("secure Matrix unread effect reads only state and refs declared before its render-time dependencies", () => {
+  const app = read("src/components/messenger/MessengerApp.jsx");
+  const unreadEffect = app.indexOf('useEffect(() => {\\n    if (!meId) return undefined;');
+  const recoveryState = app.indexOf('const [matrixRecoveryState, setMatrixRecoveryState] = useState(null);');
+  const unreadCounts = app.indexOf('const secureUnreadCountsRef = useRef(new Map());');
+
+  assert.ok(unreadEffect >= 0, "the Matrix unread-count effect must exist");
+  assert.ok(recoveryState >= 0 && recoveryState < unreadEffect,
+    "matrixRecoveryState must be initialized before its effect dependency array is evaluated");
+  assert.ok(unreadCounts >= 0 && unreadCounts < unreadEffect,
+    "secureUnreadCountsRef must be initialized before its effect can use it");
+  assert.match(app, /\\}, \\[meId, matrixRecoveryState\\?\\.state, secureRoomToConversationId\\.size\\]\\);/);
+});
+
