@@ -65,7 +65,7 @@ export default function ShellXterm({
     term.loadAddon(fit);
     term.open(hostRef.current);
     fit.fit();
-    term.focus();
+    if (activeRef.current) term.focus();
 
     termRef.current = term;
     fitRef.current = fit;
