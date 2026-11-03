@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, Avatar, Box, Button, CircularProgress, Divider, IconButton, Paper,
-  Stack, TextField, Typography,
+  Alert, Avatar, Box, Button, CircularProgress, Divider, IconButton, LinearProgress, Paper,
+  Stack, TextField, Tooltip, Typography,
 } from "@mui/material";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import MicIcon from "@mui/icons-material/Mic";
@@ -9,12 +9,48 @@ import SendIcon from "@mui/icons-material/Send";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import StopIcon from "@mui/icons-material/Stop";
+import SearchIcon from "@mui/icons-material/Search";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import DownloadIcon from "@mui/icons-material/Download";
+import DoneAllIcon from "@mui/icons-material/DoneAll";
 import {
   assertSecureMessagingReady, getSecureMatrixClient, getSecureMatrixSession,
   hasSecureMatrixInitialSync, MatrixSecureError, resolveMatrixUsers,
   sendEncryptedMedia, decryptEncryptedMedia,
 } from "./MatrixSecureClient";
 import { withTokenQuery } from "../messengerUtils";
+
+const AUTO_DECRYPT_MEDIA_MAX_BYTES = 12 * 1024 * 1024;
+
+function findFirstUnreadEventId(room, ownUserId) {
+  const events = room?.getLiveTimeline?.().getEvents?.() || [];
+  if (!events.length) return null;
+  const readUpToId = room.getEventReadUpTo?.(ownUserId);
+  const readIndex = readUpToId ? events.findIndex((event) => event.getId?.() === readUpToId) : -1;
+  const unreadEvents = events.slice(Math.max(0, readIndex + 1));
+  const firstIncoming = unreadEvents.find((event) => (
+    event.getSender?.() !== ownUserId
+    && (event.getType?.() === "m.room.message" || event.getWireType?.() === "m.room.encrypted")
+    && Boolean(event.getId?.())
+  ));
+  return firstIncoming?.getId?.() || null;
+}
+
+function getReadReceiptSummary(room, messageId, ownUserId) {
+  const events = room?.getLiveTimeline?.().getEvents?.() || [];
+  const messageIndex = events.findIndex((event) => event.getId?.() === messageId);
+  if (messageIndex < 0) return { readCount: 0, total: 0 };
+  const peers = (room?.getMembers?.() || []).filter((member) => (
+    member?.membership === "join" && member?.userId && member.userId !== ownUserId
+  ));
+  const readCount = peers.filter((member) => {
+    const readEventId = room.getEventReadUpTo?.(member.userId);
+    if (!readEventId) return false;
+    const readIndex = events.findIndex((event) => event.getId?.() === readEventId);
+    return readIndex >= messageIndex;
+  }).length;
+  return { readCount, total: peers.length };
+}
 
 function appNameForParticipant(participant) {
   const user = participant?.user || participant || {};
@@ -174,7 +210,13 @@ function waitForSync(client) {
   });
 }
 
-export default function SecureChatPanel({ conversation, currentUserId, onSecureClientReady }) {
+export default function SecureChatPanel({
+  conversation,
+  currentUserId,
+  onSecureClientReady,
+  onRegisterReconnect,
+  onSecureUnreadCountChange,
+}) {
   const roomId = conversation?.matrix_room_id;
   const [phase, setPhase] = useState("connecting");
   const [error, setError] = useState("");
@@ -183,6 +225,11 @@ export default function SecureChatPanel({ conversation, currentUserId, onSecureC
   const mediaObjectUrlsRef = useRef(new Set());
   const [loadedMedia, setLoadedMedia] = useState({});
   const [loadingMedia, setLoadingMedia] = useState({});
+  const [mediaStatus, setMediaStatus] = useState({});
+  const [pendingUpload, setPendingUpload] = useState(null);
+  const mediaOperationsRef = useRef(new Set());
+  const autoDecryptStartedRef = useRef(new Set());
+  const mediaBusyRef = useRef(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const mediaInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -191,6 +238,13 @@ export default function SecureChatPanel({ conversation, currentUserId, onSecureC
   const [recordingVoice, setRecordingVoice] = useState(false);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
+  const draftInputRef = useRef(null);
+  const readReceiptSentRef = useRef(new Set());
+  const [receiptRevision, setReceiptRevision] = useState(0);
+  const [unreadAnchorId, setUnreadAnchorId] = useState(null);
+  const initialScrollHandledRef = useRef(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
@@ -202,7 +256,9 @@ export default function SecureChatPanel({ conversation, currentUserId, onSecureC
     const room = client.getRoom(roomId);
     if (!room) return;
     setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
-  }, [roomId]);
+    const unreadCount = Number(room.getUnreadNotificationCount?.("total") || 0);
+    onSecureUnreadCountChange?.(unreadCount);
+  }, [roomId, onSecureUnreadCountChange]);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,10 +271,17 @@ export default function SecureChatPanel({ conversation, currentUserId, onSecureC
       refreshTimeline(activeClient);
     };
     const onDecrypted = () => refreshTimeline(activeClient);
+    const onReceipt = (_event, room) => {
+      if (room?.roomId !== roomId) return;
+      setReceiptRevision((value) => value + 1);
+      const unreadCount = Number(room.getUnreadNotificationCount?.("total") || 0);
+      onSecureUnreadCountChange?.(unreadCount);
+    };
     const attachRoomListeners = () => {
       if (roomListenersAttached || !activeClient) return;
       activeClient.on("Room.timeline", onTimeline);
       activeClient.on("Event.decrypted", onDecrypted);
+      activeClient.on("Room.receipt", onReceipt);
       roomListenersAttached = true;
     };
     const updateRoomMembershipState = () => {
@@ -352,6 +415,8 @@ export default function SecureChatPanel({ conversation, currentUserId, onSecureC
         if (cancelled) return;
         roomReadyForTimeline = true;
         setMessages(getRoomMessages(room, client.getUserId(), profilesByMatrixIdRef.current));
+        setUnreadAnchorId(findFirstUnreadEventId(room, client.getUserId()));
+        onSecureUnreadCountChange?.(Number(room.getUnreadNotificationCount?.("total") || 0));
         attachRoomListeners();
         client.on("sync", onSync);
         client.on("RoomMember.membership", onMembership);
@@ -368,11 +433,12 @@ export default function SecureChatPanel({ conversation, currentUserId, onSecureC
       if (activeClient) {
         activeClient.off("Room.timeline", onTimeline);
         activeClient.off("Event.decrypted", onDecrypted);
+        activeClient.off("Room.receipt", onReceipt);
         activeClient.off("sync", onSync);
         activeClient.off("RoomMember.membership", onMembership);
       }
     };
-  }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title, conversation?.participants, onSecureClientReady]);
+  }, [roomId, currentUserId, revision, refreshTimeline, conversation?.title, conversation?.participants, onSecureClientReady, onSecureUnreadCountChange]);
 
   const loadOlderHistory = useCallback(async () => {
     if (!matrixClient || !roomId || loadingOlder || !hasMoreHistory) return;
