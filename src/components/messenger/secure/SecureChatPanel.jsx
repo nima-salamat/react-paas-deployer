@@ -505,34 +505,59 @@ export default function SecureChatPanel({
   };
 
 
-  const openEncryptedMedia = async (message, { download = false } = {}) => {
-    if (!matrixClient || !message?.file || loadingMedia[message.id] || mediaBusy) return;
-    setLoadingMedia((prev) => ({ ...prev, [message.id]: true }));
-    setError("");
+  const openEncryptedMedia = useCallback(async (message, { silent = false } = {}) => {
+    const messageId = String(message?.id || "");
+    if (!matrixClient || !message?.file || !messageId || mediaOperationsRef.current.has(messageId)) return;
+    mediaOperationsRef.current.add(messageId);
+    setLoadingMedia((prev) => ({ ...prev, [messageId]: true }));
+    setMediaStatus((prev) => ({ ...prev, [messageId]: "Preparing encrypted attachment…" }));
+    if (!silent) setError("");
     try {
-      const blob = await decryptEncryptedMedia(matrixClient, message);
+      const blob = await decryptEncryptedMedia(matrixClient, message, {
+        onStatus: (status) => setMediaStatus((prev) => ({ ...prev, [messageId]: status })),
+      });
       const url = URL.createObjectURL(blob);
       mediaObjectUrlsRef.current.add(url);
-      if (download || message.mediaType === "m.file") {
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = String(message.filename || "encrypted-attachment").replace(/[\\/\\0-\\x1f]/g, "_");
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        window.setTimeout(() => {
-          URL.revokeObjectURL(url);
-          mediaObjectUrlsRef.current.delete(url);
-        }, 30000);
-      } else {
-        setLoadedMedia((prev) => ({ ...prev, [message.id]: { url, mimeType: blob.type, filename: message.filename } }));
-      }
+      setLoadedMedia((prev) => ({ ...prev, [messageId]: { url, mimeType: blob.type, filename: message.filename, size: blob.size } }));
+      setMediaStatus((prev) => ({ ...prev, [messageId]: "Decrypted and verified on this device" }));
     } catch (err) {
-      setError(err?.message || "Could not verify and decrypt this attachment.");
+      setMediaStatus((prev) => ({ ...prev, [messageId]: "Could not decrypt this attachment" }));
+      if (!silent) setError(err?.message || "Could not verify and decrypt this attachment.");
     } finally {
-      setLoadingMedia((prev) => ({ ...prev, [message.id]: false }));
+      mediaOperationsRef.current.delete(messageId);
+      setLoadingMedia((prev) => ({ ...prev, [messageId]: false }));
     }
-  };
+  }, [matrixClient]);
+
+  const downloadLoadedMedia = useCallback((message) => {
+    const media = loadedMedia[message?.id];
+    if (!media?.url) return;
+    const anchor = document.createElement("a");
+    anchor.href = media.url;
+    anchor.download = String(media.filename || message.filename || "encrypted-attachment").replace(/[\\/]/g, "_");
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  }, [loadedMedia]);
+
+  useEffect(() => {
+    if (phase !== "ready" || !matrixClient || !messages.length) return undefined;
+    let cancelled = false;
+    const decryptSmallMedia = async () => {
+      for (const message of messages) {
+        if (cancelled) return;
+        if (!message.mediaType || !message.file || loadedMedia[message.id]) continue;
+        const messageId = String(message.id);
+        if (autoDecryptStartedRef.current.has(messageId) || mediaOperationsRef.current.has(messageId)) continue;
+        const size = Number(message.info?.size || 0);
+        if (!Number.isFinite(size) || size <= 0 || size > AUTO_DECRYPT_MEDIA_MAX_BYTES) continue;
+        autoDecryptStartedRef.current.add(messageId);
+        await openEncryptedMedia(message, { silent: true });
+      }
+    };
+    void decryptSmallMedia();
+    return () => { cancelled = true; };
+  }, [phase, matrixClient, messages, loadedMedia, openEncryptedMedia]);
 
   const sendMediaFile = async (file, options = {}) => {
     if (!file || !matrixClient || !roomId || mediaBusy || phase !== "ready") return;
