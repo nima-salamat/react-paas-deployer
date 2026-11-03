@@ -42,13 +42,17 @@ function findFirstUnreadEventId(room, ownUserId) {
   return firstIncoming?.getId?.() || null;
 }
 
-async function findFirstUnreadEventWithPagination(client, room, ownUserId, maxPages = 8) {
+async function findFirstUnreadEventWithPagination(client, room, ownUserId, maxPages = 12) {
   let receiptEventId = getRoomReadReceiptEventId(room, ownUserId);
   for (let page = 0; receiptEventId && page < maxPages; page += 1) {
     const events = room?.getLiveTimeline?.().getEvents?.() || [];
     if (events.some((event) => event.getId?.() === receiptEventId)) break;
     const beforeCount = events.length;
-    await client.scrollback(room, 40);
+    try {
+      await client.scrollback(room, 40);
+    } catch {
+      break;
+    }
     const afterEvents = room?.getLiveTimeline?.().getEvents?.() || [];
     if (afterEvents.length <= beforeCount) break;
     receiptEventId = getRoomReadReceiptEventId(room, ownUserId) || receiptEventId;
@@ -551,7 +555,7 @@ export default function SecureChatPanel({
     }, { root, threshold: [0.6] });
     root.querySelectorAll("[data-secure-event-id]").forEach((node) => observer.observe(node));
     return () => observer.disconnect();
-  }, [phase, matrixClient, roomId, messages, markEventRead]);
+  }, [phase, matrixClient, roomId, messages, markEventRead, searchQuery]);
 
   useEffect(() => {
     const root = timelineRef.current;
