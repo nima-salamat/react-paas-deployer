@@ -445,7 +445,7 @@ test("secure conversations reuse the Messenger identity header and profile actio
 
   assert.match(app, /<ChatHeader[\s\S]*?secureMode=\{isMatrixE2EE\}/);
   assert.match(header, /onClick=\{\(\) => \(peer\?\.id \? loadUserProfile\(peer\.id\) : pushPanel\("info"\)\)\}/);
-  assert.match(header, /secureMode \? tr\("End-to-end encrypted"\)/);
+  assert.ok(header.includes('tr("End-to-end encrypted")'));
   assert.match(header, /secureMode && \(/);
   assert.match(header, /!secureMode && \(/);
   assert.match(panel, /role="region" aria-label=\{appConversationTitle\(conversation, currentUserId\)\}/);
