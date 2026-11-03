@@ -460,6 +460,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const [reactAnchor, setReactAnchor] = useState(null);
   const [headerMenu, setHeaderMenu] = useState(null);
   const [callChoiceOpen, setCallChoiceOpen] = useState(false);
+  const secureReconnectRef = useRef(null);
+  const registerSecureReconnect = useCallback((handler) => {
+    secureReconnectRef.current = typeof handler === "function" ? handler : null;
+  }, []);
 
   // Dialogs
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
@@ -4080,6 +4084,19 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   // configured, encrypted conversations must never fall through to the
   // plaintext Django composer/timeline.
   const isMatrixE2EE = activeConv?.security_mode === "matrix_e2ee" || Boolean(activeConv?.matrix_room_id);
+  const updateSecureUnreadCount = useCallback((count) => {
+    const conversationId = activeConv?.id;
+    if (!conversationId) return;
+    const unreadCount = Math.max(0, Number(count) || 0);
+    setConversations((prev) => prev.map((row) => (
+      String(row.id) === String(conversationId) ? { ...row, unread_count: unreadCount } : row
+    )));
+    setActiveDetail((prev) => (
+      prev && String(prev.id) === String(conversationId)
+        ? { ...prev, unread_count: unreadCount }
+        : prev
+    ));
+  }, [activeConv?.id]);
   const incomingCallConversation = incomingCall
     ? (conversations.find((row) => String(row.id) === String(incomingCall.conversation_id))
       || (String(activeConv?.id) === String(incomingCall.conversation_id) ? activeConv : null))
@@ -5410,6 +5427,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               pushPanel("secure-settings");
               void refreshSecureRecoveryState();
             }}
+            onReconnectSecureChat={() => secureReconnectRef.current?.()}
           />
 
           {isMatrixE2EE ? (
@@ -5417,6 +5435,8 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               conversation={activeConv}
               currentUserId={meId}
               onSecureClientReady={refreshSecureRecoveryState}
+              onRegisterReconnect={registerSecureReconnect}
+              onSecureUnreadCountChange={updateSecureUnreadCount}
             />
           ) : (
             <>
