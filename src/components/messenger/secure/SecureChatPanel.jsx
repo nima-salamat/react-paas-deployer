@@ -42,6 +42,7 @@ function findFirstUnreadEventId(room, ownUserId) {
   const firstIncoming = unreadEvents.find((event) => (
     event.getSender?.() !== ownUserId
     && (event.getType?.() === "m.room.message" || event.getWireType?.() === "m.room.encrypted")
+    && !relationForMatrixEvent(event).rel_type
     && Boolean(event.getId?.())
   ));
   return firstIncoming?.getId?.() || null;
@@ -52,7 +53,8 @@ const SECURE_HISTORY_PAGE_SIZE = 40;
 const MAX_INITIAL_UNREAD_HISTORY_PAGES = 100;
 
 function isSecureTimelineMessage(event) {
-  return event?.getType?.() === "m.room.message" || event?.getWireType?.() === "m.room.encrypted";
+  const isMessage = event?.getType?.() === "m.room.message" || event?.getWireType?.() === "m.room.encrypted";
+  return Boolean(isMessage && !relationForMatrixEvent(event).rel_type);
 }
 
 function countIncomingSecureMessages(events, ownUserId) {
