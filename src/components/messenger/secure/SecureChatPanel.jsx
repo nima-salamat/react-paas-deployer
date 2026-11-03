@@ -374,6 +374,14 @@ export default function SecureChatPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
   const reactionOperationsRef = useRef(new Set());
+  const [messageMenuAnchor, setMessageMenuAnchor] = useState(null);
+  const [messageMenuTarget, setMessageMenuTarget] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingMessage, setDeletingMessage] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const voiceRecordingCancelledRef = useRef(false);
   const [sending, setSending] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
@@ -399,6 +407,11 @@ export default function SecureChatPanel({
     setSearchOpen(false);
     setSearchQuery("");
     setReactionPickerMessageId(null);
+    setMessageMenuAnchor(null);
+    setMessageMenuTarget(null);
+    setEditingMessage(null);
+    setEditDraft("");
+    setDeletingMessage(null);
     setUnreadAnchorId(null);
     setTimelineInitialised(false);
     initialScrollHandledRef.current = false;
