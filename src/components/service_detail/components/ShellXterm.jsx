@@ -5,8 +5,8 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 /**
- * Real terminal surface for interactive PTY sessions (tinker, django shell, …).
- * Parent owns the WebSocket; this component only renders and relays I/O.
+ * Real terminal surface while an interactive PTY process owns stdin/stdout.
+ * Parent owns the WebSocket and preserves the completed transcript in scrollback.
  */
 export default function ShellXterm({
   active,
@@ -23,8 +23,7 @@ export default function ShellXterm({
   const activeRef = useRef(active);
   const callbacksRef = useRef({ onData, onReady, onResize });
 
-  // Keep the same xterm instance alive in Developer mode between commands.
-  // A completed command closes its Docker exec PTY, not the browser terminal.
+  // The terminal is mounted only while an interactive process owns the PTY.
   useEffect(() => {
     activeRef.current = active;
     callbacksRef.current = { onData, onReady, onResize };
