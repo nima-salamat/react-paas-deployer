@@ -102,9 +102,13 @@ async function prepareInitialSecureTimeline(client, room, ownUserId, unreadCount
     pagesLoaded += 1;
   }
 
+  const hasReadMarker = Boolean(
+    receiptEventId
+    && (room?.getLiveTimeline?.().getEvents?.() || []).some((event) => event.getId?.() === receiptEventId)
+  );
   const unreadAnchorId = unreadCount <= 0
     ? null
-    : receiptEventId
+    : hasReadMarker
       ? findFirstUnreadEventId(room, ownUserId)
       : findUnreadEventIdByCount(room, ownUserId, unreadCount);
   return {
