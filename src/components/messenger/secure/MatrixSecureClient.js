@@ -1101,14 +1101,20 @@ export async function sendEncryptedMedia(matrixClient, roomId, file, options = {
     throw new MatrixSecureError("This browser does not provide the cryptography required for encrypted attachments.", "crypto_unavailable");
   }
 
+  const reportStatus = (status) => {
+    try { options.onStatus?.(status); } catch { /* UI status must not affect encryption */ }
+  };
+  reportStatus("Preparing attachment…");
   const plainBytes = await file.arrayBuffer();
   const keyBytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(16));
   try {
+    reportStatus("Encrypting attachment locally…");
     const key = await subtle.importKey("raw", keyBytes, { name: "AES-CTR" }, false, ["encrypt"]);
     const ciphertext = await subtle.encrypt({ name: "AES-CTR", counter: iv, length: 64 }, key, plainBytes);
     const hash = await subtle.digest("SHA-256", ciphertext);
     const encryptedBlob = new Blob([ciphertext], { type: "application/octet-stream" });
+    reportStatus("Uploading encrypted attachment…");
     const uploaded = await matrixClient.uploadContent(encryptedBlob, {
       name: "encrypted-attachment.bin",
       type: "application/octet-stream",
@@ -1155,6 +1161,7 @@ export async function sendEncryptedMedia(matrixClient, roomId, file, options = {
     if (!(await crypto.isEncryptionEnabledInRoom(roomId))) {
       throw new MatrixSecureError("Room encryption changed during upload. The media event was not sent.", "encryption_lost");
     }
+    reportStatus("Sending encrypted message…");
     return await matrixClient.sendEvent(roomId, "m.room.message", content);
   } finally {
     keyBytes.fill(0);
@@ -1163,7 +1170,10 @@ export async function sendEncryptedMedia(matrixClient, roomId, file, options = {
 }
 
 /** Download and authenticate ciphertext before decrypting an E2EE attachment. */
-export async function decryptEncryptedMedia(matrixClient, message) {
+export async function decryptEncryptedMedia(matrixClient, message, { onStatus } = {}) {
+  const reportStatus = (status) => {
+    try { onStatus?.(status); } catch { /* UI status must not affect decryption */ }
+  };
   const encryptedFile = message?.file;
   if (!encryptedFile || encryptedFile.v !== "v2" || encryptedFile.key?.alg !== "A256CTR" || !encryptedFile.url?.startsWith("mxc://")) {
     throw new MatrixSecureError("The message does not contain a supported encrypted attachment.", "invalid_encrypted_media");
@@ -1178,6 +1188,7 @@ export async function decryptEncryptedMedia(matrixClient, message) {
     throw new MatrixSecureError("Encrypted media URL did not match the configured homeserver.", "media_origin_mismatch");
   }
   const token = matrixClient.getAccessToken?.();
+  reportStatus("Downloading encrypted attachment…");
   const response = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: "omit",
@@ -1185,11 +1196,13 @@ export async function decryptEncryptedMedia(matrixClient, message) {
   });
   if (!response.ok) throw new MatrixSecureError("Could not download the encrypted Matrix attachment.", "media_download_failed");
   const ciphertext = await response.arrayBuffer();
+  reportStatus("Verifying encrypted attachment integrity…");
   const expectedHash = decodeUnpaddedBase64(encryptedFile.hashes?.sha256);
   const actualHash = new Uint8Array(await subtle.digest("SHA-256", ciphertext));
   if (expectedHash.length !== actualHash.length || expectedHash.some((byte, index) => byte !== actualHash[index])) {
     throw new MatrixSecureError("Encrypted media integrity verification failed; the file was not opened.", "media_hash_mismatch");
   }
+  reportStatus("Decrypting securely on this device…");
   const iv = decodeUnpaddedBase64(encryptedFile.iv);
   if (iv.length !== 16) throw new MatrixSecureError("Encrypted media counter is invalid.", "invalid_media_iv");
   const key = await subtle.importKey("jwk", encryptedFile.key, { name: "AES-CTR" }, false, ["decrypt"]);
