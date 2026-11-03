@@ -573,3 +573,28 @@ test("secure Matrix unread effect reads only state and refs declared before its 
     "secureUnreadCountsRef must be initialized before its effect can use it");
   assert.ok(app.includes("}, [meId, matrixRecoveryState?.state, secureRoomToConversationId.size]);"));
 });
+
+
+test("secure media viewers, floating reactions, search menu and unread jump control are available", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(panel, /import MediaGalleryDialog from "\.\.\/components\/MediaGalleryDialog"/);
+  assert.match(panel, /setSecureViewerAttachment\(\{/);
+  assert.match(panel, /<MediaGalleryDialog[\s\S]*?initialItems=\{secureViewerItems\}/);
+  assert.match(panel, /function SecureAudioPlayer\([\s\S]*?<audio ref=\{audioRef\}[\s\S]*?aria-label="Audio progress"/);
+  assert.match(panel, /message\.mediaType === "m\.audio"[\s\S]*?<SecureAudioPlayer/);
+  assert.match(panel, /message\.mediaType === "m\.video"[\s\S]*?<VideoPlayer/);
+
+  assert.match(panel, /<Popover[\s\S]*?anchorEl=\{reactionPickerAnchor\}/);
+  assert.doesNotMatch(panel, /reactionPickerMessageId === message\.id && \["👍", "❤️"/);
+  assert.match(panel, /setReactionPickerAnchor\(event\.currentTarget\)/);
+
+  assert.match(panel, /aria-label="Secure chat options"/);
+  assert.match(panel, /Search loaded messages/);
+  assert.doesNotMatch(panel, /Search decrypted messages already loaded on this device/);
+
+  assert.match(panel, /<Badge[\s\S]*?badgeContent=\{unreadCount > 99 \? "99\+" : unreadCount\}/);
+  assert.match(panel, /<KeyboardArrowDownRoundedIcon/);
+  assert.match(panel, /unreadCountRef\.current - 1/);
+  assert.match(panel, /scroller\.scrollTo\(\{ top: scroller\.scrollHeight, behavior: "smooth" \}\)/);
+});
