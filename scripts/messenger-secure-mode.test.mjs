@@ -548,7 +548,7 @@ test("secure composer icon actions remain circular and fixed-size", () => {
   assert.match(panel, /flex: "0 0 38px", width: 38, height: 38/);
   assert.match(panel, /minHeight: 40/);
   assert.match(panel, /fullWidth multiline minRows=\{1\} maxRows=\{3\}/);
-  assert.match(panel, /& \.MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 18px"/);
+  assert.match(panel, /& \.MuiInputBase-inputMultiline[\s\S]*?padding: "8px 18px"/);
   assert.match(panel, /borderRadius: "50%"/);
   assert.match(panel, /maxWidth: 960,[\s\S]*?alignItems: "center",[\s\S]*?gap: \{ xs: 0\.55, sm: 0\.75 \}/);
   assert.match(panel, /Message securely…/);
@@ -567,13 +567,50 @@ test("secure composer keeps text input and voice waveform at the same height and
   assert.match(composer, /minHeight: 40/);
   assert.match(composer, /height: 40/);
   assert.match(composer, /&\.MuiInputBase-multiline": \{ padding: 0 \}/);
-  assert.match(composer, /MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 18px"/);
+  assert.match(composer, /MuiInputBase-inputMultiline[\s\S]*?padding: "8px 18px"/);
   const formSurfaceEnd = composer.indexOf("\n            <Box");
   const formSurface = composer.slice(0, formSurfaceEnd);
 
   assert.ok(formSurfaceEnd > 0);
   assert.equal(formSurface.includes('bgcolor: "background.paper"'), false);
   assert.doesNotMatch(formSurface, /backgroundImage:/);
+});
+
+test("secure multiline composer keeps Shift+Enter text inside rounded input with a styled internal scrollbar", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const formStart = panel.indexOf('component="form"');
+  const formEnd = panel.indexOf("</>", formStart);
+  const composer = panel.slice(formStart, formEnd);
+
+  assert.ok(formStart >= 0 && formEnd > formStart);
+  assert.match(composer, /fullWidth multiline minRows=\{1\} maxRows=\{3\}/);
+  assert.match(composer, /event\.key === "Enter" && !event\.shiftKey/);
+  assert.match(composer, /&\.MuiInputBase-multiline": \{[\s\S]*?overflow: "hidden"/);
+  assert.match(composer, /MuiInputBase-inputMultiline[\s\S]*?maxHeight: 76/);
+  assert.match(composer, /overflowY: "auto !important"/);
+  assert.match(composer, /overflowX: "hidden !important"/);
+  assert.match(composer, /whiteSpace: "pre-wrap"/);
+  assert.match(composer, /overflowWrap: "anywhere"/);
+  assert.match(composer, /scrollbarGutter: "stable"/);
+  assert.match(composer, /&::-webkit-scrollbar": \{ width: 6 \}/);
+  assert.match(composer, /&::-webkit-scrollbar-thumb/);
+});
+
+test("secure message bubbles and reaction buttons do not move on hover", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const bubbleStart = panel.indexOf("data-receipt-revision={receiptRevision}");
+  const bubbleEnd = panel.indexOf("{isActiveSearchMatch && (", bubbleStart);
+  const bubbleStyles = panel.slice(bubbleStart, bubbleEnd);
+  const reactionStart = panel.indexOf('className="secure-message-reaction"');
+  const reactionEnd = panel.indexOf("</IconButton>", reactionStart);
+  const reactionStyles = panel.slice(reactionStart, reactionEnd);
+
+  assert.ok(bubbleStart >= 0 && bubbleEnd > bubbleStart);
+  assert.doesNotMatch(bubbleStyles, /transform: "translateY\(-1px\)"/);
+  assert.doesNotMatch(bubbleStyles, /transition: "[^"]*transform/);
+  assert.doesNotMatch(reactionStyles, /transform:/);
+  assert.doesNotMatch(reactionStyles, /transition: "[^"]*transform/);
+  assert.match(panel, /"&:hover \.secure-message-reaction": \{ opacity: 1 \}/);
 });
 
 test("secure message actions edit with Matrix replacements and delete with Matrix redactions", () => {
@@ -700,7 +737,7 @@ test("secure Messenger visual refresh keeps timeline date groups, compact bubble
   assert.match(panel, /className="secure-message-reaction"/);
   assert.match(panel, /&:hover \.secure-message-reaction/);
   assert.match(panel, /reaction\.own[\s\S]*?alpha\(message\.isOwn \? theme\.palette\.primary\.contrastText/);
-  assert.match(panel, /translateY\(-1px\)/);
+  assert.match(panel, /transition: "box-shadow \.18s ease, outline-color \.18s ease"/);
   assert.doesNotMatch(panel, /messages on this device|End-to-end encrypted|Secure chat options/);
   assert.match(panel, /searchOpen && \(/);
   assert.match(panel, /onRegisterSecureSearch/);
