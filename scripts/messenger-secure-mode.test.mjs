@@ -572,7 +572,7 @@ test("secure composer keeps text input and voice waveform at the same height and
   const formSurface = composer.slice(0, formSurfaceEnd);
 
   assert.ok(formSurfaceEnd > 0);
-  assert.doesNotMatch(formSurface, /bgcolor: "background\\.paper"/);
+  assert.equal(formSurface.includes('bgcolor: "background.paper"'), false);
   assert.doesNotMatch(formSurface, /backgroundImage:/);
 });
 
