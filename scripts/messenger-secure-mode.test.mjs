@@ -545,7 +545,9 @@ test("secure composer icon actions remain circular and fixed-size", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
 
   assert.match(panel, /flex: "0 0 38px", width: 38, height: 38/);
-  assert.match(panel, /minHeight: 40/);
+  assert.match(panel, /minHeight: 34/);
+  assert.match(panel, /fullWidth multiline minRows=\{1\} maxRows=\{3\}/);
+  assert.match(panel, /& \.MuiOutlinedInput-inputMultiline[\s\S]*?padding: "4px 10px"/);
   assert.match(panel, /borderRadius: "50%"/);
   assert.match(panel, /alignItems: "center",[\s\S]*?gap: \{ xs: 0\.55, sm: 0\.75 \},[\s\S]*?maxWidth: 960/);
   assert.match(panel, /Message securely…/);
