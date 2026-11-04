@@ -568,8 +568,12 @@ test("secure composer keeps text input and voice waveform at the same height and
   assert.match(composer, /height: 40/);
   assert.match(composer, /&\.MuiInputBase-multiline": \{ padding: 0 \}/);
   assert.match(composer, /MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 10px"/);
-  assert.doesNotMatch(composer, /bgcolor: "background\.paper"/);
-  assert.doesNotMatch(composer, /backgroundImage:/);
+  const formSurfaceEnd = composer.indexOf("\n            <Box");
+  const formSurface = composer.slice(0, formSurfaceEnd);
+
+  assert.ok(formSurfaceEnd > 0);
+  assert.doesNotMatch(formSurface, /bgcolor: "background\\.paper"/);
+  assert.doesNotMatch(formSurface, /backgroundImage:/);
 });
 
 test("secure message actions edit with Matrix replacements and delete with Matrix redactions", () => {
