@@ -586,6 +586,49 @@ test("secure Matrix unread effect reads only state and refs declared before its 
 });
 
 
+test("redacting a Matrix reaction never renders it as a deleted message and only removes the actor's matching annotation", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const describeStart = panel.indexOf("function describeEvent(");
+  const describeEnd = panel.indexOf("\\nfunction getRoomMessages", describeStart);
+  const describeEvent = panel.slice(describeStart, describeEnd);
+
+  assert.ok(describeStart >= 0 && describeEnd > describeStart);
+  assert.ok(
+    describeEvent.indexOf('if (type !== "m.room.message" && type !== "m.room.encrypted") return null;')
+      < describeEvent.indexOf("if (isRedacted)"),
+    "non-message relations must be discarded before the deleted-message branch",
+  );
+  assert.match(panel, /if \(event\.isRedacted\?\.\(\)\) continue/);
+  assert.match(panel, /reactionEvent\.getType\?\.\(\) === "m\\.reaction"/);
+  assert.match(panel, /relation\?\.rel_type === "m\\.annotation"/);
+  assert.match(panel, /String\(relation\.event_id \|\| ""\) === String\(message\.id\)/);
+  assert.match(panel, /String\(relation\.key \|\| ""\) === String\(emoji\)/);
+  assert.match(panel, /matrixClient\.redactEvent\(roomId, ownReaction\.id\)/);
+  assert.match(panel, /"reaction_state_stale"/);
+});
+
+test("secure search highlights all loaded matches and navigates between them", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+
+  assert.match(panel, /const \[activeSearchIndex, setActiveSearchIndex\] = useState\(0\)/);
+  assert.match(panel, /const activeSearchResultId = searchQuery\.trim\(\)/);
+  assert.match(panel, /const searchMatchIds = useMemo/);
+  assert.match(panel, /setActiveSearchIndex\(0\)/);
+  assert.match(panel, /const moveSearchResult = \(direction\) =>/);
+  assert.match(panel, /Previous search result/);
+  assert.match(panel, /Next search result/);
+  assert.match(panel, /KeyboardArrowUpRoundedIcon/);
+  assert.match(panel, /KeyboardArrowDownRoundedIcon/);
+  assert.match(panel, /activeSearchIndex \+ 1\) \+ " \/ " \+ filteredMessages\.length/);
+  assert.match(panel, /scrollIntoView\(\{ block: "center", behavior: "smooth" \}\)/);
+  assert.match(panel, /data-search-match=\{isSearchMatch \? "true" : undefined\}/);
+  assert.match(panel, /data-search-active=\{isActiveSearchMatch \? "true" : undefined\}/);
+  assert.match(panel, /outline: isActiveSearchMatch \? "3px solid"/);
+  assert.match(panel, /ArrowRightAltRoundedIcon/);
+  assert.match(panel, /messages\.map\(\(message, messageIndex\) => \{/);
+  assert.doesNotMatch(panel, /filteredMessages\.map\(\(message, messageIndex\) => \{/);
+});
+
 test("secure media viewers, floating reactions, search menu and unread jump control are available", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
   const header = read("src/components/messenger/components/ChatHeader.jsx");
@@ -626,7 +669,8 @@ test("secure Messenger visual refresh keeps timeline date groups, compact bubble
   const header = read("src/components/messenger/components/ChatHeader.jsx");
 
   assert.match(panel, /function secureDateLabel\(timestamp\)/);
-  assert.match(panel, /filteredMessages\.map\(\(message, messageIndex\) => \{/);
+  assert.match(panel, /messages\.map\(\(message, messageIndex\) => \{/);
+  assert.match(panel, /data-search-active=\{isActiveSearchMatch \? "true" : undefined\}/);
   assert.match(panel, /showSender && \(/);
   assert.match(panel, /linear-gradient\(145deg/);
   assert.match(panel, /className="secure-message-reaction"/);
