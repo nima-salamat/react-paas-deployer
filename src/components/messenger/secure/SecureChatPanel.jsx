@@ -2241,163 +2241,162 @@ export default function SecureChatPanel({
                 gap: { xs: 0.55, sm: 0.75 },
               }}
             >
-            <input
-              ref={mediaInputRef}
-              type="file"
-              hidden
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) void sendMediaFile(file);
-              }}
-            />
-            <IconButton
-              aria-label="Attach encrypted file"
-              title="Attach an encrypted image, voice, video, or file"
-              disabled={mediaBusy || sending || phase !== "ready"}
-              onClick={() => mediaInputRef.current?.click()}
-              sx={{
-                flex: "0 0 38px", width: 38, height: 38, minWidth: 38, minHeight: 38,
-                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
-                color: "text.secondary", bgcolor: "action.hover",
-                "&:hover": { bgcolor: "action.selected", color: "primary.main" },
-              }}
-            >
-              <AttachFileIcon />
-            </IconButton>
-            <IconButton
-              aria-label={recordingVoice ? "Stop and send voice message" : "Record voice message"}
-              title={recordingVoice ? "Stop and send voice message" : "Record voice message"}
-              color={recordingVoice ? "error" : "default"}
-              disabled={mediaBusy || sending || phase !== "ready"}
-              onClick={() => void toggleVoiceRecording()}
-              sx={{
-                flex: "0 0 38px", width: 38, height: 38, minWidth: 38, minHeight: 38,
-                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
-                bgcolor: recordingVoice ? "error.main" : "action.hover",
-                color: recordingVoice ? "error.contrastText" : "text.secondary",
-                "&:hover": { bgcolor: recordingVoice ? "error.dark" : "action.selected", color: recordingVoice ? "error.contrastText" : "primary.main" },
-              }}
-            >
-              {recordingVoice ? <StopIcon /> : <MicIcon />}
-            </IconButton>
-            {recordingVoice && (
-              <Button
-                color="error"
-                size="small"
-                onClick={cancelVoiceRecording}
-                startIcon={<CloseIcon />}
-                sx={{ flexShrink: 0, minWidth: 0, px: 1, borderRadius: 2, fontWeight: 700 }}
-              >
-                Cancel
-              </Button>
-            )}
-            {recordingVoice ? (
-              <Box
-                role="status"
-                aria-label="Recording encrypted voice message"
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  width: "100%",
-                  height: 40,
-                  minHeight: 40,
-                  boxSizing: "border-box",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.25,
-                  px: 1.5,
-                  border: "1px solid",
-                  borderColor: (theme) => alpha(theme.palette.error.main, 0.35),
-                  borderRadius: 3.25,
-                  bgcolor: "action.hover",
-                  overflow: "hidden",
-                }}
-              >
-                <Box
-                  aria-hidden="true"
-                  sx={{ flex: 1, minWidth: 0, height: 30, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "3px", overflow: "hidden" }}
-                >
-                  {recordingWaveform.map((amplitude, index) => (
-                    <Box
-                      key={index}
-                      sx={{
-                        flex: "1 1 3px",
-                        maxWidth: 4,
-                        minWidth: 2,
-                        height: Math.max(4, Math.round(amplitude * 28)),
-                        borderRadius: 2,
-                        bgcolor: "error.main",
-                        opacity: 0.55 + amplitude * 0.4,
-                        transition: "height 65ms linear, opacity 65ms linear",
-                      }}
-                    />
-                  ))}
-                </Box>
-                <Typography
-                  variant="caption"
-                  sx={{ flexShrink: 0, minWidth: 42, textAlign: "right", fontWeight: 750, color: "error.main", fontVariantNumeric: "tabular-nums" }}
-                >
-                  {formatDuration(Math.floor(recordingElapsedMs / 1000))}
-                </Typography>
-              </Box>
-            ) : (
-              <TextField
-                inputRef={draftInputRef}
-                fullWidth multiline minRows={1} maxRows={3}
-                variant="outlined"
-                placeholder="Message securely…"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent?.isComposing) {
-                    event.preventDefault();
-                    void send();
-                  }
-                }}
-                disabled={sending || mediaBusy || phase !== "ready"}
-                inputProps={{ "aria-label": "Encrypted message" }}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    minHeight: 40,
-                    boxSizing: "border-box",
-                    padding: 0,
-                    alignItems: "center",
-                    borderRadius: 3.25,
-                    bgcolor: "action.hover",
-                    "&.MuiInputBase-multiline": { padding: 0 },
-                    transition: "background-color .18s ease, box-shadow .18s ease",
-                    "& fieldset": { borderColor: "transparent" },
-                    "&:hover fieldset": { borderColor: "divider" },
-                    "&.Mui-focused": {
-                      bgcolor: "background.paper",
-                      boxShadow: (theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.10)}`,
-                    },
-                    "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
-                  },
-                  "& .MuiOutlinedInput-inputMultiline": {
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    fontSize: 14,
-                    lineHeight: "20px",
-                  },
+              <input
+                ref={mediaInputRef}
+                type="file"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void sendMediaFile(file);
                 }}
               />
-            )}
-            <Button
-              type="submit" variant="contained" aria-label="Send encrypted message"
-              disabled={!draft.trim() || sending || mediaBusy || recordingVoice || phase !== "ready"}
-              sx={{
-                flex: "0 0 40px", width: 40, height: 40, minWidth: 40, minHeight: 40,
-                aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.75, p: 0,
-                boxShadow: "0 4px 12px rgba(25,118,210,.20)",
-                transition: "transform .16s ease, box-shadow .16s ease",
-                "&:hover": { transform: "translateY(-1px)", boxShadow: "0 7px 16px rgba(25,118,210,.26)" },
-                "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "text.disabled", boxShadow: "none" },
-              }}
-            >
-              {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
-            </Button>
-            </Box>
+              <IconButton
+                aria-label="Attach encrypted file"
+                title="Attach an encrypted image, voice, video, or file"
+                disabled={mediaBusy || sending || phase !== "ready"}
+                onClick={() => mediaInputRef.current?.click()}
+                sx={{
+                  flex: "0 0 38px", width: 38, height: 38, minWidth: 38, minHeight: 38,
+                  aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
+                  color: "text.secondary", bgcolor: "action.hover",
+                  "&:hover": { bgcolor: "action.selected", color: "primary.main" },
+                }}
+              >
+                <AttachFileIcon />
+              </IconButton>
+              <IconButton
+                aria-label={recordingVoice ? "Stop and send voice message" : "Record voice message"}
+                title={recordingVoice ? "Stop and send voice message" : "Record voice message"}
+                color={recordingVoice ? "error" : "default"}
+                disabled={mediaBusy || sending || phase !== "ready"}
+                onClick={() => void toggleVoiceRecording()}
+                sx={{
+                  flex: "0 0 38px", width: 38, height: 38, minWidth: 38, minHeight: 38,
+                  aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
+                  bgcolor: recordingVoice ? "error.main" : "action.hover",
+                  color: recordingVoice ? "error.contrastText" : "text.secondary",
+                  "&:hover": { bgcolor: recordingVoice ? "error.dark" : "action.selected", color: recordingVoice ? "error.contrastText" : "primary.main" },
+                }}
+              >
+                {recordingVoice ? <StopIcon /> : <MicIcon />}
+              </IconButton>
+              {recordingVoice && (
+                <Button
+                  color="error"
+                  size="small"
+                  onClick={cancelVoiceRecording}
+                  startIcon={<CloseIcon />}
+                  sx={{ flexShrink: 0, minWidth: 0, px: 1, borderRadius: 2, fontWeight: 700 }}
+                >
+                  Cancel
+                </Button>
+              )}
+              {recordingVoice ? (
+                <Box
+                  role="status"
+                  aria-label="Recording encrypted voice message"
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    height: 40,
+                    minHeight: 40,
+                    boxSizing: "border-box",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.25,
+                    px: 1.5,
+                    border: "1px solid",
+                    borderColor: (theme) => alpha(theme.palette.error.main, 0.35),
+                    borderRadius: 3.25,
+                    bgcolor: "action.hover",
+                    overflow: "hidden",
+                  }}
+                >
+                  <Box
+                    aria-hidden="true"
+                    sx={{ flex: 1, minWidth: 0, height: 30, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "3px", overflow: "hidden" }}
+                  >
+                    {recordingWaveform.map((amplitude, index) => (
+                      <Box
+                        key={index}
+                        sx={{
+                          flex: "1 1 3px",
+                          maxWidth: 4,
+                          minWidth: 2,
+                          height: Math.max(4, Math.round(amplitude * 28)),
+                          borderRadius: 2,
+                          bgcolor: "error.main",
+                          opacity: 0.55 + amplitude * 0.4,
+                          transition: "height 65ms linear, opacity 65ms linear",
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  <Typography
+                    variant="caption"
+                    sx={{ flexShrink: 0, minWidth: 42, textAlign: "right", fontWeight: 750, color: "error.main", fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {formatDuration(Math.floor(recordingElapsedMs / 1000))}
+                  </Typography>
+                </Box>
+              ) : (
+                <TextField
+                  inputRef={draftInputRef}
+                  fullWidth multiline minRows={1} maxRows={3}
+                  variant="outlined"
+                  placeholder="Message securely…"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent?.isComposing) {
+                      event.preventDefault();
+                      void send();
+                    }
+                  }}
+                  disabled={sending || mediaBusy || phase !== "ready"}
+                  inputProps={{ "aria-label": "Encrypted message" }}
+                  sx={{
+                    "& .MuiOutlinedInput-root": {
+                      minHeight: 40,
+                      boxSizing: "border-box",
+                      padding: 0,
+                      alignItems: "center",
+                      borderRadius: 3.25,
+                      bgcolor: "action.hover",
+                      "&.MuiInputBase-multiline": { padding: 0 },
+                      transition: "background-color .18s ease, box-shadow .18s ease",
+                      "& fieldset": { borderColor: "transparent" },
+                      "&:hover fieldset": { borderColor: "divider" },
+                      "&.Mui-focused": {
+                        bgcolor: "background.paper",
+                        boxShadow: (theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.10)}`,
+                      },
+                      "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
+                    },
+                    "& .MuiOutlinedInput-inputMultiline": {
+                      boxSizing: "border-box",
+                      padding: "8px 10px",
+                      fontSize: 14,
+                      lineHeight: "20px",
+                    },
+                  }}
+                />
+              )}
+              <Button
+                type="submit" variant="contained" aria-label="Send encrypted message"
+                disabled={!draft.trim() || sending || mediaBusy || recordingVoice || phase !== "ready"}
+                sx={{
+                  flex: "0 0 40px", width: 40, height: 40, minWidth: 40, minHeight: 40,
+                  aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.75, p: 0,
+                  boxShadow: "0 4px 12px rgba(25,118,210,.20)",
+                  transition: "transform .16s ease, box-shadow .16s ease",
+                  "&:hover": { transform: "translateY(-1px)", boxShadow: "0 7px 16px rgba(25,118,210,.26)" },
+                  "&.Mui-disabled": { bgcolor: "action.disabledBackground", color: "text.disabled", boxShadow: "none" },
+                }}
+              >
+                {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
+              </Button>
+              </Box>
           </Box>
         </>
       )}
