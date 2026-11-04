@@ -598,6 +598,9 @@ test("secure multiline composer keeps Shift+Enter text inside rounded input with
 
 test("secure message bubbles and reaction buttons do not move on hover", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const rowStart = panel.indexOf('className="secure-message-row"');
+  const rowEnd = panel.indexOf("<Paper", rowStart);
+  const rowStyles = panel.slice(rowStart, rowEnd);
   const bubbleStart = panel.indexOf("data-receipt-revision={receiptRevision}");
   const bubbleEnd = panel.indexOf("{isActiveSearchMatch && (", bubbleStart);
   const bubbleStyles = panel.slice(bubbleStart, bubbleEnd);
@@ -605,12 +608,16 @@ test("secure message bubbles and reaction buttons do not move on hover", () => {
   const reactionEnd = panel.indexOf("</IconButton>", reactionStart);
   const reactionStyles = panel.slice(reactionStart, reactionEnd);
 
+  assert.ok(rowStart >= 0 && rowEnd > rowStart);
+  assert.doesNotMatch(rowStyles, /:hover \.secure-message-reaction/);
+  assert.doesNotMatch(rowStyles, /:focus-within \.secure-message-reaction/);
+  assert.match(bubbleStyles, /&:hover \.secure-message-reaction/);
   assert.ok(bubbleStart >= 0 && bubbleEnd > bubbleStart);
-  assert.doesNotMatch(bubbleStyles, /transform: "translateY\(-1px\)"/);
+  assert.doesNotMatch(bubbleStyles, /transform: "translateY\\(-1px\\)"/);
   assert.doesNotMatch(bubbleStyles, /transition: "[^"]*transform/);
   assert.doesNotMatch(reactionStyles, /transform:/);
   assert.doesNotMatch(reactionStyles, /transition: "[^"]*transform/);
-  assert.match(panel, /"&:hover \.secure-message-reaction": \{ opacity: 1 \}/);
+  assert.match(reactionStyles, /&:focus-visible[\\s\\S]*?opacity: 1/);
 });
 
 test("secure message actions edit with Matrix replacements and delete with Matrix redactions", () => {
