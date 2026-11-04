@@ -2375,7 +2375,7 @@ export default function SecureChatPanel({
                     },
                     "& .MuiOutlinedInput-inputMultiline": {
                       boxSizing: "border-box",
-                      padding: "8px 10px",
+                      padding: "8px 18px",
                       fontSize: 14,
                       lineHeight: "20px",
                     },
