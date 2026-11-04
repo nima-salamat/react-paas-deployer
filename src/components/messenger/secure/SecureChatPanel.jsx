@@ -2221,20 +2221,26 @@ export default function SecureChatPanel({
             component="form"
             onSubmit={(event) => { event.preventDefault(); void send(); }}
             sx={{
-              px: 1,
-              py: { xs: 0.6, sm: 0.8 },
-              display: "flex",
-              alignItems: "center",
-              gap: { xs: 0.55, sm: 0.75 },
-              maxWidth: 960,
-              mx: "auto",
               width: "100%",
-              bgcolor: "background.paper",
-              backgroundImage: (theme) => theme.palette.mode === "dark"
-                ? "linear-gradient(0deg, rgba(255,255,255,.015), transparent)"
-                : "linear-gradient(0deg, rgba(15,23,42,.018), transparent)",
+              px: 0,
+              py: { xs: 0.5, sm: 0.6 },
+              display: "flex",
+              justifyContent: "center",
+              bgcolor: "background.default",
             }}
           >
+            <Box
+              sx={{
+                width: "100%",
+                maxWidth: 960,
+                mx: "auto",
+                px: 1,
+                minWidth: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: { xs: 0.55, sm: 0.75 },
+              }}
+            >
             <input
               ref={mediaInputRef}
               type="file"
@@ -2292,7 +2298,10 @@ export default function SecureChatPanel({
                 sx={{
                   flex: 1,
                   minWidth: 0,
+                  width: "100%",
+                  height: 40,
                   minHeight: 40,
+                  boxSizing: "border-box",
                   display: "flex",
                   alignItems: "center",
                   gap: 1.25,
@@ -2349,10 +2358,13 @@ export default function SecureChatPanel({
                 inputProps={{ "aria-label": "Encrypted message" }}
                 sx={{
                   "& .MuiOutlinedInput-root": {
-                    minHeight: 34,
+                    minHeight: 40,
+                    boxSizing: "border-box",
+                    padding: 0,
                     alignItems: "center",
                     borderRadius: 3.25,
                     bgcolor: "action.hover",
+                    "&.MuiInputBase-multiline": { padding: 0 },
                     transition: "background-color .18s ease, box-shadow .18s ease",
                     "& fieldset": { borderColor: "transparent" },
                     "&:hover fieldset": { borderColor: "divider" },
@@ -2363,9 +2375,10 @@ export default function SecureChatPanel({
                     "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
                   },
                   "& .MuiOutlinedInput-inputMultiline": {
-                    padding: "4px 10px",
+                    boxSizing: "border-box",
+                    padding: "8px 10px",
                     fontSize: 14,
-                    lineHeight: 1.35,
+                    lineHeight: "20px",
                   },
                 }}
               />
@@ -2384,6 +2397,7 @@ export default function SecureChatPanel({
             >
               {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
             </Button>
+            </Box>
           </Box>
         </>
       )}
