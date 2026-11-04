@@ -453,7 +453,7 @@ test("secure conversations reuse the Messenger identity header and profile actio
   assert.doesNotMatch(panel, /onOpenSecuritySettings/);
   assert.match(panel, /onRegisterSecureSearch/);
   assert.match(header, /onOpenSecureSearch/);
-  assert.match(header, /tr\("Search loaded messages"\)/);
+  assert.match(header, /tr\("Search messages"\)/);
   assert.match(app, /onOpenSecureSearch=\{\(\) => secureSearchRef\.current\?\.\(\)\}/);
 });
 
