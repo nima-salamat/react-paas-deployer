@@ -979,17 +979,17 @@ export default function SecureChatPanel({
         if (target) {
           target.scrollIntoView({ block: "start", behavior: "instant" });
         } else {
-          scroller.scrollTop = scroller.scrollHeight;
+          scroller.scrollTo({ top: scroller.scrollHeight, behavior: "instant" });
         }
       } else {
         // With no unread anchor, the intended landing point is the absolute
         // latest event. A second frame lets the complete timeline layout settle.
-        scroller.scrollTop = scroller.scrollHeight;
+        scroller.scrollTo({ top: scroller.scrollHeight, behavior: "instant" });
       }
       secondFrame = requestAnimationFrame(() => {
         const settledScroller = timelineRef.current;
         if (!settledScroller || initialScrollHandledRef.current) return;
-        if (!unreadAnchorId) settledScroller.scrollTop = settledScroller.scrollHeight;
+        if (!unreadAnchorId) settledScroller.scrollTo({ top: settledScroller.scrollHeight, behavior: "instant" });
         const distanceFromBottom = Math.max(
           0,
           settledScroller.scrollHeight - settledScroller.scrollTop - settledScroller.clientHeight,
