@@ -1326,6 +1326,24 @@ export default function SecureChatPanel({
     }
   };
 
+  const toggleReactionPicker = (message, event) => {
+    // Capture currentTarget during the click; React may clear it before a
+    // deferred state updater executes.
+    const anchorEl = event.currentTarget;
+    if (!anchorEl) return;
+    event.stopPropagation();
+
+    const isAlreadyOpen = reactionPickerMessageId === message.id && Boolean(reactionPickerAnchor);
+    if (isAlreadyOpen) {
+      setReactionPickerAnchor(null);
+      setReactionPickerMessageId(null);
+      return;
+    }
+
+    setReactionPickerMessageId(message.id);
+    setReactionPickerAnchor(anchorEl);
+  };
+
   const send = async () => {
     const body = draft.trim();
     if (!body || !matrixClient || !roomId || sending || phase !== "ready") return;
@@ -1613,9 +1631,10 @@ export default function SecureChatPanel({
                     display: "flex",
                     justifyContent: message.isOwn ? "flex-end" : "flex-start",
                     alignItems: "flex-end",
-                    px: { xs: 0, sm: 0.5 },
-                    "&:hover .secure-message-reaction": { opacity: 1, transform: "translateY(0)" },
-                    "&:focus-within .secure-message-reaction": { opacity: 1, transform: "translateY(0)" },
+                    px: { xs: 0.5, sm: 1.25 },
+                    minWidth: 0,
+                    "&:hover .secure-message-reaction": { opacity: 1, transform: "translateY(0) scale(1)" },
+                    "&:focus-within .secure-message-reaction": { opacity: 1, transform: "translateY(0) scale(1)" },
                   }}
                 >
                   <Paper
@@ -1638,13 +1657,14 @@ export default function SecureChatPanel({
                           ? "0 3px 12px rgba(0,0,0,.15)"
                           : "0 3px 14px rgba(15,23,42,.055)",
                       px: { xs: 1.35, sm: 1.65 },
-                      py: { xs: 1.05, sm: 1.2 },
-                      borderRadius: message.isOwn ? "20px 20px 6px 20px" : "20px 20px 20px 6px",
+                      py: { xs: 0.95, sm: 1.1 },
+                      borderRadius: message.isOwn ? "19px 19px 6px 19px" : "19px 19px 19px 6px",
                       transition: "box-shadow .18s ease, transform .18s ease",
                       "&:hover": {
+                        transform: "translateY(-1px)",
                         boxShadow: message.isOwn
-                          ? "0 7px 20px rgba(20,70,110,0.20)"
-                          : (theme) => theme.palette.mode === "dark" ? "0 5px 16px rgba(0,0,0,.24)" : "0 5px 18px rgba(15,23,42,.09)",
+                          ? "0 8px 22px rgba(20,70,110,0.19)"
+                          : (theme) => theme.palette.mode === "dark" ? "0 6px 18px rgba(0,0,0,.23)" : "0 6px 18px rgba(15,23,42,.075)",
                       },
                     }}
                   >
@@ -1768,7 +1788,7 @@ export default function SecureChatPanel({
                       </Box>
                     )}
                     {!message.mediaType && (
-                      <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                      <Typography sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: 14, lineHeight: 1.58, letterSpacing: 0.01 }}>
                         {message.body}
                       </Typography>
                     )}
@@ -1827,50 +1847,74 @@ export default function SecureChatPanel({
                             key={reaction.key}
                             size="small"
                             clickable
-                            color={reaction.own ? "success" : "default"}
-                            variant={reaction.own ? "filled" : "outlined"}
+                            color="default"
+                            variant="outlined"
                             label={reaction.key + " " + reaction.count}
                             onClick={() => void toggleSecureReaction(message, reaction.key)}
                             sx={{
-                              height: 25,
-                              borderRadius: 2,
-                              fontWeight: 650,
+                              height: 26,
+                              borderRadius: 99,
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              borderColor: reaction.own
+                                ? (theme) => alpha(message.isOwn ? theme.palette.primary.contrastText : theme.palette.success.main, 0.34)
+                                : (theme) => alpha(message.isOwn ? theme.palette.primary.contrastText : theme.palette.text.primary, 0.14),
+                              color: reaction.own
+                                ? (theme) => message.isOwn ? theme.palette.primary.contrastText : theme.palette.success.main
+                                : message.isOwn ? "primary.contrastText" : "text.secondary",
                               bgcolor: reaction.own
-                                ? undefined
-                                : (theme) => alpha(theme.palette.background.default, 0.72),
+                                ? (theme) => alpha(message.isOwn ? theme.palette.primary.contrastText : theme.palette.success.main, 0.14)
+                                : (theme) => alpha(message.isOwn ? theme.palette.primary.contrastText : theme.palette.text.primary, 0.055),
+                              "&:hover": {
+                                bgcolor: reaction.own
+                                  ? (theme) => alpha(message.isOwn ? theme.palette.primary.contrastText : theme.palette.success.main, 0.22)
+                                  : "action.hover",
+                                borderColor: "currentColor",
+                              },
                             }}
                           />
                         ))}
                       </Stack>
                     )}
-                    <Tooltip title={reactionPickerMessageId === message.id ? "Close reactions" : "Add reaction"}>
+                    <Tooltip title={reactionPickerMessageId === message.id && reactionPickerAnchor ? "Close reactions" : "Add reaction"}>
                       <IconButton
                         className="secure-message-reaction"
                         size="small"
                         aria-label="Add secure reaction"
-                        onClick={(event) => {
-                          setReactionPickerMessageId((current) => current === message.id ? null : message.id);
-                          setReactionPickerAnchor((current) => current && reactionPickerMessageId === message.id ? null : event.currentTarget);
-                        }}
+                        aria-haspopup="dialog"
+                        aria-expanded={reactionPickerMessageId === message.id && Boolean(reactionPickerAnchor)}
+                        onClick={(event) => toggleReactionPicker(message, event)}
                         sx={{
                           position: "absolute",
-                          top: 6,
-                          [message.isOwn ? "left" : "right"]: -34,
-                          width: 29,
-                          height: 29,
+                          bottom: 7,
+                          [message.isOwn ? "left" : "right"]: -32,
+                          zIndex: 2,
+                          width: 30,
+                          height: 30,
                           p: 0,
-                          opacity: { xs: 0.85, md: 0 },
-                          transform: "translateY(3px)",
+                          opacity: { xs: 1, md: 0 },
+                          transform: "translateY(3px) scale(.94)",
                           color: "text.secondary",
                           bgcolor: "background.paper",
                           border: "1px solid",
                           borderColor: "divider",
-                          boxShadow: 1,
-                          transition: "opacity .16s ease, transform .16s ease",
-                          "&:hover": { bgcolor: "action.hover", color: "primary.main" },
+                          boxShadow: (theme) => theme.palette.mode === "dark"
+                            ? "0 3px 12px rgba(0,0,0,.32)"
+                            : "0 3px 12px rgba(15,23,42,.12)",
+                          transition: "opacity .16s ease, transform .16s ease, color .16s ease, background-color .16s ease",
+                          "&:hover, &[aria-expanded='true']": {
+                            bgcolor: "background.paper",
+                            color: "primary.main",
+                            borderColor: "primary.main",
+                          },
+                          "&:focus-visible": {
+                            outline: "2px solid",
+                            outlineColor: "primary.main",
+                            outlineOffset: 2,
+                          },
                         }}
                       >
-                        <EmojiEmotionsIcon sx={{ fontSize: 16 }} />
+                        <EmojiEmotionsIcon sx={{ fontSize: 17 }} />
                       </IconButton>
                     </Tooltip>
                   </Paper>
@@ -2066,19 +2110,24 @@ export default function SecureChatPanel({
         }}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+        marginThreshold={12}
         slotProps={{
           paper: {
             sx: {
-              p: 0.75,
+              p: 0.65,
               borderRadius: 3,
-              boxShadow: "0 8px 28px rgba(0,0,0,0.2)",
+              bgcolor: "background.paper",
+              boxShadow: (theme) => theme.palette.mode === "dark"
+                ? "0 12px 34px rgba(0,0,0,.42)"
+                : "0 12px 34px rgba(15,23,42,.18)",
               border: "1px solid",
               borderColor: "divider",
+              backdropFilter: "blur(16px)",
             },
           },
         }}
       >
-        <Stack direction="row" spacing={0.25} alignItems="center">
+        <Stack direction="row" spacing={0.2} alignItems="center">
           {["👍", "❤️", "😂", "😮", "🙏", "🎉", "🔥"].map((emoji) => (
             <IconButton
               key={emoji}
@@ -2089,7 +2138,15 @@ export default function SecureChatPanel({
                 setReactionPickerAnchor(null);
                 setReactionPickerMessageId(null);
               }}
-              sx={{ width: 38, height: 38, fontSize: 20 }}
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: 2.25,
+                fontSize: 21,
+                transition: "transform .14s ease, background-color .14s ease",
+                "&:hover": { bgcolor: "action.hover", transform: "scale(1.12)" },
+                "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main" },
+              }}
             >
               {emoji}
             </IconButton>
