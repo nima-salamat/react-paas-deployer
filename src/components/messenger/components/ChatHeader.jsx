@@ -71,6 +71,7 @@ export default function ChatHeader(props) {
     secureMode = false,
     onOpenSecuritySettings,
     onReconnectSecureChat,
+    onOpenSecureSearch,
   } = props;
 
   const [topicMenuAnchor, setTopicMenuAnchor] = React.useState(null);
@@ -89,7 +90,7 @@ export default function ChatHeader(props) {
     spacing={msgSearchOpen && !secureMode ? (isMobile ? 0 : 0.5) : 1}
     sx={{
       px: msgSearchOpen && isMobile ? 0.35 : { xs: 1, md: 1.5 },
-      py: secureMode ? 1 : 0.85,
+      py: secureMode ? 0.65 : 0.85,
       bgcolor: (t) => alpha(t.palette.background.paper, 0.96),
       backgroundImage: secureMode
         ? (t) => t.palette.mode === "dark"
@@ -99,7 +100,7 @@ export default function ChatHeader(props) {
       backdropFilter: "blur(18px)",
       borderBottom: "1px solid",
       borderColor: secureMode ? (t) => alpha(t.palette.success.main, t.palette.mode === "dark" ? 0.28 : 0.18) : "divider",
-      minHeight: secureMode ? 66 : 56,
+      minHeight: 56,
       position: "relative",
       zIndex: 11,
       boxShadow: (t) => t.palette.mode === "dark" ? "0 4px 22px rgba(0,0,0,0.16)" : "0 5px 22px rgba(15,23,42,0.055)",
@@ -227,8 +228,8 @@ export default function ChatHeader(props) {
       <Avatar
         src={convAvatar(activeConv, meId)}
         sx={{
-          width: secureMode ? 43 : 40,
-          height: secureMode ? 43 : 40,
+          width: 40,
+          height: 40,
           cursor: "pointer",
           border: secureMode ? "2px solid" : "none",
           borderColor: secureMode ? (t) => alpha(t.palette.success.main, 0.5) : "transparent",
@@ -319,8 +320,8 @@ export default function ChatHeader(props) {
           aria-label={tr("Security settings")}
           onClick={() => onOpenSecuritySettings?.()}
           sx={{
-            width: 38,
-            height: 38,
+            width: 34,
+            height: 34,
             color: "success.main",
             bgcolor: (t) => alpha(t.palette.success.main, 0.09),
             border: "1px solid",
@@ -377,6 +378,12 @@ export default function ChatHeader(props) {
     )}
     <IconButton aria-label={tr("Chat actions")} onClick={(e) => setHeaderMenu(e.currentTarget)}><MoreVertIcon /></IconButton>
     <Menu anchorEl={headerMenu} open={Boolean(headerMenu)} onClose={() => setHeaderMenu(null)}>
+      {secureMode && (
+        <MenuItem onClick={() => { onOpenSecureSearch?.(); setHeaderMenu(null); }}>
+          <ListItemIcon><SearchIcon fontSize="small" /></ListItemIcon>
+          {tr("Search loaded messages")}
+        </MenuItem>
+      )}
       {secureMode && (
         <MenuItem onClick={() => { onReconnectSecureChat?.(); setHeaderMenu(null); }}>
           <ListItemIcon><RefreshIcon fontSize="small" /></ListItemIcon>
