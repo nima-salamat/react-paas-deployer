@@ -2396,7 +2396,7 @@ export default function SecureChatPanel({
               >
                 {sending ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
               </Button>
-              </Box>
+            </Box>
           </Box>
         </>
       )}
