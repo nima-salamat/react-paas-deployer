@@ -617,6 +617,8 @@ test("secure search highlights all loaded matches and navigates between them", (
   assert.match(panel, /const moveSearchResult = \(direction\) =>/);
   assert.match(panel, /Previous search result/);
   assert.match(panel, /Next search result/);
+  assert.match(panel, /disabled=\{!searchQuery\.trim\(\) \|\| filteredMessages\.length < 2\}/);
+  assert.match(panel, /searchQuery\.trim\(\) && filteredMessages\.length \?/);
   assert.match(panel, /KeyboardArrowUpRoundedIcon/);
   assert.match(panel, /KeyboardArrowDownRoundedIcon/);
   assert.match(panel, /activeSearchIndex \+ 1\) \+ " \/ " \+ filteredMessages\.length/);
