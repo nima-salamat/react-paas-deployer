@@ -20,6 +20,8 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CloseIcon from "@mui/icons-material/Close";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
+import ArrowRightAltRoundedIcon from "@mui/icons-material/ArrowRightAltRounded";
 import OpenInFullRoundedIcon from "@mui/icons-material/OpenInFullRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
@@ -174,6 +176,10 @@ function relationForMatrixEvent(event) {
 
 function describeEvent(event, ownUserId, profilesByMatrixId = {}) {
   const type = event.getType();
+  // Reactions, redactions, edits and other relations belong to their target
+  // message; they must never become standalone timeline rows, even after a
+  // relation event itself is redacted.
+  if (type !== "m.room.message" && type !== "m.room.encrypted") return null;
   const unsigned = event.getUnsigned?.() || {};
   const isRedacted = Boolean(event.isRedacted?.() || unsigned.redacted_because);
   const wireType = event.getWireType?.() || type;
@@ -210,8 +216,6 @@ function describeEvent(event, ownUserId, profilesByMatrixId = {}) {
       undecryptable: true,
     };
   }
-  if (type !== "m.room.message") return null;
-
   const msgtype = content.msgtype || "m.text";
   const media = ["m.image", "m.audio", "m.video", "m.file"].includes(msgtype)
     && Boolean(content.file && content.file.url?.startsWith("mxc://"));
@@ -255,6 +259,9 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
     });
   const rowsById = new Map(rows.map((row) => [row.id, row]));
   for (const event of events) {
+    // Matrix keeps the original reaction event in the timeline after a
+    // redaction. Never aggregate a redacted relation back onto its message.
+    if (event.isRedacted?.()) continue;
     const content = event.getContent?.() || {};
     const relation = relationForMatrixEvent(event);
     if (event.getType?.() === "m.room.message" && relation.rel_type === "m.replace" && relation.event_id) {
@@ -278,8 +285,10 @@ function getRoomMessages(room, ownUserId, profilesByMatrixId = {}) {
     const target = rowsById.get(relation.event_id);
     if (!target || target.undecryptable || target.redacted) continue;
     if (!Array.isArray(target.reactions)) target.reactions = [];
+    const reactionEventId = event.getId?.();
+    if (!reactionEventId) continue;
     target.reactions.push({
-      id: event.getId?.() || String(event.getTs?.() || Date.now()),
+      id: reactionEventId,
       key: String(relation.key),
       senderId: event.getSender?.() || "",
     });
@@ -552,6 +561,7 @@ export default function SecureChatPanel({
   const initialScrollHandledRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
   const [reactionPickerAnchor, setReactionPickerAnchor] = useState(null);
   const reactionOperationsRef = useRef(new Set());
@@ -592,6 +602,7 @@ export default function SecureChatPanel({
     setError("");
     setSearchOpen(false);
     setSearchQuery("");
+    setActiveSearchIndex(0);
     setReactionPickerMessageId(null);
     setReactionPickerAnchor(null);
     setSecureViewerAttachment(null);
@@ -921,6 +932,39 @@ export default function SecureChatPanel({
       message.body, message.sender, message.filename,
     ].some((value) => String(value || "").toLocaleLowerCase().includes(query)));
   }, [messages, searchQuery]);
+  const searchMatchIds = useMemo(
+    () => new Set(filteredMessages.map((message) => message.id)),
+    [filteredMessages],
+  );
+  const activeSearchResultId = searchQuery.trim()
+    ? (filteredMessages[activeSearchIndex]?.id || null)
+    : null;
+
+  useEffect(() => {
+    if (activeSearchIndex >= filteredMessages.length) {
+      setActiveSearchIndex(Math.max(0, filteredMessages.length - 1));
+    }
+  }, [activeSearchIndex, filteredMessages.length]);
+
+  useEffect(() => {
+    if (!searchQuery.trim() || !activeSearchResultId || phase !== "ready" || !timelineInitialised) return undefined;
+    const frame = requestAnimationFrame(() => {
+      const nodes = Array.from(
+        timelineRef.current?.querySelectorAll("[data-secure-event-id]") || [],
+      );
+      const target = nodes.find(
+        (node) => node.getAttribute("data-secure-event-id") === activeSearchResultId,
+      );
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeSearchResultId, phase, searchQuery, timelineInitialised]);
+
+  const moveSearchResult = (direction) => {
+    const total = filteredMessages.length;
+    if (!searchQuery.trim() || total < 2) return;
+    setActiveSearchIndex((current) => (current + direction + total) % total);
+  };
 
   const loadOlderHistory = useCallback(async () => {
     if (!matrixClient || !roomId || loadingOlder || !hasMoreHistory) return;
@@ -1227,10 +1271,33 @@ export default function SecureChatPanel({
       if (!(await matrixClient.getCrypto().isEncryptionEnabledInRoom(roomId))) {
         throw new MatrixSecureError("Room encryption is not confirmed. The reaction was not sent.", "encryption_lost");
       }
+      const ownUserId = String(matrixClient.getUserId() || "");
       const ownReaction = (message.reactions || []).find((reaction) => (
-        reaction.key === emoji && String(reaction.senderId || "") === String(matrixClient.getUserId() || "")
+        reaction.key === emoji && String(reaction.senderId || "") === ownUserId
       ));
       if (ownReaction?.id) {
+        // Resolve the exact event again before redacting it. This prevents a
+        // stale/local reaction row from being mistaken for a fresh reaction
+        // and ensures we only redact our own annotation on this message.
+        const timelineEvents = room.getLiveTimeline?.().getEvents?.() || [];
+        const reactionEvent = room.findEventById?.(ownReaction.id)
+          || timelineEvents.find((event) => event.getId?.() === ownReaction.id);
+        const relation = reactionEvent ? relationForMatrixEvent(reactionEvent) : null;
+        const isExpectedOwnReaction = Boolean(
+          reactionEvent
+          && !reactionEvent.isRedacted?.()
+          && reactionEvent.getType?.() === "m.reaction"
+          && String(reactionEvent.getSender?.() || "") === ownUserId
+          && relation?.rel_type === "m.annotation"
+          && String(relation.event_id || "") === String(message.id)
+          && String(relation.key || "") === String(emoji)
+        );
+        if (!isExpectedOwnReaction) {
+          throw new MatrixSecureError(
+            "Your reaction is still synchronizing. Refresh the encrypted timeline and try again.",
+            "reaction_state_stale",
+          );
+        }
         await matrixClient.redactEvent(roomId, ownReaction.id);
       } else {
         // MatrixClient.sendEvent encrypts timeline events automatically in encrypted rooms.
@@ -1519,10 +1586,23 @@ export default function SecureChatPanel({
                 fullWidth
                 size="small"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setActiveSearchIndex(0);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    moveSearchResult(1);
+                  } else if (event.key === "Enter" && event.shiftKey) {
+                    event.preventDefault();
+                    moveSearchResult(-1);
+                  }
+                }}
                 placeholder="Search loaded encrypted history on this device…"
                 inputProps={{ "aria-label": "Search loaded encrypted history" }}
                 sx={{
+                  minWidth: 0,
                   "& .MuiOutlinedInput-root": {
                     height: 36,
                     fontSize: 13,
@@ -1530,11 +1610,49 @@ export default function SecureChatPanel({
                   },
                 }}
               />
+              <Stack direction="row" alignItems="center" spacing={0.1} sx={{ flexShrink: 0 }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  aria-live="polite"
+                  sx={{ minWidth: 42, textAlign: "center", fontWeight: 750, fontVariantNumeric: "tabular-nums" }}
+                >
+                  {filteredMessages.length ? (activeSearchIndex + 1) + " / " + filteredMessages.length : "0 / 0"}
+                </Typography>
+                <Tooltip title="Previous result">
+                  <span>
+                    <IconButton
+                      size="small"
+                      aria-label="Previous search result"
+                      disabled={filteredMessages.length < 2}
+                      onClick={() => moveSearchResult(-1)}
+                    >
+                      <KeyboardArrowUpRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Next result">
+                  <span>
+                    <IconButton
+                      size="small"
+                      aria-label="Next search result"
+                      disabled={filteredMessages.length < 2}
+                      onClick={() => moveSearchResult(1)}
+                    >
+                      <KeyboardArrowDownRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Stack>
               <Tooltip title="Close search">
                 <IconButton
                   size="small"
                   aria-label="Close secure history search"
-                  onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+                  onClick={() => {
+                    setSearchOpen(false);
+                    setSearchQuery("");
+                    setActiveSearchIndex(0);
+                  }}
                 >
                   <ClearIcon fontSize="small" />
                 </IconButton>
@@ -1586,8 +1704,10 @@ export default function SecureChatPanel({
               </Typography>
             )}
             <Stack spacing={0.9} sx={{ maxWidth: 860, mx: "auto", pb: 1 }}>
-              {filteredMessages.map((message, messageIndex) => {
-                const previousMessage = filteredMessages[messageIndex - 1];
+              {messages.map((message, messageIndex) => {
+                const isSearchMatch = Boolean(searchQuery.trim()) && searchMatchIds.has(message.id);
+                const isActiveSearchMatch = Boolean(activeSearchResultId) && message.id === activeSearchResultId;
+                const previousMessage = messages[messageIndex - 1];
                 const showDate = !previousMessage
                   || new Date(previousMessage.timestamp).toDateString() !== new Date(message.timestamp).toDateString();
                 const showSender = !message.isOwn && (
@@ -1626,6 +1746,8 @@ export default function SecureChatPanel({
                 <Box
                   data-secure-event-id={message.id}
                   data-secure-own={message.isOwn ? "true" : "false"}
+                  data-search-match={isSearchMatch ? "true" : undefined}
+                  data-search-active={isActiveSearchMatch ? "true" : undefined}
                   className="secure-message-row"
                   sx={{
                     display: "flex",
@@ -1659,7 +1781,11 @@ export default function SecureChatPanel({
                       px: { xs: 1.35, sm: 1.65 },
                       py: { xs: 0.95, sm: 1.1 },
                       borderRadius: message.isOwn ? "19px 19px 6px 19px" : "19px 19px 19px 6px",
-                      transition: "box-shadow .18s ease, transform .18s ease",
+                      outline: isActiveSearchMatch ? "3px solid" : isSearchMatch ? "1px solid" : "none",
+                      outlineColor: "warning.main",
+                      outlineOffset: isActiveSearchMatch ? 3 : 1,
+                      zIndex: isActiveSearchMatch ? 2 : 0,
+                      transition: "box-shadow .18s ease, transform .18s ease, outline-color .18s ease",
                       "&:hover": {
                         transform: "translateY(-1px)",
                         boxShadow: message.isOwn
@@ -1668,6 +1794,17 @@ export default function SecureChatPanel({
                       },
                     }}
                   >
+                    {isActiveSearchMatch && (
+                      <Stack direction="row" alignItems="center" justifyContent={message.isOwn ? "flex-end" : "flex-start"} sx={{ mb: 0.65 }}>
+                        <Chip
+                          size="small"
+                          color="warning"
+                          icon={<ArrowRightAltRoundedIcon sx={{ fontSize: 16 }} />}
+                          label={"Match " + (activeSearchIndex + 1) + " of " + filteredMessages.length}
+                          sx={{ height: 22, fontSize: 10, fontWeight: 800, "& .MuiChip-icon": { ml: 0.55 } }}
+                        />
+                      </Stack>
+                    )}
                     {showSender && (
                       <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.8 }}>
                         <Avatar
