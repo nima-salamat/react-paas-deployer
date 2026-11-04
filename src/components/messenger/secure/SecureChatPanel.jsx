@@ -1847,8 +1847,8 @@ export default function SecureChatPanel({
                     alignItems: "flex-end",
                     px: { xs: 0.5, sm: 1.25 },
                     minWidth: 0,
-                    "&:hover .secure-message-reaction": { opacity: 1, transform: "translateY(0) scale(1)" },
-                    "&:focus-within .secure-message-reaction": { opacity: 1, transform: "translateY(0) scale(1)" },
+                    "&:hover .secure-message-reaction": { opacity: 1 },
+                    "&:focus-within .secure-message-reaction": { opacity: 1 },
                   }}
                 >
                   <Paper
@@ -1877,9 +1877,8 @@ export default function SecureChatPanel({
                       outlineColor: "warning.main",
                       outlineOffset: isActiveSearchMatch ? 3 : 1,
                       zIndex: isActiveSearchMatch ? 2 : 0,
-                      transition: "box-shadow .18s ease, transform .18s ease, outline-color .18s ease",
+                      transition: "box-shadow .18s ease, outline-color .18s ease",
                       "&:hover": {
-                        transform: "translateY(-1px)",
                         boxShadow: message.isOwn
                           ? "0 8px 22px rgba(20,70,110,0.19)"
                           : (theme) => theme.palette.mode === "dark" ? "0 6px 18px rgba(0,0,0,.23)" : "0 6px 18px rgba(15,23,42,.075)",
@@ -2128,7 +2127,6 @@ export default function SecureChatPanel({
                           height: 30,
                           p: 0,
                           opacity: { xs: 1, md: 0 },
-                          transform: "translateY(3px) scale(.94)",
                           color: "text.secondary",
                           bgcolor: "background.paper",
                           border: "1px solid",
@@ -2136,7 +2134,7 @@ export default function SecureChatPanel({
                           boxShadow: (theme) => theme.palette.mode === "dark"
                             ? "0 3px 12px rgba(0,0,0,.32)"
                             : "0 3px 12px rgba(15,23,42,.12)",
-                          transition: "opacity .16s ease, transform .16s ease, color .16s ease, background-color .16s ease",
+                          transition: "opacity .16s ease, color .16s ease, background-color .16s ease",
                           "&:hover, &[aria-expanded='true']": {
                             bgcolor: "background.paper",
                             color: "primary.main",
@@ -2362,8 +2360,13 @@ export default function SecureChatPanel({
                       padding: 0,
                       alignItems: "center",
                       borderRadius: 3.25,
+                      overflow: "hidden",
                       bgcolor: "action.hover",
-                      "&.MuiInputBase-multiline": { padding: 0 },
+                      "&.MuiInputBase-multiline": {
+                        padding: 0,
+                        alignItems: "stretch",
+                        overflow: "hidden",
+                      },
                       transition: "background-color .18s ease, box-shadow .18s ease",
                       "& fieldset": { borderColor: "transparent" },
                       "&:hover fieldset": { borderColor: "divider" },
@@ -2373,11 +2376,36 @@ export default function SecureChatPanel({
                       },
                       "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
                     },
-                    "& .MuiOutlinedInput-inputMultiline": {
+                    "& .MuiInputBase-inputMultiline": {
                       boxSizing: "border-box",
                       padding: "8px 18px",
                       fontSize: 14,
                       lineHeight: "20px",
+                      maxHeight: 76,
+                      overflowY: "auto !important",
+                      overflowX: "hidden !important",
+                      whiteSpace: "pre-wrap",
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                      resize: "none",
+                      scrollbarWidth: "thin",
+                      scrollbarColor: (theme) => `${alpha(theme.palette.text.primary, 0.28)} transparent`,
+                      scrollbarGutter: "stable",
+                      "&::-webkit-scrollbar": { width: 6 },
+                      "&::-webkit-scrollbar-track": {
+                        backgroundColor: "transparent",
+                        borderRadius: 8,
+                        marginBlock: 6,
+                      },
+                      "&::-webkit-scrollbar-thumb": {
+                        backgroundColor: (theme) => alpha(theme.palette.text.primary, 0.22),
+                        borderRadius: 8,
+                        border: "1px solid transparent",
+                        backgroundClip: "padding-box",
+                      },
+                      "&::-webkit-scrollbar-thumb:hover": {
+                        backgroundColor: (theme) => alpha(theme.palette.text.primary, 0.38),
+                      },
                     },
                   }}
                 />
