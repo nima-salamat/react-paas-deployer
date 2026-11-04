@@ -1617,14 +1617,14 @@ export default function SecureChatPanel({
                   aria-live="polite"
                   sx={{ minWidth: 42, textAlign: "center", fontWeight: 750, fontVariantNumeric: "tabular-nums" }}
                 >
-                  {filteredMessages.length ? (activeSearchIndex + 1) + " / " + filteredMessages.length : "0 / 0"}
+                  {searchQuery.trim() && filteredMessages.length ? (activeSearchIndex + 1) + " / " + filteredMessages.length : "0 / 0"}
                 </Typography>
                 <Tooltip title="Previous result">
                   <span>
                     <IconButton
                       size="small"
                       aria-label="Previous search result"
-                      disabled={filteredMessages.length < 2}
+                      disabled={!searchQuery.trim() || filteredMessages.length < 2}
                       onClick={() => moveSearchResult(-1)}
                     >
                       <KeyboardArrowUpRoundedIcon fontSize="small" />
@@ -1636,7 +1636,7 @@ export default function SecureChatPanel({
                     <IconButton
                       size="small"
                       aria-label="Next search result"
-                      disabled={filteredMessages.length < 2}
+                      disabled={!searchQuery.trim() || filteredMessages.length < 2}
                       onClick={() => moveSearchResult(1)}
                     >
                       <KeyboardArrowDownRoundedIcon fontSize="small" />
