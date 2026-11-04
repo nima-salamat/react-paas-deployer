@@ -451,6 +451,10 @@ test("secure conversations reuse the Messenger identity header and profile actio
   assert.match(header, /!secureMode && \(/);
   assert.match(panel, /role="region" aria-label=\{appConversationTitle\(conversation, currentUserId\)\}/);
   assert.doesNotMatch(panel, /onOpenSecuritySettings/);
+  assert.match(panel, /onRegisterSecureSearch/);
+  assert.match(header, /onOpenSecureSearch/);
+  assert.match(header, /tr\("Search loaded messages"\)/);
+  assert.match(app, /onOpenSecureSearch=\{\(\) => secureSearchRef\.current\?\.\(\)\}/);
 });
 
 
@@ -470,6 +474,8 @@ test("secure chat uses Matrix-native receipts, unread navigation, and reconnect 
   assert.match(app, /matrixClient\.on\("sync", onSync\)/);
   assert.match(app, /secureRoomToConversationIdRef\.current\.get/);
   assert.match(panel, /onRegisterReconnect/);
+  assert.match(panel, /onRegisterSecureSearch/);
+  assert.match(app, /registerSecureSearch/);
   assert.match(panel, /prepareInitialSecureTimeline/);
   assert.match(panel, /getReadReceiptForUserId/);
   assert.match(panel, /matrixClient\.sendReadReceipt\(event\)/);
@@ -538,9 +544,10 @@ test("secure voice recording can be cancelled without sending the captured audio
 test("secure composer icon actions remain circular and fixed-size", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
 
-  assert.match(panel, /flex: "0 0 42px", width: 42, height: 42/);
+  assert.match(panel, /flex: "0 0 38px", width: 38, height: 38/);
+  assert.match(panel, /minHeight: 40/);
   assert.match(panel, /borderRadius: "50%"/);
-  assert.match(panel, /alignItems: "center",[\s\S]*?gap: \{ xs: 0\.65, sm: 0\.9 \},[\s\S]*?maxWidth: 960/);
+  assert.match(panel, /alignItems: "center",[\s\S]*?gap: \{ xs: 0\.55, sm: 0\.75 \},[\s\S]*?maxWidth: 960/);
   assert.match(panel, /Message securely…/);
   assert.match(panel, /backgroundImage: \(theme\) => theme\.palette\.mode === "dark"/);
 });
@@ -579,6 +586,8 @@ test("secure Matrix unread effect reads only state and refs declared before its 
 
 test("secure media viewers, floating reactions, search menu and unread jump control are available", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const header = read("src/components/messenger/components/ChatHeader.jsx");
+  const app = read("src/components/messenger/MessengerApp.jsx");
 
   assert.match(panel, /import MediaGalleryDialog from "\.\.\/components\/MediaGalleryDialog"/);
   assert.match(panel, /setSecureViewerAttachment\(\{/);
@@ -591,9 +600,11 @@ test("secure media viewers, floating reactions, search menu and unread jump cont
   assert.doesNotMatch(panel, /reactionPickerMessageId === message\.id && \["👍", "❤️"/);
   assert.match(panel, /setReactionPickerAnchor\(\(current\) => current && reactionPickerMessageId === message\.id \? null : event\.currentTarget\)/);
 
-  assert.match(panel, /aria-label="Secure chat options"/);
-  assert.match(panel, /Search loaded messages/);
-  assert.doesNotMatch(panel, /Search decrypted messages already loaded on this device/);
+  assert.doesNotMatch(panel, /aria-label="Secure chat options"/);
+  assert.match(header, /onOpenSecureSearch/);
+  assert.match(header, /Search loaded messages/);
+  assert.match(app, /secureSearchRef\.current\?\.\(\)/);
+  assert.match(panel, /Search loaded encrypted history on this device/);
 
   assert.match(panel, /<Badge[\s\S]*?badgeContent=\{unreadCount > 99 \? "99\+" : unreadCount\}/);
   assert.match(panel, /<KeyboardArrowDownRoundedIcon/);
@@ -612,11 +623,12 @@ test("secure Messenger visual refresh keeps timeline date groups, compact bubble
   assert.match(panel, /linear-gradient\(145deg/);
   assert.match(panel, /className="secure-message-reaction"/);
   assert.match(panel, /&:hover \.secure-message-reaction/);
-  assert.match(panel, /minHeight: 54/);
-  assert.match(panel, /End-to-end encrypted/);
+  assert.doesNotMatch(panel, /messages on this device|End-to-end encrypted|Secure chat options/);
+  assert.match(panel, /searchOpen && \(/);
+  assert.match(panel, /onRegisterSecureSearch/);
   assert.match(panel, /scrollBehavior: "smooth"/);
   assert.match(panel, /Message securely…/);
   assert.match(panel, /& .MuiOutlinedInput-root/);
-  assert.match(header, /secureMode \? 66 : 56/);
+  assert.match(header, /minHeight: 56/);
   assert.match(header, /alpha\(t\.palette\.success\.main, 0\.5\)/);
 });
