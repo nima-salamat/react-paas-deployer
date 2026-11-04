@@ -528,7 +528,8 @@ test("secure chat loads a bounded recent window and extends it to include unread
   assert.match(panel, /unreadCount <= 0\s*\?/);
   assert.match(panel, /setUnreadAnchorId\(initialHistory\.unreadAnchorId\)/);
   assert.match(panel, /setHasMoreHistory\(initialHistory\.hasMoreHistory\)/);
-  assert.match(panel, /scroller\.scrollTo\(\{ top: scroller\.scrollHeight, behavior: "instant" \}\)/);\n  assert.match(panel, /secondFrame = requestAnimationFrame/);
+  assert.match(panel, /scroller\.scrollTo\(\{ top: scroller\.scrollHeight, behavior: "instant" \}\)/);
+  assert.match(panel, /secondFrame = requestAnimationFrame/);
 });
 
 test("secure voice recording can be cancelled without sending the captured audio", () => {
