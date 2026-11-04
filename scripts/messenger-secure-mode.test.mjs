@@ -528,7 +528,7 @@ test("secure chat loads a bounded recent window and extends it to include unread
   assert.match(panel, /unreadCount <= 0\s*\?/);
   assert.match(panel, /setUnreadAnchorId\(initialHistory\.unreadAnchorId\)/);
   assert.match(panel, /setHasMoreHistory\(initialHistory\.hasMoreHistory\)/);
-  assert.match(panel, /timelineRef\.current\.scrollTop = timelineRef\.current\.scrollHeight/);
+  assert.match(panel, /scroller\.scrollTo\(\{ top: scroller\.scrollHeight, behavior: "instant" \}\)/);\n  assert.match(panel, /secondFrame = requestAnimationFrame/);
 });
 
 test("secure voice recording can be cancelled without sending the captured audio", () => {
@@ -687,4 +687,36 @@ test("secure Messenger visual refresh keeps timeline date groups, compact bubble
   assert.match(panel, /& .MuiOutlinedInput-root/);
   assert.match(header, /minHeight: 56/);
   assert.match(header, /alpha\(t\.palette\.success\.main, 0\.5\)/);
+});
+
+
+test("secure timeline settles at the latest message when there is no unread anchor", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  assert.match(panel, /if \(!unreadAnchorId\) settledScroller\.scrollTo\(\{ top: settledScroller\.scrollHeight, behavior: "instant" \}\)/);
+  assert.match(panel, /secondFrame = requestAnimationFrame/);
+  assert.match(panel, /initialScrollHandledRef\.current = true/);
+});
+
+test("secure sent and seen states use distinct one-tick and two-tick icons", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  assert.match(panel, /import DoneIcon from "@mui\/icons-material\/Done"/);
+  assert.match(panel, /const hasBeenSeen = receiptStatus !== "Sent"/);
+  assert.match(panel, /hasBeenSeen[\s\S]*?<DoneAllIcon[\s\S]*?<DoneIcon/);
+  assert.match(panel, /<Tooltip title=\{receiptStatus\}>/);
+});
+
+test("redacted secure messages never expose message options or open an empty menu", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  assert.match(panel, /!message\.redacted && \([\s\S]*?<Tooltip title="Message options">/);
+  assert.match(panel, /open=\{Boolean\(messageMenuAnchor && messageMenuTarget && !messageMenuTarget\.redacted\)\}/);
+  assert.match(panel, /if \(message\.redacted\) return/);
+});
+
+test("secure voice recording shows live microphone waveform and elapsed time inside the composer", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  assert.match(panel, /createAnalyser\(\)/);
+  assert.match(panel, /getByteTimeDomainData\(samples\)/);
+  assert.match(panel, /recordingWaveform\.map/);
+  assert.match(panel, /formatDuration\(Math\.floor\(recordingElapsedMs \/ 1000\)\)/);
+  assert.match(panel, /voiceRecordingStartedAtRef\.current = Date\.now\(\)/);
 });
