@@ -2052,7 +2052,7 @@ export default function SecureChatPanel({
             )}
             <TextField
               inputRef={draftInputRef}
-              fullWidth multiline minRows={1} maxRows={5}
+              fullWidth multiline minRows={1} maxRows={3}
               variant="outlined"
               placeholder={recordingVoice ? "Recording voice message…" : "Message securely…"}
               value={draft}
@@ -2067,7 +2067,7 @@ export default function SecureChatPanel({
               inputProps={{ "aria-label": "Encrypted message" }}
               sx={{
                 "& .MuiOutlinedInput-root": {
-                  minHeight: 40,
+                  minHeight: 34,
                   alignItems: "center",
                   borderRadius: 3.25,
                   bgcolor: "action.hover",
@@ -2080,7 +2080,11 @@ export default function SecureChatPanel({
                   },
                   "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
                 },
-                "& .MuiInputBase-input": { py: 0.8, px: 1.25, fontSize: 14 },
+                "& .MuiOutlinedInput-inputMultiline": {
+                  padding: "4px 10px",
+                  fontSize: 14,
+                  lineHeight: 1.35,
+                },
               }}
             />
             <Button
