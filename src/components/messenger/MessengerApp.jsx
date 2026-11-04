@@ -547,6 +547,10 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
   const registerSecureReconnect = useCallback((handler) => {
     secureReconnectRef.current = typeof handler === "function" ? handler : null;
   }, []);
+  const secureSearchRef = useRef(null);
+  const registerSecureSearch = useCallback((handler) => {
+    secureSearchRef.current = typeof handler === "function" ? handler : null;
+  }, []);
 
   // Dialogs
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
@@ -5516,6 +5520,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               void refreshSecureRecoveryState();
             }}
             onReconnectSecureChat={() => secureReconnectRef.current?.()}
+            onOpenSecureSearch={() => secureSearchRef.current?.()}
           />
 
           {isMatrixE2EE ? (
@@ -5524,6 +5529,7 @@ export default function MessengerApp({ themeMode = "system", onThemeModeChange }
               currentUserId={meId}
               onSecureClientReady={refreshSecureRecoveryState}
               onRegisterReconnect={registerSecureReconnect}
+              onRegisterSecureSearch={registerSecureSearch}
               onSecureUnreadCountChange={updateSecureUnreadCount}
             />
           ) : (
