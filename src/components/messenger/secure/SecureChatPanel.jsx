@@ -10,7 +10,6 @@ import MicIcon from "@mui/icons-material/Mic";
 import SendIcon from "@mui/icons-material/Send";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import StopIcon from "@mui/icons-material/Stop";
-import SearchIcon from "@mui/icons-material/Search";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadIcon from "@mui/icons-material/Download";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
@@ -517,6 +516,7 @@ export default function SecureChatPanel({
   currentUserId,
   onSecureClientReady,
   onRegisterReconnect,
+  onRegisterSecureSearch,
   onSecureUnreadCountChange,
 }) {
   const roomId = conversation?.matrix_room_id;
@@ -552,7 +552,6 @@ export default function SecureChatPanel({
   const initialScrollHandledRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roomMenuAnchor, setRoomMenuAnchor] = useState(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState(null);
   const [reactionPickerAnchor, setReactionPickerAnchor] = useState(null);
   const reactionOperationsRef = useRef(new Set());
@@ -593,7 +592,6 @@ export default function SecureChatPanel({
     setError("");
     setSearchOpen(false);
     setSearchQuery("");
-    setRoomMenuAnchor(null);
     setReactionPickerMessageId(null);
     setReactionPickerAnchor(null);
     setSecureViewerAttachment(null);
@@ -821,6 +819,16 @@ export default function SecureChatPanel({
     onRegisterReconnect?.(reconnectSecureChat);
     return () => onRegisterReconnect?.(null);
   }, [onRegisterReconnect, reconnectSecureChat]);
+
+  const openSecureSearch = useCallback(() => {
+    setSearchOpen(true);
+    setSearchQuery("");
+  }, []);
+
+  useEffect(() => {
+    onRegisterSecureSearch?.(openSecureSearch);
+    return () => onRegisterSecureSearch?.(null);
+  }, [onRegisterSecureSearch, openSecureSearch]);
 
   const markEventRead = useCallback(async (event) => {
     if (!matrixClient || !event || event.getSender?.() === matrixClient.getUserId()) return;
@@ -1474,80 +1482,47 @@ export default function SecureChatPanel({
 
       {phase === "ready" && (
         <>
-          <Box
-            sx={{
-              minHeight: 54,
-              px: { xs: 1.25, md: 2.5 },
-              display: "flex",
-              alignItems: "center",
-              gap: 1.1,
-              borderBottom: "1px solid",
-              borderColor: "divider",
-              bgcolor: "background.paper",
-              backgroundImage: (theme) => theme.palette.mode === "dark"
-                ? "linear-gradient(110deg, rgba(45,125,95,.10), transparent 42%)"
-                : "linear-gradient(110deg, rgba(30,140,100,.055), transparent 42%)",
-            }}
-          >
-            {searchOpen ? (
-              <>
-                <TextField autoFocus fullWidth size="small" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search loaded encrypted history on this device…" inputProps={{ "aria-label": "Search loaded encrypted history" }} sx={{ "& .MuiOutlinedInput-root": { minHeight: 36, fontSize: 13, borderRadius: 3 } }} />
-                <Tooltip title="Close search">
-                  <IconButton size="small" aria-label="Close secure history search" onClick={() => { setSearchOpen(false); setSearchQuery(""); }}>
-                    <ClearIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </>
-            ) : (
-              <Stack direction="row" spacing={0.75} alignItems="center">
-                <Box sx={{
-                  width: 7, height: 7, borderRadius: "50%", bgcolor: "success.main",
-                  boxShadow: (theme) => `0 0 0 3px ${alpha(theme.palette.success.main, 0.13)}`,
-                }} />
-                <Typography variant="caption" color="text.secondary" fontWeight={550}>
-                  {messages.length} messages on this device
-                </Typography>
-              </Stack>
-            )}
-            <Box sx={{ flex: 1 }} />
-            <Chip
-              size="small"
-              icon={<LockOutlinedIcon sx={{ fontSize: "14px !important" }} />}
-              label="End-to-end encrypted"
-              color="success"
-              variant="outlined"
+          {searchOpen && (
+            <Box
               sx={{
-                height: 27,
-                px: 0.35,
-                borderRadius: 2,
-                fontSize: 10.5,
-                fontWeight: 700,
-                bgcolor: (theme) => alpha(theme.palette.success.main, 0.045),
-                "& .MuiChip-icon": { ml: 0.65 },
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+                px: { xs: 1, md: 2 },
+                py: 0.5,
+                flexShrink: 0,
+                borderBottom: "1px solid",
+                borderColor: "divider",
+                bgcolor: "background.paper",
               }}
-            />
-            <Tooltip title="Secure chat options">
-              <IconButton size="small" aria-label="Secure chat options" onClick={(event) => setRoomMenuAnchor(event.currentTarget)}>
-                <MoreVertIcon />
-              </IconButton>
-            </Tooltip>
-          </Box>
-          <Menu
-            anchorEl={roomMenuAnchor}
-            open={Boolean(roomMenuAnchor)}
-            onClose={() => setRoomMenuAnchor(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-            transformOrigin={{ vertical: "top", horizontal: "right" }}
-          >
-            <MenuItem onClick={() => {
-              setSearchOpen(true);
-              setSearchQuery("");
-              setRoomMenuAnchor(null);
-            }}>
-              <SearchIcon fontSize="small" sx={{ mr: 1.2 }} />
-              Search loaded messages
-            </MenuItem>
-          </Menu>
+            >
+              <TextField
+                autoFocus
+                fullWidth
+                size="small"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search loaded encrypted history on this device…"
+                inputProps={{ "aria-label": "Search loaded encrypted history" }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    height: 36,
+                    fontSize: 13,
+                    borderRadius: 2.5,
+                  },
+                }}
+              />
+              <Tooltip title="Close search">
+                <IconButton
+                  size="small"
+                  aria-label="Close secure history search"
+                  onClick={() => { setSearchOpen(false); setSearchQuery(""); }}
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
           <Box sx={{ flex: 1, minHeight: 0, position: "relative", display: "flex" }}>
           <Box
             ref={timelineRef}
@@ -1967,10 +1942,11 @@ export default function SecureChatPanel({
             component="form"
             onSubmit={(event) => { event.preventDefault(); void send(); }}
             sx={{
-              p: { xs: 1, sm: 1.5 },
+              px: 1,
+              py: { xs: 0.6, sm: 0.8 },
               display: "flex",
               alignItems: "center",
-              gap: { xs: 0.65, sm: 0.9 },
+              gap: { xs: 0.55, sm: 0.75 },
               maxWidth: 960,
               mx: "auto",
               width: "100%",
@@ -1995,7 +1971,7 @@ export default function SecureChatPanel({
               disabled={mediaBusy || sending || phase !== "ready"}
               onClick={() => mediaInputRef.current?.click()}
               sx={{
-                flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42,
+                flex: "0 0 38px", width: 38, height: 38, minWidth: 38, minHeight: 38,
                 aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
                 color: "text.secondary", bgcolor: "action.hover",
                 "&:hover": { bgcolor: "action.selected", color: "primary.main" },
@@ -2010,7 +1986,7 @@ export default function SecureChatPanel({
               disabled={mediaBusy || sending || phase !== "ready"}
               onClick={() => void toggleVoiceRecording()}
               sx={{
-                flex: "0 0 42px", width: 42, height: 42, minWidth: 42, minHeight: 42,
+                flex: "0 0 38px", width: 38, height: 38, minWidth: 38, minHeight: 38,
                 aspectRatio: "1 / 1", alignSelf: "center", borderRadius: "50%", p: 0,
                 bgcolor: recordingVoice ? "error.main" : "action.hover",
                 color: recordingVoice ? "error.contrastText" : "text.secondary",
@@ -2047,7 +2023,7 @@ export default function SecureChatPanel({
               inputProps={{ "aria-label": "Encrypted message" }}
               sx={{
                 "& .MuiOutlinedInput-root": {
-                  minHeight: 46,
+                  minHeight: 40,
                   alignItems: "center",
                   borderRadius: 3.25,
                   bgcolor: "action.hover",
@@ -2060,14 +2036,14 @@ export default function SecureChatPanel({
                   },
                   "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
                 },
-                "& .MuiInputBase-input": { py: 1.15, px: 1.5, fontSize: 14 },
+                "& .MuiInputBase-input": { py: 0.8, px: 1.25, fontSize: 14 },
               }}
             />
             <Button
               type="submit" variant="contained" aria-label="Send encrypted message"
               disabled={!draft.trim() || sending || mediaBusy || recordingVoice || phase !== "ready"}
               sx={{
-                flex: "0 0 44px", width: 44, height: 44, minWidth: 44, minHeight: 44,
+                flex: "0 0 40px", width: 40, height: 40, minWidth: 40, minHeight: 40,
                 aspectRatio: "1 / 1", alignSelf: "center", borderRadius: 2.75, p: 0,
                 boxShadow: "0 4px 12px rgba(25,118,210,.20)",
                 transition: "transform .16s ease, box-shadow .16s ease",
