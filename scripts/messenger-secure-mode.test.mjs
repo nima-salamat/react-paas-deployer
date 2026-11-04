@@ -598,7 +598,13 @@ test("secure media viewers, floating reactions, search menu and unread jump cont
 
   assert.match(panel, /<Popover[\s\S]*?anchorEl=\{reactionPickerAnchor\}/);
   assert.doesNotMatch(panel, /reactionPickerMessageId === message\.id && \["👍", "❤️"/);
-  assert.match(panel, /setReactionPickerAnchor\(\(current\) => current && reactionPickerMessageId === message\.id \? null : event\.currentTarget\)/);
+  assert.match(panel, /const toggleReactionPicker = \(message, event\) => \{/);
+  assert.match(panel, /const anchorEl = event\.currentTarget;[\s\S]*?setReactionPickerAnchor\(anchorEl\)/);
+  assert.doesNotMatch(panel, /setReactionPickerAnchor\(\(current\) =>[\s\S]*?event\.currentTarget/);
+  assert.match(panel, /onClick=\{\(event\) => toggleReactionPicker\(message, event\)\}/);
+  assert.match(panel, /aria-haspopup="dialog"/);
+  assert.match(panel, /bottom: 7,[\s\S]*?\[message\.isOwn \? "left" : "right"\]: -32/);
+  assert.match(panel, /marginThreshold=\{12\}/);
 
   assert.doesNotMatch(panel, /aria-label="Secure chat options"/);
   assert.match(header, /onOpenSecureSearch/);
@@ -623,6 +629,8 @@ test("secure Messenger visual refresh keeps timeline date groups, compact bubble
   assert.match(panel, /linear-gradient\(145deg/);
   assert.match(panel, /className="secure-message-reaction"/);
   assert.match(panel, /&:hover \.secure-message-reaction/);
+  assert.match(panel, /reaction\.own[\s\S]*?alpha\(message\.isOwn \? theme\.palette\.primary\.contrastText/);
+  assert.match(panel, /translateY\(-1px\)/);
   assert.doesNotMatch(panel, /messages on this device|End-to-end encrypted|Secure chat options/);
   assert.match(panel, /searchOpen && \(/);
   assert.match(panel, /onRegisterSecureSearch/);
