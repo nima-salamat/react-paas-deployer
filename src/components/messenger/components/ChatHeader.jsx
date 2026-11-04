@@ -381,7 +381,7 @@ export default function ChatHeader(props) {
       {secureMode && (
         <MenuItem onClick={() => { onOpenSecureSearch?.(); setHeaderMenu(null); }}>
           <ListItemIcon><SearchIcon fontSize="small" /></ListItemIcon>
-          {tr("Search loaded messages")}
+          {tr("Search messages")}
         </MenuItem>
       )}
       {secureMode && (
