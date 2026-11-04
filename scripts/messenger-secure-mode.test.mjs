@@ -546,13 +546,30 @@ test("secure composer icon actions remain circular and fixed-size", () => {
   const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
 
   assert.match(panel, /flex: "0 0 38px", width: 38, height: 38/);
-  assert.match(panel, /minHeight: 34/);
+  assert.match(panel, /minHeight: 40/);
   assert.match(panel, /fullWidth multiline minRows=\{1\} maxRows=\{3\}/);
-  assert.match(panel, /& \.MuiOutlinedInput-inputMultiline[\s\S]*?padding: "4px 10px"/);
+  assert.match(panel, /& \.MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 10px"/);
   assert.match(panel, /borderRadius: "50%"/);
-  assert.match(panel, /alignItems: "center",[\s\S]*?gap: \{ xs: 0\.55, sm: 0\.75 \},[\s\S]*?maxWidth: 960/);
+  assert.match(panel, /maxWidth: 960,[\s\S]*?alignItems: "center",[\s\S]*?gap: \{ xs: 0\.55, sm: 0\.75 \}/);
   assert.match(panel, /Message securely…/);
-  assert.match(panel, /backgroundImage: \(theme\) => theme\.palette\.mode === "dark"/);
+  assert.match(panel, /bgcolor: "background\.default"/);
+});
+
+test("secure composer keeps text input and voice waveform at the same height and uses one full-width background", () => {
+  const panel = read("src/components/messenger/secure/SecureChatPanel.jsx");
+  const formStart = panel.indexOf('component="form"');
+  const formEnd = panel.indexOf("</>", formStart);
+  const composer = panel.slice(formStart, formEnd);
+
+  assert.ok(formStart >= 0 && formEnd > formStart);
+  assert.match(composer, /width: "100%"[\s\S]*?bgcolor: "background\.default"/);
+  assert.match(composer, /maxWidth: 960/);
+  assert.match(composer, /minHeight: 40/);
+  assert.match(composer, /height: 40/);
+  assert.match(composer, /&\.MuiInputBase-multiline": \{ padding: 0 \}/);
+  assert.match(composer, /MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 10px"/);
+  assert.doesNotMatch(composer, /bgcolor: "background\.paper"/);
+  assert.doesNotMatch(composer, /backgroundImage:/);
 });
 
 test("secure message actions edit with Matrix replacements and delete with Matrix redactions", () => {
