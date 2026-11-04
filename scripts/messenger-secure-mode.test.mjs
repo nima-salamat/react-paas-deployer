@@ -567,7 +567,7 @@ test("secure composer keeps text input and voice waveform at the same height and
   assert.match(composer, /minHeight: 40/);
   assert.match(composer, /height: 40/);
   assert.match(composer, /&\.MuiInputBase-multiline": \{ padding: 0 \}/);
-  assert.match(composer, /MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 10px"/);
+  assert.match(composer, /MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 18px"/);
   const formSurfaceEnd = composer.indexOf("\n            <Box");
   const formSurface = composer.slice(0, formSurfaceEnd);
 
