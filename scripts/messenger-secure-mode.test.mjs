@@ -548,7 +548,7 @@ test("secure composer icon actions remain circular and fixed-size", () => {
   assert.match(panel, /flex: "0 0 38px", width: 38, height: 38/);
   assert.match(panel, /minHeight: 40/);
   assert.match(panel, /fullWidth multiline minRows=\{1\} maxRows=\{3\}/);
-  assert.match(panel, /& \.MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 10px"/);
+  assert.match(panel, /& \.MuiOutlinedInput-inputMultiline[\s\S]*?padding: "8px 18px"/);
   assert.match(panel, /borderRadius: "50%"/);
   assert.match(panel, /maxWidth: 960,[\s\S]*?alignItems: "center",[\s\S]*?gap: \{ xs: 0\.55, sm: 0\.75 \}/);
   assert.match(panel, /Message securely…/);
