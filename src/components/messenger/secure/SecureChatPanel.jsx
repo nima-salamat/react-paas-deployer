@@ -1847,8 +1847,6 @@ export default function SecureChatPanel({
                     alignItems: "flex-end",
                     px: { xs: 0.5, sm: 1.25 },
                     minWidth: 0,
-                    "&:hover .secure-message-reaction": { opacity: 1 },
-                    "&:focus-within .secure-message-reaction": { opacity: 1 },
                   }}
                 >
                   <Paper
@@ -1873,6 +1871,7 @@ export default function SecureChatPanel({
                       px: { xs: 1.35, sm: 1.65 },
                       py: { xs: 0.95, sm: 1.1 },
                       borderRadius: message.isOwn ? "19px 19px 6px 19px" : "19px 19px 19px 6px",
+                      "&:hover .secure-message-reaction": { opacity: 1 },
                       outline: isActiveSearchMatch ? "3px solid" : isSearchMatch ? "1px solid" : "none",
                       outlineColor: "warning.main",
                       outlineOffset: isActiveSearchMatch ? 3 : 1,
@@ -2141,6 +2140,7 @@ export default function SecureChatPanel({
                             borderColor: "primary.main",
                           },
                           "&:focus-visible": {
+                            opacity: 1,
                             outline: "2px solid",
                             outlineColor: "primary.main",
                             outlineOffset: 2,
