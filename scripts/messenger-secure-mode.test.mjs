@@ -608,7 +608,7 @@ test("secure media viewers, floating reactions, search menu and unread jump cont
 
   assert.doesNotMatch(panel, /aria-label="Secure chat options"/);
   assert.match(header, /onOpenSecureSearch/);
-  assert.match(header, /Search loaded messages/);
+  assert.match(header, /tr\("Search messages"\)/);
   assert.match(app, /secureSearchRef\.current\?\.\(\)/);
   assert.match(panel, /Search loaded encrypted history on this device/);
 
