@@ -13,6 +13,7 @@ import StopIcon from "@mui/icons-material/Stop";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DownloadIcon from "@mui/icons-material/Download";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
+import DoneIcon from "@mui/icons-material/Done";
 import ClearIcon from "@mui/icons-material/Clear";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -547,6 +548,9 @@ export default function SecureChatPanel({
   const mediaStreamRef = useRef(null);
   const mediaChunksRef = useRef([]);
   const [recordingVoice, setRecordingVoice] = useState(false);
+  const [recordingElapsedMs, setRecordingElapsedMs] = useState(0);
+  const [recordingWaveform, setRecordingWaveform] = useState(() => Array(28).fill(0.12));
+  const voiceRecordingStartedAtRef = useRef(0);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const draftInputRef = useRef(null);
@@ -583,6 +587,76 @@ export default function SecureChatPanel({
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const timelineRef = useRef(null);
   const inviteJoinInProgressRef = useRef(false);
+
+  useEffect(() => {
+    if (!recordingVoice) {
+      setRecordingElapsedMs(0);
+      setRecordingWaveform(Array(28).fill(0.12));
+      return undefined;
+    }
+
+    const stream = mediaStreamRef.current;
+    const AudioContextConstructor = typeof window !== "undefined"
+      ? (window.AudioContext || window.webkitAudioContext)
+      : null;
+    let audioContext = null;
+    let source = null;
+    let analyser = null;
+    let samples = null;
+    let frame = 0;
+    let lastSampleAt = 0;
+
+    try {
+      if (stream && AudioContextConstructor) {
+        audioContext = new AudioContextConstructor();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 128;
+        source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        samples = new Uint8Array(analyser.fftSize);
+        if (audioContext.state === "suspended") void audioContext.resume();
+      }
+    } catch {
+      analyser = null;
+      samples = null;
+    }
+
+    const sampleMicrophone = (now) => {
+      if (now - lastSampleAt >= 65) {
+        setRecordingElapsedMs(Math.max(0, Date.now() - voiceRecordingStartedAtRef.current));
+        if (analyser && samples) {
+          analyser.getByteTimeDomainData(samples);
+          const bars = Array.from({ length: 28 }, (_, index) => {
+            const start = Math.floor(index * samples.length / 28);
+            const end = Math.max(start + 1, Math.floor((index + 1) * samples.length / 28));
+            let energy = 0;
+            for (let sampleIndex = start; sampleIndex < end; sampleIndex += 1) {
+              const amplitude = (samples[sampleIndex] - 128) / 128;
+              energy += amplitude * amplitude;
+            }
+            const rms = Math.sqrt(energy / (end - start));
+            return Math.min(1, Math.max(0.12, rms * 2.8));
+          });
+          setRecordingWaveform(bars);
+        } else {
+          setRecordingWaveform(Array.from({ length: 28 }, (_, index) => (
+            0.12 + Math.abs(Math.sin(now / 175 + index * 0.72)) * 0.25
+          )));
+        }
+        lastSampleAt = now;
+      }
+      frame = requestAnimationFrame(sampleMicrophone);
+    };
+
+    frame = requestAnimationFrame(sampleMicrophone);
+    return () => {
+      cancelAnimationFrame(frame);
+      try { source?.disconnect(); } catch { /* already disconnected */ }
+      if (audioContext && audioContext.state !== "closed") {
+        void audioContext.close().catch(() => {});
+      }
+    };
+  }, [recordingVoice]);
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
@@ -894,25 +968,41 @@ export default function SecureChatPanel({
 
   useEffect(() => {
     const root = timelineRef.current;
-    if (phase !== "ready" || !timelineInitialised || !messages.length || !root || initialScrollHandledRef.current) return;
-    requestAnimationFrame(() => {
-      if (initialScrollHandledRef.current || !timelineRef.current) return;
+    if (phase !== "ready" || !timelineInitialised || !messages.length || !root || initialScrollHandledRef.current) return undefined;
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      const scroller = timelineRef.current;
+      if (!scroller || initialScrollHandledRef.current) return;
       if (unreadAnchorId) {
-        const target = Array.from(timelineRef.current.querySelectorAll("[data-secure-event-id]"))
+        const target = Array.from(scroller.querySelectorAll("[data-secure-event-id]"))
           .find((node) => node.getAttribute("data-secure-event-id") === unreadAnchorId);
-        if (target) target.scrollIntoView({ block: "start", behavior: "auto" });
-        else timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
+        if (target) {
+          target.scrollIntoView({ block: "start", behavior: "instant" });
+        } else {
+          scroller.scrollTop = scroller.scrollHeight;
+        }
       } else {
-        timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
+        // With no unread anchor, the intended landing point is the absolute
+        // latest event. A second frame lets the complete timeline layout settle.
+        scroller.scrollTop = scroller.scrollHeight;
       }
-      const distanceFromBottom = Math.max(
-        0,
-        timelineRef.current.scrollHeight - timelineRef.current.scrollTop - timelineRef.current.clientHeight,
-      );
-      isNearBottomRef.current = distanceFromBottom < 120;
-      setShowJumpToBottom(distanceFromBottom >= 120);
-      initialScrollHandledRef.current = true;
+      secondFrame = requestAnimationFrame(() => {
+        const settledScroller = timelineRef.current;
+        if (!settledScroller || initialScrollHandledRef.current) return;
+        if (!unreadAnchorId) settledScroller.scrollTop = settledScroller.scrollHeight;
+        const distanceFromBottom = Math.max(
+          0,
+          settledScroller.scrollHeight - settledScroller.scrollTop - settledScroller.clientHeight,
+        );
+        isNearBottomRef.current = distanceFromBottom < 120;
+        setShowJumpToBottom(distanceFromBottom >= 120);
+        initialScrollHandledRef.current = true;
+      });
     });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+    };
   }, [phase, timelineInitialised, messages, unreadAnchorId]);
 
   useEffect(() => {
@@ -1231,6 +1321,8 @@ export default function SecureChatPanel({
         }
       };
       recorder.start();
+      voiceRecordingStartedAtRef.current = Date.now();
+      setRecordingElapsedMs(0);
       setRecordingVoice(true);
     } catch (err) {
       mediaStreamRef.current?.getTracks?.().forEach((track) => track.stop());
@@ -1946,24 +2038,29 @@ export default function SecureChatPanel({
                       >
                         {new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </Typography>
-                      {message.isOwn && (
-                        <Tooltip title={getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId())}>
-                          <DoneAllIcon sx={{
-                            fontSize: 15,
-                            color: getReadReceiptStatus(matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId()) === "Seen"
-                              ? "#9de4ca"
-                              : "rgba(255,255,255,0.65)",
-                          }} />
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Message options">
-                        <IconButton
-                          size="small"
-                          aria-label="Message options"
-                          onClick={(event) => {
-                            setMessageMenuTarget(message);
-                            setMessageMenuAnchor(event.currentTarget);
-                          }}
+                      {message.isOwn && (() => {
+                        const receiptStatus = getReadReceiptStatus(
+                          matrixClient?.getRoom(roomId), message.id, matrixClient?.getUserId(),
+                        );
+                        const hasBeenSeen = receiptStatus !== "Sent";
+                        return (
+                          <Tooltip title={receiptStatus}>
+                            {hasBeenSeen
+                              ? <DoneAllIcon sx={{ fontSize: 16, color: "#9de4ca" }} />
+                              : <DoneIcon sx={{ fontSize: 16, color: "rgba(255,255,255,0.72)" }} />}
+                          </Tooltip>
+                        );
+                      })()}
+                      {!message.redacted && (
+                        <Tooltip title="Message options">
+                          <IconButton
+                            size="small"
+                            aria-label="Message options"
+                            onClick={(event) => {
+                              if (message.redacted) return;
+                              setMessageMenuTarget(message);
+                              setMessageMenuAnchor(event.currentTarget);
+                            }}
                           sx={{
                             width: 23,
                             height: 23,
@@ -1973,9 +2070,10 @@ export default function SecureChatPanel({
                             "&:hover": { bgcolor: message.isOwn ? "rgba(255,255,255,.14)" : "action.hover" },
                           }}
                         >
-                          <MoreVertIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </Tooltip>
+                            <MoreVertIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Stack>
                     {message.reactions?.length > 0 && (
                       <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.45} sx={{ mt: 0.8 }}>
@@ -2187,43 +2285,91 @@ export default function SecureChatPanel({
                 Cancel
               </Button>
             )}
-            <TextField
-              inputRef={draftInputRef}
-              fullWidth multiline minRows={1} maxRows={3}
-              variant="outlined"
-              placeholder={recordingVoice ? "Recording voice message…" : "Message securely…"}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent?.isComposing) {
-                  event.preventDefault();
-                  void send();
-                }
-              }}
-              disabled={sending || mediaBusy || recordingVoice || phase !== "ready"}
-              inputProps={{ "aria-label": "Encrypted message" }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  minHeight: 34,
+            {recordingVoice ? (
+              <Box
+                role="status"
+                aria-label="Recording encrypted voice message"
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: 40,
+                  display: "flex",
                   alignItems: "center",
+                  gap: 1.25,
+                  px: 1.5,
+                  border: "1px solid",
+                  borderColor: (theme) => alpha(theme.palette.error.main, 0.35),
                   borderRadius: 3.25,
                   bgcolor: "action.hover",
-                  transition: "background-color .18s ease, box-shadow .18s ease",
-                  "& fieldset": { borderColor: "transparent" },
-                  "&:hover fieldset": { borderColor: "divider" },
-                  "&.Mui-focused": {
-                    bgcolor: "background.paper",
-                    boxShadow: (theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.10)}`,
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  aria-hidden="true"
+                  sx={{ flex: 1, minWidth: 0, height: 30, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "3px", overflow: "hidden" }}
+                >
+                  {recordingWaveform.map((amplitude, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        flex: "1 1 3px",
+                        maxWidth: 4,
+                        minWidth: 2,
+                        height: Math.max(4, Math.round(amplitude * 28)),
+                        borderRadius: 2,
+                        bgcolor: "error.main",
+                        opacity: 0.55 + amplitude * 0.4,
+                        transition: "height 65ms linear, opacity 65ms linear",
+                      }}
+                    />
+                  ))}
+                </Box>
+                <Typography
+                  variant="caption"
+                  sx={{ flexShrink: 0, minWidth: 42, textAlign: "right", fontWeight: 750, color: "error.main", fontVariantNumeric: "tabular-nums" }}
+                >
+                  {formatDuration(Math.floor(recordingElapsedMs / 1000))}
+                </Typography>
+              </Box>
+            ) : (
+              <TextField
+                inputRef={draftInputRef}
+                fullWidth multiline minRows={1} maxRows={3}
+                variant="outlined"
+                placeholder="Message securely…"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent?.isComposing) {
+                    event.preventDefault();
+                    void send();
+                  }
+                }}
+                disabled={sending || mediaBusy || phase !== "ready"}
+                inputProps={{ "aria-label": "Encrypted message" }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    minHeight: 34,
+                    alignItems: "center",
+                    borderRadius: 3.25,
+                    bgcolor: "action.hover",
+                    transition: "background-color .18s ease, box-shadow .18s ease",
+                    "& fieldset": { borderColor: "transparent" },
+                    "&:hover fieldset": { borderColor: "divider" },
+                    "&.Mui-focused": {
+                      bgcolor: "background.paper",
+                      boxShadow: (theme) => `0 0 0 3px ${alpha(theme.palette.primary.main, 0.10)}`,
+                    },
+                    "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
                   },
-                  "&.Mui-focused fieldset": { borderColor: "primary.main", borderWidth: 1 },
-                },
-                "& .MuiOutlinedInput-inputMultiline": {
-                  padding: "4px 10px",
-                  fontSize: 14,
-                  lineHeight: 1.35,
-                },
-              }}
-            />
+                  "& .MuiOutlinedInput-inputMultiline": {
+                    padding: "4px 10px",
+                    fontSize: 14,
+                    lineHeight: 1.35,
+                  },
+                }}
+              />
+            )}
             <Button
               type="submit" variant="contained" aria-label="Send encrypted message"
               disabled={!draft.trim() || sending || mediaBusy || recordingVoice || phase !== "ready"}
@@ -2306,7 +2452,7 @@ export default function SecureChatPanel({
 
       <Menu
         anchorEl={messageMenuAnchor}
-        open={Boolean(messageMenuAnchor && messageMenuTarget)}
+        open={Boolean(messageMenuAnchor && messageMenuTarget && !messageMenuTarget.redacted)}
         onClose={() => {
           setMessageMenuAnchor(null);
           setMessageMenuTarget(null);
