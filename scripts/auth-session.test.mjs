@@ -359,10 +359,12 @@ test("manual logout invalidates Matrix and Django sessions before clearing local
 
   assert.ok(logoutSource.indexOf("matrixLogout = await logoutSecureMatrixSession()") < logoutSource.indexOf("await revokeMySession(sessionId)"));
   assert.ok(logoutSource.indexOf("await revokeMySession(sessionId)") < logoutSource.indexOf("clearStoredAuth(storage)"));
-  assert.match(matrixLogout, /_matrix\/client\/v3\/logout/);
+  assert.match(matrixLogout, /secure\/device-session\/logout/);
   assert.match(matrixLogout, /clearStoredSession:\s*true/);
   assert.doesNotMatch(matrixLogout, /forgetPersistentMatrixDeviceId/);
   assert.match(matrixSource, /stable device ID and IndexedDB crypto store are intentionally retained/i);
+  assert.match(matrixLogout, /X-Matrix-Access-Token/);
+  assert.match(matrixLogout, /X-Matrix-Device-ID/);
 });
 
 test("all manual logout entry points use the shared secure logout handler", () => {
