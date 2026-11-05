@@ -852,10 +852,10 @@ test("expired Django auth can still locate the current Matrix bearer token for i
 test("stored Matrix session validation uses whoami and never the logout endpoint", () => {
   const client = read("src/components/messenger/secure/MatrixSecureClient.js");
   const start = client.indexOf("async function validateStoredSession(session)");
-  const end = client.indexOf("\\nasync function requestNewDeviceSession", start);
+  const end = client.indexOf("\nasync function requestNewDeviceSession", start);
   assert.ok(start >= 0 && end > start, "Could not locate stored-session validation");
   const validation = client.slice(start, end);
-  assert.match(validation, /_matrix\\/client\\/v3\\/account\\/whoami/);
-  assert.doesNotMatch(validation, /_matrix\\/client\\/v3\\/logout/);
-  assert.match(validation, /Authorization: `Bearer \\$\\{session\\.accessToken\\}`/);
+  assert.ok(validation.includes("/_matrix/client/v3/account/whoami"));
+  assert.ok(!validation.includes("/_matrix/client/v3/logout"));
+  assert.ok(validation.includes("Authorization: `Bearer ${session.accessToken}`"));
 });
