@@ -11,7 +11,10 @@ RUN npm config set registry ${DOCKERFILE_NPM_MIRROR} \
 
 COPY . .
 
-RUN npm run build
+# Vite/Rollup needs more than Node's default ~2 GiB heap for this application.
+# Override at build time with --build-arg NODE_MAX_OLD_SPACE_SIZE=<MiB>.
+ARG NODE_MAX_OLD_SPACE_SIZE=4096
+RUN NODE_OPTIONS="--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" npm run build
 
 EXPOSE 3000
 
