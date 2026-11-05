@@ -98,6 +98,15 @@ export function isSessionReauthRequired(storage = safeStorage("sessionStorage"))
   }
 }
 
+function readLifecycleEventFromStorage() {
+  try {
+    const value = JSON.parse(safeStorage("localStorage")?.getItem?.(AUTH_LIFECYCLE_KEY) || "null");
+    return value && typeof value === "object" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Mark a hard authentication rejection without navigating away from the
  * current route. Only Django bearer tokens are discarded: Matrix credentials,
@@ -111,6 +120,22 @@ export function expireStoredAuth(storage, reason = "session_expired") {
     );
   } catch {
     // Still notify the app; the browser may have blocked storage access.
+  }
+
+  let expiryAlreadyPending = isSessionReauthRequired();
+  if (!expiryAlreadyPending) {
+    try {
+      expiryAlreadyPending = readLifecycleEventFromStorage()?.event === "expired";
+    } catch {
+      expiryAlreadyPending = false;
+    }
+  }
+
+  // A public endpoint may return 401 even when the visitor never had a
+  // session. Do not turn an unauthenticated error into a global login modal.
+  if (!hadCredentials && !expiryAlreadyPending) {
+    clearStoredAuth(storage);
+    return;
   }
 
   recordAuthLifecycleEvent("expired", reason);
