@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
-import { clearStoredAuth } from "../customHooks/authSession.js";
+import { logoutCurrentBrowser } from "../customHooks/logout.js";
 
 const resolveName = (profile) =>
   profile?.display_name ||
@@ -56,6 +56,7 @@ export default function AccountMenu({
   const { profiles, primaryImageUrl } = useProfiles();
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const currentProfile = useMemo(() => {
     if (!Array.isArray(profiles) || profiles.length === 0) return null;
@@ -66,19 +67,17 @@ export default function AccountMenu({
   const avatarSrc = avatar || resolveProfileImageUrl(currentProfile) || primaryImageUrl || undefined;
   const initials = resolveInitials(currentProfile);
 
-  const handleLogoutConfirm = () => {
-    clearStoredAuth(window.localStorage);
-    setLogoutDialogOpen(false);
-    setMenuAnchor(null);
-
+  const handleLogoutConfirm = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
     try {
-      window.dispatchEvent(new Event("auth-changed"));
-      window.dispatchEvent(new Event("auth"));
-    } catch {
-      /* ignore browser event errors */
+      await logoutCurrentBrowser();
+    } finally {
+      setLogoutDialogOpen(false);
+      setMenuAnchor(null);
+      setLoggingOut(false);
+      navigate("/signin_or_signup", { replace: true });
     }
-
-    navigate("/signin_or_signup", { replace: true });
   };
 
   const handleProfile = () => {
@@ -201,6 +200,7 @@ export default function AccountMenu({
             <Button onClick={() => setLogoutDialogOpen(false)}>Cancel</Button>
             <Button
               onClick={handleLogoutConfirm}
+              disabled={loggingOut}
               color="error"
               variant="contained"
               autoFocus
