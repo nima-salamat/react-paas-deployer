@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -35,6 +35,7 @@ export default function SessionReauthenticationDialog() {
   const navigate = useNavigate();
   const { t } = useLocale();
   const [open, setOpen] = useState(() => isSessionReauthRequired());
+  const openRef = useRef(open);
   const [attempt, setAttempt] = useState(0);
   const [reason, setReason] = useState("");
   const [switchingAccount, setSwitchingAccount] = useState(false);
@@ -42,8 +43,15 @@ export default function SessionReauthenticationDialog() {
   const showExpiredSession = useCallback((nextReason = "session_expired") => {
     if (isAuthRoute(window.location?.pathname)) return;
     setReason(nextReason);
-    setAttempt((value) => value + 1);
+    if (!openRef.current) setAttempt((value) => value + 1);
+    openRef.current = true;
     setOpen(true);
+  }, []);
+
+  const closeReauthentication = useCallback(() => {
+    openRef.current = false;
+    setOpen(false);
+    setReason("");
   }, []);
 
   const applyLifecycleEvent = useCallback((value) => {
@@ -54,10 +62,9 @@ export default function SessionReauthenticationDialog() {
     }
     if (value.event === "logout" || value.event === "login") {
       clearSessionReauthRequired();
-      setOpen(false);
-      setReason("");
+      closeReauthentication();
     }
-  }, [showExpiredSession]);
+  }, [closeReauthentication, showExpiredSession]);
 
   useEffect(() => {
     const onExpired = (event) => {
@@ -73,8 +80,7 @@ export default function SessionReauthenticationDialog() {
       }
       if (token && isSessionBoundToken(token)) {
         clearSessionReauthRequired();
-        setOpen(false);
-        setReason("");
+        closeReauthentication();
         return;
       }
       applyLifecycleEvent(readLifecycleEvent());
@@ -91,15 +97,13 @@ export default function SessionReauthenticationDialog() {
       }
       if (event.key === "access" && event.newValue) {
         clearSessionReauthRequired();
-        setOpen(false);
-        setReason("");
+        closeReauthentication();
       }
     };
 
     const onExplicitLogout = () => {
       clearSessionReauthRequired();
-      setOpen(false);
-      setReason("");
+      closeReauthentication();
     };
 
     window.addEventListener("session-expired", onExpired);
@@ -120,23 +124,22 @@ export default function SessionReauthenticationDialog() {
       window.removeEventListener("auth-logged-out", onExplicitLogout);
       window.removeEventListener("storage", onLifecycleStorage);
     };
-  }, [applyLifecycleEvent, showExpiredSession]);
+  }, [applyLifecycleEvent, closeReauthentication, showExpiredSession]);
 
   useEffect(() => {
     if (isAuthRoute(location.pathname)) {
-      setOpen(false);
+      closeReauthentication();
       return;
     }
     const lifecycle = readLifecycleEvent();
     if (isSessionReauthRequired() || lifecycle?.event === "expired") {
       showExpiredSession(lifecycle?.reason || "session_expired");
     }
-  }, [location.pathname, showExpiredSession]);
+  }, [closeReauthentication, location.pathname, showExpiredSession]);
 
   const handleAuthenticated = () => {
     clearSessionReauthRequired();
-    setOpen(false);
-    setReason("");
+    closeReauthentication();
   };
 
   const handleSwitchAccount = async () => {
@@ -148,7 +151,7 @@ export default function SessionReauthenticationDialog() {
       await logoutCurrentBrowser({ revokeDjangoSession: false });
     } finally {
       setSwitchingAccount(false);
-      setOpen(false);
+      closeReauthentication();
       navigate("/signin_or_signup", { replace: true });
     }
   };
