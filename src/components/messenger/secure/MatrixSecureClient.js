@@ -1517,6 +1517,16 @@ function suspendMatrixRuntimeWhenDjangoAuthIsMissing() {
 if (typeof window !== "undefined") {
   window.addEventListener("auth-changed", suspendMatrixRuntimeWhenDjangoAuthIsMissing);
   window.addEventListener("storage", (event) => {
+    // Explicit logout removes the Matrix session key shared by every tab.
+    // Stop any other tab's in-memory SDK client even before Django tokens are
+    // removed; the durable IndexedDB crypto store is intentionally untouched.
+    if (
+      event.key === LEGACY_SESSION_KEY
+      || (typeof event.key === "string" && event.key.startsWith(SESSION_KEY_PREFIX))
+    ) {
+      shutdownSecureMatrixClient();
+      return;
+    }
     if (event.key === null || event.key === "access" || event.key === "refresh") {
       suspendMatrixRuntimeWhenDjangoAuthIsMissing();
     }
