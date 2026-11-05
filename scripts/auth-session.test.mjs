@@ -147,6 +147,8 @@ test("remembered login identifier contains only allowed non-secret fields and ca
     phone: "+49123456789",
     method: "email",
   });
+  rememberLoginIdentifier({ username: "developer", method: "username" }, storage);
+  assert.equal(readLastLoginIdentifier(storage).method, "username");
   const remembered = JSON.parse(values.values().next().value);
   assert.equal(Object.hasOwn(remembered, "password"), false);
   assert.equal(Object.hasOwn(remembered, "code"), false);
@@ -459,6 +461,10 @@ test("reauthentication follows current backend methods and cannot create an acco
   assert.match(signin, /reauthMode && step === "credentials" \? t\("Sign in again"\)/);
   assert.match(signin, /onAuthenticated\?\.\(\)/);
   assert.match(signin, /rememberLoginIdentifier/);
+  assert.match(signin, /settings.allow_username && !settings.require_otp \\? "username" : null/);
+  assert.match(signin, /base.existing_account_only = true/);
+  assert.match(signin, /if \(reauthMode && \(!settingsLoaded \|\| settingsError\)\)/);
+  assert.match(signin, /setSettingsRetry/);
 });
 
 test("manual logout clears remembered identity while expiry preserves it", () => {
