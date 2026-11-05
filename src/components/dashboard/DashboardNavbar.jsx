@@ -47,7 +47,7 @@ export default function DashboardNavbar({
   const { t } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
-  const { profiles, primaryImageUrl } = useProfiles();
+  const { profiles } = useProfiles();
   
   const currentProfile = useMemo(() => {
     if (!Array.isArray(profiles) || profiles.length === 0) return null;
