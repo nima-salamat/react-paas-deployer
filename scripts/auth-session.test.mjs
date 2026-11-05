@@ -456,7 +456,7 @@ test("auth expiry emits an in-place reauthentication event instead of redirectin
 
 test("reauthentication follows current backend methods and cannot create an account", () => {
   const signin = read("src/components/signin_or_signup/signin_or_signup.jsx");
-  assert.match(signin, /axios\.get\(\`\$\{BASE_URL\}\/settings\//);
+  assert.ok(signin.includes("axios.get(`${BASE_URL}/settings/"));
   assert.match(signin, /base\.existing_account_only = true/);
   assert.match(signin, /reauthMode && step === "credentials" \? t\("Sign in again"\)/);
   assert.match(signin, /onAuthenticated\?\.\(\)/);
