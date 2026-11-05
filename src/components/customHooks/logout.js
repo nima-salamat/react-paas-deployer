@@ -64,6 +64,7 @@ export async function logoutCurrentBrowser({ revokeDjangoSession = true, logoutM
 
   if (typeof window !== "undefined") {
     try {
+      window.dispatchEvent(new Event("auth-logged-out"));
       window.dispatchEvent(new Event("auth-changed"));
       window.dispatchEvent(new Event("auth"));
     } catch {
