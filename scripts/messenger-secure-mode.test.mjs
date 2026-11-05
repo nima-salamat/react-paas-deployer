@@ -847,3 +847,15 @@ test("expired Django auth can still locate the current Matrix bearer token for i
   assert.match(logout, /let namespace = currentDjangoUserNamespace\(\) \|\| currentSessionNamespace/);
   assert.match(source, /if \(localStorage\.getItem\(PERSISTENT_ACCOUNT_NAMESPACE_KEY\) === namespace\)/);
 });
+
+
+test("stored Matrix session validation uses whoami and never the logout endpoint", () => {
+  const client = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const start = client.indexOf("async function validateStoredSession(session)");
+  const end = client.indexOf("\\nasync function requestNewDeviceSession", start);
+  assert.ok(start >= 0 && end > start, "Could not locate stored-session validation");
+  const validation = client.slice(start, end);
+  assert.match(validation, /_matrix\\/client\\/v3\\/account\\/whoami/);
+  assert.doesNotMatch(validation, /_matrix\\/client\\/v3\\/logout/);
+  assert.match(validation, /Authorization: `Bearer \\$\\{session\\.accessToken\\}`/);
+});
