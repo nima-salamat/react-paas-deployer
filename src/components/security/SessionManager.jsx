@@ -24,7 +24,7 @@ import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
 import PhoneAndroidOutlinedIcon from "@mui/icons-material/PhoneAndroidOutlined";
 import TabletMacOutlinedIcon from "@mui/icons-material/TabletMacOutlined";
-import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
+import { logoutCurrentBrowser } from "../customHooks/logout.js";
 import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   fetchMySessions,
@@ -286,11 +286,11 @@ export default function SessionManager({ title = "Devices & sessions", compact =
     setLoadingId(session.id);
     setActionError("");
     try {
-      await revokeMySession(session.id);
       if (isCurrent) {
-        clearAuthAndRedirect();
+        await logoutCurrentBrowser();
         return;
       }
+      await revokeMySession(session.id);
       await load({ silent: true });
     } catch (error) {
       setActionError(
@@ -324,7 +324,7 @@ export default function SessionManager({ title = "Devices & sessions", compact =
     setActionError("");
     try {
       await logoutAllMySessions();
-      clearAuthAndRedirect();
+      await logoutCurrentBrowser({ revokeDjangoSession: false });
     } catch (error) {
       setActionError(
         error?.response?.data?.code === "session_too_new_for_management"
