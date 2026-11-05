@@ -830,3 +830,20 @@ test("explicit logout propagates to other Messenger tabs without deleting local 
   assert.doesNotMatch(listener, /clearStoredSession:\s*true/);
   assert.doesNotMatch(listener, /indexedDB\.deleteDatabase/);
 });
+
+
+test("expired Django auth can still locate the current Matrix bearer token for intentional logout", () => {
+  const source = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const logoutStart = source.indexOf("export async function logoutSecureMatrixSession");
+  const logoutEnd = source.indexOf("/**", logoutStart + 1);
+  const logout = source.slice(logoutStart, logoutEnd);
+  const storeStart = source.indexOf("function storeSession");
+  const storeEnd = source.indexOf("function clearSession", storeStart);
+  const store = source.slice(storeStart, storeEnd);
+
+  assert.match(source, /PERSISTENT_ACCOUNT_NAMESPACE_KEY = "pd\.matrix\.account-namespace\.v1"/);
+  assert.match(store, /localStorage\.setItem\(PERSISTENT_ACCOUNT_NAMESPACE_KEY, namespace\)/);
+  assert.match(logout, /localStorage\.getItem\(PERSISTENT_ACCOUNT_NAMESPACE_KEY\)/);
+  assert.match(logout, /const namespace = currentDjangoUserNamespace\(\) \|\| currentSessionNamespace/);
+  assert.match(source, /if \(localStorage\.getItem\(PERSISTENT_ACCOUNT_NAMESPACE_KEY\) === namespace\)/);
+});
