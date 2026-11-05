@@ -880,7 +880,7 @@ export async function getRecoveryState(matrixClient) {
     const body = await response.json();
     const data = body?.data || body;
     if (response.ok && Array.isArray(data?.results)) {
-      deviceCount = data.results.filter((row) => !row.revoked_at).length;
+      deviceCount = data.results.filter((row) => !row.revoked_at && !row.logged_out_at).length;
     } else {
       deviceInventoryUnavailable = true;
     }
