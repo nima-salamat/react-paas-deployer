@@ -315,7 +315,7 @@ test("ordinary Matrix client shutdown preserves saved credentials, while explici
   const client = read("src/components/messenger/secure/MatrixSecureClient.js");
   const devices = read("src/components/messenger/secure/MatrixDevicesDialog.jsx");
 
-  assert.match(client, /shutdownSecureMatrixClient\(\{ clearStoredSession = false \} = \{\}\)/);
+  assert.match(client, /shutdownSecureMatrixClient\(\{ clearStoredSession = false, storageNamespace = null \} = \{\}\)/);
   assert.match(client, /if \(clearStoredSession\) \{\s*clearSession\(\)/);
   assert.match(client, /Normal shutdown and account switching release SDK resources and locks/);
   assert.match(devices, /shutdownSecureMatrixClient\(\{ clearStoredSession: true \}\)/);
