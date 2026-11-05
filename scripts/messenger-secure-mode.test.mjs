@@ -816,3 +816,17 @@ test("Django expiry shuts down Matrix sync without erasing the saved Matrix sess
   assert.doesNotMatch(handler, /clearStoredSession:\s*true/);
   assert.doesNotMatch(handler, /clearSession\(/);
 });
+
+
+test("explicit logout propagates to other Messenger tabs without deleting local crypto storage", () => {
+  const source = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const start = source.indexOf('window.addEventListener("storage"');
+  const end = source.indexOf("\n  });", start);
+  const listener = source.slice(start, end + 6);
+
+  assert.ok(start >= 0 && end > start);
+  assert.match(listener, /startsWith\(SESSION_KEY_PREFIX\)/);
+  assert.match(listener, /shutdownSecureMatrixClient\(\);/);
+  assert.doesNotMatch(listener, /clearStoredSession:\s*true/);
+  assert.doesNotMatch(listener, /indexedDB\.deleteDatabase/);
+});
