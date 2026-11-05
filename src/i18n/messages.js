@@ -40,6 +40,7 @@ const fa = {
   "Loading...": "در حال بارگذاری...",
   "Sign in / Sign up": "ورود / ثبت‌نام",
   "Your session has expired": "نشست شما منقضی شده است",
+  "Could not load the current sign-in settings. Please retry.": "تنظیمات فعلی ورود دریافت نشد. لطفاً دوباره تلاش کنید.",
   "Sign in again": "ورود دوباره",
   "Your session expired. Sign in to continue without leaving this page.": "نشست شما منقضی شده است. برای ادامه دوباره وارد شوید؛ صفحهٔ فعلی باز می‌ماند.",
   "Your current page will remain open. Only sign-in for your existing account is available here.": "صفحهٔ فعلی باز می‌ماند. در این پنجره فقط ورود به حساب موجود امکان‌پذیر است.",
