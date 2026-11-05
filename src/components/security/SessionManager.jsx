@@ -25,6 +25,7 @@ import ComputerOutlinedIcon from "@mui/icons-material/ComputerOutlined";
 import PhoneAndroidOutlinedIcon from "@mui/icons-material/PhoneAndroidOutlined";
 import TabletMacOutlinedIcon from "@mui/icons-material/TabletMacOutlined";
 import { logoutCurrentBrowser } from "../customHooks/logout.js";
+import { logoutSecureMatrixSession } from "../messenger/secure/MatrixSecureClient.js";
 import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import {
   fetchMySessions,
@@ -323,8 +324,9 @@ export default function SessionManager({ title = "Devices & sessions", compact =
 
     setActionError("");
     try {
+      await logoutSecureMatrixSession();
       await logoutAllMySessions();
-      await logoutCurrentBrowser({ revokeDjangoSession: false });
+      await logoutCurrentBrowser({ revokeDjangoSession: false, logoutMatrix: false });
     } catch (error) {
       setActionError(
         error?.response?.data?.code === "session_too_new_for_management"
