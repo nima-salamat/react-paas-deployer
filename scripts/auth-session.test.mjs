@@ -357,7 +357,7 @@ test("manual logout invalidates Matrix and Django sessions before clearing local
     matrixSource.indexOf("/**", matrixSource.indexOf("export async function logoutSecureMatrixSession") + 1),
   );
 
-  assert.ok(logoutSource.indexOf("await logoutSecureMatrixSession()") < logoutSource.indexOf("await revokeMySession(sessionId)"));
+  assert.ok(logoutSource.indexOf("matrixLogout = await logoutSecureMatrixSession()") < logoutSource.indexOf("await revokeMySession(sessionId)"));
   assert.ok(logoutSource.indexOf("await revokeMySession(sessionId)") < logoutSource.indexOf("clearStoredAuth(storage)"));
   assert.match(matrixLogout, /_matrix\/client\/v3\/logout/);
   assert.match(matrixLogout, /clearStoredSession:\s*true/);
