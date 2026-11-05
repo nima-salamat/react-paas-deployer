@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearStoredAuth, getSessionBoundAccessToken, invalidateSessionlessAuth } from "./authSession.js";
+import { clearStoredAuth, expireStoredAuth, getSessionBoundAccessToken } from "./authSession.js";
 import { normalizeLanguage, translateText } from "../../i18n/messages.js";
 
 /**
@@ -103,8 +103,8 @@ function isAccessTokenExpired(token, leewayMs = 5000) {
 // Single-flight refresh: many parallel 401s must share one refresh call
 let refreshPromise = null;
 
-function clearAuthAndRedirect() {
-  invalidateSessionlessAuth(localStorage);
+function clearAuthAndRedirect(reason = "refresh_rejected") {
+  expireStoredAuth(localStorage, reason);
 }
 
 function buildHeaders(accessToken, data) {
@@ -160,7 +160,7 @@ function refreshAccessToken() {
   refreshPromise = (async () => {
     const refreshToken = localStorage.getItem("refresh");
     if (!refreshToken) {
-      clearAuthAndRedirect();
+      clearAuthAndRedirect("refresh_token_missing");
       throw new Error("No refresh token");
     }
 
@@ -168,7 +168,7 @@ function refreshAccessToken() {
       const refreshResponse = await postRefresh(refreshToken);
       const access = refreshResponse?.data?.access;
       if (!access) {
-        clearAuthAndRedirect();
+        clearAuthAndRedirect("refresh_response_invalid");
         throw new Error("Refresh response missing access token");
       }
 
@@ -193,7 +193,7 @@ function refreshAccessToken() {
       // is invalid. Network/timeout/5xx failures are transient and MUST NOT
       // destroy the locally stored session.
       if (status === 401 || status === 403) {
-        clearAuthAndRedirect();
+        clearAuthAndRedirect("refresh_token_rejected");
       }
       throw err;
     } finally {
@@ -251,7 +251,7 @@ const apiRequest = async ({ method = "GET", url, data = {}, params = {}, onUploa
       // If the failing call was the refresh endpoint itself, give up
       const failedUrl = String(url || "");
       if (failedUrl.includes("/login/token/refresh")) {
-        clearAuthAndRedirect();
+        clearAuthAndRedirect("refresh_endpoint_rejected");
         throw error;
       }
 
