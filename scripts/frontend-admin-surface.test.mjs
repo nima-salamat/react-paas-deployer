@@ -347,8 +347,7 @@ test("admin-specific security surfaces remain connected to logout and identity s
   const identity = read("src/components/admin/hooks/useAdminIdentity.js");
 
   assert.match(dashboard, /clearSessionPermissions/);
-  assert.match(dashboard, /localStorage\.removeItem\("access"\)/);
-  assert.match(dashboard, /localStorage\.removeItem\("refresh"\)/);
+  assert.match(dashboard, /logoutCurrentBrowser/);
   assert.match(topbar, /Users &amp; access/);
   assert.match(topbar, /onNavigate\?\.\("users"\)/);
   assert.match(sidebar, /onLogout/);
