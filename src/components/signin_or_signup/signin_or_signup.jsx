@@ -628,7 +628,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
 
         {!loginClosed && step === "credentials" && (
           <Box component="form" onSubmit={handleCredentials} noValidate>
-            {settings.allow_username && (!reauthMode || method === "username" || settings.require_otp) && (
+            {settings.allow_username && (!reauthMode || method === "username") && (
               <TextField fullWidth label={t("Username")} name="username" value={form.username}
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
