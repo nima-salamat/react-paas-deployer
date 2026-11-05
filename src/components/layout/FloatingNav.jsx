@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import apiRequest from "../customHooks/apiRequest.jsx";
 import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
+import { logoutCurrentBrowser } from "../customHooks/logout.js";
 import { Link as RouterLink, useNavigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -180,22 +181,20 @@ export default function FloatingNav({
     setOpen((s) => !s);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (typeof onLogout === "function") {
       onLogout();
       close();
       return;
     }
 
-    window.localStorage.removeItem("access");
-    window.localStorage.removeItem("refresh");
-    setLoggedIn(false);
     try {
-      window.dispatchEvent(new Event("auth-changed"));
-      window.dispatchEvent(new Event("auth"));
-    } catch {}
-    navigate("/signin_or_signup");
-    close();
+      await logoutCurrentBrowser();
+    } finally {
+      setLoggedIn(false);
+      navigate("/signin_or_signup", { replace: true });
+      close();
+    }
   };
 
   const bottom = anchorOffset?.bottom ?? 24;
