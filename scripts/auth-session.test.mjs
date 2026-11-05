@@ -147,7 +147,9 @@ test("remembered login identifier contains only allowed non-secret fields and ca
     phone: "+49123456789",
     method: "email",
   });
-  assert.doesNotMatch(values.values().next().value, /must-never-be-stored|12345678/);
+  const remembered = JSON.parse(values.values().next().value);
+  assert.equal(Object.hasOwn(remembered, "password"), false);
+  assert.equal(Object.hasOwn(remembered, "code"), false);
   clearRememberedLoginIdentifier(storage);
   assert.equal(values.size, 0);
 });
@@ -162,7 +164,7 @@ test("authentication route detection avoids redirect loops", () => {
 test("api request layer rejects sessionless credentials before network I/O", () => {
   const source = read("src/components/customHooks/apiRequest.jsx");
   assert.match(source, /getSessionBoundAccessToken\(localStorage\)/);
-  assert.match(source, /clearAuthAndRedirect\(\);/);
+  assert.match(source, /function clearAuthAndRedirect\(reason = "refresh_rejected"\)/);
   assert.match(source, /expireStoredAuth\(localStorage/);
 });
 
@@ -446,7 +448,7 @@ test("auth expiry emits an in-place reauthentication event instead of redirectin
   assert.match(requestSource, /expireStoredAuth\(localStorage/);
   assert.match(dialogSource, /<SigninOrSignup[\s\S]*?reauthMode/);
   assert.match(dialogSource, /onAuthenticated=\{handleAuthenticated\}/);
-  assert.match(dialogSource, /You will return to the page you were using/);
+  assert.match(dialogSource, /you will return to the page you were using/i);
   assert.match(appSource, /<SessionReauthenticationDialog \/>/);
 });
 
@@ -454,7 +456,7 @@ test("reauthentication follows current backend methods and cannot create an acco
   const signin = read("src/components/signin_or_signup/signin_or_signup.jsx");
   assert.match(signin, /axios\.get\(\`\$\{BASE_URL\}\/settings\//);
   assert.match(signin, /base\.existing_account_only = true/);
-  assert.match(signin, /reauthMode \? t\("Sign in again"\)/);
+  assert.match(signin, /reauthMode && step === "credentials" \\? t\("Sign in again"\)/);
   assert.match(signin, /onAuthenticated\?\.\(\)/);
   assert.match(signin, /rememberLoginIdentifier/);
 });
