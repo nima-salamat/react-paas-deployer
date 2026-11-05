@@ -388,7 +388,16 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
       });
 
       setLoggedIn(true);
-      await refreshStaffFlag();
+      const body = validateRes?.data || {};
+      const user = body.user || body;
+      const hasRoleFlags = typeof user?.is_staff === "boolean" || typeof user?.is_superuser === "boolean";
+      if (hasRoleFlags) {
+        const nextIsStaff = Boolean(user.is_staff || user.is_superuser);
+        setIsStaff(nextIsStaff);
+        writeCachedNavbarState(nextIsStaff, window.localStorage);
+      } else {
+        await refreshStaffFlag();
+      }
       await loadProfilesIfNeeded();
       if (fromMenu) closeDrawer();
     } catch (error) {
