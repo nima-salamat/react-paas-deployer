@@ -844,6 +844,6 @@ test("expired Django auth can still locate the current Matrix bearer token for i
   assert.match(source, /PERSISTENT_ACCOUNT_NAMESPACE_KEY = "pd\.matrix\.account-namespace\.v1"/);
   assert.match(store, /localStorage\.setItem\(PERSISTENT_ACCOUNT_NAMESPACE_KEY, namespace\)/);
   assert.match(logout, /localStorage\.getItem\(PERSISTENT_ACCOUNT_NAMESPACE_KEY\)/);
-  assert.match(logout, /const namespace = currentDjangoUserNamespace\(\) \|\| currentSessionNamespace/);
+  assert.match(logout, /let namespace = currentDjangoUserNamespace\(\) \|\| currentSessionNamespace/);
   assert.match(source, /if \(localStorage\.getItem\(PERSISTENT_ACCOUNT_NAMESPACE_KEY\) === namespace\)/);
 });
