@@ -1,5 +1,6 @@
 import {
   clearStoredAuth,
+  clearCachedNavbarState,
   decodeJwtPayload,
   getSessionBoundAccessToken,
   clearRememberedLoginIdentifier,
@@ -56,6 +57,7 @@ export async function logoutCurrentBrowser({ revokeDjangoSession = true, logoutM
 
   try {
     clearStoredAuth(storage);
+    clearCachedNavbarState(storage);
     clearRememberedLoginIdentifier();
     clearSessionReauthRequired();
   } catch {
