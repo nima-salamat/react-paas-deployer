@@ -260,17 +260,15 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
       if (!mountedRef.current) return false;
 
       setLoggedIn(true);
-      try {
-        const body = validateRes.data;
-        const u = body.user || body;
-        setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
-      } catch {
-        // fallback: fetch user profile flags
-        try {
-          await refreshStaffFlag();
-        } catch {
-          setIsStaff(false);
-        }
+      const body = validateRes?.data || {};
+      const user = body.user || body;
+      const hasRoleFlags = typeof user?.is_staff === "boolean" || typeof user?.is_superuser === "boolean";
+      if (hasRoleFlags) {
+        const nextIsStaff = Boolean(user.is_staff || user.is_superuser);
+        setIsStaff(nextIsStaff);
+        writeCachedNavbarState(nextIsStaff, window.localStorage);
+      } else {
+        await refreshStaffFlag();
       }
       await loadProfilesIfNeeded({ force });
       return true;
