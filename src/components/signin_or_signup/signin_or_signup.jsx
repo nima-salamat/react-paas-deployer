@@ -515,7 +515,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
         boxSizing: "border-box",
       }}
     >
-      <Backdrop sx={{ color: "#fff", zIndex: (t) => (reauthMode ? t.zIndex.modal + 2 : t.zIndex.drawer + 2) }} open={loading}>
+      <Backdrop sx={{ color: "#fff", zIndex: (t) => (reauthMode ? t.zIndex.modal + 2 : t.zIndex.drawer + 2) }} open={loading || !settingsLoaded}>
         <CircularProgress color="inherit" />
       </Backdrop>
 
@@ -612,7 +612,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
                   }}
                 >
                   {reauthMode && settings.allow_username && !settings.require_otp && (
-                    <ToggleButton value="username"><PersonSearchOutlined sx={{ mr: 0.5 }} /> {t("Username")}</ToggleButton>
+                    <ToggleButton value="username"><PersonSearch sx={{ mr: 0.5 }} /> {t("Username")}</ToggleButton>
                   )}
                   {settings.allow_email && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> {t("Email")}</ToggleButton>}
                   {settings.allow_phone && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> {t("Phone")}</ToggleButton>}
