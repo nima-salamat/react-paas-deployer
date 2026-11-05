@@ -566,7 +566,7 @@ test("secure composer keeps text input and voice waveform at the same height and
   assert.match(composer, /maxWidth: 960/);
   assert.match(composer, /minHeight: 40/);
   assert.match(composer, /height: 40/);
-  assert.match(composer, /&\\.MuiInputBase-multiline": \\{[\\s\\S]*?padding: 0/);
+  assert.match(composer, /&\.MuiInputBase-multiline": \{[\s\S]*?padding: 0/);
   assert.match(composer, /MuiInputBase-inputMultiline[\s\S]*?padding: "8px 18px"/);
   const formSurfaceEnd = composer.indexOf("\n            <Box");
   const formSurface = composer.slice(0, formSurfaceEnd);
@@ -617,7 +617,7 @@ test("secure message bubbles and reaction buttons do not move on hover", () => {
   assert.doesNotMatch(bubbleStyles, /transition: "[^"]*transform/);
   assert.doesNotMatch(reactionStyles, /transform:/);
   assert.doesNotMatch(reactionStyles, /transition: "[^"]*transform/);
-  assert.match(reactionStyles, /&:focus-visible[\\s\\S]*?opacity: 1/);
+  assert.match(reactionStyles, /&:focus-visible[\s\S]*?opacity: 1/);
 });
 
 test("secure message actions edit with Matrix replacements and delete with Matrix redactions", () => {
