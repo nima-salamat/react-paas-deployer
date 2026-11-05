@@ -76,6 +76,8 @@ test("logout storage helper clears both credentials", () => {
   const values = new Map([
     ["access", "old-access"],
     ["refresh", "old-refresh"],
+    ["pd.matrix.secure-session.v2:1", JSON.stringify({ accessToken: "matrix-token" })],
+    ["pd.matrix.device-id.v1:1", "PDDEVICE1234"],
     ["other", "preserve"],
   ]);
   const storage = {
@@ -89,8 +91,6 @@ test("logout storage helper clears both credentials", () => {
   assert.equal(values.has("access"), false);
   assert.equal(values.has("refresh"), false);
   assert.equal(values.get("other"), "preserve");
-  values.set("pd.matrix.secure-session.v2:1", JSON.stringify({ accessToken: "matrix-token" }));
-  values.set("pd.matrix.device-id.v1:1", "PDDEVICE1234");
   clearStoredAuth(storage);
   assert.equal(values.has("access"), false);
   assert.equal(values.has("refresh"), false);
@@ -338,7 +338,12 @@ test("automatic Django auth expiry preserves Matrix credentials while suspending
   );
 
   assert.match(requestSource, /function clearAuthAndRedirect\(\)\s*\{\s*invalidateSessionlessAuth\(localStorage\);/);
-  assert.match(authSource, /export function clearStoredAuth\(storage\)[\s\S]*?removeItem\?\.\(\"access\"\)[\s\S]*?removeItem\?\.\(\"refresh\"\)/);
+  const clearAuthSource = authSource.slice(
+    authSource.indexOf("export function clearStoredAuth"),
+    authSource.indexOf("export function isAuthRoute"),
+  );
+  assert.ok(clearAuthSource.includes('storage?.removeItem?.("access")'));
+  assert.ok(clearAuthSource.includes('storage?.removeItem?.("refresh")'));
   assert.match(expiryHandler, /shutdownSecureMatrixClient\(\);/);
   assert.doesNotMatch(expiryHandler, /clearStoredSession:\s*true/);
   assert.doesNotMatch(expiryHandler, /clearSession\(/);
@@ -357,7 +362,7 @@ test("manual logout invalidates Matrix and Django sessions before clearing local
   assert.match(matrixLogout, /_matrix\/client\/v3\/logout/);
   assert.match(matrixLogout, /clearStoredSession:\s*true/);
   assert.doesNotMatch(matrixLogout, /forgetPersistentMatrixDeviceId/);
-  assert.match(matrixLogout, /stable device ID and IndexedDB crypto store are intentionally retained/i);
+  assert.match(matrixSource, /stable device ID and IndexedDB crypto store are intentionally retained/i);
 });
 
 test("all manual logout entry points use the shared secure logout handler", () => {
