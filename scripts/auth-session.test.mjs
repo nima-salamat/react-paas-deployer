@@ -89,6 +89,13 @@ test("logout storage helper clears both credentials", () => {
   assert.equal(values.has("access"), false);
   assert.equal(values.has("refresh"), false);
   assert.equal(values.get("other"), "preserve");
+  values.set("pd.matrix.secure-session.v2:1", JSON.stringify({ accessToken: "matrix-token" }));
+  values.set("pd.matrix.device-id.v1:1", "PDDEVICE1234");
+  clearStoredAuth(storage);
+  assert.equal(values.has("access"), false);
+  assert.equal(values.has("refresh"), false);
+  assert.equal(values.has("pd.matrix.secure-session.v2:1"), true);
+  assert.equal(values.has("pd.matrix.device-id.v1:1"), true);
 });
 
 test("authentication route detection avoids redirect loops", () => {
@@ -318,4 +325,49 @@ test("recorded video messages do not perform a redundant second encoding pass", 
   assert.doesNotMatch(recordingFinalizeBlock, /_messengerProcessing/);
   assert.doesNotMatch(recordingFinalizeBlock, /cropVideoMessageToSquare/);
   assert.ok(recordingFinalizeBlock.includes("flushSync(() => setFiles"));
+});
+
+
+test("automatic Django auth expiry preserves Matrix credentials while suspending runtime", () => {
+  const authSource = read("src/components/customHooks/authSession.js");
+  const requestSource = read("src/components/customHooks/apiRequest.jsx");
+  const matrixSource = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const expiryHandler = matrixSource.slice(
+    matrixSource.indexOf("function suspendMatrixRuntimeWhenDjangoAuthIsMissing"),
+    matrixSource.indexOf("if (typeof window !== \"undefined\")", matrixSource.indexOf("function suspendMatrixRuntimeWhenDjangoAuthIsMissing")),
+  );
+
+  assert.match(requestSource, /function clearAuthAndRedirect\(\)\s*\{\s*invalidateSessionlessAuth\(localStorage\);/);
+  assert.match(authSource, /export function clearStoredAuth\(storage\)[\s\S]*?removeItem\?\.\(\"access\"\)[\s\S]*?removeItem\?\.\(\"refresh\"\)/);
+  assert.match(expiryHandler, /shutdownSecureMatrixClient\(\);/);
+  assert.doesNotMatch(expiryHandler, /clearStoredSession:\s*true/);
+  assert.doesNotMatch(expiryHandler, /clearSession\(/);
+});
+
+test("manual logout invalidates Matrix and Django sessions before clearing local auth", () => {
+  const logoutSource = read("src/components/customHooks/logout.js");
+  const matrixSource = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const matrixLogout = matrixSource.slice(
+    matrixSource.indexOf("export async function logoutSecureMatrixSession"),
+    matrixSource.indexOf("/**", matrixSource.indexOf("export async function logoutSecureMatrixSession") + 1),
+  );
+
+  assert.ok(logoutSource.indexOf("await logoutSecureMatrixSession()") < logoutSource.indexOf("await revokeMySession(sessionId)"));
+  assert.ok(logoutSource.indexOf("await revokeMySession(sessionId)") < logoutSource.indexOf("clearStoredAuth(storage)"));
+  assert.match(matrixLogout, /_matrix\/client\/v3\/logout/);
+  assert.match(matrixLogout, /clearStoredSession:\s*true/);
+  assert.doesNotMatch(matrixLogout, /forgetPersistentMatrixDeviceId/);
+  assert.match(matrixLogout, /stable device ID and IndexedDB crypto store are intentionally retained/i);
+});
+
+test("all manual logout entry points use the shared secure logout handler", () => {
+  for (const file of [
+    "src/components/layout/AccountMenu.jsx",
+    "src/components/layout/FloatingNav.jsx",
+    "src/components/admin/AdminDashboard.jsx",
+    "src/components/security/SessionManager.jsx",
+  ]) {
+    const source = read(file);
+    assert.match(source, /logoutCurrentBrowser/);
+  }
 });
