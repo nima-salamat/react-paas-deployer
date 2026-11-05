@@ -9,12 +9,19 @@ import {
   clearRememberedLoginIdentifier,
   decodeJwtPayload,
   expireStoredAuth,
+  getAuthCacheScope,
   getSessionBoundAccessToken,
+  readCachedNavbarState,
+  writeCachedNavbarState,
   isAuthRoute,
   isSessionBoundToken,
   readLastLoginIdentifier,
   rememberLoginIdentifier,
 } from "../src/components/customHooks/authSession.js";
+import {
+  readProfileCache,
+  writeProfileCache,
+} from "../src/components/profile/profileCache.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -478,4 +485,53 @@ test("manual logout clears remembered identity while expiry preserves it", () =>
   );
   assert.doesNotMatch(expireBlock, /clearRememberedLoginIdentifier/);
   assert.match(expireBlock, /clearStoredAuth\(storage\)/);
+});
+
+
+test("profile and navbar caches are scoped to the authenticated account", () => {
+  const values = new Map([
+    ["access", fakeJwt({ user_id: 17, sid: "session-a" })],
+  ]);
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+
+  const scope = getAuthCacheScope(storage);
+  assert.equal(scope, "user:17");
+
+  const previousProfiles = [{
+    id: 3,
+    username: "cached-user",
+    image_url: "/media/avatar.png",
+  }];
+  assert.equal(writeProfileCache(scope, previousProfiles, storage), true);
+  assert.deepEqual(readProfileCache(scope, storage), previousProfiles);
+  assert.equal(values.get("paas.profile-cache.v1:user%3A17").includes("token="), false);
+
+  assert.equal(writeCachedNavbarState(true, storage), true);
+  assert.deepEqual(readCachedNavbarState(storage), { isStaff: true, scope: "user:17" });
+
+  values.set("access", fakeJwt({ user_id: 29, sid: "session-b" }));
+  assert.equal(getAuthCacheScope(storage), "user:29");
+  assert.equal(readProfileCache(getAuthCacheScope(storage), storage), null);
+  assert.equal(readCachedNavbarState(storage), null);
+});
+
+test("profile cache ignores malformed, stale-version and non-array payloads", () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+  const key = "paas.profile-cache.v1:user%3A17";
+
+  values.set(key, "{broken");
+  assert.equal(readProfileCache("user:17", storage), null);
+  values.set(key, JSON.stringify({ version: 999, savedAt: Date.now(), profiles: [] }));
+  assert.equal(readProfileCache("user:17", storage), null);
+  values.set(key, JSON.stringify({ version: 1, savedAt: Date.now(), profiles: {} }));
+  assert.equal(readProfileCache("user:17", storage), null);
 });
