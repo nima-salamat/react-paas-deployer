@@ -432,18 +432,22 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
       } catch {
         response = await apiRequest({ method: "GET", url: `${API_BASE}/users/user/` });
       }
-      const data = response.data;
+      const data = response.data || {};
       const u = data.user || data;
-      setIsStaff(Boolean(u?.is_staff || u?.is_superuser));
+      const nextIsStaff = Boolean(u?.is_staff || u?.is_superuser);
+      setIsStaff(nextIsStaff);
+      writeCachedNavbarState(nextIsStaff, window.localStorage);
+      return nextIsStaff;
     } catch {
+      const cached = readCachedNavbarState(window.localStorage);
+      if (cached) {
+        setIsStaff(cached.isStaff);
+        return cached.isStaff;
+      }
       setIsStaff(false);
+      return false;
     }
   };
-
-  useEffect(() => {
-    if (loggedIn) refreshStaffFlag();
-    else setIsStaff(false);
-  }, [loggedIn]);
 
   const visibleNavItems = baseNavItems.filter((item) => {
     if (!loggedIn && !item.guest) return false;
@@ -636,7 +640,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
               }}
             />
 
-            {!checkingAuth && loggedIn ? (
+            {loggedIn ? (
               <>
               <TicketNotifyBell />
               <AccountMenu
