@@ -193,6 +193,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
   }, [settings.allow_email, settings.allow_phone, method]);
 
   useEffect(() => {
+    if (reauthMode) return;
     const token = localStorage.getItem("access");
     if (!token) return;
     if (!isSessionBoundToken(token)) {
@@ -474,7 +475,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
   return (
     <Box
       sx={{
-        minHeight: { xs: "calc(100dvh - 64px)", md: "calc(100dvh - 72px)" },
+        minHeight: reauthMode ? 0 : { xs: "calc(100dvh - 64px)", md: "calc(100dvh - 72px)" },
         width: "100%",
         display: "flex",
         alignItems: "center",
