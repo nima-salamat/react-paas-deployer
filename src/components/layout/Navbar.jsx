@@ -276,13 +276,15 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
       if (mountedRef.current) {
         console.error("Auth check failed:", error);
         if (isNetworkAuthFailure(error)) {
-          // Connectivity loss must never destroy an otherwise valid local session.
-          // The locally stored access/refresh tokens remain untouched.
+          // Keep the last successful account chrome visible during outages.
           setLoggedIn(true);
+          const cached = readCachedNavbarState(window.localStorage);
+          if (cached) setIsStaff(cached.isStaff);
           return true;
         }
         setLoggedIn(false);
         setIsStaff(false);
+        clearCachedNavbarState(window.localStorage);
         setUserImage(null);
         profilesLoadedRef.current = false;
         currentProfileIdRef.current = null;
