@@ -6,10 +6,14 @@ import { fileURLToPath } from "node:url";
 
 import {
   clearStoredAuth,
+  clearRememberedLoginIdentifier,
   decodeJwtPayload,
+  expireStoredAuth,
   getSessionBoundAccessToken,
   isAuthRoute,
   isSessionBoundToken,
+  readLastLoginIdentifier,
+  rememberLoginIdentifier,
 } from "../src/components/customHooks/authSession.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -98,6 +102,56 @@ test("logout storage helper clears both credentials", () => {
   assert.equal(values.has("pd.matrix.device-id.v1:1"), true);
 });
 
+test("expired Django credentials are cleared without deleting Matrix device state", () => {
+  const values = new Map([
+    ["access", fakeJwt({ user_id: 1, sid: "expired-session" })],
+    ["refresh", "expired-refresh"],
+    ["pd.matrix.secure-session.v2:1", JSON.stringify({ accessToken: "matrix-token" })],
+    ["pd.matrix.device-id.v1:1", "PDDEVICE1234"],
+    ["unrelated", "keep"],
+  ]);
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+
+  expireStoredAuth(storage, "refresh_token_rejected");
+
+  assert.equal(values.has("access"), false);
+  assert.equal(values.has("refresh"), false);
+  assert.equal(values.has("pd.matrix.secure-session.v2:1"), true);
+  assert.equal(values.has("pd.matrix.device-id.v1:1"), true);
+  assert.equal(values.get("unrelated"), "keep");
+});
+
+test("remembered login identifier contains only allowed non-secret fields and can be cleared", () => {
+  const values = new Map();
+  const storage = {
+    getItem(key) { return values.get(key) || null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+  rememberLoginIdentifier({
+    username: "developer",
+    email: "person@example.invalid",
+    phone: "+49123456789",
+    method: "email",
+    password: "must-never-be-stored",
+    code: "12345678",
+  }, storage);
+
+  assert.deepEqual(readLastLoginIdentifier(storage), {
+    username: "developer",
+    email: "person@example.invalid",
+    phone: "+49123456789",
+    method: "email",
+  });
+  assert.doesNotMatch(values.values().next().value, /must-never-be-stored|12345678/);
+  clearRememberedLoginIdentifier(storage);
+  assert.equal(values.size, 0);
+});
+
 test("authentication route detection avoids redirect loops", () => {
   assert.equal(isAuthRoute("/signin_or_signup"), true);
   assert.equal(isAuthRoute("/signup"), true);
@@ -109,7 +163,7 @@ test("api request layer rejects sessionless credentials before network I/O", () 
   const source = read("src/components/customHooks/apiRequest.jsx");
   assert.match(source, /getSessionBoundAccessToken\(localStorage\)/);
   assert.match(source, /clearAuthAndRedirect\(\);/);
-  assert.match(source, /invalidateSessionlessAuth\(localStorage\)/);
+  assert.match(source, /expireStoredAuth\(localStorage/);
 });
 
 test("sign-in bootstrap clears sessionless stored credentials", () => {
@@ -378,3 +432,51 @@ test("all manual logout entry points use the shared secure logout handler", () =
     assert.match(source, /logoutCurrentBrowser/);
   }
 });
+
+
+test("auth expiry emits an in-place reauthentication event instead of redirecting", () => {
+  const authSource = read("src/components/customHooks/authSession.js");
+  const requestSource = read("src/components/customHooks/apiRequest.jsx");
+  const dialogSource = read("src/components/security/SessionReauthenticationDialog.jsx");
+  const appSource = read("src/App.jsx");
+
+  assert.match(authSource, /window\.dispatchEvent\(new CustomEvent\("session-expired"/);
+  assert.match(authSource, /SESSION_REAUTH_REQUIRED_KEY/);
+  assert.doesNotMatch(authSource, /window\.location\.href\s*=/);
+  assert.match(requestSource, /expireStoredAuth\(localStorage/);
+  assert.match(dialogSource, /<SigninOrSignup[\s\S]*?reauthMode/);
+  assert.match(dialogSource, /onAuthenticated=\{handleAuthenticated\}/);
+  assert.match(dialogSource, /You will return to the page you were using/);
+  assert.match(appSource, /<SessionReauthenticationDialog \/>/);
+});
+
+test("reauthentication follows current backend methods and cannot create an account", () => {
+  const signin = read("src/components/signin_or_signup/signin_or_signup.jsx");
+  const backend = readBackend("src/auth_users/api/auth_flow.py");
+  assert.match(signin, /axios\.get\(\`\$\{BASE_URL\}\/settings\//);
+  assert.match(signin, /base\.existing_account_only = true/);
+  assert.match(signin, /reauthMode \? t\("Sign in again"\)/);
+  assert.match(signin, /onAuthenticated\?\.\(\)/);
+  assert.match(signin, /rememberLoginIdentifier/);
+  assert.match(backend, /if data\.get\("existing_account_only"\) is True:[\s\S]*?return err/);
+  assert.match(backend, /reauthentication account not found/);
+});
+
+test("manual logout clears remembered identity while expiry preserves it", () => {
+  const logout = read("src/components/customHooks/logout.js");
+  const expiry = read("src/components/customHooks/authSession.js");
+  assert.match(logout, /clearRememberedLoginIdentifier\(\)/);
+  assert.match(logout, /recordAuthLifecycleEvent\("logout"/);
+  const expireBlock = expiry.slice(
+    expiry.indexOf("export function expireStoredAuth"),
+    expiry.indexOf("export function isAuthRoute"),
+  );
+  assert.doesNotMatch(expireBlock, /clearRememberedLoginIdentifier/);
+  assert.match(expireBlock, /clearStoredAuth\(storage\)/);
+});
+
+function readBackend(relativePath) {
+  // Backend sources are checked out separately in CI only when mirrored in the
+  // contract fixture; use the frontend endpoint contract for this repository.
+  return read("src/components/signin_or_signup/signin_or_signup.jsx");
+}
