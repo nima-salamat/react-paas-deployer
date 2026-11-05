@@ -10,6 +10,7 @@ import { ToastProvider } from "./components/ToastContext.jsx";
 import ConfirmDialog from "./components/ConfirmDialog.jsx";
 import { clearSessionPermissions, canSeeNav, hasAnyRule, adminMeUrl } from "./adminUtils";
 import apiRequest from "../customHooks/apiRequest";
+import { logoutCurrentBrowser } from "../customHooks/logout.js";
 import { useAdminIdentity } from "./hooks/useAdminIdentity.js";
 import { useTicketsData } from "./hooks/useTicketsData.js";
 import { useInvitesAndCodes } from "./hooks/useInvitesAndCodes.js";
@@ -246,14 +247,10 @@ function AdminDashboardInner({ themeMode, onThemeModeChange }) {
     if (tab === "codes" && canSeeNav("codes")) loadCodes();
   }, [tab, meLoading, loadInvites, loadCodes]);
 
-  const doLogout = useCallback(() => {
-    try {
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
-    } catch { /* */ }
+  const doLogout = useCallback(async () => {
+    await logoutCurrentBrowser();
     clearSessionPermissions();
-    window.dispatchEvent(new Event("auth-changed"));
-    navigate("/signin_or_signup");
+    navigate("/signin_or_signup", { replace: true });
   }, [navigate]);
 
   const requestLogout = useCallback(() => {
