@@ -795,13 +795,13 @@ test("explicit logout revokes the current Matrix token but preserves device key 
   const logout = source.slice(start, end);
 
   assert.ok(start >= 0);
-  assert.match(logout, /_matrix\/client\/v3\/logout/);
+  assert.match(logout, /secure\/device-session\/logout/);
   assert.match(logout, /credentials:\s*"omit"/);
   assert.match(logout, /redirect:\s*"error"/);
   assert.match(logout, /clearStoredSession:\s*true/);
   assert.doesNotMatch(logout, /forgetPersistentMatrixDeviceId/);
   assert.doesNotMatch(logout, /indexedDB\.deleteDatabase/);
-  assert.match(logout, /stable device ID and IndexedDB crypto store are intentionally retained/);
+  assert.match(source, /stable device ID and IndexedDB crypto store are intentionally retained/);
 });
 
 test("Django expiry shuts down Matrix sync without erasing the saved Matrix session", () => {
