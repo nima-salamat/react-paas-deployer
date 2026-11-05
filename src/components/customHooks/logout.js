@@ -2,6 +2,9 @@ import {
   clearStoredAuth,
   decodeJwtPayload,
   getSessionBoundAccessToken,
+  clearRememberedLoginIdentifier,
+  clearSessionReauthRequired,
+  recordAuthLifecycleEvent,
 } from "./authSession.js";
 import { revokeMySession } from "../security/sessionApi.js";
 import { logoutSecureMatrixSession } from "../messenger/secure/MatrixSecureClient.js";
@@ -11,9 +14,13 @@ import { logoutSecureMatrixSession } from "../messenger/secure/MatrixSecureClien
  *
  * Matrix is logged out before Django's session is revoked, because the Matrix
  * token must still be available locally for the homeserver logout request.
- * Automatic token expiry deliberately does not call this function.
+ * Automatic token expiry deliberately does not call this function. It keeps
+ * the non-secret remembered identifier for the in-place reauthentication UI.
  */
 export async function logoutCurrentBrowser({ revokeDjangoSession = true, logoutMatrix = true } = {}) {
+  // Tell other tabs that this is an intentional logout, not a refresh-token
+  // rejection. The lifecycle marker is written before bearer tokens disappear.
+  recordAuthLifecycleEvent("logout", "user_initiated");
   let storage = null;
   let sessionId = null;
 
@@ -27,7 +34,7 @@ export async function logoutCurrentBrowser({ revokeDjangoSession = true, logoutM
 
   let matrixLogout = null;
   try {
-    matrixLogout = await logoutSecureMatrixSession();
+    if (logoutMatrix) matrixLogout = await logoutSecureMatrixSession();
   } catch (error) {
     // The Matrix helper is designed to clear locally in all cases, but keep
     // logout fail-safe if a browser API unexpectedly throws.
@@ -49,6 +56,8 @@ export async function logoutCurrentBrowser({ revokeDjangoSession = true, logoutM
 
   try {
     clearStoredAuth(storage);
+    clearRememberedLoginIdentifier();
+    clearSessionReauthRequired();
   } catch {
     // Continue with navigation/event notification when storage is unavailable.
   }
