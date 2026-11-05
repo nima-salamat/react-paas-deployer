@@ -50,6 +50,7 @@ import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 import AccountMenu from "./AccountMenu.jsx";
+import { logoutCurrentBrowser } from "../customHooks/logout.js";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_ICON = "/icon.svg";
@@ -956,16 +957,13 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
                       variant="contained"
                       color="error"
                       startIcon={<LogoutOutlinedIcon />}
-                      onClick={() => {
+                      onClick={async () => {
                         closeDrawer();
                         try {
-                          window.localStorage.removeItem("access");
-                          window.localStorage.removeItem("refresh");
-                          window.dispatchEvent(new Event("auth-changed"));
-                        } catch {
-                          /* ignore browser storage errors */
+                          await logoutCurrentBrowser();
+                        } finally {
+                          navigate("/signin_or_signup", { replace: true });
                         }
-                        navigate("/signin_or_signup", { replace: true });
                       }}
                     >
                       Logout
