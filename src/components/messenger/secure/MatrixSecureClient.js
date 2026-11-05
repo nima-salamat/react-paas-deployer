@@ -114,8 +114,8 @@ function storeSession(session) {
   return stored;
 }
 
-function clearSession() {
-  const namespace = currentSessionNamespace || currentDjangoUserNamespace();
+function clearSession(storageNamespace = null) {
+  const namespace = storageNamespace || currentSessionNamespace || currentDjangoUserNamespace();
   if (namespace) {
     try { localStorage.removeItem(`${SESSION_KEY_PREFIX}${namespace}`); }
     catch { /* Keep runtime state cleared even if storage is blocked. */ }
@@ -1392,14 +1392,14 @@ export async function createEncryptedTopic({ conversation, title, description = 
   );
 }
 
-export function shutdownSecureMatrixClient({ clearStoredSession = false } = {}) {
+export function shutdownSecureMatrixClient({ clearStoredSession = false, storageNamespace = null } = {}) {
   try { client?.stopClient(); } catch { /* no-op */ }
   client = null;
   clientPromise = null;
   clientPromiseNamespace = "";
 
   if (clearStoredSession) {
-    clearSession();
+    clearSession(storageNamespace);
   } else {
     // Normal shutdown and account switching release SDK resources and locks
     // without deleting a validated session that should be reused next time.
@@ -1413,4 +1413,111 @@ export function shutdownSecureMatrixClient({ clearStoredSession = false } = {}) 
   recoveryKeyIdPending = null;
   if (releaseDeviceLock) releaseDeviceLock();
   releaseDeviceLock = null;
+}
+
+/**
+ * Explicit user-initiated logout:
+ * - invalidate the current Matrix access token at the homeserver;
+ * - remove the browser-persisted Matrix bearer token;
+ * - stop the local SDK and clear in-memory secret-storage material.
+ *
+ * The stable device ID and IndexedDB crypto store are intentionally retained.
+ * They are device identity/key material, not login credentials; preserving them
+ * avoids silently destroying the only local copy of historical room keys.
+ */
+export async function logoutSecureMatrixSession() {
+  const namespace = currentDjangoUserNamespace() || currentSessionNamespace;
+  let session = null;
+
+  if (namespace) {
+    if (currentSession && currentSessionNamespace === namespace && isValidStoredSession(currentSession)) {
+      session = currentSession;
+    } else {
+      try {
+        const stored = JSON.parse(
+          localStorage.getItem(`${SESSION_KEY_PREFIX}${namespace}`) || "null",
+        );
+        if (isValidStoredSession(stored)) session = stored;
+      } catch {
+        // A broken browser storage entry must not block local sign-out.
+      }
+    }
+  } else if (currentSession && isValidStoredSession(currentSession)) {
+    session = currentSession;
+  }
+
+  let remoteLogoutConfirmed = false;
+  try {
+    client?.stopClient();
+  } catch {
+    // Local cleanup continues even if the SDK has already stopped.
+  }
+
+  if (session?.accessToken && session?.homeserverUrl) {
+    let timeoutId = null;
+    let controller = null;
+    try {
+      controller = new AbortController();
+      timeoutId = globalThis.setTimeout(() => controller.abort(), 4000);
+      const response = await fetch(
+        `${session.homeserverUrl.replace(/\\/+$/, "")}/_matrix/client/v3/logout`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: "{}",
+          credentials: "omit",
+          cache: "no-store",
+          redirect: "error",
+          signal: controller.signal,
+        },
+      );
+      // A 401 means the Matrix token was already invalid; that is also a
+      // successful security outcome for logout.
+      remoteLogoutConfirmed = response.ok || response.status === 401;
+      if (!remoteLogoutConfirmed) {
+        console.warn("Matrix logout could not be confirmed; the local token will still be removed.");
+      }
+    } catch {
+      // Offline homeservers must never prevent local credential removal.
+      console.warn("Matrix logout could not reach the homeserver; the local token will still be removed.");
+    } finally {
+      if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
+    }
+  }
+
+  shutdownSecureMatrixClient({
+    clearStoredSession: true,
+    storageNamespace: namespace || null,
+  });
+
+  return {
+    hadMatrixSession: Boolean(session?.accessToken),
+    remoteLogoutConfirmed,
+  };
+}
+
+/**
+ * A Django session expiring is not an explicit Matrix logout. Stop active sync
+ * while preserving the Matrix token, stable device ID and local crypto store;
+ * the next successful Django login will validate and reuse that device.
+ */
+function suspendMatrixRuntimeWhenDjangoAuthIsMissing() {
+  try {
+    if (getSessionBoundAccessToken(window.localStorage)) return;
+  } catch {
+    // Treat inaccessible auth storage as unauthenticated for runtime purposes.
+  }
+  shutdownSecureMatrixClient();
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("auth-changed", suspendMatrixRuntimeWhenDjangoAuthIsMissing);
+  window.addEventListener("storage", (event) => {
+    if (event.key === null || event.key === "access" || event.key === "refresh") {
+      suspendMatrixRuntimeWhenDjangoAuthIsMissing();
+    }
+  });
 }
