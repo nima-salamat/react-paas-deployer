@@ -5,6 +5,7 @@ services:
       context: .
       args:
         DOCKERFILE_NPM_MIRROR: ${DOCKERFILE_NPM_MIRROR:-https://registry.npmmirror.com}
+        NODE_MAX_OLD_SPACE_SIZE: ${NODE_MAX_OLD_SPACE_SIZE:-4096}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3005:3000"
