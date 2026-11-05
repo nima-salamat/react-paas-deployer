@@ -72,7 +72,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
   const [step, setStep] = useState("credentials");
   const [method, setMethod] = useState(() => {
     const remembered = readLastLoginIdentifier();
-    return remembered.method || "email";
+    return remembered.method || (remembered.email ? "email" : (remembered.phone ? "phone" : (remembered.username ? "username" : "email")));
   });
   const [form, setForm] = useState(() => {
     const remembered = readLastLoginIdentifier();
@@ -123,11 +123,13 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
       // Submit exactly the identifier the user selected. A remembered username
       // must not be combined with a newly edited email/phone and accidentally
       // resolve a different account through the backend's OR fallback.
-      if (method === "email" && settings.allow_email && form.email.trim()) {
+      if (method === "username" && settings.allow_username && !settings.require_otp && form.username.trim()) {
+        base.username = form.username.trim();
+      } else if (method === "email" && settings.allow_email && form.email.trim()) {
         base.email = form.email.trim();
       } else if (method === "phone" && settings.allow_phone && form.phone.trim()) {
         base.phone_number = form.phone.trim();
-      } else if (settings.allow_username && form.username.trim()) {
+      } else if (settings.allow_username && !settings.require_otp && form.username.trim()) {
         base.username = form.username.trim();
       }
       base.existing_account_only = true;
@@ -155,7 +157,9 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
       username: settings.allow_username ? form.username : "",
       email: settings.allow_email ? form.email : "",
       phone: settings.allow_phone ? form.phone : "",
-      method,
+      method: method === "username" && settings.require_otp
+        ? (settings.allow_email ? "email" : (settings.allow_phone ? "phone" : "username"))
+        : method,
     });
     clearSessionReauthRequired();
     recordAuthLifecycleEvent("login", "authentication_succeeded");
@@ -199,11 +203,13 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
   }, [inviteFromUrl, language]);
 
   useEffect(() => {
+    if (method === "username" && settings.allow_username && !settings.require_otp) return;
     if (method === "email" && settings.allow_email) return;
     if (method === "phone" && settings.allow_phone) return;
     if (settings.allow_email) setMethod("email");
     else if (settings.allow_phone) setMethod("phone");
-  }, [settings.allow_email, settings.allow_phone, method]);
+    else if (settings.allow_username) setMethod("username");
+  }, [settings.allow_username, settings.allow_email, settings.allow_phone, settings.require_otp, method]);
 
   useEffect(() => {
     if (reauthMode) return;
@@ -382,7 +388,14 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
       ? `linear-gradient(135deg, rgba(10,25,47,0.9) 0%, rgba(22,32,54,0.85) 50%, rgba(7,16,32,0.95) 100%)`
       : `linear-gradient(135deg, ${theme.palette.primary.light} 0%, rgba(255,255,255,0.85) 30%, ${theme.palette.secondary.light} 100%)`;
 
-  const showMethodToggle = settings.allow_email && settings.allow_phone;
+  const reauthMethodOptions = [
+    settings.allow_username && !settings.require_otp ? "username" : null,
+    settings.allow_email ? "email" : null,
+    settings.allow_phone ? "phone" : null,
+  ].filter(Boolean);
+  const showMethodToggle = reauthMode
+    ? reauthMethodOptions.length > 1
+    : settings.allow_email && settings.allow_phone;
   const recoveryEmailOk = step.startsWith("password_recovery") ? settings.password_recovery_via_email : settings.recovery_via_email;
   const recoveryPhoneOk = step.startsWith("password_recovery") ? settings.password_recovery_via_phone : settings.recovery_via_phone;
   const showRecoveryMethodToggle = recoveryEmailOk && recoveryPhoneOk;
@@ -571,7 +584,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
 
         {!loginClosed && step === "credentials" && (
           <Box component="form" onSubmit={handleCredentials} noValidate>
-            {settings.allow_username && (
+            {settings.allow_username && (!reauthMode || method === "username" || settings.require_otp) && (
               <TextField fullWidth label={t("Username")} name="username" value={form.username}
                 onChange={onChange} margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
             )}
@@ -598,6 +611,9 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
                     },
                   }}
                 >
+                  {reauthMode && settings.allow_username && !settings.require_otp && (
+                    <ToggleButton value="username"><PersonSearchOutlined sx={{ mr: 0.5 }} /> {t("Username")}</ToggleButton>
+                  )}
                   {settings.allow_email && <ToggleButton value="email"><EmailOutlined sx={{ mr: 0.5 }} /> {t("Email")}</ToggleButton>}
                   {settings.allow_phone && <ToggleButton value="phone"><PhoneOutlined sx={{ mr: 0.5 }} /> {t("Phone")}</ToggleButton>}
                 </ToggleButtonGroup>
