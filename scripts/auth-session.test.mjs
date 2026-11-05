@@ -535,3 +535,30 @@ test("profile cache ignores malformed, stale-version and non-array payloads", ()
   values.set(key, JSON.stringify({ version: 1, savedAt: Date.now(), profiles: {} }));
   assert.equal(readProfileCache("user:17", storage), null);
 });
+
+
+test("home and dashboard navbars hydrate from the previous profile before refreshing", () => {
+  const homeNavbar = read("src/components/layout/Navbar.jsx");
+  const dashboardNavbar = read("src/components/dashboard/DashboardNavbar.jsx");
+  const profileContext = read("src/components/profile/profileContext.jsx");
+  const accountMenu = read("src/components/layout/AccountMenu.jsx");
+
+  assert.match(homeNavbar, /useState\(readInitialNavbarState\)/);
+  assert.match(homeNavbar, /setLoggedIn\(initialAuthState\.loggedIn\)/);
+  assert.match(homeNavbar, /setIsStaff\(initialAuthState\.isStaff\)/);
+  assert.match(homeNavbar, /loggedIn \? \(/);
+  assert.match(profileContext, /normalizeProfiles\(readProfileCache\(initialScope\) \|\| \[\]\)/);
+  assert.match(profileContext, /writeProfileCache\(scope, list\)/);
+  assert.match(profileContext, /activeScopeRef\.current === scope && getAuthCacheScope\(\) === scope/);
+  assert.match(dashboardNavbar, /useProfiles\(\)/);
+  assert.match(accountMenu, /useProfiles\(\)/);
+  assert.match(accountMenu, /resolveProfileImageUrl\(currentProfile\)/);
+});
+
+test("explicit logout clears cached navbar role hints but keeps profile snapshots account-scoped", () => {
+  const logout = read("src/components/customHooks/logout.js");
+  const auth = read("src/components/customHooks/authSession.js");
+  assert.match(logout, /clearCachedNavbarState\(storage\)/);
+  assert.match(auth, /cached\?\.scope !== scope/);
+  assert.match(auth, /export function getAuthCacheScope/);
+});
