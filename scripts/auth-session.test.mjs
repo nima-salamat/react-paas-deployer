@@ -461,7 +461,7 @@ test("reauthentication follows current backend methods and cannot create an acco
   assert.match(signin, /reauthMode && step === "credentials" \? t\("Sign in again"\)/);
   assert.match(signin, /onAuthenticated\?\.\(\)/);
   assert.match(signin, /rememberLoginIdentifier/);
-  assert.match(signin, /settings.allow_username && !settings.require_otp \\? "username" : null/);
+  assert.match(signin, /settings.allow_username && !settings.require_otp \? "username" : null/);
   assert.match(signin, /base.existing_account_only = true/);
   assert.match(signin, /if \(reauthMode && \(!settingsLoaded \|\| settingsError\)\)/);
   assert.match(signin, /setSettingsRetry/);
