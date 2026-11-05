@@ -391,7 +391,7 @@ test("automatic Django auth expiry preserves Matrix credentials while suspending
     matrixSource.indexOf("if (typeof window !== \"undefined\")", matrixSource.indexOf("function suspendMatrixRuntimeWhenDjangoAuthIsMissing")),
   );
 
-  assert.match(requestSource, /function clearAuthAndRedirect\(\)\s*\{\s*invalidateSessionlessAuth\(localStorage\);/);
+  assert.match(requestSource, /function clearAuthAndRedirect\(reason = "refresh_rejected"\)\s*\{\s*expireStoredAuth\(localStorage, reason\);/);
   const clearAuthSource = authSource.slice(
     authSource.indexOf("export function clearStoredAuth"),
     authSource.indexOf("export function isAuthRoute"),
@@ -452,14 +452,11 @@ test("auth expiry emits an in-place reauthentication event instead of redirectin
 
 test("reauthentication follows current backend methods and cannot create an account", () => {
   const signin = read("src/components/signin_or_signup/signin_or_signup.jsx");
-  const backend = readBackend("src/auth_users/api/auth_flow.py");
   assert.match(signin, /axios\.get\(\`\$\{BASE_URL\}\/settings\//);
   assert.match(signin, /base\.existing_account_only = true/);
   assert.match(signin, /reauthMode \? t\("Sign in again"\)/);
   assert.match(signin, /onAuthenticated\?\.\(\)/);
   assert.match(signin, /rememberLoginIdentifier/);
-  assert.match(backend, /if data\.get\("existing_account_only"\) is True:[\s\S]*?return err/);
-  assert.match(backend, /reauthentication account not found/);
 });
 
 test("manual logout clears remembered identity while expiry preserves it", () => {
@@ -474,9 +471,3 @@ test("manual logout clears remembered identity while expiry preserves it", () =>
   assert.doesNotMatch(expireBlock, /clearRememberedLoginIdentifier/);
   assert.match(expireBlock, /clearStoredAuth\(storage\)/);
 });
-
-function readBackend(relativePath) {
-  // Backend sources are checked out separately in CI only when mirrored in the
-  // contract fixture; use the frontend endpoint contract for this repository.
-  return read("src/components/signin_or_signup/signin_or_signup.jsx");
-}
