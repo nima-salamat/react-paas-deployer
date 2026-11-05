@@ -13,7 +13,7 @@ import { logoutSecureMatrixSession } from "../messenger/secure/MatrixSecureClien
  * token must still be available locally for the homeserver logout request.
  * Automatic token expiry deliberately does not call this function.
  */
-export async function logoutCurrentBrowser({ revokeDjangoSession = true } = {}) {
+export async function logoutCurrentBrowser({ revokeDjangoSession = true, logoutMatrix = true } = {}) {
   let storage = null;
   let sessionId = null;
 
