@@ -544,8 +544,8 @@ test("home and dashboard navbars hydrate from the previous profile before refres
   const accountMenu = read("src/components/layout/AccountMenu.jsx");
 
   assert.match(homeNavbar, /useState\(readInitialNavbarState\)/);
-  assert.match(homeNavbar, /setLoggedIn\(initialAuthState\.loggedIn\)/);
-  assert.match(homeNavbar, /setIsStaff\(initialAuthState\.isStaff\)/);
+  assert.match(homeNavbar, /useState\(initialAuthState\.loggedIn\)/);
+  assert.match(homeNavbar, /useState\(initialAuthState\.isStaff\)/);
   assert.match(homeNavbar, /loggedIn \? \(/);
   assert.match(profileContext, /normalizeProfiles\(readProfileCache\(initialScope\) \|\| \[\]\)/);
   assert.match(profileContext, /writeProfileCache\(scope, list\)/);
