@@ -69,6 +69,8 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
 
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsRetry, setSettingsRetry] = useState(0);
   const [step, setStep] = useState("credentials");
   const [method, setMethod] = useState(() => {
     const remembered = readLastLoginIdentifier();
@@ -178,14 +180,24 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
   };
 
   useEffect(() => {
+    let active = true;
+    setSettingsLoaded(false);
+    setSettingsError("");
     (async () => {
       try {
         const res = await axios.get(`${BASE_URL}/settings/`, getAuthRequestConfig());
-        if (res.data?.settings) setSettings({ ...DEFAULT_SETTINGS, ...res.data.settings });
-      } catch { /* keep defaults */ }
-      finally { setSettingsLoaded(true); }
+        if (!res.data?.settings || typeof res.data.settings !== "object") {
+          throw new Error("Login settings response was incomplete.");
+        }
+        if (active) setSettings({ ...DEFAULT_SETTINGS, ...res.data.settings });
+      } catch {
+        if (active) setSettingsError("Could not load the current sign-in settings. Please retry.");
+      } finally {
+        if (active) setSettingsLoaded(true);
+      }
     })();
-  }, [language]);
+    return () => { active = false; };
+  }, [language, settingsRetry]);
 
   useEffect(() => {
     if (!inviteFromUrl) return;
@@ -425,6 +437,38 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
     password_recovery_otp: t("Enter the code and choose a new password."),
   };
 
+  if (reauthMode && (!settingsLoaded || settingsError)) {
+    return (
+      <Box
+        role="status"
+        sx={{
+          minHeight: 120,
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 2,
+        }}
+      >
+        {settingsLoaded ? (
+          <Alert
+            severity="warning"
+            variant="outlined"
+            action={
+              <Button color="inherit" size="small" onClick={() => setSettingsRetry((value) => value + 1)}>
+                {t("Retry")}
+              </Button>
+            }
+          >
+            {t(settingsError || "Could not load the current sign-in settings. Please retry.")}
+          </Alert>
+        ) : (
+          <CircularProgress size={28} />
+        )}
+      </Box>
+    );
+  }
+
   if (loginClosed && !reauthMode) {
     return (
       <Box
@@ -515,7 +559,7 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
         boxSizing: "border-box",
       }}
     >
-      <Backdrop sx={{ color: "#fff", zIndex: (t) => (reauthMode ? t.zIndex.modal + 2 : t.zIndex.drawer + 2) }} open={loading || !settingsLoaded}>
+      <Backdrop sx={{ color: "#fff", zIndex: (t) => (reauthMode ? t.zIndex.modal + 2 : t.zIndex.drawer + 2) }} open={loading}>
         <CircularProgress color="inherit" />
       </Backdrop>
 
