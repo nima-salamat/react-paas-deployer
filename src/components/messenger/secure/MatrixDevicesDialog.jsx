@@ -104,7 +104,7 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
           {message && <Alert severity="success">{t(message)}</Alert>}
           {!loading && !error && (
             <Alert severity="info">
-              {devices.filter((device) => !device.revoked_at).length} {t("active Matrix device(s)")} · {devices.filter((device) => Boolean(device.revoked_at)).length} {t("revoked historical device(s).")}
+              {devices.filter((device) => !device.revoked_at && !device.logged_out_at).length} {t("active Matrix device(s)")} · {devices.filter((device) => Boolean(device.logged_out_at) && !device.revoked_at).length} {t("signed-out device(s)")} · {devices.filter((device) => Boolean(device.revoked_at)).length} {t("revoked historical device(s).")}
             </Alert>
           )}
           {loading && <Box sx={{ py: 2, display: "flex", justifyContent: "center" }}><CircularProgress size={22} /></Box>}
@@ -117,6 +117,7 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
             {devices.map((device) => {
               const isCurrent = Boolean(device.is_current);
               const revoked = Boolean(device.revoked_at);
+              const loggedOut = Boolean(device.logged_out_at) && !revoked;
               return (
                 <ListItem
                   key={device.device_id}
@@ -147,6 +148,7 @@ export default function MatrixDevicesDialog({ open, onClose, onCurrentDeviceRevo
                           {device.display_name || "Paas Deployer browser"}
                         </Typography>
                         {isCurrent && <Typography component="span" color="primary.main" variant="caption">(this device)</Typography>}
+                        {loggedOut && <Typography component="span" color="text.secondary" variant="caption">(signed out; can sign in again)</Typography>}
                         {revoked && <Typography component="span" color="error.main" variant="caption">(revoked)</Typography>}
                       </Box>
                     )}
