@@ -6,6 +6,7 @@ import { getSessionBoundAccessToken } from "../../customHooks/authSession.js";
 
 const LEGACY_SESSION_KEY = "pd.matrix.secure-session.v1";
 const SESSION_KEY_PREFIX = "pd.matrix.secure-session.v2:";
+const PERSISTENT_ACCOUNT_NAMESPACE_KEY = "pd.matrix.account-namespace.v1";
 const PERSISTENT_DEVICE_KEY_PREFIX = "pd.matrix.device-id.v1:";
 const CRYPTO_STORE_MODE_KEY_PREFIX = "pd.matrix.crypto-store-mode.v1:";
 const DEVICE_MARKER_DB = "pd-messenger-matrix-device-marker";
@@ -111,6 +112,14 @@ function storeSession(session) {
 
   currentSessionNamespace = namespace;
   currentSession = stored;
+  try {
+    // The Django JWT may be gone by the time the user explicitly signs out
+    // from the expiry dialog. Remember only the account namespace (not a token)
+    // so the matching Matrix bearer credential can still be invalidated.
+    localStorage.setItem(PERSISTENT_ACCOUNT_NAMESPACE_KEY, namespace);
+  } catch {
+    // The Matrix session itself is already stored; this hint is best-effort.
+  }
   return stored;
 }
 
@@ -119,6 +128,13 @@ function clearSession(storageNamespace = null) {
   if (namespace) {
     try { localStorage.removeItem(`${SESSION_KEY_PREFIX}${namespace}`); }
     catch { /* Keep runtime state cleared even if storage is blocked. */ }
+    try {
+      if (localStorage.getItem(PERSISTENT_ACCOUNT_NAMESPACE_KEY) === namespace) {
+        localStorage.removeItem(PERSISTENT_ACCOUNT_NAMESPACE_KEY);
+      }
+    } catch {
+      /* Optional namespace hint; never block local logout. */
+    }
   }
   try { sessionStorage.removeItem(LEGACY_SESSION_KEY); } catch { /* optional legacy state */ }
   currentSession = null;
@@ -1427,7 +1443,14 @@ export function shutdownSecureMatrixClient({ clearStoredSession = false, storage
  * administrator's permanent device revocation, so the same ID can be reused.
  */
 export async function logoutSecureMatrixSession() {
-  const namespace = currentDjangoUserNamespace() || currentSessionNamespace;
+  let namespace = currentDjangoUserNamespace() || currentSessionNamespace;
+  if (!namespace) {
+    try {
+      namespace = localStorage.getItem(PERSISTENT_ACCOUNT_NAMESPACE_KEY) || "";
+    } catch {
+      namespace = "";
+    }
+  }
   let session = null;
 
   if (namespace) {
