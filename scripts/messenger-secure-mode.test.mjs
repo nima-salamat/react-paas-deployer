@@ -786,3 +786,33 @@ test("secure voice recording shows live microphone waveform and elapsed time ins
   assert.match(panel, /formatDuration\(Math\.floor\(recordingElapsedMs \/ 1000\)\)/);
   assert.match(panel, /voiceRecordingStartedAtRef\.current = Date\.now\(\)/);
 });
+
+
+test("explicit logout revokes the current Matrix token but preserves device key material", () => {
+  const source = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const start = source.indexOf("export async function logoutSecureMatrixSession");
+  const end = source.indexOf("/**", start + 1);
+  const logout = source.slice(start, end);
+
+  assert.ok(start >= 0);
+  assert.match(logout, /_matrix\/client\/v3\/logout/);
+  assert.match(logout, /credentials:\s*"omit"/);
+  assert.match(logout, /redirect:\s*"error"/);
+  assert.match(logout, /clearStoredSession:\s*true/);
+  assert.doesNotMatch(logout, /forgetPersistentMatrixDeviceId/);
+  assert.doesNotMatch(logout, /indexedDB\.deleteDatabase/);
+  assert.match(logout, /stable device ID and IndexedDB crypto store are intentionally retained/);
+});
+
+test("Django expiry shuts down Matrix sync without erasing the saved Matrix session", () => {
+  const source = read("src/components/messenger/secure/MatrixSecureClient.js");
+  const start = source.indexOf("function suspendMatrixRuntimeWhenDjangoAuthIsMissing");
+  const end = source.indexOf("if (typeof window !== \"undefined\")", start);
+  const handler = source.slice(start, end);
+
+  assert.ok(start >= 0 && end > start);
+  assert.match(handler, /getSessionBoundAccessToken\(window\.localStorage\)/);
+  assert.match(handler, /shutdownSecureMatrixClient\(\);/);
+  assert.doesNotMatch(handler, /clearStoredSession:\s*true/);
+  assert.doesNotMatch(handler, /clearSession\(/);
+});
