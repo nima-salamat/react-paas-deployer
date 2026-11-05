@@ -13,14 +13,6 @@ import { readProfileCache, writeProfileCache } from "./profileCache.js";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
 
-function hasAccessToken() {
-  try {
-    return Boolean(getSessionBoundAccessToken(window.localStorage));
-  } catch {
-    return false;
-  }
-}
-
 export function resolveProfileImageUrl(profile) {
   if (!profile) return null;
   const candidates = [
