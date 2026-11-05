@@ -51,9 +51,20 @@ import { useLocale } from "../../i18n/LocaleProvider.jsx";
 import { useProfiles, resolveProfileImageUrl } from "../profile/profileContext.jsx";
 import AccountMenu from "./AccountMenu.jsx";
 import { logoutCurrentBrowser } from "../customHooks/logout.js";
+import { clearCachedNavbarState, getSessionBoundAccessToken, readCachedNavbarState, writeCachedNavbarState } from "../customHooks/authSession.js";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}`;
 const DEFAULT_ICON = "/icon.svg";
+
+function readInitialNavbarState() {
+  try {
+    const hasSession = Boolean(getSessionBoundAccessToken(window.localStorage));
+    const cached = hasSession ? readCachedNavbarState(window.localStorage) : null;
+    return { loggedIn: hasSession, isStaff: Boolean(cached?.isStaff) };
+  } catch {
+    return { loggedIn: false, isStaff: false };
+  }
+}
 
 const baseNavItems = [
   { path: "/", label: "Home", icon: HomeOutlinedIcon, guest: true },
@@ -77,12 +88,17 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
   const theme = useTheme();
   const { t } = useLocale();
 
+  const [initialAuthState] = useState(readInitialNavbarState);
+  const { profiles, fetchProfiles: refreshProfiles, primaryImageUrl } = useProfiles();
+
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [userImage, setUserImage] = useState(null);
- 
+  const [loggedIn, setLoggedIn] = useState(initialAuthState.loggedIn);
+  const [isStaff, setIsStaff] = useState(initialAuthState.isStaff);
+  const [checkingAuth, setCheckingAuth] = useState(initialAuthState.loggedIn);
+  const [userImage, setUserImage] = useState(() =>
+    primaryImageUrl || resolveProfileImageUrl(profiles[0]) || null
+  );
+
   const firstItemRef = useRef(null);
   const authCheckStartedRef = useRef(false);
   const profileRequestRef = useRef(null);
@@ -90,8 +106,6 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
   const currentProfileIdRef = useRef(null);
   const mountedRef = useRef(true);
   const previousViewedProfileIdRef = useRef(null);
-
-  const { profiles, fetchProfiles: refreshProfiles, primaryImageUrl } = useProfiles();
 
   useEffect(() => {
     mountedRef.current = true;
