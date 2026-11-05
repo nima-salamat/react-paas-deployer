@@ -1417,13 +1417,14 @@ export function shutdownSecureMatrixClient({ clearStoredSession = false, storage
 
 /**
  * Explicit user-initiated logout:
- * - invalidate the current Matrix access token at the homeserver;
+ * - ask Django to invalidate the Matrix access token and mark the device as
+ *   deliberately signed out (not permanently revoked);
  * - remove the browser-persisted Matrix bearer token;
  * - stop the local SDK and clear in-memory secret-storage material.
  *
  * The stable device ID and IndexedDB crypto store are intentionally retained.
- * They are device identity/key material, not login credentials; preserving them
- * avoids silently destroying the only local copy of historical room keys.
+ * Django records the expected remote-device deletion separately from an
+ * administrator's permanent device revocation, so the same ID can be reused.
  */
 export async function logoutSecureMatrixSession() {
   const namespace = currentDjangoUserNamespace() || currentSessionNamespace;
@@ -1460,13 +1461,14 @@ export async function logoutSecureMatrixSession() {
       controller = new AbortController();
       timeoutId = globalThis.setTimeout(() => controller.abort(), 4000);
       const response = await fetch(
-        `${session.homeserverUrl.replace(/\\/+$/, "")}/_matrix/client/v3/logout`,
+        `${MSG_API}/secure/device-session/logout/`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.accessToken}`,
+          headers: authHeaders({
             "Content-Type": "application/json",
-          },
+            "X-Matrix-Access-Token": session.accessToken,
+            "X-Matrix-Device-ID": session.deviceId,
+          }),
           body: "{}",
           credentials: "omit",
           cache: "no-store",
@@ -1474,9 +1476,8 @@ export async function logoutSecureMatrixSession() {
           signal: controller.signal,
         },
       );
-      // A 401 means the Matrix token was already invalid; that is also a
-      // successful security outcome for logout.
-      remoteLogoutConfirmed = response.ok || response.status === 401;
+      const body = await response.json().catch(() => null);
+      remoteLogoutConfirmed = response.ok && (body?.data?.logged_out === true || body?.logged_out === true);
       if (!remoteLogoutConfirmed) {
         console.warn("Matrix logout could not be confirmed; the local token will still be removed.");
       }
