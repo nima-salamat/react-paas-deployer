@@ -1,5 +1,6 @@
 export const LAST_LOGIN_IDENTIFIER_KEY = "paas.auth.last-identifier.v1";
 export const AUTH_LIFECYCLE_KEY = "paas.auth.lifecycle.v1";
+export const NAVBAR_AUTH_CACHE_KEY = "paas.auth.navbar-state.v1";
 const SESSION_REAUTH_REQUIRED_KEY = "paas.auth.reauth-required.v1";
 
 export function decodeJwtPayload(token) {
@@ -15,6 +16,72 @@ export function decodeJwtPayload(token) {
 
 export function isSessionBoundToken(token) {
   return Boolean(decodeJwtPayload(token)?.sid);
+}
+
+/**
+ * Stable, non-secret scope for UI caches. Profile and role snapshots are
+ * isolated by authenticated account and are never used to authorize requests.
+ */
+export function getAuthCacheScope(storage) {
+  try {
+    const target = storage || (typeof window !== "undefined" ? window.localStorage : null);
+    const token = target?.getItem?.("access");
+    const payload = decodeJwtPayload(token);
+    if (!payload?.sid) return "";
+    const userId = payload.user_id ?? payload.userId ?? payload.uid ?? payload.sub;
+    if (userId !== undefined && userId !== null && String(userId).trim()) {
+      return `user:${String(userId).slice(0, 160)}`;
+    }
+    return `session:${String(payload.sid).slice(0, 160)}`;
+  } catch {
+    return "";
+  }
+}
+
+export function readCachedNavbarState(storage) {
+  try {
+    const target = storage || (typeof window !== "undefined" ? window.localStorage : null);
+    const scope = getAuthCacheScope(target);
+    if (!scope) return null;
+    const cached = JSON.parse(target?.getItem?.(NAVBAR_AUTH_CACHE_KEY) || "null");
+    const savedAt = Number(cached?.savedAt);
+    if (
+      cached?.version !== 1 ||
+      cached?.scope !== scope ||
+      !Number.isFinite(savedAt) ||
+      savedAt > Date.now() ||
+      Date.now() - savedAt > 30 * 24 * 60 * 60 * 1000
+    ) return null;
+    return { isStaff: Boolean(cached.isStaff), scope };
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedNavbarState(isStaff, storage) {
+  try {
+    const target = storage || (typeof window !== "undefined" ? window.localStorage : null);
+    const scope = getAuthCacheScope(target);
+    if (!target || !scope) return false;
+    target.setItem(NAVBAR_AUTH_CACHE_KEY, JSON.stringify({
+      version: 1,
+      scope,
+      isStaff: Boolean(isStaff),
+      savedAt: Date.now(),
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearCachedNavbarState(storage) {
+  try {
+    const target = storage || (typeof window !== "undefined" ? window.localStorage : null);
+    target?.removeItem?.(NAVBAR_AUTH_CACHE_KEY);
+  } catch {
+    // Cache cleanup is best-effort and must not affect logout.
+  }
 }
 
 export function clearStoredAuth(storage) {
