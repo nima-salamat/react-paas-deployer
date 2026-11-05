@@ -119,11 +119,24 @@ export default function SigninOrSignup({ reauthMode = false, onAuthenticated } =
 
   const getPayload = async () => {
     const base = {};
-    if (settings.allow_username && form.username.trim()) base.username = form.username.trim();
-    if (method === "email" && form.email.trim()) base.email = form.email.trim();
-    if (method === "phone" && form.phone.trim()) base.phone_number = form.phone.trim();
-    if (inviteToken && !reauthMode) base.invite = inviteToken;
-    if (reauthMode) base.existing_account_only = true;
+    if (reauthMode) {
+      // Submit exactly the identifier the user selected. A remembered username
+      // must not be combined with a newly edited email/phone and accidentally
+      // resolve a different account through the backend's OR fallback.
+      if (method === "email" && settings.allow_email && form.email.trim()) {
+        base.email = form.email.trim();
+      } else if (method === "phone" && settings.allow_phone && form.phone.trim()) {
+        base.phone_number = form.phone.trim();
+      } else if (settings.allow_username && form.username.trim()) {
+        base.username = form.username.trim();
+      }
+      base.existing_account_only = true;
+    } else {
+      if (settings.allow_username && form.username.trim()) base.username = form.username.trim();
+      if (method === "email" && form.email.trim()) base.email = form.email.trim();
+      if (method === "phone" && form.phone.trim()) base.phone_number = form.phone.trim();
+      if (inviteToken) base.invite = inviteToken;
+    }
     return { ...base, ...(await getDeviceAuthPayload()) };
   };
 
