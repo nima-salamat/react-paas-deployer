@@ -23,7 +23,7 @@ import LockReset from "@mui/icons-material/LockReset";
 import LinkIcon from "@mui/icons-material/Link";
 import Block from "@mui/icons-material/Block";
 import { clearAuthAndRedirect } from "../customHooks/apiRequest.jsx";
-import { isSessionBoundToken } from "../customHooks/authSession.js";
+import { isSessionBoundToken, readLastLoginIdentifier, rememberLoginIdentifier, clearSessionReauthRequired, recordAuthLifecycleEvent } from "../customHooks/authSession.js";
 import { getDeviceAuthPayload } from "../security/deviceIdentity.js";
 import { useLocale } from "../../i18n/LocaleProvider.jsx";
 
@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS = {
   custom_login_closed_message: "",
 };
 
-export default function SigninOrSignup() {
+export default function SigninOrSignup({ reauthMode = false, onAuthenticated } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -70,9 +70,20 @@ export default function SigninOrSignup() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [step, setStep] = useState("credentials");
-  const [method, setMethod] = useState("email");
-  const [form, setForm] = useState({
-    username: "", email: "", phone: "", code: "", password: "", password_confirm: "",
+  const [method, setMethod] = useState(() => {
+    const remembered = readLastLoginIdentifier();
+    return remembered.method || "email";
+  });
+  const [form, setForm] = useState(() => {
+    const remembered = readLastLoginIdentifier();
+    return {
+      username: remembered.username || "",
+      email: remembered.email || "",
+      phone: remembered.phone || "",
+      code: "",
+      password: "",
+      password_confirm: "",
+    };
   });
   const [inviteToken, setInviteToken] = useState(inviteFromUrl);
   const [inviteInfo, setInviteInfo] = useState(null);
@@ -111,7 +122,8 @@ export default function SigninOrSignup() {
     if (settings.allow_username && form.username.trim()) base.username = form.username.trim();
     if (method === "email" && form.email.trim()) base.email = form.email.trim();
     if (method === "phone" && form.phone.trim()) base.phone_number = form.phone.trim();
-    if (inviteToken) base.invite = inviteToken;
+    if (inviteToken && !reauthMode) base.invite = inviteToken;
+    if (reauthMode) base.existing_account_only = true;
     return { ...base, ...(await getDeviceAuthPayload()) };
   };
 
@@ -126,7 +138,23 @@ export default function SigninOrSignup() {
   const completeLogin = (access, refresh) => {
     if (access) localStorage.setItem("access", access);
     if (refresh) localStorage.setItem("refresh", refresh);
+    rememberLoginIdentifier({
+      username: settings.allow_username ? form.username : "",
+      email: settings.allow_email ? form.email : "",
+      phone: settings.allow_phone ? form.phone : "",
+      method,
+    });
+    clearSessionReauthRequired();
+    recordAuthLifecycleEvent("login", "authentication_succeeded");
     window.dispatchEvent(new Event("auth-changed"));
+
+    if (reauthMode) {
+      // The expired-session dialog is mounted above the current route. Do not
+      // navigate: restoring credentials should return the user exactly here.
+      onAuthenticated?.();
+      return;
+    }
+
     const returnPath = getReturnPath();
     if (returnPath) navigate(returnPath, { replace: true });
     else navigate("/", { replace: true });
@@ -158,9 +186,11 @@ export default function SigninOrSignup() {
   }, [inviteFromUrl, language]);
 
   useEffect(() => {
+    if (method === "email" && settings.allow_email) return;
+    if (method === "phone" && settings.allow_phone) return;
     if (settings.allow_email) setMethod("email");
     else if (settings.allow_phone) setMethod("phone");
-  }, [settings.allow_email, settings.allow_phone]);
+  }, [settings.allow_email, settings.allow_phone, method]);
 
   useEffect(() => {
     const token = localStorage.getItem("access");
@@ -368,11 +398,11 @@ export default function SigninOrSignup() {
     password_recovery_otp: t("Enter the code and choose a new password."),
   };
 
-  if (loginClosed) {
+  if (loginClosed && !reauthMode) {
     return (
       <Box
         sx={{
-          minHeight: { xs: "calc(100dvh - 64px)", md: "calc(100dvh - 72px)" },
+          minHeight: reauthMode ? 0 : { xs: "calc(100dvh - 64px)", md: "calc(100dvh - 72px)" },
           width: "100%",
           display: "flex",
           alignItems: "center",
@@ -449,16 +479,16 @@ export default function SigninOrSignup() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        p: { xs: 1, sm: 2 },
-        py: { xs: 1.5, sm: 2.5 },
-        background: bgGradient,
+        p: reauthMode ? 0 : { xs: 1, sm: 2 },
+        py: reauthMode ? 0 : { xs: 1.5, sm: 2.5 },
+        background: reauthMode ? "transparent" : bgGradient,
         position: "relative",
         overflowX: "hidden",
-        overflowY: "auto",
+        overflowY: reauthMode ? "visible" : "auto",
         boxSizing: "border-box",
       }}
     >
-      <Backdrop sx={{ color: "#fff", zIndex: (t) => t.zIndex.drawer + 2 }} open={loading}>
+      <Backdrop sx={{ color: "#fff", zIndex: (t) => (reauthMode ? t.zIndex.modal + 2 : t.zIndex.drawer + 2) }} open={loading}>
         <CircularProgress color="inherit" />
       </Backdrop>
 
@@ -467,30 +497,42 @@ export default function SigninOrSignup() {
         animate="visible"
         variants={fadeUp}
         transition={{ duration: 0.45 }}
-        elevation={12}
+        elevation={reauthMode ? 0 : 12}
         sx={{
-          p: { xs: 2, sm: 3, md: 4 },
+          p: reauthMode ? 0 : { xs: 2, sm: 3, md: 4 },
           maxWidth: 520,
           width: "100%",
-          my: { xs: 0.5, sm: 1.5 },
+          my: reauthMode ? 0 : { xs: 0.5, sm: 1.5 },
           boxSizing: "border-box",
-          borderRadius: { xs: 2.5, sm: 3 },
-          backdropFilter: "blur(10px)",
-          background: theme.palette.mode === "dark" ? "rgba(17,24,39,0.68)" : "rgba(255,255,255,0.88)",
-          border: "1px solid",
+          borderRadius: reauthMode ? 0 : { xs: 2.5, sm: 3 },
+          backdropFilter: reauthMode ? "none" : "blur(10px)",
+          background: reauthMode ? "transparent" : (theme.palette.mode === "dark" ? "rgba(17,24,39,0.68)" : "rgba(255,255,255,0.88)"),
+          border: reauthMode ? 0 : "1px solid",
           borderColor: "divider",
-          boxShadow: "0 18px 50px rgba(2,6,23,0.22)",
+          boxShadow: reauthMode ? "none" : "0 18px 50px rgba(2,6,23,0.22)",
         }}
       >
 
         <Typography component="h1" variant={isSm ? "h5" : "h4"} align="center" sx={{ fontWeight: 700, mb: 1 }}>
-          {stepTitle[step] || t("Welcome")}
+          {reauthMode && step === "credentials" ? t("Sign in again") : (stepTitle[step] || t("Welcome"))}
         </Typography>
         <Typography variant="body2" align="center" color="text.secondary" sx={{ mb: 2 }}>
-          {stepSubtitle[step] || ""}
+          {reauthMode && step === "credentials" ? t("Your session expired. Sign in to continue without leaving this page.") : (stepSubtitle[step] || "")}
         </Typography>
 
-        {inviteToken && step === "credentials" && (
+        {loginClosed && reauthMode && (
+          <Alert severity="warning" variant="outlined" sx={{ mb: 2 }}>
+            {t(settings.custom_login_closed_message || settings.custom_login_closed_title || "Authentication is currently disabled. Please try again later or contact support.")}
+          </Alert>
+        )}
+
+        {!loginClosed && reauthMode && step === "credentials" && (
+          <Alert severity="info" variant="outlined" sx={{ mb: 2 }}>
+            {t("Your current page will remain open. Only sign-in for your existing account is available here.")}
+          </Alert>
+        )}
+
+        {!reauthMode && inviteToken && step === "credentials" && (
           <Box sx={{ mb: 2 }}>
             {inviteInfo?.valid ? (
               <Alert severity="success" icon={<LinkIcon />} variant="outlined">
@@ -507,13 +549,13 @@ export default function SigninOrSignup() {
           </Box>
         )}
 
-        {signupClosed && !inviteToken && step === "credentials" && (
+        {!reauthMode && signupClosed && !inviteToken && step === "credentials" && (
           <Alert severity="info" sx={{ mb: 2 }} variant="outlined">
             {t("New accounts require an invite link. If you already have an account, just enter your credentials below and continue — login works without an invite.")}
           </Alert>
         )}
 
-        {step === "credentials" && (
+        {!loginClosed && step === "credentials" && (
           <Box component="form" onSubmit={handleCredentials} noValidate>
             {settings.allow_username && (
               <TextField fullWidth label={t("Username")} name="username" value={form.username}
@@ -576,7 +618,7 @@ export default function SigninOrSignup() {
           </Box>
         )}
 
-        {step === "otp" && (
+        {!loginClosed && step === "otp" && (
           <Box component="form" onSubmit={handleOtp}>
             <TextField fullWidth label={t("Verification Code")} name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
@@ -587,7 +629,7 @@ export default function SigninOrSignup() {
           </Box>
         )}
 
-        {(step === "password" || step === "set_password") && (() => {
+        {!loginClosed && (step === "password" || step === "set_password") && (() => {
           const isSetPassword = step === "set_password" || accountCreated;
           return (
             <Box component="form" onSubmit={handlePassword}>
@@ -607,7 +649,7 @@ export default function SigninOrSignup() {
           );
         })()}
 
-        {step === "recovery" && (
+        {!loginClosed && step === "recovery" && (
           <Box component="form" onSubmit={handleRecoveryRequest}>
             {showRecoveryMethodToggle && (
               <ToggleButtonGroup
@@ -642,7 +684,7 @@ export default function SigninOrSignup() {
           </Box>
         )}
 
-        {step === "recovery_otp" && (
+        {!loginClosed && step === "recovery_otp" && (
           <Box component="form" onSubmit={handleRecoveryConfirm}>
             <TextField fullWidth label={t("Verification Code")} name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
@@ -653,7 +695,7 @@ export default function SigninOrSignup() {
           </Box>
         )}
 
-        {step === "recovery_result" && (
+        {!loginClosed && step === "recovery_result" && (
           <Box textAlign="center">
             <Typography variant="h6" sx={{ mb: 2 }}>{t("Your username:")}</Typography>
             <Paper variant="outlined" sx={{ p: 2, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 3, mb: 3 }}>
@@ -669,7 +711,7 @@ export default function SigninOrSignup() {
           </Box>
         )}
 
-        {step === "password_recovery" && (
+        {!loginClosed && step === "password_recovery" && (
           <Box component="form" onSubmit={handlePasswordRecoveryRequest}>
             {showRecoveryMethodToggle && (
               <ToggleButtonGroup
@@ -704,7 +746,7 @@ export default function SigninOrSignup() {
           </Box>
         )}
 
-        {step === "password_recovery_otp" && (
+        {!loginClosed && step === "password_recovery_otp" && (
           <Box component="form" onSubmit={handlePasswordRecoveryConfirm}>
             <TextField fullWidth label={t("Verification Code")} name="code" value={form.code}
               onChange={onChange} autoFocus margin="normal" InputProps={{ sx: { borderRadius: 3 } }} />
