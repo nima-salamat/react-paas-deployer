@@ -49,7 +49,7 @@ export function rememberLoginIdentifier({ username = "", email = "", phone = "",
     username: String(username || "").trim().slice(0, 255),
     email: String(email || "").trim().slice(0, 255),
     phone: String(phone || "").trim().slice(0, 64),
-    method: ["email", "phone"].includes(method) ? method : "",
+    method: ["username", "email", "phone"].includes(method) ? method : "",
   };
   if (!safe.username && !safe.email && !safe.phone) return;
   try {
@@ -67,7 +67,7 @@ export function readLastLoginIdentifier(storage = safeStorage("localStorage")) {
       username: typeof value.username === "string" ? value.username.slice(0, 255) : "",
       email: typeof value.email === "string" ? value.email.slice(0, 255) : "",
       phone: typeof value.phone === "string" ? value.phone.slice(0, 64) : "",
-      method: ["email", "phone"].includes(value.method) ? value.method : "",
+      method: ["username", "email", "phone"].includes(value.method) ? value.method : "",
     };
   } catch {
     return {};
