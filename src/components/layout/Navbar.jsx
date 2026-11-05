@@ -231,7 +231,8 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
     if (!accessToken) {
       if (mountedRef.current) {
         setLoggedIn(false);
-      setIsStaff(false);
+        setIsStaff(false);
+        clearCachedNavbarState(window.localStorage);
         setUserImage(null);
         setCheckingAuth(false);
         profilesLoadedRef.current = false;
@@ -387,6 +388,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
       });
 
       setLoggedIn(true);
+      await refreshStaffFlag();
       await loadProfilesIfNeeded();
       if (fromMenu) closeDrawer();
     } catch (error) {
@@ -401,6 +403,7 @@ export default function Navbar({ themeMode = "system", onThemeModeChange, isAuth
       window.localStorage.setItem("auth_mode", "signin_or_signup");
       setLoggedIn(false);
       setIsStaff(false);
+      clearCachedNavbarState(window.localStorage);
       setUserImage(null);
       profilesLoadedRef.current = false;
       currentProfileIdRef.current = null;
