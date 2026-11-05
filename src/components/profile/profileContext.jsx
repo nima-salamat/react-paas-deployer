@@ -8,7 +8,8 @@ import React, {
   useState,
 } from "react";
 import apiRequest from "../customHooks/apiRequest";
-import { getSessionBoundAccessToken } from "../customHooks/authSession.js";
+import { getAuthCacheScope, getSessionBoundAccessToken } from "../customHooks/authSession.js";
+import { readProfileCache, writeProfileCache } from "./profileCache.js";
 
 const API_BASE = `https://${import.meta.env.VITE_API_BASE}/users/`;
 
@@ -66,6 +67,14 @@ function getProfileId(profile) {
   return profile.id ?? profile.pk ?? profile.uuid ?? null;
 }
 
+function normalizeProfiles(list) {
+  return list.map((profile) => ({
+    ...profile,
+    id: getProfileId(profile),
+    image_url: resolveProfileImageUrl(profile),
+  })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
 function friendlyErr(err, fallback = "Something went wrong.") {
   const data = err?.response?.data;
   if (!data) return err?.message || fallback;
@@ -89,70 +98,84 @@ function friendlyErr(err, fallback = "Something went wrong.") {
 const ProfileContext = createContext(null);
 
 export function ProfileProvider({ children }) {
-  const [profiles, setProfiles] = useState([]);
+  const initialScope = getAuthCacheScope();
+  const [profiles, setProfiles] = useState(() =>
+    normalizeProfiles(readProfileCache(initialScope) || []),
+  );
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [profileError, setProfileError] = useState("");
+  const activeScopeRef = useRef(initialScope);
   const inFlightRef = useRef(null);
 
   const fetchProfiles = useCallback(async () => {
-    if (!hasAccessToken()) {
+    const scope = getAuthCacheScope();
+    if (!scope) {
+      activeScopeRef.current = "";
       setProfiles([]);
       setLoadingProfiles(false);
       setProfileError("");
       return [];
     }
 
-    if (inFlightRef.current) return inFlightRef.current;
+    if (activeScopeRef.current !== scope) {
+      activeScopeRef.current = scope;
+      setProfiles(normalizeProfiles(readProfileCache(scope) || []));
+      setProfileError("");
+    }
+    if (inFlightRef.current?.scope === scope) return inFlightRef.current.promise;
 
+    const requestState = { scope, promise: null };
+    inFlightRef.current = requestState;
     setLoadingProfiles(true);
     setProfileError("");
 
-    const req = (async () => {
+    requestState.promise = (async () => {
       try {
         const response = await apiRequest({ url: `${API_BASE}profile/list/`, method: "GET" });
         const raw = response?.data;
-        const list = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.results)
-          ? raw.results
-          : Array.isArray(raw?.profiles)
-          ? raw.profiles
-          : [];
+        const list = Array.isArray(raw) ? raw
+          : Array.isArray(raw?.results) ? raw.results
+            : Array.isArray(raw?.profiles) ? raw.profiles : [];
+        const normalized = normalizeProfiles(list);
 
-        const normalized = list.map((p) => ({
-          ...p,
-          id: getProfileId(p),
-          image_url: resolveProfileImageUrl(p),
-        }));
-        normalized.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        setProfiles(normalized);
+        if (activeScopeRef.current === scope && getAuthCacheScope() === scope) {
+          // Store raw API objects, never token-bearing resolved image URLs.
+          writeProfileCache(scope, list);
+          setProfiles(normalized);
+        }
         return normalized;
       } catch (err) {
-        if (err?.response?.status === 401 || err?.response?.status === 403) {
-          setProfiles([]);
-          setProfileError("");
-          return [];
+        if (activeScopeRef.current === scope && getAuthCacheScope() === scope) {
+          if (err?.response?.status === 401 || err?.response?.status === 403) {
+            setProfiles([]);
+            setProfileError("");
+          } else {
+            // Preserve the previous successful snapshot during network failures.
+            setProfileError(friendlyErr(err, "Failed to fetch profiles"));
+          }
         }
-        setProfileError(friendlyErr(err, "Failed to fetch profiles"));
         return [];
       } finally {
-        setLoadingProfiles(false);
-        inFlightRef.current = null;
+        if (inFlightRef.current === requestState) {
+          inFlightRef.current = null;
+          setLoadingProfiles(false);
+        }
       }
     })();
-
-    inFlightRef.current = req;
-    return req;
+    return requestState.promise;
   }, []);
 
   useEffect(() => {
-    fetchProfiles();
-    const onAuth = () => fetchProfiles();
+    void fetchProfiles();
+    const onAuth = () => { void fetchProfiles(); };
+    const onStorage = (event) => {
+      if (!event || event.key === "access" || event.key === "refresh") void fetchProfiles();
+    };
     window.addEventListener("auth-changed", onAuth);
-    window.addEventListener("storage", onAuth);
+    window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("auth-changed", onAuth);
-      window.removeEventListener("storage", onAuth);
+      window.removeEventListener("storage", onStorage);
     };
   }, [fetchProfiles]);
 
