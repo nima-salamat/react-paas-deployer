@@ -323,7 +323,7 @@ export default function GlobalServiceControls({
           variant="contained"
           startIcon={<PlayArrowIcon />}
           onClick={() => startService()}
-          disabled={!service || serviceLoading || serviceBusy || !selectedDeployId}
+          disabled={managedByApplication || !service || serviceLoading || serviceBusy || !selectedDeployId}
           fullWidth={!compact}
           size={compact ? "small" : "medium"}
           sx={{ borderRadius: 1.5, fontWeight: 700, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
@@ -336,7 +336,7 @@ export default function GlobalServiceControls({
           startIcon={<RefreshIcon />}
           onClick={handleRebuildClick}
           disabled={
-            !service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId
+            managedByApplication || !service || serviceLoading || serviceBusy || rebuildLoading || !selectedDeployId
           }
           fullWidth={!compact}
           size={compact ? "small" : "medium"}
@@ -354,7 +354,7 @@ export default function GlobalServiceControls({
             color="error"
             startIcon={<CancelIcon />}
             onClick={() => forceCancelDeploy?.()}
-            disabled={!service || forceCancelLoading || !forceCancelDeploy}
+            disabled={managedByApplication || !service || forceCancelLoading || !forceCancelDeploy}
             fullWidth={!compact}
             size={compact ? "small" : "medium"}
             title="Stop deploy immediately and remove intermediate containers/images"
@@ -368,7 +368,7 @@ export default function GlobalServiceControls({
           color="error"
           startIcon={<StopIcon />}
           onClick={stopService}
-          disabled={!service || serviceLoading || serviceBusy}
+          disabled={managedByApplication || !service || serviceLoading || serviceBusy}
           fullWidth={!compact}
           size={compact ? "small" : "medium"}
           sx={{ borderRadius: 1.5, fontWeight: 600, textTransform: "none", py: compact ? 0.75 : 1, flex: compact ? "1 1 40%" : undefined, minWidth: compact ? 0 : undefined }}
