@@ -692,7 +692,7 @@ export default function ReadyAppInstallation() {
         )}
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1} alignItems={{ xs: "stretch", sm: "center" }}>
-          {!["running", "stopping", "failed", "cancelled"].includes(status) && (
+          {!["running", "stopping", "failed", "cancelled"].includes(status) && !installation.runtime_operation && (
             <Button
               color="warning"
               variant="outlined"
