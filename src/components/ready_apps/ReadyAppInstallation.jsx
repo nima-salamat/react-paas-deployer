@@ -345,7 +345,7 @@ export default function ReadyAppInstallation() {
       ""
   ).trim();
   const serviceRows = installation?.services || [];
-  const canStartAll = ["stopped", "degraded"].includes(status);
+  const canStartAll = status === "stopped";
   const canStopAll = ["running", "degraded"].includes(status);
   const runtimeActionBusy = Boolean(runtimeAction || cancelling || deleting || cleanupDeletePending);
   const serviceMetricsKey = serviceRows.map((item) => String(item?.service_id || "")).filter(Boolean).join(",");
@@ -525,7 +525,9 @@ export default function ReadyAppInstallation() {
                 Application services
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Start and stop the complete stack in dependency-safe order.
+                {status === "degraded"
+                  ? "Stop All first to confirm every service is stopped before starting the application again."
+                  : "Start and stop the complete stack in dependency-safe order."}
               </Typography>
             </Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ flexShrink: 0 }}>
