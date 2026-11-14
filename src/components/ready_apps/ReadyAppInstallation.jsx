@@ -347,7 +347,9 @@ export default function ReadyAppInstallation() {
   const serviceRows = installation?.services || [];
   const stoppedParentHasActiveChildren =
     status === "stopped" && serviceRows.some(
-      (service) => String(service?.status || "").toLowerCase() !== "stopped"
+      (service) =>
+        String(service?.status || "").toLowerCase() !== "stopped" ||
+        String(service?.desired_state || "").toLowerCase() !== "stopped"
     );
   const canStartAll = status === "stopped" && !stoppedParentHasActiveChildren;
   const canStopAll =
