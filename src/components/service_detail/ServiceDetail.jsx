@@ -2115,6 +2115,12 @@ export default function ServiceDetail({ themeMode = "system", onThemeModeChange 
               volumeCapabilities={volumeCapabilities}
               onPurgeRuntime={handlePurgeRuntime}
               purgeRuntimeLoading={volumeActionLoading}
+              managedByApplication={catalogManaged}
+              onOpenManagedApplication={
+                service?.application_instance_id
+                  ? () => navigate("/dashboard/ready-apps/installations/" + service.application_instance_id)
+                  : undefined
+              }
               availablePlans={availablePlans}
               plansLoading={plansLoading}
               plansError={plansLoadError}
