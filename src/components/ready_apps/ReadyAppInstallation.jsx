@@ -32,6 +32,8 @@ import MemoryRoundedIcon from "@mui/icons-material/MemoryRounded";
 import StorageRoundedIcon from "@mui/icons-material/StorageRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import MiscellaneousServicesRoundedIcon from "@mui/icons-material/MiscellaneousServicesRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import StopRoundedIcon from "@mui/icons-material/StopRounded";
 import apiRequest from "../customHooks/apiRequest";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -53,6 +55,11 @@ function pretty(value) {
     readiness: "Checking the app",
     finished: "Finishing up",
     application_ready: "Ready",
+    starting_services: "Starting services",
+    stopping_services: "Stopping services",
+    runtime_start_failed: "Start All failed",
+    runtime_stop_failed: "Stop All could not finish",
+    stopping: "Stopping",
     cancellation_requested: "Stopping safely",
     cancellation_cleanup: "Cleaning up",
     cancelled: "Cancelled",
@@ -69,7 +76,7 @@ function statusColor(status) {
   const value = String(status || "").toLowerCase();
   if (value === "running") return "success";
   if (value === "failed") return "error";
-  if (value === "cancelled" || value === "degraded") return "warning";
+  if (value === "cancelled" || value === "degraded" || value === "stopping") return "warning";
   return "default";
 }
 
@@ -97,6 +104,7 @@ export default function ReadyAppInstallation() {
   const [error, setError] = useState("");
   const [polling, setPolling] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  const [runtimeAction, setRuntimeAction] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [cleanupDeletePending, setCleanupDeletePending] = useState(false);
   const [actionDialog, setActionDialog] = useState(null);
@@ -127,7 +135,7 @@ export default function ReadyAppInstallation() {
           cleanupPending && locationPathRef.current === installationPath;
         setPolling(
           !cleanupPending &&
-          (!["running", "stopped", "failed"].includes(nextStatus) &&
+          (!["running", "stopped", "degraded", "failed"].includes(nextStatus) &&
             !(nextStatus === "cancelled" && !cleanupPending))
         );
       } catch (err) {
@@ -233,7 +241,7 @@ export default function ReadyAppInstallation() {
             Array.isArray(response.data?.services) &&
             response.data.services.length > 0);
         setCleanupDeletePending(cleanupPending);
-        if (cleanupPending || ["running", "stopped", "failed"].includes(nextStatus)) {
+        if (cleanupPending || ["running", "stopped", "degraded", "failed"].includes(nextStatus)) {
           setPolling(false);
         }
       } catch (err) {
@@ -266,6 +274,24 @@ export default function ReadyAppInstallation() {
     }
   };
 
+  const runRuntimeAction = async (action) => {
+    if (!id || !["start", "stop"].includes(action)) return;
+    setRuntimeAction(action);
+    setError("");
+    try {
+      const response = await apiRequest({
+        method: "POST",
+        url: ROOT + "/installations/" + encodeURIComponent(id) + "/" + action + "/",
+        data: {},
+      });
+      setInstallation(response.data);
+      setPolling(true);
+    } catch (err) {
+      setError(String(err?.response?.data?.detail || err?.response?.data?.error || "The application lifecycle action failed."));
+    } finally {
+      setRuntimeAction("");
+    }
+  };
   const deleteInstallation = async () => {
     const shouldNavigateAfterDelete =
       locationPathRef.current === installationPath;
@@ -319,6 +345,9 @@ export default function ReadyAppInstallation() {
       ""
   ).trim();
   const serviceRows = installation?.services || [];
+  const canStartAll = ["stopped", "degraded"].includes(status);
+  const canStopAll = ["running", "degraded"].includes(status);
+  const runtimeActionBusy = Boolean(runtimeAction || cancelling || deleting || cleanupDeletePending);
   const serviceMetricsKey = serviceRows.map((item) => String(item?.service_id || "")).filter(Boolean).join(",");
 
   const refreshServiceMetrics = useCallback(async (rows) => {
@@ -477,6 +506,53 @@ export default function ReadyAppInstallation() {
           {error && <Alert severity="warning" sx={{ mt: 2, borderRadius: 2 }}>{error}</Alert>}
         </Paper>
 
+        {serviceRows.length > 0 && !deletionPending ? (
+          <Paper
+            variant="outlined"
+            sx={{
+              borderRadius: 2.5,
+              px: { xs: 1.8, sm: 2.2 },
+              py: 1.8,
+              display: "flex",
+              alignItems: { xs: "stretch", sm: "center" },
+              justifyContent: "space-between",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 1.5,
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 850 }}>
+                Application services
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Start and stop the complete stack in dependency-safe order.
+              </Typography>
+            </Box>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ flexShrink: 0 }}>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={runtimeAction === "start" ? <CircularProgress size={16} color="inherit" /> : <PlayArrowRoundedIcon />}
+                onClick={() => runRuntimeAction("start")}
+                disabled={!canStartAll || runtimeActionBusy}
+                sx={{ borderRadius: 1.7, fontWeight: 800, minWidth: { sm: 132 } }}
+              >
+                {runtimeAction === "start" ? "Starting…" : "Start All"}
+              </Button>
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={runtimeAction === "stop" ? <CircularProgress size={16} color="inherit" /> : <StopRoundedIcon />}
+                onClick={() => runRuntimeAction("stop")}
+                disabled={!canStopAll || runtimeActionBusy}
+                sx={{ borderRadius: 1.7, fontWeight: 800, minWidth: { sm: 132 } }}
+              >
+                {runtimeAction === "stop" ? "Stopping…" : "Stop All"}
+              </Button>
+            </Stack>
+          </Paper>
+        ) : null}
+
         <Grid container spacing={2}>
           <Grid item xs={12} md={12}>
             <Card variant="outlined" sx={{ borderRadius: 3, height: "100%" }}>
@@ -616,7 +692,7 @@ export default function ReadyAppInstallation() {
         )}
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.1} alignItems={{ xs: "stretch", sm: "center" }}>
-          {!["running", "failed", "cancelled"].includes(status) && (
+          {!["running", "stopping", "failed", "cancelled"].includes(status) && (
             <Button
               color="warning"
               variant="outlined"
@@ -629,7 +705,7 @@ export default function ReadyAppInstallation() {
             </Button>
           )}
 
-          {["running", "stopped", "degraded", "failed"].includes(status) && (
+          {["running", "stopping", "stopped", "degraded", "failed"].includes(status) && (
             <Button
               color="error"
               variant="outlined"
