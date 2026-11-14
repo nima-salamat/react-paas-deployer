@@ -346,7 +346,11 @@ export default function ReadyAppInstallation() {
   ).trim();
   const serviceRows = installation?.services || [];
   const canStartAll = status === "stopped";
-  const canStopAll = ["running", "degraded"].includes(status);
+  const canStopAll =
+    ["running", "degraded"].includes(status) ||
+    (status === "stopped" && serviceRows.some(
+      (service) => String(service?.status || "").toLowerCase() !== "stopped"
+    ));
   const runtimeActionBusy = Boolean(runtimeAction || cancelling || deleting || cleanupDeletePending);
   const serviceMetricsKey = serviceRows.map((item) => String(item?.service_id || "")).filter(Boolean).join(",");
 
