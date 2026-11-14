@@ -475,6 +475,8 @@ export default function SettingsPanel({
   purgeRuntimeLoading = false,
   onDeleteService,
   deleteServiceLoading = false,
+  managedByApplication = false,
+  onOpenManagedApplication,
   availablePlans,
   plansLoading,
   plansError = "",
@@ -1412,7 +1414,22 @@ export default function SettingsPanel({
           subtitle={t("Destructive actions. Runtime must be removed before volume topology changes.")}
         />
 
-        <Stack spacing={1.5}>
+        {managedByApplication ? (
+          <Alert
+            severity="info"
+            sx={{ borderRadius: 2, alignItems: "center" }}
+            action={
+              onOpenManagedApplication ? (
+                <Button color="inherit" size="small" onClick={onOpenManagedApplication}>
+                  Open Ready App
+                </Button>
+              ) : null
+            }
+          >
+            This service is owned by a Ready App. Runtime removal and individual deletion are disabled here; manage the complete application from its parent.
+          </Alert>
+        ) : (
+          <Stack spacing={1.5}>
           <Paper variant="outlined" sx={{ p: 1.75, borderRadius: 2, borderColor: "divider" }}>
             <Stack
               direction={{ xs: "column", sm: "row" }}
@@ -1473,7 +1490,8 @@ export default function SettingsPanel({
               </Button>
             </Stack>
           </Paper>
-        </Stack>
+          </Stack>
+        )}
       </Paper>
 
       {/* ═══════════ Create Network Dialog ═══════════ */}
