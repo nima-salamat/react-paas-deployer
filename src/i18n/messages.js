@@ -16,6 +16,9 @@ const fa = {
   "Services": "سرویس‌ها",
   "Deployed Apps": "اپلیکیشن‌های دیپلوی‌شده",
   "Start All": "شروع همه",
+  "Open Ready App": "باز کردن Ready App",
+  "This service is owned by a Ready App. Runtime removal and individual deletion are disabled here; manage the complete application from its parent.": "این سرویس تحت مالکیت یک Ready App است. حذف runtime و حذف تکی از این بخش غیرفعال است؛ کل اپلیکیشن را از صفحهٔ والد مدیریت کنید.",
+
   "Stop All": "توقف همه",
   "Starting…": "در حال شروع…",
   "Stopping…": "در حال توقف…",
